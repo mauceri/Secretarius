@@ -1,0 +1,2 @@
+# Minimal runtime dependencies for Secretarius phase-1
+requests>=2.31
