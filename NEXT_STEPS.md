@@ -1,60 +1,141 @@
-# Secretarius - Reprise rapide
+# Secretarius - Document de travail (19 fevrier 2026)
 
-## État actuel (16 février 2026)
-- Contrat JSON phase 1 implémenté:
-  - `ordre_chunk` (index 0..n-1)
-  - `chunk`
-  - `expressions_caracteristiques`
-- Pipeline locale en place (`chunking -> extraction`) avec validation runtime stricte.
-- CLI extraction disponible: `python -m secretarius.cli`.
-- Serveur HTTP local disponible:
-  - `GET /health`
-  - `POST /extract`
-- Tests: `11 passed, 1 skipped`.
+## 1) Ce qui est en place depuis le dernier commit
 
-## Commandes pour reprendre
-```bash
-cd /home/mauceric/Secretarius
-source ../secretarius_venv/bin/activate
-python -m pytest
+### Serveur MCP
+- Serveur MCP fonctionnel via `run_secretarius_mcp.py` + `secretarius/mcp_server.py`.
+- Compatible OpenClaw (`openclaw_mcp_adapter`) en transport `stdio`.
+- Outils exposes:
+  1. `extract_expressions`
+  2. `expressions_to_embeddings`
+  3. `semantic_graph_search`
+
+### Outil 1 - Extraction d'expressions
+- Chunking semantique actif (vendor local: `secretarius/vendor/chunk_data.py`).
+- Prompt local interne au repo:
+  - `secretarius/prompts/prompt.txt`
+- Appel LLM via `llama.cpp` (`/v1/chat/completions`).
+- Filtre verbatim applique:
+  - une expression est conservee seulement si elle apparait telle quelle dans le texte.
+- Sortie enrichie:
+  - `chunks`
+  - `by_chunk` (expressions par chunk)
+  - `expressions` (dedup)
+  - `request_fingerprint`
+  - `inference_params`
+  - debug optionnel (`raw_llm_outputs`)
+
+### Outil 2 - Plongements
+- `expressions_to_embeddings` implemente (plus un stub).
+- Modele par defaut:
+  - `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`
+- Espace latent:
+  - dimension `384`
+- Parametres exposes:
+  - `model` (optionnel)
+  - `normalize` (bool)
+  - `batch_size` (int)
+
+### Outil 3 - Graphe semantique sur base
+- `semantic_graph_search` implemente sur Milvus (plus un stub).
+- Flux unifie:
+  - option d'insertion (documents fournis) + recherche dans le meme appel.
+- Retour:
+  - `graph.nodes`, `graph.edges`
+  - `hits`
+  - `inserted_count`, `query_count`
+  - `warning`
+- Compatibilite Milvus 2.2:
+  - `COSINE` mappe vers `IP` (avec embeddings normalises).
+
+### Infra Milvus
+- Stack docker compose prete dans `infra/milvus`.
+- Validation realisee:
+  - demarrage OK
+  - healthcheck OK
+  - test insertion+recherche OK via `semantic_graph_search`.
+
+## 2) Orientation produit (idees valides)
+
+### Tout est "note"
+Unite documentaire unique: la note.
+- une note peut etre brute, lecture, synthese, capture, brouillon, etc.
+- les chunks sont une vue technique de la note.
+- les expressions sont une vue semantique de granularite fine.
+
+### Switch de persistance
+Pour `semantic_graph_search`, garder un commutateur simple:
+- `upsert=false`: requete seule
+- `upsert=true`: insertion + requete
+
+## 3) Proposition de structure de metadonnees (bio-friendly)
+
+Objectif: garder des champs humains comprehensibles, sans perdre la tracabilite technique.
+
+### Niveau note (`source_metadata`)
+```json
+{
+  "source_id": "note:2026-02-19:001",
+  "title": "Titre humain",
+  "note_type": "lecture",
+  "status": "draft",
+  "importance": 3,
+  "confidentiality": "internal",
+  "themes": ["histoire", "poesie"],
+  "keywords": ["mort", "seigneurie"],
+  "language": "fr",
+  "author": "mauceric",
+  "created_at": "2026-02-19T15:00:00Z",
+  "updated_at": "2026-02-19T15:00:00Z"
+}
 ```
 
-## Exécuter la CLI
-```bash
-python -m secretarius.cli \
-  --text "Le camail est vert. Le voile est blanc." \
-  --min-sentences 1 \
-  --max-sentences 1 \
-  --pretty
+### Niveau chunk (`chunk_metadata`)
+```json
+{
+  "chunk_id": "chunk:sha256:...",
+  "source_id": "note:2026-02-19:001",
+  "chunk_index": 0,
+  "char_start": 0,
+  "char_end": 420,
+  "status": "draft",
+  "confidentiality": "internal",
+  "themes": ["histoire", "poesie"]
+}
 ```
 
-## Exécuter le serveur HTTP
-```bash
-python -m secretarius.serve --host 0.0.0.0 --port 8090
+### Niveau expression (`expression_metadata`)
+```json
+{
+  "expression_id": "expr:sha256:...",
+  "source_id": "note:2026-02-19:001",
+  "chunk_id": "chunk:sha256:...",
+  "expression_text": "chambre aux deniers",
+  "origin": "auto",
+  "human_score": null
+}
 ```
 
-### Vérification rapide
-```bash
-curl -s http://localhost:8090/health
-curl -s http://localhost:8090/extract \
-  -H 'Content-Type: application/json' \
-  -d '{"text":"Le camail est vert. Le voile est blanc.","min_sentences":1,"max_sentences":1}'
-```
+## 4) Orchestration cible des 3 outils
 
-## Fichiers clés
-- `secretarius/pipeline.py`: chunking, extraction, contrat JSON, validation.
-- `secretarius/cli.py`: point d’entrée CLI extraction.
-- `secretarius/server.py`: logique endpoint `/extract`.
-- `secretarius/serve.py`: lancement serveur HTTP.
-- `infra/milvus/compose.yml`: stack Milvus versionnée (etcd/minio/milvus).
-- `infra/milvus/.env.example`: variables d'environnement Milvus.
-- `infra/milvus/README.md`: démarrage et migration des données.
-- `tests/test_pipeline_contract.py`: contrat et validation.
-- `tests/test_cli_contract.py`: contrat via CLI.
-- `tests/test_server_contract.py`: contrat via endpoint HTTP.
+1. `extract_expressions(text, source_metadata)`  
+Sorties:
+- chunks
+- expressions par chunk
+- liste globale dedup
 
-## Prochaines étapes recommandées
-1. Ajouter un endpoint `POST /extract/batch` pour traiter plusieurs textes en une requête.
-2. Ajouter retries/timeouts configurables et logs structurés côté extracteur HTTP.
-3. Ajouter tests d’intégration smoke contre un vrai `llama-server` local (`RUN_LLAMA_SMOKE=1`).
-4. Introduire schéma JSON versionné (ex: `contract_version`) pour geler l’API.
+2. `expressions_to_embeddings(expressions, metadata_refs)`  
+Sorties:
+- embeddings alignes expression par expression
+
+3. `semantic_graph_search(embeddings, documents, upsert, filters)`  
+Sorties:
+- hits
+- graphe de similarite ponderee
+
+## 5) Prochaines actions recommandees
+
+1. Ajouter `source_id` en entree de `extract_expressions` et le propager partout.
+2. Ajouter `upsert` et `filters` dans `semantic_graph_search`.
+3. Formaliser un schema JSON versionne (`contract_version`).
+4. Ajouter tests d'integration e2e (extract -> embed -> graph).

@@ -10,6 +10,7 @@ Secretarius est un assistant local et frugal orienté mémoire documentaire:
 - Serveur HTTP local:
   - `GET /health`
   - `POST /extract`
+- Serveur MCP (stubs): `python -m secretarius.mcp_serve`
 - Tests: `python -m pytest`
 
 ## Démarrage rapide
@@ -18,6 +19,20 @@ cd /home/mauceric/Secretarius
 source .venv/bin/activate
 python -m pytest
 ```
+
+## MCP
+
+Le serveur MCP expose trois outils:
+- `extract_expressions`
+- `expressions_to_embeddings`
+- `semantic_graph_search`
+
+Etat courant:
+- `extract_expressions`: implemente (llama.cpp + chunking)
+- `expressions_to_embeddings`: implemente (multilingue, dimension 384)
+- `semantic_graph_search`: implemente (Milvus, mode unifie insertion/recherche)
+
+Documentation d'integration OpenClaw: `docs_mcp_openclaw.md`.
 
 ## Milvus (infra)
 La configuration Milvus est versionnée dans `infra/milvus`, avec données persistantes hors dépôt.

@@ -1,0 +1,338 @@
+from __future__ import annotations
+
+import importlib.util
+import hashlib
+import json
+import os
+import re
+import sys
+from pathlib import Path
+from typing import Any
+from urllib import error as urlerror
+from urllib import request as urlrequest
+
+
+SECRETARIUS_ROOT = Path(__file__).resolve().parent
+DEFAULT_PROMPT_PATH = SECRETARIUS_ROOT / "prompts" / "prompt.txt"
+CHUNK_DATA_PATH = SECRETARIUS_ROOT / "vendor" / "chunk_data.py"
+NLTK_DATA_PATH = Path("/home/mauceric/Secretarius/.nltk_data")
+HF_CACHE_MODEL_ROOT = Path("/home/mauceric/.cache/huggingface/hub/models--sentence-transformers--paraphrase-multilingual-MiniLM-L12-v2")
+_CACHED_CHUNKER: Any | None = None
+
+_JSON_CODEBLOCK_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
+
+
+def extract_expressions_with_llama(
+    text: str,
+    *,
+    llama_url: str = "http://127.0.0.1:8080/v1/chat/completions",
+    model: str = "phi4",
+    timeout_s: float = 120.0,
+    max_tokens: int = 512,
+    prompt_path: str | None = None,
+    seed: int = 42,
+    debug_return_raw: bool = False,
+) -> dict[str, Any]:
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return {"chunks": [], "by_chunk": [], "expressions": [], "warning": "empty input text"}
+
+    system_prompt = _load_prompt_text(prompt_path)
+    if system_prompt is None:
+        return {"chunks": [], "by_chunk": [], "expressions": [], "warning": "unable to load prompt"}
+
+    chunker, chunker_warning = _load_chunker()
+    if chunker is None:
+        return {"chunks": [], "by_chunk": [], "expressions": [], "warning": chunker_warning}
+
+    try:
+        chunks = chunker.chunk(cleaned)  # type: ignore[attr-defined]
+    except Exception as exc:
+        return {"chunks": [], "by_chunk": [], "expressions": [], "warning": f"chunking failed: {exc}"}
+    chunks = [c for c in chunks if isinstance(c, str) and c.strip()]
+    if not chunks:
+        return {"chunks": [], "by_chunk": [], "expressions": [], "warning": "chunker returned no chunks"}
+
+    by_chunk: list[dict[str, Any]] = []
+    all_expressions: list[str] = []
+    warnings: list[str] = []
+    filtered_out_total = 0
+
+    for idx, chunk_text in enumerate(chunks):
+        parsed, warn, removed, raw_output = _extract_expressions_for_single_text(
+            chunk_text,
+            system_prompt=system_prompt,
+            llama_url=llama_url,
+            model=model,
+            timeout_s=timeout_s,
+            max_tokens=max_tokens,
+            seed=seed,
+        )
+        if warn:
+            warnings.append(f"chunk {idx}: {warn}")
+        filtered_out_total += removed
+        by_chunk.append(
+            {
+                "id": idx,
+                "chunk": chunk_text,
+                "expressions": parsed,
+                "request_fingerprint": _request_fingerprint(
+                    text=chunk_text,
+                    system_prompt=system_prompt,
+                    llama_url=llama_url,
+                    model=model,
+                    timeout_s=timeout_s,
+                    max_tokens=max_tokens,
+                    seed=seed,
+                ),
+                **({"raw_llm_output": raw_output} if debug_return_raw else {}),
+            }
+        )
+        all_expressions.extend(parsed)
+
+    dedup: list[str] = []
+    seen: set[str] = set()
+    for expr in all_expressions:
+        if expr not in seen:
+            dedup.append(expr)
+            seen.add(expr)
+
+    if filtered_out_total:
+        warnings.append(f"filtered out {filtered_out_total} non-verbatim expressions")
+    result = {
+        "chunks": chunks,
+        "by_chunk": by_chunk,
+        "expressions": dedup,
+        "request_fingerprint": _request_fingerprint(
+            text=cleaned,
+            system_prompt=system_prompt,
+            llama_url=llama_url,
+            model=model,
+            timeout_s=timeout_s,
+            max_tokens=max_tokens,
+            seed=seed,
+        ),
+        "inference_params": {
+            "temperature": 0.0,
+            "top_p": 1.0,
+            "top_k": 1,
+            "repeat_penalty": 1.0,
+            "seed": seed,
+        },
+        "warning": " | ".join(warnings) if warnings else None,
+    }
+    if debug_return_raw:
+        result["raw_llm_outputs"] = [entry.get("raw_llm_output", "") for entry in by_chunk]
+    return result
+
+
+def _extract_expressions_for_single_text(
+    text: str,
+    *,
+    system_prompt: str,
+    llama_url: str,
+    model: str,
+    timeout_s: float,
+    max_tokens: int,
+    seed: int,
+) -> tuple[list[str], str | None, int, str]:
+    user_prompt = (
+        "Quelles sont les expressions clés contenues à l'identique dans ce texte :\n"
+        f"{text}"
+    )
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "max_tokens": max_tokens,
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "top_k": 1,
+        "repeat_penalty": 1.0,
+        "seed": seed,
+        "stream": False,
+    }
+    raw, req_warning = _post_chat_completion(llama_url=llama_url, payload=payload, timeout_s=timeout_s)
+    if raw is None:
+        return [], req_warning, 0, ""
+
+    parsed, parse_warning = _parse_expressions_output(raw)
+    if parsed is None:
+        return [], parse_warning, 0, raw
+
+    filtered, removed = _filter_verbatim_expressions(text, parsed)
+    warning = _merge_warnings(parse_warning)
+    return filtered, warning, removed, raw
+
+
+def _load_prompt_text(prompt_path: str | None) -> str | None:
+    target = Path(prompt_path) if prompt_path else DEFAULT_PROMPT_PATH
+    try:
+        return target.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+
+
+def _load_chunker() -> tuple[Any | None, str | None]:
+    global _CACHED_CHUNKER
+    if _CACHED_CHUNKER is not None:
+        return _CACHED_CHUNKER, None
+    if not CHUNK_DATA_PATH.exists():
+        return None, f"missing chunker module: {CHUNK_DATA_PATH}"
+
+    try:
+        os.environ.setdefault("NLTK_DATA", str(NLTK_DATA_PATH))
+        os.environ.setdefault("HF_HUB_OFFLINE", "1")
+        os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+        os.environ.setdefault("SECRETARIUS_LOCAL_FILES_ONLY", "1")
+        local_model_path = _detect_local_sentence_model_path()
+        if local_model_path is not None:
+            os.environ.setdefault("SECRETARIUS_SENTENCE_MODEL", str(local_model_path))
+
+        spec = importlib.util.spec_from_file_location("secretarius_vendor_chunk_data", CHUNK_DATA_PATH)
+        if spec is None or spec.loader is None:
+            return None, "unable to load chunk_data.py spec"
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        _CACHED_CHUNKER = module.SemanticChunker()
+        return _CACHED_CHUNKER, None
+    except Exception as exc:
+        return None, f"unable to initialize SemanticChunker: {exc}"
+
+
+def _detect_local_sentence_model_path() -> Path | None:
+    snapshots_dir = HF_CACHE_MODEL_ROOT / "snapshots"
+    if not snapshots_dir.exists():
+        return None
+    candidates = [p for p in snapshots_dir.iterdir() if p.is_dir()]
+    if not candidates:
+        return None
+    candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return candidates[0]
+
+
+def _post_chat_completion(*, llama_url: str, payload: dict[str, Any], timeout_s: float) -> tuple[str | None, str | None]:
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    req = urlrequest.Request(
+        llama_url,
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlrequest.urlopen(req, timeout=timeout_s) as resp:
+            raw = resp.read()
+    except (urlerror.URLError, TimeoutError) as exc:
+        return None, f"llama-server request failed: {exc}"
+
+    try:
+        parsed = json.loads(raw.decode("utf-8"))
+        content = parsed["choices"][0]["message"]["content"]
+    except Exception as exc:
+        return None, f"invalid llama-server response shape: {exc}"
+    return str(content), None
+
+
+def _parse_expressions_output(content: str) -> tuple[list[str] | None, str | None]:
+    candidates = [content.strip()]
+    match = _JSON_CODEBLOCK_RE.search(content or "")
+    if match:
+        candidates.append(match.group(1).strip())
+    candidates.append(_extract_json(content))
+
+    last_err = "no parseable json output"
+    for candidate in candidates:
+        if not candidate:
+            continue
+        try:
+            parsed = json.loads(candidate)
+        except Exception as exc:
+            last_err = str(exc)
+            continue
+
+        if isinstance(parsed, list):
+            if all(isinstance(x, str) for x in parsed):
+                return [x for x in parsed if x.strip()], None
+            return None, "json output list must contain only strings"
+        if isinstance(parsed, dict):
+            # tolerate wrappers if model returns {"expressions":[...]}
+            exprs = parsed.get("expressions")
+            if isinstance(exprs, list) and all(isinstance(x, str) for x in exprs):
+                return [x for x in exprs if x.strip()], "json wrapper object detected"
+            return None, "json output object does not contain string list 'expressions'"
+        if isinstance(parsed, str):
+            # nested JSON string
+            nested, nested_warn = _parse_expressions_output(parsed)
+            if nested is not None:
+                return nested, _merge_warnings("nested json string output", nested_warn)
+            return None, nested_warn or "nested json string unparsable"
+
+        return None, f"unsupported json type: {type(parsed).__name__}"
+    return None, f"unable to parse llm json output: {last_err}"
+
+
+def _extract_json(text: str) -> str:
+    t = (text or "").strip()
+    start = t.find("[")
+    if start != -1:
+        end = t.rfind("]")
+        if end != -1 and end > start:
+            return t[start : end + 1]
+    start_obj = t.find("{")
+    if start_obj != -1:
+        end_obj = t.rfind("}")
+        if end_obj != -1 and end_obj > start_obj:
+            return t[start_obj : end_obj + 1]
+    return t
+
+
+def _filter_verbatim_expressions(text: str, expressions: list[str]) -> tuple[list[str], int]:
+    out: list[str] = []
+    removed = 0
+    seen: set[str] = set()
+    for expr in expressions:
+        if not expr or expr in seen:
+            continue
+        if expr in text:
+            out.append(expr)
+            seen.add(expr)
+        else:
+            removed += 1
+    return out, removed
+
+
+def _merge_warnings(*warnings: str | None) -> str | None:
+    parts = [w for w in warnings if isinstance(w, str) and w.strip()]
+    if not parts:
+        return None
+    return " | ".join(parts)
+
+
+def _request_fingerprint(
+    *,
+    text: str,
+    system_prompt: str,
+    llama_url: str,
+    model: str,
+    timeout_s: float,
+    max_tokens: int,
+    seed: int,
+) -> str:
+    payload = {
+        "text": text,
+        "system_prompt": system_prompt,
+        "llama_url": llama_url,
+        "model": model,
+        "timeout_s": timeout_s,
+        "max_tokens": max_tokens,
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "top_k": 1,
+        "repeat_penalty": 1.0,
+        "seed": seed,
+    }
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
