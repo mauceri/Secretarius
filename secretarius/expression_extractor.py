@@ -20,6 +20,7 @@ HF_CACHE_MODEL_ROOT = Path("/home/mauceric/.cache/huggingface/hub/models--senten
 _CACHED_CHUNKER: Any | None = None
 
 _JSON_CODEBLOCK_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
+_JSON_STRING_RE = re.compile(r'"((?:\\.|[^"\\])*)"')
 
 
 def extract_expressions_with_llama(
@@ -32,6 +33,7 @@ def extract_expressions_with_llama(
     prompt_path: str | None = None,
     seed: int = 42,
     debug_return_raw: bool = False,
+    per_chunk_llm: bool = False,
 ) -> dict[str, Any]:
     cleaned = (text or "").strip()
     if not cleaned:
@@ -58,9 +60,41 @@ def extract_expressions_with_llama(
     warnings: list[str] = []
     filtered_out_total = 0
 
-    for idx, chunk_text in enumerate(chunks):
-        parsed, warn, removed, raw_output = _extract_expressions_for_single_text(
-            chunk_text,
+    if per_chunk_llm:
+        for idx, chunk_text in enumerate(chunks):
+            parsed, warn, removed, raw_output = _extract_expressions_for_single_text(
+                chunk_text,
+                system_prompt=system_prompt,
+                llama_url=llama_url,
+                model=model,
+                timeout_s=timeout_s,
+                max_tokens=max_tokens,
+                seed=seed,
+            )
+            if warn:
+                warnings.append(f"chunk {idx}: {warn}")
+            filtered_out_total += removed
+            by_chunk.append(
+                {
+                    "id": idx,
+                    "chunk": chunk_text,
+                    "expressions": parsed,
+                    "request_fingerprint": _request_fingerprint(
+                        text=chunk_text,
+                        system_prompt=system_prompt,
+                        llama_url=llama_url,
+                        model=model,
+                        timeout_s=timeout_s,
+                        max_tokens=max_tokens,
+                        seed=seed,
+                    ),
+                    **({"raw_llm_output": raw_output} if debug_return_raw else {}),
+                }
+            )
+            all_expressions.extend(parsed)
+    else:
+        parsed_global, warn_global, removed_global, raw_global = _extract_expressions_for_single_text(
+            cleaned,
             system_prompt=system_prompt,
             llama_url=llama_url,
             model=model,
@@ -68,27 +102,29 @@ def extract_expressions_with_llama(
             max_tokens=max_tokens,
             seed=seed,
         )
-        if warn:
-            warnings.append(f"chunk {idx}: {warn}")
-        filtered_out_total += removed
-        by_chunk.append(
-            {
-                "id": idx,
-                "chunk": chunk_text,
-                "expressions": parsed,
-                "request_fingerprint": _request_fingerprint(
-                    text=chunk_text,
-                    system_prompt=system_prompt,
-                    llama_url=llama_url,
-                    model=model,
-                    timeout_s=timeout_s,
-                    max_tokens=max_tokens,
-                    seed=seed,
-                ),
-                **({"raw_llm_output": raw_output} if debug_return_raw else {}),
-            }
-        )
-        all_expressions.extend(parsed)
+        if warn_global:
+            warnings.append(f"global: {warn_global}")
+        filtered_out_total += removed_global
+        all_expressions.extend(parsed_global)
+        for idx, chunk_text in enumerate(chunks):
+            chunk_exprs = [expr for expr in parsed_global if expr in chunk_text]
+            by_chunk.append(
+                {
+                    "id": idx,
+                    "chunk": chunk_text,
+                    "expressions": chunk_exprs,
+                    "request_fingerprint": _request_fingerprint(
+                        text=chunk_text,
+                        system_prompt=system_prompt,
+                        llama_url=llama_url,
+                        model=model,
+                        timeout_s=timeout_s,
+                        max_tokens=max_tokens,
+                        seed=seed,
+                    ),
+                    **({"raw_llm_output": raw_global} if debug_return_raw else {}),
+                }
+            )
 
     dedup: list[str] = []
     seen: set[str] = set()
@@ -118,6 +154,7 @@ def extract_expressions_with_llama(
             "top_k": 1,
             "repeat_penalty": 1.0,
             "seed": seed,
+            "per_chunk_llm": per_chunk_llm,
         },
         "warning": " | ".join(warnings) if warnings else None,
     }
@@ -271,6 +308,15 @@ def _parse_expressions_output(content: str) -> tuple[list[str] | None, str | Non
             return None, nested_warn or "nested json string unparsable"
 
         return None, f"unsupported json type: {type(parsed).__name__}"
+
+    # Fallback for truncated JSON (e.g. "Unterminated string ...").
+    for candidate in candidates:
+        recovered = _recover_string_list(candidate)
+        if recovered:
+            return recovered, _merge_warnings(
+                f"unable to parse llm json output: {last_err}",
+                "recovered from partial json string list",
+            )
     return None, f"unable to parse llm json output: {last_err}"
 
 
@@ -287,6 +333,34 @@ def _extract_json(text: str) -> str:
         if end_obj != -1 and end_obj > start_obj:
             return t[start_obj : end_obj + 1]
     return t
+
+
+def _recover_string_list(candidate: str) -> list[str]:
+    t = (candidate or "").strip()
+    if not t:
+        return []
+    # Prefer list segment to avoid picking object keys like "expressions".
+    start = t.find("[")
+    segment = t[start:] if start != -1 else t
+    end = segment.rfind("]")
+    if end != -1:
+        segment = segment[: end + 1]
+
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in _JSON_STRING_RE.findall(segment):
+        try:
+            value = json.loads(f'"{raw}"')
+        except Exception:
+            continue
+        if not isinstance(value, str):
+            continue
+        value = value.strip()
+        if not value or value in seen:
+            continue
+        out.append(value)
+        seen.add(value)
+    return out
 
 
 def _filter_verbatim_expressions(text: str, expressions: list[str]) -> tuple[list[str], int]:

@@ -106,6 +106,8 @@ def test_extract_tool_supports_document_content() -> None:
     assert result["status"] == "ok"
     assert result["received"]["has_document"] is True
     assert result["expressions"]
+    assert result["document"]["schema"] == "secretarius.document.v0.1"
+    assert result["document"]["indexing"]["state"] in ("embedding", "done")
 
 
 def test_extract_tool_rejects_empty_payload() -> None:
@@ -181,6 +183,43 @@ def test_embeddings_tool_call_returns_vectors() -> None:
     assert len(result["embeddings"]) == 2
 
 
+def test_embeddings_tool_supports_document_schema_input() -> None:
+    def fake_embedder(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+        return {
+            "embeddings": [[0.1, 0.2]],
+            "dimension": 2,
+            "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+            "warning": None,
+        }
+
+    mcp_server.embed_expressions_multilingual = fake_embedder
+
+    response = handle_mcp_message(
+        {
+            "jsonrpc": "2.0",
+            "id": 18,
+            "method": "tools/call",
+            "params": {
+                "name": "expressions_to_embeddings",
+                "arguments": {
+                    "document": {
+                        "schema": "secretarius.document.v0.1",
+                        "type": "note",
+                        "content": {"mode": "inline", "text": "test"},
+                        "derived": {"expressions": [{"expression": "camail vert"}]},
+                    },
+                },
+            },
+        }
+    )
+    assert response is not None
+    result = response["result"]["structuredContent"]
+    assert result["status"] == "ok"
+    assert result["embedding_count"] == 1
+    assert result["document"]["schema"] == "secretarius.document.v0.1"
+    assert result["document"]["indexing"]["state"] == "done"
+
+
 def test_semantic_graph_search_calls_milvus_backend() -> None:
     def fake_semantic_backend(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
         return {
@@ -222,6 +261,141 @@ def test_semantic_graph_search_calls_milvus_backend() -> None:
     assert result["query_count"] == 1
     assert isinstance(result["graph"]["nodes"], list)
     assert isinstance(result["graph"]["edges"], list)
+
+
+def test_semantic_graph_search_supports_upsert_flag() -> None:
+    captured = {}
+
+    def fake_semantic_backend(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
+        captured["documents"] = kwargs.get("documents")
+        return {
+            "graph": {"nodes": [], "edges": []},
+            "hits": [[]],
+            "inserted_count": 0,
+            "query_count": 1,
+            "collection_name": "secretarius_semantic_graph",
+            "metric_type": "IP",
+            "warning": None,
+        }
+
+    mcp_server.semantic_graph_search_milvus = fake_semantic_backend
+
+    response = handle_mcp_message(
+        {
+            "jsonrpc": "2.0",
+            "id": 19,
+            "method": "tools/call",
+            "params": {
+                "name": "semantic_graph_search",
+                "arguments": {
+                    "embeddings": [[0.1, 0.2, 0.3]],
+                    "document": {
+                        "schema": "secretarius.document.v0.1",
+                        "type": "note",
+                        "content": {"mode": "inline", "text": "example"},
+                    },
+                    "upsert": False,
+                },
+            },
+        }
+    )
+    assert response is not None
+    result = response["result"]["structuredContent"]
+    assert result["status"] == "ok"
+    assert result["received"]["unified_query_and_insert"] is False
+    assert captured["documents"] == []
+
+
+def test_semantic_graph_search_derives_embeddings_from_expressions() -> None:
+    captured = {}
+
+    def fake_embed(expressions, **kwargs):  # noqa: ANN001, ANN003, ANN202
+        captured["expressions"] = expressions
+        return {
+            "embeddings": [[0.1, 0.2, 0.3] for _ in expressions],
+            "dimension": 3,
+            "model": "dummy",
+            "warning": None,
+        }
+
+    def fake_semantic_backend(embeddings, **kwargs):  # noqa: ANN001, ANN003, ANN202
+        captured["embeddings"] = embeddings
+        return {
+            "graph": {"nodes": [], "edges": []},
+            "hits": [[]],
+            "inserted_count": 0,
+            "query_count": 1,
+            "collection_name": "secretarius_semantic_graph",
+            "metric_type": "COSINE",
+            "warning": None,
+        }
+
+    mcp_server.embed_expressions_multilingual = fake_embed
+    mcp_server.semantic_graph_search_milvus = fake_semantic_backend
+
+    response = handle_mcp_message(
+        {
+            "jsonrpc": "2.0",
+            "id": 23,
+            "method": "tools/call",
+            "params": {
+                "name": "semantic_graph_search",
+                "arguments": {
+                    "expressions": ["porte-paniers", "chambre aux deniers"],
+                    "upsert": False,
+                },
+            },
+        }
+    )
+    assert response is not None
+    result = response["result"]["structuredContent"]
+    assert result["status"] == "ok"
+    assert result["received"]["embedding_count"] == 2
+    assert result["received"]["expression_count"] == 2
+    assert captured["expressions"] == ["porte-paniers", "chambre aux deniers"]
+    assert len(captured["embeddings"]) == 2
+
+
+def test_semantic_graph_search_auto_upserts_when_only_embeddings_are_provided() -> None:
+    captured = {}
+
+    def fake_semantic_backend(embeddings, **kwargs):  # noqa: ANN001, ANN003, ANN202
+        captured["embeddings"] = embeddings
+        captured["documents"] = kwargs.get("documents")
+        return {
+            "graph": {"nodes": [], "edges": []},
+            "hits": [[]],
+            "inserted_count": min(len(embeddings), len(captured["documents"] or [])),
+            "query_count": len(embeddings),
+            "collection_name": "secretarius_semantic_graph",
+            "metric_type": "COSINE",
+            "warning": None,
+        }
+
+    mcp_server.semantic_graph_search_milvus = fake_semantic_backend
+
+    response = handle_mcp_message(
+        {
+            "jsonrpc": "2.0",
+            "id": 24,
+            "method": "tools/call",
+            "params": {
+                "name": "semantic_graph_search",
+                "arguments": {
+                    "embeddings": [[0.1, 0.2, 0.3], [0.7, 0.8, 0.9]],
+                    "upsert": True,
+                },
+            },
+        }
+    )
+    assert response is not None
+    result = response["result"]["structuredContent"]
+    assert result["status"] == "ok"
+    assert result["inserted_count"] == 2
+    assert result["received"]["document_count"] == 2
+    assert result["received"]["upsert_source"] == "auto_embeddings"
+    assert isinstance(captured["documents"], list)
+    assert len(captured["documents"]) == 2
 
 
 def test_unknown_tool_returns_error() -> None:

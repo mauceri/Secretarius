@@ -166,6 +166,11 @@ def _resolve_metric_type(metric_type: str) -> str:
 
 def _ensure_collection(*, client: Any, collection_name: str, dim: int, metric_type: str) -> None:
     if client.has_collection(collection_name=collection_name):
+        existing_dim = _get_collection_dimension(client=client, collection_name=collection_name)
+        if existing_dim is not None and existing_dim != dim:
+            raise ValueError(
+                f"collection '{collection_name}' dimension mismatch: existing={existing_dim}, requested={dim}"
+            )
         return
     client.create_collection(
         collection_name=collection_name,
@@ -173,6 +178,39 @@ def _ensure_collection(*, client: Any, collection_name: str, dim: int, metric_ty
         metric_type=metric_type,
         consistency_level="Strong",
     )
+
+
+def _get_collection_dimension(*, client: Any, collection_name: str) -> int | None:
+    try:
+        details = client.describe_collection(collection_name=collection_name)
+    except Exception:
+        return None
+    if not isinstance(details, dict):
+        return None
+    for key in ("dimension", "dim"):
+        value = details.get(key)
+        if isinstance(value, int):
+            return value
+    schema = details.get("schema")
+    if not isinstance(schema, dict):
+        return None
+    fields = schema.get("fields")
+    if not isinstance(fields, list):
+        return None
+    for field in fields:
+        if not isinstance(field, dict):
+            continue
+        if str(field.get("type", "")).upper().find("VECTOR") < 0 and str(field.get("data_type", "")).upper().find("VECTOR") < 0:
+            continue
+        params = field.get("params")
+        if isinstance(params, dict):
+            dim = params.get("dim")
+            if isinstance(dim, int):
+                return dim
+        dim = field.get("dim")
+        if isinstance(dim, int):
+            return dim
+    return None
 
 
 def _insert_documents(

@@ -13,9 +13,11 @@ def _load_run_stdio_server():
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
-    return module.run_stdio_server
+    return module.run_stdio_server, getattr(module, "start_background_warmup", None)
 
 
 if __name__ == "__main__":
-    run_stdio_server = _load_run_stdio_server()
+    run_stdio_server, start_background_warmup = _load_run_stdio_server()
+    if callable(start_background_warmup):
+        start_background_warmup()
     run_stdio_server()
