@@ -2,5 +2,6 @@
 .pytest_cache/
 __pycache__/
 *.pyc
+.webui_secret_key
 infra/milvus/.env
 .nltk_data/

@@ -33,6 +33,11 @@ Etat courant:
 - `semantic_graph_search`: implemente (Milvus, mode unifie insertion/recherche)
 
 Documentation d'integration OpenClaw: `docs_mcp_openclaw.md`.
+Documentation runtime multi-canaux (Open WebUI + extensibilite Telegram/WhatsApp/Email): `docs_channels.md`.
+Connecteur Telegram pret a l'emploi: `serverTelegram.py`.
+Connecteur Email (IMAP/SMTP) pret a l'emploi: `serverEmail.py`.
+Units `systemd --user` prêtes: `deploy/systemd-user/`.
+Inclut aussi l'API OpenAI pour Open WebUI: `deploy/systemd-user/secretarius-openwebui-api.service`.
 
 ## Milvus (infra)
 La configuration Milvus est versionnée dans `infra/milvus`, avec données persistantes hors dépôt.

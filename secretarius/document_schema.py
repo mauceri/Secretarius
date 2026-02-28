@@ -79,21 +79,29 @@ def touch_updated_at(doc: dict[str, Any]) -> None:
 
 
 def resolve_text_for_extraction(arguments: dict[str, Any]) -> tuple[str | None, dict[str, Any] | None]:
-    text = arguments.get("text")
-    if isinstance(text, str) and text.strip():
-        return text.strip(), None
-
+    arg_text = arguments.get("text")
+    arg_text_str = arg_text.strip() if isinstance(arg_text, str) and arg_text.strip() else None
     raw_doc = arguments.get("document")
     if not isinstance(raw_doc, dict):
-        return None, None
+        return arg_text_str, None
     doc = normalize_document(raw_doc)
 
+    doc_text_str: str | None = None
     content = doc.get("content")
     if isinstance(content, dict):
         content_text = content.get("text")
         if isinstance(content_text, str) and content_text.strip():
-            return content_text.strip(), doc
+            doc_text_str = content_text.strip()
 
+    if arg_text_str and doc_text_str:
+        # Prefer the richer text to avoid truncated orchestrator payloads.
+        if len(doc_text_str) >= len(arg_text_str):
+            return doc_text_str, doc
+        return arg_text_str, doc
+    if doc_text_str:
+        return doc_text_str, doc
+    if arg_text_str:
+        return arg_text_str, doc
     return None, doc
 
 

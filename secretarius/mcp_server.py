@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 try:
-    from .expression_extractor import extract_expressions_with_llama
+    from .expression_extractor import extract_expressions_with_llama_cpp
 except ImportError:
     module_path = Path(__file__).resolve().parent / "expression_extractor.py"
     spec = importlib.util.spec_from_file_location("secretarius_expression_extractor", module_path)
@@ -20,7 +20,13 @@ except ImportError:
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
-    extract_expressions_with_llama = module.extract_expressions_with_llama
+    extract_expressions_with_llama_cpp = module.extract_expressions_with_llama_cpp
+    # Backward-compat if only old symbol exists in local module.
+    if not callable(extract_expressions_with_llama_cpp) and hasattr(module, "extract_expressions_with_llama"):
+        extract_expressions_with_llama_cpp = module.extract_expressions_with_llama
+
+# Backward-compatible export name (used by tests/older code).
+extract_expressions_with_llama = extract_expressions_with_llama_cpp
 
 try:
     from .embeddings import embed_expressions_multilingual
@@ -115,13 +121,21 @@ def _tools_catalog() -> list[MCPTool]:
                         },
                         "additionalProperties": True,
                     },
-                    "llama_url": {
+                    "llama_cpp_url": {
                         "type": "string",
                         "description": "Endpoint chat completions llama.cpp.",
                     },
+                    "llama_url": {
+                        "type": "string",
+                        "description": "Alias de compatibilite (deprecated) pour 'llama_cpp_url'.",
+                    },
+                    "llama_cpp_model": {
+                        "type": "string",
+                        "description": "Nom logique du modele llama.cpp.",
+                    },
                     "model": {
                         "type": "string",
-                        "description": "Nom logique du modele (ex: phi4).",
+                        "description": "Alias de compatibilite (deprecated) pour 'llama_cpp_model'.",
                     },
                     "timeout_s": {
                         "type": "number",
@@ -323,319 +337,349 @@ def _tool_result(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _handle_tool_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-    if name == "extract_expressions":
-        started_at = time.monotonic()
-        text, normalized_doc = resolve_text_for_extraction(arguments)
-        text = text or ""
-        llama_url = arguments.get("llama_url") or os.environ.get(
-            "SECRETARIUS_LLAMA_URL",
-            "http://127.0.0.1:8080/v1/chat/completions",
-        )
-        model = arguments.get("model") or os.environ.get("SECRETARIUS_LLAMA_MODEL", "phi4")
-        timeout_s = arguments.get("timeout_s", float(os.environ.get("SECRETARIUS_TIMEOUT_S", "30.0")))
-        max_tokens = arguments.get("max_tokens", int(os.environ.get("SECRETARIUS_MAX_TOKENS", "512")))
-        seed = arguments.get("seed", int(os.environ.get("SECRETARIUS_SEED", "42")))
-        prompt_path = arguments.get("prompt_path") or os.environ.get("SECRETARIUS_PROMPT_PATH")
-        debug_env = os.environ.get("SECRETARIUS_DEBUG_RETURN_RAW", "false").strip().lower()
-        debug_default = debug_env in ("1", "true", "yes", "on")
-        debug_return_raw = arguments.get("debug_return_raw", debug_default)
-        per_chunk_env = os.environ.get("SECRETARIUS_EXTRACT_PER_CHUNK", "false").strip().lower()
-        per_chunk_default = per_chunk_env in ("1", "true", "yes", "on")
-        per_chunk_llm = arguments.get("per_chunk_llm", per_chunk_default)
-        if not isinstance(llama_url, str) or not llama_url.strip():
-            raise ValueError("'llama_url' must be a non-empty string")
-        if not isinstance(model, str) or not model.strip():
-            raise ValueError("'model' must be a non-empty string")
-        if not isinstance(timeout_s, (int, float)) or timeout_s <= 0:
-            raise ValueError("'timeout_s' must be a positive number")
-        if not isinstance(max_tokens, int) or max_tokens < 1:
-            raise ValueError("'max_tokens' must be an integer >= 1")
-        if not isinstance(seed, int):
-            raise ValueError("'seed' must be an integer")
-        if prompt_path is not None and not isinstance(prompt_path, str):
-            raise ValueError("'prompt_path' must be a string when provided")
-        if not isinstance(debug_return_raw, bool):
-            raise ValueError("'debug_return_raw' must be a boolean")
-        if not isinstance(per_chunk_llm, bool):
-            raise ValueError("'per_chunk_llm' must be a boolean")
-        if not text and normalized_doc is None:
-            raise ValueError("Provide non-empty 'text' or 'document.content.text'")
+def _handle_extract_expressions(arguments: Dict[str, Any]) -> Dict[str, Any]:
+    started_at = time.monotonic()
+    text, normalized_doc = resolve_text_for_extraction(arguments)
+    text = text or ""
+    llama_cpp_url = (
+        arguments.get("llama_cpp_url")
+        or arguments.get("llama_url")
+        or os.environ.get("SECRETARIUS_LLAMA_CPP_URL")
+        or os.environ.get("SECRETARIUS_LLAMA_URL")
+        or "http://127.0.0.1:8989/v1/chat/completions"
+    )
+    llama_cpp_model = (
+        arguments.get("llama_cpp_model")
+        or arguments.get("model")
+        or os.environ.get(
+        "SECRETARIUS_LLAMA_CPP_MODEL",
+        os.environ.get("SECRETARIUS_LLAMA_MODEL", "local-llama-cpp"),
+    )
+    )
+    timeout_s = arguments.get("timeout_s", float(os.environ.get("SECRETARIUS_TIMEOUT_S", "30.0")))
+    max_tokens = arguments.get("max_tokens", int(os.environ.get("SECRETARIUS_MAX_TOKENS", "512")))
+    seed = arguments.get("seed", int(os.environ.get("SECRETARIUS_SEED", "42")))
+    prompt_path = arguments.get("prompt_path") or os.environ.get("SECRETARIUS_PROMPT_PATH")
+    debug_env = os.environ.get("SECRETARIUS_DEBUG_RETURN_RAW", "false").strip().lower()
+    debug_default = debug_env in ("1", "true", "yes", "on")
+    debug_return_raw = arguments.get("debug_return_raw", debug_default)
+    per_chunk_env = os.environ.get("SECRETARIUS_EXTRACT_PER_CHUNK", "false").strip().lower()
+    per_chunk_default = per_chunk_env in ("1", "true", "yes", "on")
+    per_chunk_llm = arguments.get("per_chunk_llm", per_chunk_default)
 
-        if normalized_doc is not None:
-            if not text:
-                set_indexing_state(normalized_doc, "queued")
-                add_indexing_error(normalized_doc, "extracting", "No inline content to extract (fetching required)")
-                return _tool_result(
-                    {
-                        "status": "ok",
-                        "tool": name,
-                        "backend": "llama_cpp_direct",
-                        "received": {
-                            "has_text": bool(arguments.get("text")),
-                            "has_document": True,
-                        },
-                        "text_length": 0,
-                        "chunk_count": 0,
-                        "by_chunk": [],
-                        "expressions": [],
-                        "request_fingerprint": None,
-                        "inference_params": None,
-                        "document": normalized_doc,
-                        "message": "Document accepté sans contenu inline: extraction différée.",
-                        "warning": "document has no inline text",
-                    }
-                )
-            set_indexing_state(normalized_doc, "extracting")
+    _debug_log(
+        "extract.args "
+        f"text_len={len(text)} "
+        f"llama_cpp_url={llama_cpp_url} "
+        f"llama_cpp_model={llama_cpp_model} "
+        f"prompt_path={prompt_path} "
+        f"arg_keys={sorted(list(arguments.keys()))}"
+    )
+    if not isinstance(llama_cpp_url, str) or not llama_cpp_url.strip():
+        raise ValueError("'llama_cpp_url' must be a non-empty string")
+    if not isinstance(llama_cpp_model, str) or not llama_cpp_model.strip():
+        raise ValueError("'llama_cpp_model' must be a non-empty string")
+    if not isinstance(timeout_s, (int, float)) or timeout_s <= 0:
+        raise ValueError("'timeout_s' must be a positive number")
+    if not isinstance(max_tokens, int) or max_tokens < 1:
+        raise ValueError("'max_tokens' must be an integer >= 1")
+    if not isinstance(seed, int):
+        raise ValueError("'seed' must be an integer")
+    if prompt_path is not None and not isinstance(prompt_path, str):
+        raise ValueError("'prompt_path' must be a string when provided")
+    if not isinstance(debug_return_raw, bool):
+        raise ValueError("'debug_return_raw' must be a boolean")
+    if not isinstance(per_chunk_llm, bool):
+        raise ValueError("'per_chunk_llm' must be a boolean")
+    if not text and normalized_doc is None:
+        raise ValueError("Provide non-empty 'text' or 'document.content.text'")
 
-        result = extract_expressions_with_llama(
-            text,
-            llama_url=llama_url,
-            model=model,
-            timeout_s=float(timeout_s),
-            max_tokens=max_tokens,
-            seed=seed,
-            prompt_path=prompt_path,
-            debug_return_raw=debug_return_raw,
-            per_chunk_llm=per_chunk_llm,
-        )
-        by_chunk = result.get("by_chunk", [])
-        chunk_count = len(result.get("chunks", []))
-        expressions = result.get("expressions", [])
-        request_fingerprint = result.get("request_fingerprint")
-        inference_params = result.get("inference_params")
-        raw_llm_outputs = result.get("raw_llm_outputs") if debug_return_raw else None
-        warning = result.get("warning")
-        if not isinstance(by_chunk, list):
-            by_chunk = []
-        if not isinstance(expressions, list):
-            expressions = []
-        expressions = [e for e in expressions if isinstance(e, str)]
-        _debug_log(
-            "extract_expressions timing: "
-            f"elapsed_s={time.monotonic()-started_at:.3f} "
-            f"text_len={len(text)} chunk_count={chunk_count}"
-        )
-        if normalized_doc is not None:
-            normalized_doc = enrich_document_with_extraction(
-                normalized_doc,
-                chunks=result.get("chunks", []) if isinstance(result.get("chunks"), list) else [],
-                by_chunk=by_chunk,
-                expressions=expressions,
+    if normalized_doc is not None:
+        if not text:
+            set_indexing_state(normalized_doc, "queued")
+            add_indexing_error(normalized_doc, "extracting", "No inline content to extract (fetching required)")
+            return _tool_result(
+                {
+                    "status": "ok",
+                    "tool": "extract_expressions",
+                    "backend": "llama_cpp_direct",
+                    "received": {
+                        "has_text": bool(arguments.get("text")),
+                        "has_document": True,
+                    },
+                    "text_length": 0,
+                    "chunk_count": 0,
+                    "by_chunk": [],
+                    "expressions": [],
+                    "request_fingerprint": None,
+                    "inference_params": None,
+                    "document": normalized_doc,
+                    "message": "Document accepté sans contenu inline: extraction différée.",
+                    "warning": "document has no inline text",
+                }
             )
+        set_indexing_state(normalized_doc, "extracting")
 
-        payload = {
-            "status": "ok",
-            "tool": name,
-            "backend": "llama_cpp_direct",
-            "received": {
-                "has_text": bool(arguments.get("text")),
-                "has_document": isinstance(arguments.get("document"), dict),
-            },
-            "text_length": len(text),
-            "chunk_count": chunk_count,
-            "by_chunk": by_chunk,
-            "expressions": expressions,
-            "request_fingerprint": request_fingerprint,
-            "inference_params": inference_params,
-            "message": "Extraction d'expressions caracteristiques.",
-            "warning": warning,
-        }
-        if normalized_doc is not None:
-            payload["document"] = normalized_doc
-        if debug_return_raw:
-            payload["raw_llm_outputs"] = raw_llm_outputs
-        return _tool_result(payload)
+    result = extract_expressions_with_llama_cpp(
+        text,
+        llama_cpp_url=llama_cpp_url,
+        llama_cpp_model=llama_cpp_model,
+        timeout_s=float(timeout_s),
+        max_tokens=max_tokens,
+        seed=seed,
+        prompt_path=prompt_path,
+        debug_return_raw=debug_return_raw,
+        per_chunk_llm=per_chunk_llm,
+    )
+    by_chunk = result.get("by_chunk", [])
+    chunk_count = len(result.get("chunks", []))
+    expressions = result.get("expressions", [])
+    request_fingerprint = result.get("request_fingerprint")
+    inference_params = result.get("inference_params")
+    raw_llm_outputs = result.get("raw_llm_outputs") if debug_return_raw else None
+    warning = result.get("warning")
+    if not isinstance(by_chunk, list):
+        by_chunk = []
+    if not isinstance(expressions, list):
+        expressions = []
+    expressions = [e for e in expressions if isinstance(e, str)]
+    _debug_log(
+        "extract_expressions timing: "
+        f"elapsed_s={time.monotonic()-started_at:.3f} "
+        f"text_len={len(text)} chunk_count={chunk_count}"
+    )
+    if normalized_doc is not None:
+        normalized_doc = enrich_document_with_extraction(
+            normalized_doc,
+            chunks=result.get("chunks", []) if isinstance(result.get("chunks"), list) else [],
+            by_chunk=by_chunk,
+            expressions=expressions,
+        )
 
-    if name == "expressions_to_embeddings":
-        normalized_doc = normalize_document(arguments.get("document")) if isinstance(arguments.get("document"), dict) else None
-        expressions = arguments.get("expressions", [])
-        if normalized_doc is not None and not expressions:
-            expressions = expressions_from_document(normalized_doc)
-        model = arguments.get("model")
-        normalize = arguments.get("normalize", True)
-        batch_size = arguments.get("batch_size", 32)
-        if not isinstance(expressions, list) or not expressions:
-            raise ValueError("'expressions' must be a non-empty list")
-        if not all(isinstance(item, str) for item in expressions):
-            raise ValueError("'expressions' must contain only strings")
-        if model is not None and not isinstance(model, str):
-            raise ValueError("'model' must be a string when provided")
-        if not isinstance(normalize, bool):
-            raise ValueError("'normalize' must be a boolean")
-        if not isinstance(batch_size, int) or batch_size < 1:
-            raise ValueError("'batch_size' must be an integer >= 1")
-        if normalized_doc is not None:
-            set_indexing_state(normalized_doc, "embedding")
+    payload = {
+        "status": "ok",
+        "tool": "extract_expressions",
+        "backend": "llama_cpp_direct",
+        "received": {
+            "has_text": bool(arguments.get("text")),
+            "has_document": isinstance(arguments.get("document"), dict),
+        },
+        "text_length": len(text),
+        "chunk_count": chunk_count,
+        "by_chunk": by_chunk,
+        "expressions": expressions,
+        "request_fingerprint": request_fingerprint,
+        "inference_params": inference_params,
+        "message": "Extraction d'expressions caracteristiques.",
+        "warning": warning,
+    }
+    if normalized_doc is not None:
+        payload["document"] = normalized_doc
+    if debug_return_raw:
+        payload["raw_llm_outputs"] = raw_llm_outputs
+    return _tool_result(payload)
 
-        result = embed_expressions_multilingual(
+
+def _handle_expressions_to_embeddings(arguments: Dict[str, Any]) -> Dict[str, Any]:
+    normalized_doc = normalize_document(arguments.get("document")) if isinstance(arguments.get("document"), dict) else None
+    expressions = arguments.get("expressions", [])
+    if normalized_doc is not None and not expressions:
+        expressions = expressions_from_document(normalized_doc)
+    model = arguments.get("model")
+    normalize = arguments.get("normalize", True)
+    batch_size = arguments.get("batch_size", 32)
+    if not isinstance(expressions, list) or not expressions:
+        raise ValueError("'expressions' must be a non-empty list")
+    if not all(isinstance(item, str) for item in expressions):
+        raise ValueError("'expressions' must contain only strings")
+    if model is not None and not isinstance(model, str):
+        raise ValueError("'model' must be a string when provided")
+    if not isinstance(normalize, bool):
+        raise ValueError("'normalize' must be a boolean")
+    if not isinstance(batch_size, int) or batch_size < 1:
+        raise ValueError("'batch_size' must be an integer >= 1")
+    if normalized_doc is not None:
+        set_indexing_state(normalized_doc, "embedding")
+
+    result = embed_expressions_multilingual(
+        expressions,
+        model=model,
+        normalize=normalize,
+        batch_size=batch_size,
+    )
+    embeddings = result.get("embeddings", [])
+    dimension = result.get("dimension", 0)
+    used_model = result.get("model")
+    warning = result.get("warning")
+    if normalized_doc is not None:
+        normalized_doc = enrich_document_with_embeddings(
+            normalized_doc,
+            expressions=expressions if isinstance(expressions, list) else [],
+            embeddings=embeddings if isinstance(embeddings, list) else [],
+        )
+    payload = {
+        "status": "ok",
+        "tool": "expressions_to_embeddings",
+        "received_count": len(expressions) if isinstance(expressions, list) else 0,
+        "embedding_count": len(embeddings) if isinstance(embeddings, list) else 0,
+        "dimension": dimension,
+        "normalized": normalize,
+        "model": used_model,
+        "embeddings": embeddings,
+        "message": "Generation de plongements multilingues.",
+        "warning": warning,
+    }
+    if normalized_doc is not None:
+        payload["document"] = normalized_doc
+    return _tool_result(payload)
+
+
+def _handle_semantic_graph_search(arguments: Dict[str, Any]) -> Dict[str, Any]:
+    embeddings = arguments.get("embeddings", [])
+    expressions = arguments.get("expressions")
+    documents = arguments.get("documents", [])
+    normalized_doc = normalize_document(arguments.get("document")) if isinstance(arguments.get("document"), dict) else None
+    upsert = arguments.get("upsert", True)
+    top_k = arguments.get("top_k", 10)
+    embed_model = arguments.get("model")
+    normalize = arguments.get("normalize", True)
+    batch_size = arguments.get("batch_size", 32)
+    milvus_uri = arguments.get("milvus_uri") or os.environ.get(
+        "SECRETARIUS_MILVUS_URI",
+        "http://127.0.0.1:19530",
+    )
+    milvus_token = arguments.get("milvus_token") or os.environ.get("SECRETARIUS_MILVUS_TOKEN")
+    collection_name = arguments.get("collection_name") or os.environ.get(
+        "SECRETARIUS_MILVUS_COLLECTION",
+        "secretarius_semantic_graph",
+    )
+    metric_type = arguments.get("metric_type") or os.environ.get(
+        "SECRETARIUS_MILVUS_METRIC",
+        "COSINE",
+    )
+
+    if expressions is None and normalized_doc is not None:
+        expressions = expressions_from_document(normalized_doc)
+    if expressions is not None:
+        if not isinstance(expressions, list) or not all(isinstance(e, str) for e in expressions):
+            raise ValueError("'expressions' must be a list of strings when provided")
+    if not isinstance(normalize, bool):
+        raise ValueError("'normalize' must be a boolean")
+    if embed_model is not None and not isinstance(embed_model, str):
+        raise ValueError("'model' must be a string when provided")
+    if not isinstance(batch_size, int) or batch_size < 1:
+        raise ValueError("'batch_size' must be an integer >= 1")
+    if (not isinstance(embeddings, list) or not embeddings) and isinstance(expressions, list) and expressions:
+        embedded = embed_expressions_multilingual(
             expressions,
-            model=model,
+            model=embed_model,
             normalize=normalize,
             batch_size=batch_size,
         )
-        embeddings = result.get("embeddings", [])
-        dimension = result.get("dimension", 0)
-        used_model = result.get("model")
-        warning = result.get("warning")
-        if normalized_doc is not None:
-            normalized_doc = enrich_document_with_embeddings(
-                normalized_doc,
-                expressions=expressions if isinstance(expressions, list) else [],
-                embeddings=embeddings if isinstance(embeddings, list) else [],
-            )
-        payload = {
-            "status": "ok",
-            "tool": name,
-            "received_count": len(expressions) if isinstance(expressions, list) else 0,
+        embeddings = embedded.get("embeddings", [])
+    if not isinstance(embeddings, list) or not embeddings:
+        raise ValueError(
+            "Provide non-empty 'embeddings', or pass non-empty 'expressions'/'document' so embeddings can be derived"
+        )
+    if documents is not None and not isinstance(documents, list):
+        raise ValueError("'documents' must be a list when provided")
+    if not isinstance(upsert, bool):
+        raise ValueError("'upsert' must be a boolean")
+    if not isinstance(top_k, int) or top_k < 1:
+        raise ValueError("'top_k' must be an integer >= 1")
+    if not isinstance(milvus_uri, str) or not milvus_uri.strip():
+        raise ValueError("'milvus_uri' must be a non-empty string")
+    if milvus_token is not None and not isinstance(milvus_token, str):
+        raise ValueError("'milvus_token' must be a string when provided")
+    if not isinstance(collection_name, str) or not collection_name.strip():
+        raise ValueError("'collection_name' must be a non-empty string")
+    if not isinstance(metric_type, str) or not metric_type.strip():
+        raise ValueError("'metric_type' must be a non-empty string")
+    docs_to_insert = documents if isinstance(documents, list) else []
+    upsert_source = "none"
+    if normalized_doc is not None and upsert and not docs_to_insert:
+        docs_to_insert = [normalized_doc]
+        set_indexing_state(normalized_doc, "upserting")
+        upsert_source = "document"
+    elif upsert and not docs_to_insert:
+        if isinstance(expressions, list) and expressions:
+            count = min(len(expressions), len(embeddings))
+            docs_to_insert = [
+                {
+                    "schema": "secretarius.document.v0.1",
+                    "type": "snippet",
+                    "content": {"mode": "inline", "text": str(expressions[idx])},
+                    "derived": {"expressions": [{"expression": str(expressions[idx])}]},
+                    "indexing": {"source": "semantic_graph_search:auto-from-expressions"},
+                }
+                for idx in range(count)
+            ]
+            upsert_source = "auto_expressions"
+        elif isinstance(embeddings, list) and embeddings:
+            docs_to_insert = [
+                {
+                    "schema": "secretarius.document.v0.1",
+                    "type": "embedding_only",
+                    "content": {"mode": "none", "text": None},
+                    "indexing": {
+                        "source": "semantic_graph_search:auto-from-embeddings",
+                        "source_idx": idx,
+                    },
+                }
+                for idx in range(len(embeddings))
+            ]
+            upsert_source = "auto_embeddings"
+
+    result = semantic_graph_search_milvus(
+        embeddings,
+        documents=docs_to_insert if upsert else [],
+        top_k=top_k,
+        uri=milvus_uri,
+        token=milvus_token,
+        collection_name=collection_name,
+        metric_type=metric_type,
+    )
+    graph = result.get("graph", {"nodes": [], "edges": []})
+    warning = result.get("warning")
+    payload = {
+        "status": "ok",
+        "tool": "semantic_graph_search",
+        "backend": "milvus",
+        "received": {
             "embedding_count": len(embeddings) if isinstance(embeddings, list) else 0,
-            "dimension": dimension,
-            "normalized": normalize,
-            "model": used_model,
-            "embeddings": embeddings,
-            "message": "Generation de plongements multilingues.",
-            "warning": warning,
-        }
-        if normalized_doc is not None:
-            payload["document"] = normalized_doc
-        return _tool_result(payload)
+            "expression_count": len(expressions) if isinstance(expressions, list) else 0,
+            "document_count": len(docs_to_insert) if isinstance(docs_to_insert, list) else 0,
+            "unified_query_and_insert": upsert,
+            "upsert_source": upsert_source if upsert else "disabled",
+        },
+        "collection_name": result.get("collection_name", collection_name),
+        "metric_type": result.get("metric_type", metric_type),
+        "inserted_count": result.get("inserted_count", 0),
+        "query_count": result.get("query_count", 0),
+        "graph": graph,
+        "hits": result.get("hits", []),
+        "message": "Recherche/insertions semantiques via Milvus.",
+        "warning": warning,
+    }
+    if normalized_doc is not None:
+        if warning:
+            add_indexing_error(normalized_doc, "upserting", str(warning))
+        else:
+            set_indexing_state(normalized_doc, "done")
+        payload["document"] = normalized_doc
+    return _tool_result(payload)
 
-    if name == "semantic_graph_search":
-        embeddings = arguments.get("embeddings", [])
-        expressions = arguments.get("expressions")
-        documents = arguments.get("documents", [])
-        normalized_doc = normalize_document(arguments.get("document")) if isinstance(arguments.get("document"), dict) else None
-        upsert = arguments.get("upsert", True)
-        top_k = arguments.get("top_k", 10)
-        embed_model = arguments.get("model")
-        normalize = arguments.get("normalize", True)
-        batch_size = arguments.get("batch_size", 32)
-        milvus_uri = arguments.get("milvus_uri") or os.environ.get(
-            "SECRETARIUS_MILVUS_URI",
-            "http://127.0.0.1:19530",
-        )
-        milvus_token = arguments.get("milvus_token") or os.environ.get("SECRETARIUS_MILVUS_TOKEN")
-        collection_name = arguments.get("collection_name") or os.environ.get(
-            "SECRETARIUS_MILVUS_COLLECTION",
-            "secretarius_semantic_graph",
-        )
-        metric_type = arguments.get("metric_type") or os.environ.get(
-            "SECRETARIUS_MILVUS_METRIC",
-            "COSINE",
-        )
 
-        if expressions is None and normalized_doc is not None:
-            expressions = expressions_from_document(normalized_doc)
-        if expressions is not None:
-            if not isinstance(expressions, list) or not all(isinstance(e, str) for e in expressions):
-                raise ValueError("'expressions' must be a list of strings when provided")
-        if not isinstance(normalize, bool):
-            raise ValueError("'normalize' must be a boolean")
-        if embed_model is not None and not isinstance(embed_model, str):
-            raise ValueError("'model' must be a string when provided")
-        if not isinstance(batch_size, int) or batch_size < 1:
-            raise ValueError("'batch_size' must be an integer >= 1")
-        if (not isinstance(embeddings, list) or not embeddings) and isinstance(expressions, list) and expressions:
-            embedded = embed_expressions_multilingual(
-                expressions,
-                model=embed_model,
-                normalize=normalize,
-                batch_size=batch_size,
-            )
-            embeddings = embedded.get("embeddings", [])
-        if not isinstance(embeddings, list) or not embeddings:
-            raise ValueError(
-                "Provide non-empty 'embeddings', or pass non-empty 'expressions'/'document' so embeddings can be derived"
-            )
-        if documents is not None and not isinstance(documents, list):
-            raise ValueError("'documents' must be a list when provided")
-        if not isinstance(upsert, bool):
-            raise ValueError("'upsert' must be a boolean")
-        if not isinstance(top_k, int) or top_k < 1:
-            raise ValueError("'top_k' must be an integer >= 1")
-        if not isinstance(milvus_uri, str) or not milvus_uri.strip():
-            raise ValueError("'milvus_uri' must be a non-empty string")
-        if milvus_token is not None and not isinstance(milvus_token, str):
-            raise ValueError("'milvus_token' must be a string when provided")
-        if not isinstance(collection_name, str) or not collection_name.strip():
-            raise ValueError("'collection_name' must be a non-empty string")
-        if not isinstance(metric_type, str) or not metric_type.strip():
-            raise ValueError("'metric_type' must be a non-empty string")
-        docs_to_insert = documents if isinstance(documents, list) else []
-        upsert_source = "none"
-        if normalized_doc is not None and upsert and not docs_to_insert:
-            docs_to_insert = [normalized_doc]
-            set_indexing_state(normalized_doc, "upserting")
-            upsert_source = "document"
-        elif upsert and not docs_to_insert:
-            if isinstance(expressions, list) and expressions:
-                count = min(len(expressions), len(embeddings))
-                docs_to_insert = [
-                    {
-                        "schema": "secretarius.document.v0.1",
-                        "type": "snippet",
-                        "content": {"mode": "inline", "text": str(expressions[idx])},
-                        "derived": {"expressions": [{"expression": str(expressions[idx])}]},
-                        "indexing": {"source": "semantic_graph_search:auto-from-expressions"},
-                    }
-                    for idx in range(count)
-                ]
-                upsert_source = "auto_expressions"
-            elif isinstance(embeddings, list) and embeddings:
-                docs_to_insert = [
-                    {
-                        "schema": "secretarius.document.v0.1",
-                        "type": "embedding_only",
-                        "content": {"mode": "none", "text": None},
-                        "indexing": {
-                            "source": "semantic_graph_search:auto-from-embeddings",
-                            "source_idx": idx,
-                        },
-                    }
-                    for idx in range(len(embeddings))
-                ]
-                upsert_source = "auto_embeddings"
-
-        result = semantic_graph_search_milvus(
-            embeddings,
-            documents=docs_to_insert if upsert else [],
-            top_k=top_k,
-            uri=milvus_uri,
-            token=milvus_token,
-            collection_name=collection_name,
-            metric_type=metric_type,
-        )
-        graph = result.get("graph", {"nodes": [], "edges": []})
-        warning = result.get("warning")
-        payload = {
-            "status": "ok",
-            "tool": name,
-            "backend": "milvus",
-            "received": {
-                "embedding_count": len(embeddings) if isinstance(embeddings, list) else 0,
-                "expression_count": len(expressions) if isinstance(expressions, list) else 0,
-                "document_count": len(docs_to_insert) if isinstance(docs_to_insert, list) else 0,
-                "unified_query_and_insert": upsert,
-                "upsert_source": upsert_source if upsert else "disabled",
-            },
-            "collection_name": result.get("collection_name", collection_name),
-            "metric_type": result.get("metric_type", metric_type),
-            "inserted_count": result.get("inserted_count", 0),
-            "query_count": result.get("query_count", 0),
-            "graph": graph,
-            "hits": result.get("hits", []),
-            "message": "Recherche/insertions semantiques via Milvus.",
-            "warning": warning,
-        }
-        if normalized_doc is not None:
-            if warning:
-                add_indexing_error(normalized_doc, "upserting", str(warning))
-            else:
-                set_indexing_state(normalized_doc, "done")
-            payload["document"] = normalized_doc
-        return _tool_result(payload)
-
-    raise ValueError(f"Unknown tool: {name}")
+def _handle_tool_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    handlers = {
+        "extract_expressions": _handle_extract_expressions,
+        "expressions_to_embeddings": _handle_expressions_to_embeddings,
+        "semantic_graph_search": _handle_semantic_graph_search,
+    }
+    handler = handlers.get(name)
+    if handler is None:
+        raise ValueError(f"Unknown tool: {name}")
+    return handler(arguments)
 
 
 def handle_mcp_message(message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -726,7 +770,7 @@ def start_background_warmup() -> None:
     def _worker() -> None:
         # Warmup chunker path via extraction call with tiny timeout.
         try:
-            extract_expressions_with_llama(
+            extract_expressions_with_llama_cpp(
                 "warmup",
                 timeout_s=1.0,
                 max_tokens=8,

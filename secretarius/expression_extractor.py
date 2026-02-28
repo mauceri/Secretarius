@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import importlib.util
 import hashlib
+import importlib.util
 import json
+import logging
 import os
 import re
 import sys
@@ -21,13 +22,14 @@ _CACHED_CHUNKER: Any | None = None
 
 _JSON_CODEBLOCK_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
 _JSON_STRING_RE = re.compile(r'"((?:\\.|[^"\\])*)"')
+LOGGER = logging.getLogger("secretarius.extractor")
 
 
-def extract_expressions_with_llama(
+def extract_expressions_with_llama_cpp(
     text: str,
     *,
-    llama_url: str = "http://127.0.0.1:8080/v1/chat/completions",
-    model: str = "phi4",
+    llama_cpp_url: str = "http://127.0.0.1:8989/v1/chat/completions",
+    llama_cpp_model: str = "local-llama-cpp",
     timeout_s: float = 120.0,
     max_tokens: int = 512,
     prompt_path: str | None = None,
@@ -35,6 +37,7 @@ def extract_expressions_with_llama(
     debug_return_raw: bool = False,
     per_chunk_llm: bool = False,
 ) -> dict[str, Any]:
+    LOGGER.info("")
     cleaned = (text or "").strip()
     if not cleaned:
         return {"chunks": [], "by_chunk": [], "expressions": [], "warning": "empty input text"}
@@ -53,27 +56,42 @@ def extract_expressions_with_llama(
         return {"chunks": [], "by_chunk": [], "expressions": [], "warning": f"chunking failed: {exc}"}
     chunks = [c for c in chunks if isinstance(c, str) and c.strip()]
     if not chunks:
-        return {"chunks": [], "by_chunk": [], "expressions": [], "warning": "chunker returned no chunks"}
-
+        # Fallback pragmatique: traiter le texte complet en un seul chunk.
+        chunks = [cleaned]
+        warnings = ["chunker returned no chunks; fallback to single raw-text chunk"]
+    else:
+        warnings = []
+    LOGGER.info("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++chunks: %s", chunks)
     by_chunk: list[dict[str, Any]] = []
     all_expressions: list[str] = []
-    warnings: list[str] = []
     filtered_out_total = 0
 
     if per_chunk_llm:
+        source_texts = chunks
+        warn_prefix = "chunk"
+    else:
+        source_texts = [cleaned]
+        warn_prefix = "global"
+
+    extracted_by_source: list[tuple[list[str], str | None, int, str]] = []
+    for idx, source_text in enumerate(source_texts):
+        parsed, warn, removed, raw_output = _extract_expressions_for_single_text(
+            source_text,
+            system_prompt=system_prompt,
+            llama_cpp_url=llama_cpp_url,
+            llama_cpp_model=llama_cpp_model,
+            timeout_s=timeout_s,
+            max_tokens=max_tokens,
+            seed=seed,
+        )
+        if warn:
+            warnings.append(f"{warn_prefix} {idx}: {warn}" if per_chunk_llm else f"{warn_prefix}: {warn}")
+        filtered_out_total += removed
+        extracted_by_source.append((parsed, warn, removed, raw_output))
+
+    if per_chunk_llm:
         for idx, chunk_text in enumerate(chunks):
-            parsed, warn, removed, raw_output = _extract_expressions_for_single_text(
-                chunk_text,
-                system_prompt=system_prompt,
-                llama_url=llama_url,
-                model=model,
-                timeout_s=timeout_s,
-                max_tokens=max_tokens,
-                seed=seed,
-            )
-            if warn:
-                warnings.append(f"chunk {idx}: {warn}")
-            filtered_out_total += removed
+            parsed, _warn, _removed, raw_output = extracted_by_source[idx]
             by_chunk.append(
                 {
                     "id": idx,
@@ -82,8 +100,8 @@ def extract_expressions_with_llama(
                     "request_fingerprint": _request_fingerprint(
                         text=chunk_text,
                         system_prompt=system_prompt,
-                        llama_url=llama_url,
-                        model=model,
+                        llama_cpp_url=llama_cpp_url,
+                        llama_cpp_model=llama_cpp_model,
                         timeout_s=timeout_s,
                         max_tokens=max_tokens,
                         seed=seed,
@@ -93,18 +111,7 @@ def extract_expressions_with_llama(
             )
             all_expressions.extend(parsed)
     else:
-        parsed_global, warn_global, removed_global, raw_global = _extract_expressions_for_single_text(
-            cleaned,
-            system_prompt=system_prompt,
-            llama_url=llama_url,
-            model=model,
-            timeout_s=timeout_s,
-            max_tokens=max_tokens,
-            seed=seed,
-        )
-        if warn_global:
-            warnings.append(f"global: {warn_global}")
-        filtered_out_total += removed_global
+        parsed_global, _warn, _removed, raw_global = extracted_by_source[0]
         all_expressions.extend(parsed_global)
         for idx, chunk_text in enumerate(chunks):
             chunk_exprs = [expr for expr in parsed_global if expr in chunk_text]
@@ -116,8 +123,8 @@ def extract_expressions_with_llama(
                     "request_fingerprint": _request_fingerprint(
                         text=chunk_text,
                         system_prompt=system_prompt,
-                        llama_url=llama_url,
-                        model=model,
+                        llama_cpp_url=llama_cpp_url,
+                        llama_cpp_model=llama_cpp_model,
                         timeout_s=timeout_s,
                         max_tokens=max_tokens,
                         seed=seed,
@@ -142,8 +149,8 @@ def extract_expressions_with_llama(
         "request_fingerprint": _request_fingerprint(
             text=cleaned,
             system_prompt=system_prompt,
-            llama_url=llama_url,
-            model=model,
+            llama_cpp_url=llama_cpp_url,
+            llama_cpp_model=llama_cpp_model,
             timeout_s=timeout_s,
             max_tokens=max_tokens,
             seed=seed,
@@ -163,12 +170,38 @@ def extract_expressions_with_llama(
     return result
 
 
+def extract_expressions_with_llama(
+    text: str,
+    *,
+    llama_cpp_url: str = "http://127.0.0.1:8989/v1/chat/completions",
+    model: str = "local-llama-cpp",
+    timeout_s: float = 120.0,
+    max_tokens: int = 512,
+    prompt_path: str | None = None,
+    seed: int = 42,
+    debug_return_raw: bool = False,
+    per_chunk_llm: bool = False,
+) -> dict[str, Any]:
+    # Deprecated wrapper kept for compatibility only.
+    return extract_expressions_with_llama_cpp(
+        text,
+        llama_cpp_url=llama_cpp_url,
+        llama_cpp_model=model,
+        timeout_s=timeout_s,
+        max_tokens=max_tokens,
+        prompt_path=prompt_path,
+        seed=seed,
+        debug_return_raw=debug_return_raw,
+        per_chunk_llm=per_chunk_llm,
+    )
+
+
 def _extract_expressions_for_single_text(
     text: str,
     *,
     system_prompt: str,
-    llama_url: str,
-    model: str,
+    llama_cpp_url: str,
+    llama_cpp_model: str,
     timeout_s: float,
     max_tokens: int,
     seed: int,
@@ -178,7 +211,7 @@ def _extract_expressions_for_single_text(
         f"{text}"
     )
     payload = {
-        "model": model,
+        "model": llama_cpp_model,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
@@ -191,7 +224,7 @@ def _extract_expressions_for_single_text(
         "seed": seed,
         "stream": False,
     }
-    raw, req_warning = _post_chat_completion(llama_url=llama_url, payload=payload, timeout_s=timeout_s)
+    raw, req_warning = _post_chat_completion(llama_cpp_url=llama_cpp_url, payload=payload, timeout_s=timeout_s)
     if raw is None:
         return [], req_warning, 0, ""
 
@@ -205,11 +238,24 @@ def _extract_expressions_for_single_text(
 
 
 def _load_prompt_text(prompt_path: str | None) -> str | None:
-    target = Path(prompt_path) if prompt_path else DEFAULT_PROMPT_PATH
-    try:
-        return target.read_text(encoding="utf-8").strip()
-    except OSError:
-        return None
+    candidates: list[Path] = []
+    if prompt_path:
+        p = Path(prompt_path)
+        if p.is_absolute():
+            candidates.append(p)
+        else:
+            candidates.append(Path.cwd() / p)
+            candidates.append(SECRETARIUS_ROOT.parent / p)
+            candidates.append(SECRETARIUS_ROOT / p)
+    candidates.append(DEFAULT_PROMPT_PATH)
+
+    for target in candidates:
+        try:
+            if target.exists():
+                return target.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+    return None
 
 
 def _load_chunker() -> tuple[Any | None, str | None]:
@@ -251,10 +297,10 @@ def _detect_local_sentence_model_path() -> Path | None:
     return candidates[0]
 
 
-def _post_chat_completion(*, llama_url: str, payload: dict[str, Any], timeout_s: float) -> tuple[str | None, str | None]:
+def _post_chat_completion(*, llama_cpp_url: str, payload: dict[str, Any], timeout_s: float) -> tuple[str | None, str | None]:
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = urlrequest.Request(
-        llama_url,
+        llama_cpp_url,
         data=body,
         headers={"Content-Type": "application/json"},
         method="POST",
@@ -262,6 +308,8 @@ def _post_chat_completion(*, llama_url: str, payload: dict[str, Any], timeout_s:
     try:
         with urlrequest.urlopen(req, timeout=timeout_s) as resp:
             raw = resp.read()
+    except urlerror.HTTPError as exc:
+        return None, f"llama-server request failed: HTTP Error {exc.code}: {exc.reason}"
     except (urlerror.URLError, TimeoutError) as exc:
         return None, f"llama-server request failed: {exc}"
 
@@ -389,8 +437,8 @@ def _request_fingerprint(
     *,
     text: str,
     system_prompt: str,
-    llama_url: str,
-    model: str,
+    llama_cpp_url: str,
+    llama_cpp_model: str,
     timeout_s: float,
     max_tokens: int,
     seed: int,
@@ -398,8 +446,8 @@ def _request_fingerprint(
     payload = {
         "text": text,
         "system_prompt": system_prompt,
-        "llama_url": llama_url,
-        "model": model,
+        "llama_cpp_url": llama_cpp_url,
+        "llama_cpp_model": llama_cpp_model,
         "timeout_s": timeout_s,
         "max_tokens": max_tokens,
         "temperature": 0.0,

@@ -45,7 +45,7 @@ def test_extract_tool_call_returns_expressions() -> None:
             "warning": None,
         }
 
-    mcp_server.extract_expressions_with_llama = fake_pipeline
+    mcp_server.extract_expressions_with_llama_cpp = fake_pipeline
 
     response = handle_mcp_message(
         {
@@ -83,7 +83,7 @@ def test_extract_tool_supports_document_content() -> None:
             "warning": None,
         }
 
-    mcp_server.extract_expressions_with_llama = fake_pipeline
+    mcp_server.extract_expressions_with_llama_cpp = fake_pipeline
 
     response = handle_mcp_message(
         {
@@ -131,7 +131,7 @@ def test_extract_tool_returns_empty_list_when_pipeline_fails() -> None:
     def fake_pipeline(*args, **kwargs):  # noqa: ANN002, ANN003, ANN202
         return {"expressions": [], "warning": "llama unavailable"}
 
-    mcp_server.extract_expressions_with_llama = fake_pipeline
+    mcp_server.extract_expressions_with_llama_cpp = fake_pipeline
 
     response = handle_mcp_message(
         {
