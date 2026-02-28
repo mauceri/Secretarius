@@ -100,6 +100,7 @@ class SecretariusAgentRuntime:
     def run(self, messages: list[dict[str, str]]) -> str:
         bot = self._ensure_bot()
         last_response: Any = None
+        fallback_user_text = self._last_user_content(messages)
         LOGGER.info("********************************************messages: %s", messages)
         for responses in bot.run(messages=messages):
             #LOGGER.info("********************************************responses: %s", responses)
@@ -110,7 +111,10 @@ class SecretariusAgentRuntime:
         LOGGER.info("********************************************last_response: %s", last_response)
 
         # First, handle native qwen-agent function_call payloads directly.
-        direct_tool_payload = self._maybe_execute_function_call_from_response(last_response)
+        direct_tool_payload = self._maybe_execute_function_call_from_response(
+            last_response,
+            fallback_user_text=fallback_user_text,
+        )
         if direct_tool_payload is not None:
             return direct_tool_payload
 
@@ -165,7 +169,7 @@ class SecretariusAgentRuntime:
             result = handle_tool_call_local(tool_name, arguments)
             payload = result.get("structuredContent")
             if isinstance(payload, dict):
-                return json.dumps(payload, ensure_ascii=False)
+                return _format_tool_payload_for_user(payload)
             return json.dumps(result, ensure_ascii=False)
         except Exception as exc:
             return json.dumps(
@@ -174,7 +178,11 @@ class SecretariusAgentRuntime:
             )
 
     @staticmethod
-    def _maybe_execute_function_call_from_response(last_response: Any) -> str | None:
+    def _maybe_execute_function_call_from_response(
+        last_response: Any,
+        *,
+        fallback_user_text: str | None = None,
+    ) -> str | None:
         if not isinstance(last_response, list):
             return None
 
@@ -208,12 +216,22 @@ class SecretariusAgentRuntime:
                 arguments = arguments["arguments"]
 
             tool_name = _canonical_tool_name(name)
+            if tool_name == "extract_expressions":
+                has_text = isinstance(arguments.get("text"), str) and bool(arguments.get("text").strip())
+                has_doc = isinstance(arguments.get("document"), dict)
+                if not has_text and not has_doc and isinstance(fallback_user_text, str) and fallback_user_text.strip():
+                    arguments = dict(arguments)
+                    arguments["text"] = _extract_text_candidate_for_extraction(fallback_user_text)
+                    LOGGER.info(
+                        "********************************************function_call_fallback_text len=%d",
+                        len(arguments["text"]),
+                    )
             try:
                 from .mcp_server import _handle_tool_call as handle_tool_call_local
                 result = handle_tool_call_local(tool_name, arguments)
                 payload = result.get("structuredContent")
                 if isinstance(payload, dict):
-                    return json.dumps(payload, ensure_ascii=False)
+                    return _format_tool_payload_for_user(payload)
                 return json.dumps(result, ensure_ascii=False)
             except Exception as exc:
                 return json.dumps(
@@ -231,6 +249,18 @@ class SecretariusAgentRuntime:
                 if isinstance(item, dict) and isinstance(item.get("function_call"), dict):
                     return True
         return False
+
+    @staticmethod
+    def _last_user_content(messages: list[dict[str, str]]) -> str | None:
+        for msg in reversed(messages):
+            if not isinstance(msg, dict):
+                continue
+            if msg.get("role") != "user":
+                continue
+            content = msg.get("content")
+            if isinstance(content, str) and content.strip():
+                return content
+        return None
 
 
 def _extract_tool_call_json(text: str) -> dict[str, Any] | None:
@@ -277,6 +307,42 @@ def _extract_first_json_object(text: str) -> dict[str, Any] | None:
         if isinstance(obj, dict):
             return obj
     return None
+
+
+def _format_tool_payload_for_user(payload: dict[str, Any]) -> str:
+    expressions_only = os.environ.get("SECRETARIUS_EXTRACT_RETURN_EXPRESSIONS_ONLY", "true").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    if expressions_only and payload.get("tool") == "extract_expressions":
+        expressions = payload.get("expressions")
+        if isinstance(expressions, list):
+            return json.dumps(expressions, ensure_ascii=False)
+    return json.dumps(payload, ensure_ascii=False)
+
+
+def _extract_text_candidate_for_extraction(user_prompt: str) -> str:
+    text = (user_prompt or "").strip()
+    lower = text.lower()
+    marker = "texte"
+    idx = lower.find(marker)
+    if idx != -1:
+        colon = text.find(":", idx)
+        if colon != -1 and colon + 1 < len(text):
+            candidate = text[colon + 1 :].strip()
+            if candidate:
+                text = candidate
+    text = text.replace("**", "")
+    lines = text.splitlines()
+    cleaned_lines: list[str] = []
+    for line in lines:
+        line = line.strip()
+        if line.startswith("*"):
+            line = line.lstrip("*").strip()
+        cleaned_lines.append(line)
+    return "\n".join(cleaned_lines).strip("* \n\t")
 
 
 _RUNTIME: SecretariusAgentRuntime | None = None
