@@ -1,0 +1,21 @@
+llm:
+  base_url: "http://localhost:11434"
+  model: "qwen3:0.6b"
+  think: false
+  raw_log_file: "logs/llm_raw.log"
+
+ui:
+  journal_file: "logs/guichet.log"
+
+openwebui:
+  host: "0.0.0.0"
+  port: 8000
+  port_fallback_attempts: 3
+  model_id: "secretarius-agent"
+  journal_file: "logs/openwebui.log"
+  request_timeout_s: 90
+
+mcp_servers:
+  oracle:
+    command: "python"
+    args: ["tools/oracle_server.py"]
