@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 
 from .models import Message, Role, SessionState, Priority, ContextItem
 from .ports import LLMInterface, ToolClientInterface, InputGatewayInterface
@@ -20,12 +21,15 @@ Tool selection rules:
 
 You MUST respond ONLY with a valid JSON object matching this schema:
 {{
-    "thought": "Your reasoning behind what to do next",
-    "action": "Name of the tool to use, or null if no action is needed",
-    "action_input": {{"arg1": "value1"}},
-    "final_answer": "Your response to the user if no further action is needed (mutually exclusive with action)"
+    "action": "Name of the tool to use, or null if no tool is needed",
+    "action_input": {{"arg1": "value1"}}
 }}
+Do not provide final_answer.
+Do not output chain-of-thought or hidden reasoning.
 """
+
+NO_TOOL_FALLBACK_MESSAGE = "Aucun outil ne correspond a votre demande."
+MAX_TOOL_CALLS_PER_TURN = 2
 
 class ChefDOrchestre:
     def __init__(
@@ -64,7 +68,7 @@ class ChefDOrchestre:
         if len(self.state.context_items) > max_context_items:
             self.state.context_items = self.state.context_items[-max_context_items:]
 
-    def _build_context_prompt(self) -> str:
+    def _build_context_prompt(self, include_session_history: bool = True) -> str:
         # Priority 1: Tool Results
         # Priority 2: Session History
         # Priority 3: Semantic Memory
@@ -78,7 +82,7 @@ class ChefDOrchestre:
             context_str += "--- Priority 1: Tool Results ---\n"
             for c in p1[-10:]: # keep recent
                 context_str += f"{c.content}\n"
-        if p2:
+        if include_session_history and p2:
             context_str += "--- Priority 2: Session History ---\n"
             for c in p2[-20:]:
                 context_str += f"{c.content}\n"
@@ -89,20 +93,189 @@ class ChefDOrchestre:
             
         return context_str
 
+    def _build_router_tools_schema(self, tools: list[dict]) -> str:
+        compact_tools: list[dict] = []
+        for tool in tools:
+            if not isinstance(tool, dict):
+                continue
+            name = str(tool.get("name") or "").strip()
+            if not name:
+                continue
+            description = str(tool.get("description") or "").strip()
+            input_schema = tool.get("inputSchema") if isinstance(tool.get("inputSchema"), dict) else {}
+            properties = input_schema.get("properties") if isinstance(input_schema.get("properties"), dict) else {}
+            required = input_schema.get("required") if isinstance(input_schema.get("required"), list) else []
+            fields = sorted(str(k) for k in properties.keys())
+            compact_tools.append(
+                {
+                    "name": name,
+                    "description": description[:220],
+                    "input_fields": fields,
+                    "required": [str(k) for k in required],
+                }
+            )
+        return json.dumps(compact_tools, ensure_ascii=False, indent=2)
+
+    def _sanitize_action_input(self, action: str, action_input: dict) -> dict:
+        if not isinstance(action_input, dict):
+            return {}
+
+        if action == "ask_oracle":
+            question = action_input.get("question")
+            if question is None:
+                return {}
+            return {"question": str(question)}
+
+        if action == "extract_expressions":
+            allowed = {"text", "document"}
+            return {k: v for k, v in action_input.items() if k in allowed}
+
+        if action == "expressions_to_embeddings":
+            allowed = {"expressions", "document", "model", "normalize", "batch_size"}
+            return {k: v for k, v in action_input.items() if k in allowed}
+
+        if action == "semantic_graph_search":
+            allowed = {
+                "embeddings",
+                "expressions",
+                "documents",
+                "top_k",
+                "document",
+                "upsert",
+                "milvus_uri",
+                "milvus_token",
+                "collection_name",
+                "metric_type",
+                "model",
+                "normalize",
+                "batch_size",
+            }
+            return {k: v for k, v in action_input.items() if k in allowed}
+
+        if action == "index_text":
+            allowed = {
+                "text",
+                "document",
+                "collection_name",
+                "milvus_uri",
+                "milvus_token",
+                "metric_type",
+                "model",
+                "normalize",
+                "batch_size",
+            }
+            return {k: v for k, v in action_input.items() if k in allowed}
+
+        if action == "search_text":
+            allowed = {
+                "query",
+                "top_k",
+                "collection_name",
+                "milvus_uri",
+                "milvus_token",
+                "metric_type",
+                "model",
+                "normalize",
+                "batch_size",
+            }
+            return {k: v for k, v in action_input.items() if k in allowed}
+
+        return action_input
+
+    def _is_explicit_oracle_request(self) -> bool:
+        user_text = ""
+        for msg in reversed(self.state.messages):
+            if msg.role == Role.USER:
+                user_text = (msg.content or "").strip().lower()
+                if user_text:
+                    break
+        if not user_text:
+            return False
+
+        # Keep oracle tool opt-in strict to avoid random fallback on unrelated requests.
+        oracle_markers = (
+            "oracle",
+            "orakel",
+            "proph",
+            "divination",
+            "voyance",
+            "boule de cristal",
+            "ask_oracle",
+        )
+        return any(marker in user_text for marker in oracle_markers)
+
+    def _latest_user_text(self) -> str:
+        for msg in reversed(self.state.messages):
+            if msg.role == Role.USER and isinstance(msg.content, str):
+                text = msg.content.strip()
+                if text:
+                    return text
+        return ""
+
+    def _ensure_extract_expressions_payload(self, action_input: dict) -> dict:
+        if not isinstance(action_input, dict):
+            action_input = {}
+
+        text = action_input.get("text")
+        has_text = isinstance(text, str) and bool(text.strip())
+
+        document = action_input.get("document")
+        has_document_text = False
+        if isinstance(document, dict):
+            content = document.get("content")
+            if isinstance(content, dict):
+                doc_text = content.get("text")
+                has_document_text = isinstance(doc_text, str) and bool(doc_text.strip())
+
+        if has_text or has_document_text:
+            return action_input
+
+        fallback_text = self._latest_user_text()
+        if fallback_text:
+            action_input["text"] = fallback_text
+            return action_input
+
+        return action_input
+
+    @staticmethod
+    def _strip_extract_instruction_prefix(text: str) -> str:
+        if not isinstance(text, str):
+            return text
+        t = text.strip()
+        if not t:
+            return t
+
+        # Remove leading imperative prompt wrapper while preserving poem/content body.
+        # Examples:
+        # "extraire les expressions caractéristiques de : <body>"
+        # "peux-tu extraire ... ? <body>"
+        patterns = [
+            r"(?is)^\s*(?:\*+\s*)?(?:peux-tu|pouvez-vous|merci de|veuillez)?\s*"
+            r"(?:extraire|extrait|extrais)\b.*?(?::|\n)\s*(.+)$",
+            r"(?is)^\s*(?:\*+\s*)?(?:extraire|extrait|extrais)\b.*?\?\s*(.+)$",
+        ]
+        for pattern in patterns:
+            m = re.match(pattern, t)
+            if m:
+                body = (m.group(1) or "").strip()
+                if body:
+                    return body
+        return t
+
     async def _execute_react_cycle(self):
         tools = await self.tool_client.list_tools()
         tool_names = {t.get("name") for t in tools if isinstance(t, dict)}
-        tools_schema = json.dumps(tools, indent=2)
+        tools_schema = self._build_router_tools_schema(tools)
         system_prompt = REACT_SYSTEM_PROMPT.format(tools_schema=tools_schema)
-        system_prompt += "\n" + self._build_context_prompt()
+        # Router mode: avoid duplicating the current user message in both
+        # `messages` and context prompt.
+        system_prompt += "\n" + self._build_context_prompt(include_session_history=False)
 
-        max_steps = 10
-        invalid_response_count = 0
         called_actions_in_cycle: set[str] = set()
-        for step in range(max_steps):
+        for _ in range(MAX_TOOL_CALLS_PER_TURN):
             try:
                 raw_response = await self.llm.generate_response(self.state.messages, system_prompt)
-                
+
                 # Try parsing JSON
                 try:
                     # Some LLMs wrap JSON in markdown blocks
@@ -121,150 +294,108 @@ class ChefDOrchestre:
                         f"Failed to parse LLM JSON: {raw_response}",
                         phase="parse_json_error",
                     )
-                    self.state.messages.append(Message(
-                        role=Role.USER, 
-                        content="Your previous response was not valid JSON. Please respond ONLY with a raw JSON object matching the schema."
-                    ))
+                    await self._display_message("Secretarius", NO_TOOL_FALLBACK_MESSAGE, phase="no_tool_json_error")
+                    self.state.messages.append(Message(role=Role.ASSISTANT, content=NO_TOOL_FALLBACK_MESSAGE))
+                    self.state.context_items.append(
+                        ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {NO_TOOL_FALLBACK_MESSAGE}")
+                    )
                     self._trim_state()
-                    continue
+                    return
 
-                thought = response_data.get("thought", "")
-                if thought:
-                    await self._display_thought(thought, phase="thought")
-
+                logger.info(f"############################################# {response_data}")
                 action = response_data.get("action")
                 if isinstance(action, str):
                     action = action.strip() or None
                 action_input = response_data.get("action_input", {})
-                final_answer = response_data.get("final_answer")
-                if isinstance(final_answer, str):
-                    final_answer = final_answer.strip() or None
+                if not isinstance(action_input, dict):
+                    action_input = {}
+                if response_data.get("final_answer") is not None:
+                    await self._display_thought(
+                        "Ignored model final_answer: router mode requires tool-only decisions.",
+                        phase="ignored_model_final_answer",
+                    )
 
-                if final_answer and action:
-                    # Tolerance strategy for small models:
-                    # - before any tool call in this cycle, if action is valid, execute it.
-                    # - after at least one tool call, favor finalization to avoid duplicated calls.
-                    if action in tool_names and not called_actions_in_cycle:
-                        await self._display_thought(
-                            f"Model returned both action and final_answer; proceeding with action '{action}'.",
-                            phase="validation_recovered_prefer_action",
-                        )
-                        final_answer = None
-                    elif called_actions_in_cycle and action in tool_names:
-                        await self._display_thought(
-                            "Model returned both action and final_answer after a tool call; proceeding with final_answer.",
-                            phase="validation_recovered_prefer_final_answer",
-                        )
-                        action = None
-                    else:
-                        invalid_response_count += 1
-                        await self._display_thought(
-                            "Invalid response: both action and final_answer were provided.",
-                            phase="validation_error",
-                        )
-                        self.state.messages.append(Message(
-                            role=Role.USER,
-                            content=(
-                                "Your previous response included both action and final_answer. "
-                                "Choose exactly one."
-                            )
-                        ))
-                        self._trim_state()
-                        if invalid_response_count >= 3:
-                            await self._display_message(
-                                "System",
-                                "Le modèle renvoie des réponses invalides répétées. Réessayez avec une formulation plus simple.",
-                                phase="too_many_invalid_responses",
-                            )
-                            break
-                        continue
-
-                if final_answer:
-                    invalid_response_count = 0
-                    # Complete cycle
-                    self.state.messages.append(Message(role=Role.ASSISTANT, content=final_answer))
-                    await self._display_message("Secretarius", final_answer, phase="final_answer")
-                    
+                if not action or action not in tool_names:
+                    await self._display_message("Secretarius", NO_TOOL_FALLBACK_MESSAGE, phase="no_matching_tool")
+                    self.state.messages.append(Message(role=Role.ASSISTANT, content=NO_TOOL_FALLBACK_MESSAGE))
                     self.state.context_items.append(
-                        ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {final_answer}")
+                        ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {NO_TOOL_FALLBACK_MESSAGE}")
                     )
                     self._trim_state()
-                    break
+                    return
 
-                if action:
-                    invalid_response_count = 0
-                    action_signature = f"{action}:{json.dumps(action_input, sort_keys=True, ensure_ascii=False)}"
-                    if action_signature in called_actions_in_cycle:
-                        await self._display_thought(
-                            f"Action '{action}' with same inputs already called in this cycle; requesting final_answer.",
-                            phase="duplicate_action_guard",
-                        )
-                        self.state.messages.append(Message(
-                            role=Role.USER,
-                            content=(
-                                "You already called this tool with the same inputs in this cycle and got an observation. "
-                                "Do not call the tool again. Provide final_answer now."
-                            ),
-                        ))
-                        self._trim_state()
-                        invalid_response_count += 1
-                        if invalid_response_count >= 3:
-                            await self._display_message(
-                                "System",
-                                "Le modèle répète les mêmes appels outil. Réessayez avec une formulation plus simple.",
-                                phase="duplicate_action_guard_stop",
-                            )
-                            break
-                        continue
-                    called_actions_in_cycle.add(action_signature)
-
+                if action == "ask_oracle" and not self._is_explicit_oracle_request():
                     await self._display_thought(
-                        f"Calling tool: {action} with inputs {action_input}",
-                        phase="tool_call_start",
+                        "Blocked ask_oracle: user did not explicitly request oracle usage.",
+                        phase="oracle_policy_block",
                     )
-                    try:
-                        observation = await self.tool_client.call_tool(action, action_input)
-                    except Exception as e:
-                        observation = f"Error calling tool {action}: {e}"
-                        
-                    await self._display_thought(
-                        f"Observation: {observation}",
-                        phase="tool_call_observation",
+                    await self._display_message("Secretarius", NO_TOOL_FALLBACK_MESSAGE, phase="oracle_policy_block_stop")
+                    self.state.messages.append(Message(role=Role.ASSISTANT, content=NO_TOOL_FALLBACK_MESSAGE))
+                    self.state.context_items.append(
+                        ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {NO_TOOL_FALLBACK_MESSAGE}")
                     )
-
-                    # Priorité 1 : Tool result
-                    tool_context = f"Tool '{action}' returned: {observation}"
-                    self.state.context_items.append(ContextItem(
-                        priority=Priority.TOOL_RESULT,
-                        content=tool_context
-                    ))
-                    
-                    self.state.messages.append(Message(
-                        role=Role.TOOL,
-                        name=action,
-                        content=observation
-                    ))
                     self._trim_state()
-                    continue
+                    return
 
-                # If neither action nor final answer is returned, force a correction.
-                invalid_response_count += 1
-                self.state.messages.append(Message(
-                    role=Role.USER,
-                    content=(
-                        "Your previous response had neither action nor final_answer. "
-                        "Provide exactly one of them."
+                sanitized_action_input = self._sanitize_action_input(action, action_input)
+                if action == "extract_expressions":
+                    sanitized_action_input = self._ensure_extract_expressions_payload(sanitized_action_input)
+                    text_value = sanitized_action_input.get("text")
+                    if isinstance(text_value, str) and text_value.strip():
+                        sanitized_action_input["text"] = self._strip_extract_instruction_prefix(text_value)
+                removed_keys = sorted(set(action_input.keys()) - set(sanitized_action_input.keys()))
+                if removed_keys:
+                    await self._display_thought(
+                        f"Dropped unsupported tool args for '{action}': {removed_keys}",
+                        phase="tool_input_sanitized",
                     )
+                action_input = sanitized_action_input
+                action_signature = f"{action}:{json.dumps(action_input, sort_keys=True, ensure_ascii=False)}"
+                if action_signature in called_actions_in_cycle:
+                    await self._display_message("Secretarius", NO_TOOL_FALLBACK_MESSAGE, phase="duplicate_action_guard")
+                    self.state.messages.append(Message(role=Role.ASSISTANT, content=NO_TOOL_FALLBACK_MESSAGE))
+                    self.state.context_items.append(
+                        ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {NO_TOOL_FALLBACK_MESSAGE}")
+                    )
+                    self._trim_state()
+                    return
+                called_actions_in_cycle.add(action_signature)
+
+                await self._display_thought(
+                    f"Calling tool: {action} with inputs {action_input}",
+                    phase="tool_call_start",
+                )
+                try:
+                    observation = await self.tool_client.call_tool(action, action_input)
+                except Exception as e:
+                    observation = f"Error calling tool {action}: {e}"
+
+                await self._display_thought(
+                    f"Observation: {observation}",
+                    phase="tool_call_observation",
+                )
+
+                tool_context = f"Tool '{action}' returned: {observation}"
+                self.state.context_items.append(ContextItem(
+                    priority=Priority.TOOL_RESULT,
+                    content=tool_context
                 ))
+
+                self.state.messages.append(Message(
+                    role=Role.TOOL,
+                    name=action,
+                    content=observation
+                ))
+
+                # Router mode: return tool output directly, no post-tool LLM formatting.
+                tool_output = str(observation).strip()
+                self.state.messages.append(Message(role=Role.ASSISTANT, content=tool_output))
+                await self._display_message("Secretarius", tool_output, phase="final_answer_from_tool")
+                self.state.context_items.append(
+                    ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {tool_output}")
+                )
                 self._trim_state()
-                if invalid_response_count >= 3:
-                    await self._display_message(
-                        "System",
-                        "Le modèle renvoie des réponses invalides répétées. Réessayez avec une formulation plus simple.",
-                        phase="too_many_invalid_responses",
-                    )
-                    break
-                    
+                return
             except Exception as e:
                 logger.error(f"Error in ReAct cycle: {e}")
                 await self._display_message(
@@ -272,10 +403,21 @@ class ChefDOrchestre:
                     f"An internal error occurred: {e}",
                     phase="react_cycle_exception",
                 )
-                break
+                return
+
+        await self._display_message("Secretarius", NO_TOOL_FALLBACK_MESSAGE, phase="max_tool_calls_reached")
+        self.state.messages.append(Message(role=Role.ASSISTANT, content=NO_TOOL_FALLBACK_MESSAGE))
+        self.state.context_items.append(
+            ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {NO_TOOL_FALLBACK_MESSAGE}")
+        )
+        self._trim_state()
 
     async def handle_user_input(self, user_input: str):
         async with self._cycle_lock:
+            # Stateless-by-default: reset state for every user request,
+            # regardless of channel, to avoid anchoring on prior turns.
+            self.state = SessionState()
+
             # 1. Update State
             self.state.messages.append(Message(role=Role.USER, content=user_input))
             self.state.context_items.append(ContextItem(

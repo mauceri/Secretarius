@@ -171,45 +171,6 @@ def _tools_catalog() -> list[MCPTool]:
             },
         ),
         MCPTool(
-            name="expressions_to_embeddings",
-            description=(
-                "Transforme une liste d'expressions caracteristiques en plongements "
-                "(embeddings) multilingues."
-            ),
-            input_schema={
-                "type": "object",
-                "properties": {
-                    "expressions": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "minItems": 1,
-                        "description": "Expressions caracteristiques a projeter.",
-                    },
-                    "document": {
-                        "type": "object",
-                        "description": "Document Secretarius v0.1 contenant derived.expressions.",
-                        "additionalProperties": True,
-                    },
-                    "model": {
-                        "type": "string",
-                        "description": "Modele d'embedding cible (optionnel).",
-                    },
-                    "normalize": {
-                        "type": "boolean",
-                        "default": True,
-                        "description": "Normaliser les vecteurs (recommande pour cosine).",
-                    },
-                    "batch_size": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "default": 32,
-                    },
-                },
-                "anyOf": [{"required": ["expressions"]}, {"required": ["document"]}],
-                "additionalProperties": True,
-            },
-        ),
-        MCPTool(
             name="semantic_graph_search",
             description=(
                 "Recherche/insertions unifiees dans Milvus a partir d'une liste de "
@@ -293,6 +254,84 @@ def _tools_catalog() -> list[MCPTool]:
                     {"required": ["expressions"]},
                     {"required": ["document"]},
                 ],
+                "additionalProperties": True,
+            },
+        ),
+        MCPTool(
+            name="index_text",
+            description=(
+                "Pipeline metier: extrait les expressions d'un texte/document puis "
+                "insere dans Milvus."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": "Texte brut a indexer.",
+                    },
+                    "document": {
+                        "type": "object",
+                        "description": "Document Secretarius v0.1.",
+                        "additionalProperties": True,
+                    },
+                    "collection_name": {
+                        "type": "string",
+                        "description": "Collection cible Milvus.",
+                    },
+                    "milvus_uri": {
+                        "type": "string",
+                        "description": "URI Milvus.",
+                    },
+                    "milvus_token": {
+                        "type": "string",
+                        "description": "Token Milvus optionnel.",
+                    },
+                    "metric_type": {
+                        "type": "string",
+                        "description": "Metrique d'index (COSINE, IP, L2).",
+                    },
+                },
+                "anyOf": [{"required": ["text"]}, {"required": ["document"]}],
+                "additionalProperties": True,
+            },
+        ),
+        MCPTool(
+            name="search_text",
+            description=(
+                "Pipeline metier: recherche semantique dans Milvus a partir d'une "
+                "requete textuelle."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Requete textuelle a rechercher.",
+                    },
+                    "top_k": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "default": 10,
+                    },
+                    "collection_name": {
+                        "type": "string",
+                        "description": "Collection cible Milvus.",
+                    },
+                    "milvus_uri": {
+                        "type": "string",
+                        "description": "URI Milvus.",
+                    },
+                    "milvus_token": {
+                        "type": "string",
+                        "description": "Token Milvus optionnel.",
+                    },
+                    "metric_type": {
+                        "type": "string",
+                        "description": "Metrique d'index (COSINE, IP, L2).",
+                    },
+                },
+                "required": ["query"],
                 "additionalProperties": True,
             },
         ),
@@ -670,11 +709,80 @@ def _handle_semantic_graph_search(arguments: Dict[str, Any]) -> Dict[str, Any]:
     return _tool_result(payload)
 
 
+def _handle_index_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
+    # Reuse extraction pipeline, then index by expressions/doc.
+    extract_res = _handle_extract_expressions(arguments)
+    extract_payload = extract_res.get("structuredContent", {}) if isinstance(extract_res, dict) else {}
+    if not isinstance(extract_payload, dict):
+        raise ValueError("extract_expressions returned invalid payload")
+
+    expressions = extract_payload.get("expressions")
+    normalized_doc = extract_payload.get("document")
+    if not isinstance(expressions, list) or not expressions:
+        raise ValueError("No expressions extracted; cannot index")
+
+    graph_args: Dict[str, Any] = {
+        "expressions": expressions,
+        "upsert": True,
+    }
+    if isinstance(normalized_doc, dict):
+        graph_args["document"] = normalized_doc
+    for key in ("collection_name", "milvus_uri", "milvus_token", "metric_type", "model", "normalize", "batch_size"):
+        if key in arguments:
+            graph_args[key] = arguments[key]
+
+    graph_res = _handle_semantic_graph_search(graph_args)
+    graph_payload = graph_res.get("structuredContent", {}) if isinstance(graph_res, dict) else {}
+    if not isinstance(graph_payload, dict):
+        raise ValueError("semantic_graph_search returned invalid payload")
+
+    payload = {
+        "status": "ok",
+        "tool": "index_text",
+        "message": "Indexation complete (extraction + insertion semantic graph).",
+        "extract": extract_payload,
+        "index": graph_payload,
+        "warning": extract_payload.get("warning") or graph_payload.get("warning"),
+    }
+    return _tool_result(payload)
+
+
+def _handle_search_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
+    query = arguments.get("query")
+    if not isinstance(query, str) or not query.strip():
+        raise ValueError("'query' must be a non-empty string")
+
+    graph_args: Dict[str, Any] = {
+        "expressions": [query.strip()],
+        "upsert": False,
+        "top_k": arguments.get("top_k", 10),
+    }
+    for key in ("collection_name", "milvus_uri", "milvus_token", "metric_type", "model", "normalize", "batch_size"):
+        if key in arguments:
+            graph_args[key] = arguments[key]
+
+    graph_res = _handle_semantic_graph_search(graph_args)
+    graph_payload = graph_res.get("structuredContent", {}) if isinstance(graph_res, dict) else {}
+    if not isinstance(graph_payload, dict):
+        raise ValueError("semantic_graph_search returned invalid payload")
+
+    payload = {
+        "status": "ok",
+        "tool": "search_text",
+        "message": "Recherche semantique executee.",
+        "query": query.strip(),
+        "search": graph_payload,
+        "warning": graph_payload.get("warning"),
+    }
+    return _tool_result(payload)
+
+
 def _handle_tool_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     handlers = {
         "extract_expressions": _handle_extract_expressions,
-        "expressions_to_embeddings": _handle_expressions_to_embeddings,
         "semantic_graph_search": _handle_semantic_graph_search,
+        "index_text": _handle_index_text,
+        "search_text": _handle_search_text,
     }
     handler = handlers.get(name)
     if handler is None:

@@ -9,8 +9,10 @@ from core.ports import InputGatewayInterface, LLMInterface, ToolClientInterface
 class FakeLLM(LLMInterface):
     def __init__(self, responses: list[str]):
         self._responses = responses[:]
+        self.calls = 0
 
     async def generate_response(self, messages: list[Message], system_prompt: str) -> str:
+        self.calls += 1
         if not self._responses:
             raise RuntimeError("No fake responses left")
         return self._responses.pop(0)
@@ -23,6 +25,11 @@ class FakeToolClient(ToolClientInterface):
     async def list_tools(self) -> list[dict[str, Any]]:
         return [
             {
+                "name": "extract_expressions",
+                "description": "Extract expressions",
+                "inputSchema": {"type": "object"},
+            },
+            {
                 "name": "ask_oracle",
                 "description": "Ask a yes/no question",
                 "inputSchema": {"type": "object"},
@@ -31,7 +38,11 @@ class FakeToolClient(ToolClientInterface):
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> str:
         self.calls.append((name, arguments))
-        return "oracle: OUI"
+        if name == "extract_expressions":
+            return '{"expressions":["a","b"]}'
+        if name == "ask_oracle":
+            return "oracle: OUI"
+        return "unknown"
 
     async def connect(self):
         return None
@@ -60,27 +71,28 @@ class FakeGateway(InputGatewayInterface):
 
 
 class TestChefDOrchestre(unittest.IsolatedAsyncioTestCase):
-    async def test_accepts_markdown_json_and_displays_final_answer(self):
+    async def test_accepts_markdown_json_and_returns_tool_output_directly(self):
         llm = FakeLLM(
             [
                 """```json
-{"thought":"ok","action":null,"action_input":{},"final_answer":"Bonjour"}
+{"action":"extract_expressions","action_input":{"text":"Bonjour"}}
 ```"""
             ]
         )
+        tools = FakeToolClient()
         gateway = FakeGateway()
-        orchestrator = ChefDOrchestre(llm=llm, tool_client=FakeToolClient(), gateway=gateway)
+        orchestrator = ChefDOrchestre(llm=llm, tool_client=tools, gateway=gateway)
 
         await orchestrator.handle_user_input("Salut")
 
-        self.assertEqual(gateway.messages[-1], ("Secretarius", "Bonjour"))
+        self.assertEqual(llm.calls, 1)
+        self.assertEqual(len(tools.calls), 1)
+        self.assertEqual(gateway.messages[-1], ("Secretarius", '{"expressions":["a","b"]}'))
 
-    async def test_rejects_action_and_final_answer_together_then_recovers(self):
+    async def test_ignores_final_answer_and_executes_action(self):
         llm = FakeLLM(
             [
-                '{"thought":"bad","action":"ask_oracle","action_input":{"question":"x"},"final_answer":"oops"}',
-                '{"thought":"use tool","action":"ask_oracle","action_input":{"question":"x"},"final_answer":null}',
-                '{"thought":"done","action":null,"action_input":{},"final_answer":"Termine"}',
+                '{"action":"extract_expressions","action_input":{"text":"x"},"final_answer":"oops"}',
             ]
         )
         tools = FakeToolClient()
@@ -89,12 +101,12 @@ class TestChefDOrchestre(unittest.IsolatedAsyncioTestCase):
 
         await orchestrator.handle_user_input("Test")
 
-        self.assertTrue(any("both action and final_answer" in t for t in gateway.thoughts))
         self.assertEqual(len(tools.calls), 1)
-        self.assertEqual(gateway.messages[-1], ("Secretarius", "Termine"))
+        self.assertTrue(any("Ignored model final_answer" in t for t in gateway.thoughts))
+        self.assertEqual(gateway.messages[-1], ("Secretarius", '{"expressions":["a","b"]}'))
 
     async def test_state_is_trimmed(self):
-        llm = FakeLLM(['{"thought":"ok","action":null,"action_input":{},"final_answer":"done"}'])
+        llm = FakeLLM(['{"action":"extract_expressions","action_input":{"text":"done"}}'])
         gateway = FakeGateway()
         orchestrator = ChefDOrchestre(llm=llm, tool_client=FakeToolClient(), gateway=gateway)
 
@@ -104,3 +116,61 @@ class TestChefDOrchestre(unittest.IsolatedAsyncioTestCase):
         self.assertLessEqual(len(orchestrator.state.messages), 100)
         self.assertLessEqual(len(orchestrator.state.context_items), 200)
 
+    async def test_blocks_ask_oracle_when_not_explicitly_requested(self):
+        llm = FakeLLM(
+            [
+                '{"action":"ask_oracle","action_input":{"question":"Fera-t-il beau ?"}}',
+            ]
+        )
+        tools = FakeToolClient()
+        gateway = FakeGateway()
+        orchestrator = ChefDOrchestre(llm=llm, tool_client=tools, gateway=gateway)
+
+        await orchestrator.handle_user_input("Fera-t-il beau aujourd'hui ?")
+
+        self.assertEqual(len(tools.calls), 0)
+        self.assertTrue(any("Blocked ask_oracle" in t for t in gateway.thoughts))
+        self.assertEqual(
+            gateway.messages[-1],
+            ("Secretarius", "Aucun outil ne correspond a votre demande."),
+        )
+
+    async def test_returns_fallback_when_no_tool_matches(self):
+        llm = FakeLLM(['{"action":null,"action_input":{}}'])
+        tools = FakeToolClient()
+        gateway = FakeGateway()
+        orchestrator = ChefDOrchestre(llm=llm, tool_client=tools, gateway=gateway)
+
+        await orchestrator.handle_user_input("Bonjour")
+
+        self.assertEqual(llm.calls, 1)
+        self.assertEqual(len(tools.calls), 0)
+        self.assertEqual(gateway.messages[-1], ("Secretarius", "Aucun outil ne correspond a votre demande."))
+
+    async def test_extract_expressions_recovers_when_text_missing(self):
+        llm = FakeLLM(['{"action":"extract_expressions","action_input":{"document":"text"}}'])
+        tools = FakeToolClient()
+        gateway = FakeGateway()
+        orchestrator = ChefDOrchestre(llm=llm, tool_client=tools, gateway=gateway)
+
+        user_text = "Extraire les expressions de ce texte: Dans la plaine les baladins."
+        await orchestrator.handle_user_input(user_text)
+
+        self.assertEqual(len(tools.calls), 1)
+        tool_name, tool_args = tools.calls[0]
+        self.assertEqual(tool_name, "extract_expressions")
+        self.assertEqual(tool_args.get("text"), "Dans la plaine les baladins.")
+
+    async def test_extract_expressions_strips_instruction_prefix(self):
+        llm = FakeLLM(
+            ['{"action":"extract_expressions","action_input":{"text":"Extraire les expressions caractéristiques de : Dans la plaine les baladins"}}']
+        )
+        tools = FakeToolClient()
+        gateway = FakeGateway()
+        orchestrator = ChefDOrchestre(llm=llm, tool_client=tools, gateway=gateway)
+
+        await orchestrator.handle_user_input("ignored")
+
+        self.assertEqual(len(tools.calls), 1)
+        _, tool_args = tools.calls[0]
+        self.assertEqual(tool_args.get("text"), "Dans la plaine les baladins")
