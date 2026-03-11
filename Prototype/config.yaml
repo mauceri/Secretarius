@@ -17,6 +17,6 @@ openwebui:
   request_timeout_s: 90
 
 mcp_servers:
-  oracle:
+  secretarius:
     command: "python"
-    args: ["tools/oracle_server.py"]
+    args: ["tools/secretarius_server.py"]

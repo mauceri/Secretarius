@@ -32,16 +32,19 @@ class SecretariusTUI(App):
         self,
         callback: Callable[[str], Awaitable[None]] = None,
         journal_hook: Optional[Callable[[str, str, str], None]] = None,
+        show_thoughts: bool = True,
     ):
         super().__init__()
         self.callback = callback
         self.journal_hook = journal_hook
+        self.show_thoughts = show_thoughts
 
     def compose(self) -> ComposeResult:
         with VerticalScroll(id="chat-container"):
             yield RichLog(id="chat-log", markup=True)
-        with VerticalScroll(id="thought-container"):
-            yield RichLog(id="thought-log", markup=True)
+        if self.show_thoughts:
+            with VerticalScroll(id="thought-container"):
+                yield RichLog(id="thought-log", markup=True)
         yield Input(placeholder="Type your message to Secretarius...", id="user-input")
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -61,6 +64,8 @@ class SecretariusTUI(App):
             asyncio.create_task(self.callback(user_text))
 
     def log_thought(self, text: str):
+        if not self.show_thoughts:
+            return
         thought_log = self.query_one("#thought-log", RichLog)
         thought_log.write(f"[italic]{escape(text)}[/italic]")
         if self.journal_hook:
@@ -79,13 +84,14 @@ class SecretariusTUI(App):
 
 
 class TUIChannel:
-    def __init__(self, guichet: GuichetUnique, channel_name: str = "tui"):
+    def __init__(self, guichet: GuichetUnique, channel_name: str = "tui", show_thoughts: bool = True):
         self._guichet = guichet
         self._channel_name = channel_name
+        self._show_thoughts = show_thoughts
         self._app: SecretariusTUI = None
         self._guichet.register_channel(
             self._channel_name,
-            thought_sink=self._on_thought,
+            thought_sink=self._on_thought if self._show_thoughts else None,
             message_sink=self._on_message,
         )
 
@@ -118,5 +124,6 @@ class TUIChannel:
         self._app = SecretariusTUI(
             callback=self._on_user_input,
             journal_hook=None,
+            show_thoughts=self._show_thoughts,
         )
         await self._app.run_async()

@@ -1,3 +1,8 @@
+# ATTENTION - REGLE DE TRAVAIL OBLIGATOIRE
+NE FAIRE AUCUNE MODIFICATION DE CODE, DE CONFIGURATION OU DE FICHIER SANS ACCORD EXPLICITE PREALABLE DE L'UTILISATEUR.
+TOUTE PROPOSITION DE CHANGEMENT DOIT D'ABORD ETRE VALIDEE PAR L'UTILISATEUR AVANT EDITION.
+POUR LES COMMANDES PYTHON SUR CE PROJET, UTILISER L'ENVIRONNEMENT VIRTUEL : /home/mauceric/Secretarius/.venv
+
 # Continuation - Secretarius Prototype
 
 ## Contexte
@@ -14,7 +19,7 @@ Objectif: rendre `Prototype` autonome, avec serveur MCP fonctionnel et outils in
   - `adapters/output/llm_ollama.py` (timeout HTTP)
   - `main.py` (fallback config, `sys.executable`, `cwd`)
 - Serveur MCP local:
-  - `tools/oracle_server.py`
+  - `tools/secretarius_server.py`
   - expose `ask_oracle` + délègue aux outils locaux vendorisés.
 - Intégration locale des outils MCP (copiés dans `Prototype`):
   - `secretarius_local/mcp_server.py`
@@ -190,3 +195,54 @@ Résultat attendu: aucun match.
 ### Décisions produit entérinées
 - `extract_expressions` reste exposé pour usage d’analyse.
 - `expressions_to_embeddings` n’est plus un outil final utilisateur.
+- IMPORTANT (architecture): la logique de retry/dédup spécifique OpenWebUI doit rester dans le canal `openwebui_api.py` (transport), pas dans les outils MCP; l’orchestrateur ne garde qu’une protection générique minimale anti-boucle.
+
+---
+
+## Mise à jour du 2026-03-06
+
+### Changements effectués
+- Nettoyage API extraction:
+  - suppression des wrappers legacy autour de `extract_expressions`,
+  - simplification du chargement côté `secretarius_local/mcp_server.py` pour ne résoudre qu'une seule fonction publique d'extraction.
+- Factorisation des chemins runtime:
+  - ajout de `secretarius_local/runtime_paths.py`,
+  - suppression des chemins locaux codés en dur pour NLTK et le cache Hugging Face,
+  - réutilisation de cette résolution dans `secretarius_local/expression_extractor.py` et `secretarius_local/embeddings.py`.
+- Externalisation des prompts:
+  - renommage de `secretarius_local/prompts/prompt.txt` vers `secretarius_local/prompts/prompt_extracteur.txt`,
+  - ajout de `secretarius_local/prompts/prompt_routeur.txt`,
+  - chargement disque du prompt routeur dans `core/chef_orchestre.py`,
+  - fallback de compatibilité conservé côté extracteur vers l'ancien `prompt.txt`.
+- Observabilité renforcée:
+  - journalisation dans `logs/guichet.log` du prompt envoyé à `llama.cpp` pour `extract_expressions`,
+  - journalisation dans `logs/guichet.log` du prompt routeur final envoyé à Qwen (`system_prompt` + `messages`).
+- Prompt routeur révisé:
+  - version française dédiée au rôle de routeur MCP,
+  - ajout de contraintes explicites contre la troncature du texte multiligne,
+  - interdiction explicite de pseudo-valeurs comme `document: "text"`,
+  - ajout d'exemples few-shot, dont un cas d'extraction multiligne.
+
+### Diagnostic confirmé
+- Le problème de troncature observé sur `extract_expressions` ne venait ni d'OpenWebUI ni de l'outil d'extraction.
+- Les logs montrent que le routeur recevait bien l'intégralité du poème dans `messages`, puis que Qwen renvoyait un `action_input.text` tronqué à la première ligne, parfois avec un faux `document: "text"`.
+- L'amélioration doit donc rester concentrée sur le prompt routeur et l'observabilité de son entrée/sortie.
+
+### Tests / validation
+- Régression détectée après externalisation du prompt routeur:
+  - cause: utilisation de `.format(...)` sur un prompt fichier contenant des accolades JSON littérales,
+  - symptôme: `KeyError: '"action"'` dans `tests/test_chef_orchestre.py`.
+- Correctif appliqué:
+  - remplacement du formatage global par une substitution ciblée de `{tools_schema}`.
+- Validation effectuée dans l'environnement virtuel projet:
+  - `source ../.venv/bin/activate && python -m unittest discover -s tests -p 'test_*.py' -v`
+  - résultat: 17 tests OK.
+
+### Point de reprise pour demain
+- Rejouer un cas d'extraction multiligne via OpenWebUI et vérifier dans `logs/guichet.log`:
+  - le bloc `Router LLM request`,
+  - la ligne `Calling tool: extract_expressions ...`,
+  - le bloc `llama.cpp extract request`.
+- Si Qwen tronque encore `action_input.text`, décider entre:
+  - renforcement supplémentaire du prompt routeur,
+  - pré-routage déterministe pour certains cas très reconnaissables d'extraction.

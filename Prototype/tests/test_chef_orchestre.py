@@ -33,7 +33,12 @@ class FakeToolClient(ToolClientInterface):
                 "name": "ask_oracle",
                 "description": "Ask a yes/no question",
                 "inputSchema": {"type": "object"},
-            }
+            },
+            {
+                "name": "index_text",
+                "description": "Index text",
+                "inputSchema": {"type": "object"},
+            },
         ]
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> str:
@@ -42,6 +47,13 @@ class FakeToolClient(ToolClientInterface):
             return '{"expressions":["a","b"]}'
         if name == "ask_oracle":
             return "oracle: OUI"
+        if name == "index_text":
+            return (
+                '{"status":"ok","tool":"index_text",'
+                '"extract":{"expressions":["a","b"]},'
+                '"index":{"collection_name":"secretarius_semantic_graph","inserted_count":0,'
+                '"warning":"milvus connection failed"}}'
+            )
         return "unknown"
 
     async def connect(self):
@@ -174,3 +186,56 @@ class TestChefDOrchestre(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(tools.calls), 1)
         _, tool_args = tools.calls[0]
         self.assertEqual(tool_args.get("text"), "Dans la plaine les baladins")
+
+    async def test_index_text_recovers_from_document_string_and_drops_bad_collection_name(self):
+        llm = FakeLLM(
+            [
+                '{"action":"index_text","action_input":{"collection_name":"text","document":"Indexer le texte : Dans la plaine les baladins"}}',
+            ]
+        )
+        tools = FakeToolClient()
+        gateway = FakeGateway()
+        orchestrator = ChefDOrchestre(llm=llm, tool_client=tools, gateway=gateway)
+
+        await orchestrator.handle_user_input("Indexer le texte : Dans la plaine les baladins")
+
+        self.assertEqual(len(tools.calls), 1)
+        tool_name, tool_args = tools.calls[0]
+        self.assertEqual(tool_name, "index_text")
+        self.assertEqual(tool_args.get("text"), "Dans la plaine les baladins")
+        self.assertNotIn("collection_name", tool_args)
+        self.assertNotIn("document", tool_args)
+        self.assertTrue(any("Index summary:" in t for t in gateway.thoughts))
+
+    async def test_index_text_ignores_collection_name_unless_user_requests_it(self):
+        llm = FakeLLM(
+            [
+                '{"action":"index_text","action_input":{"collection_name":"tetes_charniers","text":"Quand je considere ces tetes entassees"}}',
+            ]
+        )
+        tools = FakeToolClient()
+        gateway = FakeGateway()
+        orchestrator = ChefDOrchestre(llm=llm, tool_client=tools, gateway=gateway)
+
+        await orchestrator.handle_user_input("Indexer : Quand je considere ces tetes entassees")
+
+        self.assertEqual(len(tools.calls), 1)
+        _, tool_args = tools.calls[0]
+        self.assertNotIn("collection_name", tool_args)
+
+    async def test_index_text_prefers_user_multiline_text_over_llm_rewrite(self):
+        llm = FakeLLM(
+            [
+                '{"action":"index_text","action_input":{"text":"Indexer le texte : version alteree sur une ligne"}}',
+            ]
+        )
+        tools = FakeToolClient()
+        gateway = FakeGateway()
+        orchestrator = ChefDOrchestre(llm=llm, tool_client=tools, gateway=gateway)
+
+        user_text = "Indexer le texte :\nVers un.\nVers deux."
+        await orchestrator.handle_user_input(user_text)
+
+        self.assertEqual(len(tools.calls), 1)
+        _, tool_args = tools.calls[0]
+        self.assertEqual(tool_args.get("text"), "Vers un.\nVers deux.")

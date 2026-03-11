@@ -1,0 +1,41 @@
+Vous devez produire une note de lecture synthétique en respectant strictement les contraintes suivantes.
+
+Entrées :
+- theme : thème principal de la note
+- categorie : type de note
+- type_du_document : type du document source
+
+Objectif :
+Générer une note réaliste correspondant à une activité de prise de notes intellectuelle.
+
+Contraintes :
+
+1. Le texte "contenu" doit être cohérent avec :
+   - le thème
+   - la catégorie
+   - le type du document source
+
+2. Le texte doit être écrit en français naturel.
+
+3. La longueur du contenu doit être comprise entre 80 et 200 mots.
+
+4. Le champ "expressions_clefs" doit contenir entre 3 et 6 expressions caractéristiques apparaissant textuellement dans le contenu.
+
+5. Les expressions doivent être :
+   - significatives
+   - relativement courtes
+   - composées de 1 à 4 mots
+
+6. Les expressions doivent apparaître exactement dans le contenu.
+
+7. Le champ "url" doit contenir une référence plausible au document :
+   - URL
+   - référence bibliographique
+   - identifiant de document
+
+8. Le champ "date" doit être une date ISO imaginaire (YYYY-MM-DD).
+
+Important :
+
+Ne produisez que les champs demandés par la signature DSPy.
+N'ajoutez aucun commentaire.

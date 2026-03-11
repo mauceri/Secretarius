@@ -33,13 +33,15 @@ async def build_runtime(gateway: InputGatewayInterface, config_path: Path | None
         base_url=llm_config.get("base_url") or "http://localhost:11434",
         model=llm_config.get("model") or "qwen3:0.6b",
         think=bool(llm_config.get("think", False)),
+        request_timeout_s=float(llm_config.get("request_timeout_s") or 180.0),
         raw_log_path=_resolve_project_path(project_root, llm_raw_log),
     )
 
-    mcp_config = config.get("mcp_servers", {}).get("oracle", {})
+    mcp_servers = config.get("mcp_servers", {})
+    mcp_config = mcp_servers.get("secretarius") or mcp_servers.get("oracle", {})
     mcp_client = StdioMCPClient(
         command=mcp_config.get("command") or sys.executable,
-        args=mcp_config.get("args", ["tools/oracle_server.py"]),
+        args=mcp_config.get("args", ["tools/secretarius_server.py"]),
         cwd=str(project_root),
     )
     await mcp_client.connect()
@@ -55,4 +57,3 @@ async def build_runtime(gateway: InputGatewayInterface, config_path: Path | None
         "orchestrator": orchestrator,
         "mcp_client": mcp_client,
     }
-

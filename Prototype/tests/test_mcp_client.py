@@ -10,7 +10,7 @@ class TestStdioMCPClient(unittest.IsolatedAsyncioTestCase):
         repo_root = Path(__file__).resolve().parents[1]
         client = StdioMCPClient(
             command=sys.executable,
-            args=["tools/oracle_server.py"],
+            args=["tools/secretarius_server.py"],
             cwd=str(repo_root),
         )
 
@@ -23,4 +23,3 @@ class TestStdioMCPClient(unittest.IsolatedAsyncioTestCase):
             self.assertIn("answered:", output)
         finally:
             await client.disconnect()
-

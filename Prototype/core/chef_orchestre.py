@@ -2,11 +2,15 @@ import asyncio
 import json
 import logging
 import re
+from datetime import datetime
+from pathlib import Path
 
 from .models import Message, Role, SessionState, Priority, ContextItem
 from .ports import LLMInterface, ToolClientInterface, InputGatewayInterface
 
 logger = logging.getLogger(__name__)
+
+ROUTER_PROMPT_PATH = Path(__file__).resolve().parent.parent / "secretarius_local" / "prompts" / "prompt_routeur.txt"
 
 REACT_SYSTEM_PROMPT = """
 You are Secretarius, a helpful AI agent.
@@ -27,6 +31,18 @@ You MUST respond ONLY with a valid JSON object matching this schema:
 Do not provide final_answer.
 Do not output chain-of-thought or hidden reasoning.
 """
+
+
+def _load_router_system_prompt() -> str:
+    try:
+        return ROUTER_PROMPT_PATH.read_text(encoding="utf-8").strip()
+    except OSError:
+        return REACT_SYSTEM_PROMPT.strip()
+
+
+def _build_router_system_prompt(tools_schema: str) -> str:
+    template = _load_router_system_prompt()
+    return template.replace("{tools_schema}", tools_schema)
 
 NO_TOOL_FALLBACK_MESSAGE = "Aucun outil ne correspond a votre demande."
 MAX_TOOL_CALLS_PER_TURN = 2
@@ -58,6 +74,30 @@ class ChefDOrchestre:
             await self.gateway.display_message(role, content)
         except Exception:
             logger.exception("UI display_message failed (phase=%s, role=%s)", phase, role)
+
+    def _append_journal_trace(self, text: str) -> None:
+        journal_path = getattr(self.gateway, "_journal_path", None)
+        if journal_path is None:
+            journal_path = Path("logs/guichet.log")
+
+        channel = "router"
+        current_channel = getattr(self.gateway, "_current_channel", None)
+        if current_channel is not None:
+            try:
+                channel = current_channel.get() or channel
+            except Exception:
+                pass
+
+        timestamp = datetime.now().isoformat(timespec="seconds")
+        normalized = str(text).replace("\r\n", "\n").replace("\r", "\n")
+        line = f"{timestamp}\t{channel}\tTHOUGHT\tASSISTANT\t{normalized}\n"
+        try:
+            journal_path = Path(journal_path)
+            journal_path.parent.mkdir(parents=True, exist_ok=True)
+            with journal_path.open("a", encoding="utf-8") as handle:
+                handle.write(line)
+        except OSError:
+            logger.exception("Unable to append router trace to journal")
 
     def _trim_state(self):
         # Keep memory bounded to avoid context bloat over long sessions.
@@ -163,6 +203,7 @@ class ChefDOrchestre:
                 "model",
                 "normalize",
                 "batch_size",
+                "debug_full",
             }
             return {k: v for k, v in action_input.items() if k in allowed}
 
@@ -177,6 +218,7 @@ class ChefDOrchestre:
                 "model",
                 "normalize",
                 "batch_size",
+                "debug_full",
             }
             return {k: v for k, v in action_input.items() if k in allowed}
 
@@ -212,6 +254,12 @@ class ChefDOrchestre:
                     return text
         return ""
 
+    def _user_explicitly_requests_collection(self) -> bool:
+        user_text = self._latest_user_text().lower()
+        if not user_text:
+            return False
+        return bool(re.search(r"\b(collection|collection_name|nom de collection)\b", user_text))
+
     def _ensure_extract_expressions_payload(self, action_input: dict) -> dict:
         if not isinstance(action_input, dict):
             action_input = {}
@@ -237,6 +285,101 @@ class ChefDOrchestre:
 
         return action_input
 
+    def _ensure_index_text_payload(self, action_input: dict) -> dict:
+        if not isinstance(action_input, dict):
+            action_input = {}
+
+        user_text = self._latest_user_text()
+        extracted_user_text = self._strip_extract_instruction_prefix(user_text) if user_text else ""
+
+        text = action_input.get("text")
+        document = action_input.get("document")
+
+        if extracted_user_text and extracted_user_text != user_text:
+            action_input["text"] = extracted_user_text
+        elif isinstance(text, str) and text.strip():
+            action_input["text"] = text.strip()
+        elif isinstance(document, str) and document.strip():
+            action_input["text"] = document.strip()
+
+        text_now = action_input.get("text")
+        if not isinstance(text_now, str) or not text_now.strip():
+            fallback_text = user_text
+            if fallback_text:
+                action_input["text"] = fallback_text
+
+        if isinstance(action_input.get("document"), str):
+            action_input.pop("document", None)
+
+        # Keep collection override only when explicitly requested by the user.
+        collection_name = action_input.get("collection_name")
+        if not self._user_explicitly_requests_collection():
+            action_input.pop("collection_name", None)
+        elif isinstance(collection_name, str) and collection_name.strip().lower() in {"text", "document", "doc"}:
+            action_input.pop("collection_name", None)
+
+        text_final = action_input.get("text")
+        if isinstance(text_final, str) and text_final.strip():
+            action_input["text"] = self._strip_extract_instruction_prefix(text_final)
+        return action_input
+
+    def _ensure_search_text_payload(self, action_input: dict) -> dict:
+        if not isinstance(action_input, dict):
+            return {}
+        if not self._user_explicitly_requests_collection():
+            action_input.pop("collection_name", None)
+        return action_input
+
+    async def _emit_tool_summary(self, action: str, observation: str) -> None:
+        if not isinstance(observation, str):
+            return
+        try:
+            payload = json.loads(observation)
+        except Exception:
+            return
+        if not isinstance(payload, dict):
+            return
+
+        if action == "index_text":
+            extract = payload.get("extract") if isinstance(payload.get("extract"), dict) else {}
+            index = payload.get("index") if isinstance(payload.get("index"), dict) else {}
+            extract_count = len(extract.get("expressions", [])) if isinstance(extract.get("expressions"), list) else 0
+            inserted_count = index.get("inserted_count", 0)
+            warning = index.get("warning") or payload.get("warning")
+            summary = (
+                "Index summary: "
+                f"expressions={extract_count}, inserted={inserted_count}, "
+                f"collection={index.get('collection_name', '-')}, "
+                f"warning={warning or '-'}"
+            )
+            await self._display_thought(summary, phase="tool_summary_index_text")
+            return
+
+        if action == "search_text":
+            search = payload.get("search") if isinstance(payload.get("search"), dict) else {}
+            query_count = search.get("query_count", 0)
+            hits = search.get("hits")
+            hit_count = len(hits) if isinstance(hits, list) else 0
+            warning = search.get("warning") or payload.get("warning")
+            summary = (
+                "Search summary: "
+                f"queries={query_count}, hit_lists={hit_count}, "
+                f"collection={search.get('collection_name', '-')}, "
+                f"warning={warning or '-'}"
+            )
+            await self._display_thought(summary, phase="tool_summary_search_text")
+            return
+
+        if action == "semantic_graph_search":
+            warning = payload.get("warning")
+            inserted = payload.get("inserted_count", 0)
+            query_count = payload.get("query_count", 0)
+            summary = (
+                "Semantic graph summary: "
+                f"queries={query_count}, inserted={inserted}, warning={warning or '-'}"
+            )
+            await self._display_thought(summary, phase="tool_summary_semantic_graph")
+
     @staticmethod
     def _strip_extract_instruction_prefix(text: str) -> str:
         if not isinstance(text, str):
@@ -251,8 +394,8 @@ class ChefDOrchestre:
         # "peux-tu extraire ... ? <body>"
         patterns = [
             r"(?is)^\s*(?:\*+\s*)?(?:peux-tu|pouvez-vous|merci de|veuillez)?\s*"
-            r"(?:extraire|extrait|extrais)\b.*?(?::|\n)\s*(.+)$",
-            r"(?is)^\s*(?:\*+\s*)?(?:extraire|extrait|extrais)\b.*?\?\s*(.+)$",
+            r"(?:extraire|extrait|extrais|indexer|ins[eé]rer|inserer|rechercher|interroger)\b.*?(?::|\n)\s*(.+)$",
+            r"(?is)^\s*(?:\*+\s*)?(?:extraire|extrait|extrais|indexer|ins[eé]rer|inserer|rechercher|interroger)\b.*?\?\s*(.+)$",
         ]
         for pattern in patterns:
             m = re.match(pattern, t)
@@ -266,7 +409,7 @@ class ChefDOrchestre:
         tools = await self.tool_client.list_tools()
         tool_names = {t.get("name") for t in tools if isinstance(t, dict)}
         tools_schema = self._build_router_tools_schema(tools)
-        system_prompt = REACT_SYSTEM_PROMPT.format(tools_schema=tools_schema)
+        system_prompt = _build_router_system_prompt(tools_schema)
         # Router mode: avoid duplicating the current user message in both
         # `messages` and context prompt.
         system_prompt += "\n" + self._build_context_prompt(include_session_history=False)
@@ -274,6 +417,11 @@ class ChefDOrchestre:
         called_actions_in_cycle: set[str] = set()
         for _ in range(MAX_TOOL_CALLS_PER_TURN):
             try:
+                self._append_journal_trace(
+                    "Router LLM request\n"
+                    f"system_prompt:\n{system_prompt}\n"
+                    f"messages:\n{json.dumps([msg.model_dump() for msg in self.state.messages], ensure_ascii=False, indent=2)}"
+                )
                 raw_response = await self.llm.generate_response(self.state.messages, system_prompt)
 
                 # Try parsing JSON
@@ -343,6 +491,10 @@ class ChefDOrchestre:
                     text_value = sanitized_action_input.get("text")
                     if isinstance(text_value, str) and text_value.strip():
                         sanitized_action_input["text"] = self._strip_extract_instruction_prefix(text_value)
+                if action == "index_text":
+                    sanitized_action_input = self._ensure_index_text_payload(sanitized_action_input)
+                if action == "search_text":
+                    sanitized_action_input = self._ensure_search_text_payload(sanitized_action_input)
                 removed_keys = sorted(set(action_input.keys()) - set(sanitized_action_input.keys()))
                 if removed_keys:
                     await self._display_thought(
@@ -374,6 +526,7 @@ class ChefDOrchestre:
                     f"Observation: {observation}",
                     phase="tool_call_observation",
                 )
+                await self._emit_tool_summary(action, observation)
 
                 tool_context = f"Tool '{action}' returned: {observation}"
                 self.state.context_items.append(ContextItem(

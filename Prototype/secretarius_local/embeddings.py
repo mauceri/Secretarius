@@ -1,13 +1,27 @@
 from __future__ import annotations
 
 import os
+import importlib.util
+import sys
 from pathlib import Path
 from typing import Any
 
-HF_CACHE_MODEL_ROOT = Path(
-    "/home/mauceric/.cache/huggingface/hub/models--sentence-transformers--paraphrase-multilingual-MiniLM-L12-v2"
-)
-DEFAULT_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+MODULE_ROOT = Path(__file__).resolve().parent
+
+try:
+    from .runtime_paths import DEFAULT_SENTENCE_MODEL, resolve_sentence_model_path
+except ImportError:
+    _RUNTIME_PATHS = MODULE_ROOT / "runtime_paths.py"
+    _RUNTIME_PATHS_SPEC = importlib.util.spec_from_file_location("secretarius_runtime_paths", _RUNTIME_PATHS)
+    if _RUNTIME_PATHS_SPEC is None or _RUNTIME_PATHS_SPEC.loader is None:
+        raise RuntimeError(f"unable to load runtime_paths from {_RUNTIME_PATHS}")
+    _runtime_paths_module = importlib.util.module_from_spec(_RUNTIME_PATHS_SPEC)
+    sys.modules[_RUNTIME_PATHS_SPEC.name] = _runtime_paths_module
+    _RUNTIME_PATHS_SPEC.loader.exec_module(_runtime_paths_module)
+    DEFAULT_SENTENCE_MODEL = _runtime_paths_module.DEFAULT_SENTENCE_MODEL
+    resolve_sentence_model_path = _runtime_paths_module.resolve_sentence_model_path
+
+DEFAULT_MODEL = DEFAULT_SENTENCE_MODEL
 
 _CACHED_MODEL: Any | None = None
 _CACHED_MODEL_NAME: str | None = None
@@ -80,7 +94,7 @@ def _load_encoder(model: str | None) -> tuple[Any | None, str | None]:
         return None, f"sentence-transformers import failed: {exc}"
 
     kwargs: dict[str, Any] = {}
-    local_model_path = _detect_local_model_path()
+    local_model_path = resolve_sentence_model_path()
     if local_model_path is not None:
         kwargs["local_files_only"] = True
         model_name = str(local_model_path)
@@ -95,14 +109,3 @@ def _load_encoder(model: str | None) -> tuple[Any | None, str | None]:
     _CACHED_MODEL = encoder
     _CACHED_MODEL_NAME = model or DEFAULT_MODEL
     return encoder, None
-
-
-def _detect_local_model_path() -> Path | None:
-    snapshots_dir = HF_CACHE_MODEL_ROOT / "snapshots"
-    if not snapshots_dir.exists():
-        return None
-    candidates = [p for p in snapshots_dir.iterdir() if p.is_dir()]
-    if not candidates:
-        return None
-    candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-    return candidates[0]

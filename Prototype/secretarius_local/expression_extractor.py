@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from urllib import error as urlerror
@@ -14,18 +15,29 @@ from urllib import request as urlrequest
 
 
 SECRETARIUS_ROOT = Path(__file__).resolve().parent
-DEFAULT_PROMPT_PATH = SECRETARIUS_ROOT / "prompts" / "prompt.txt"
+DEFAULT_PROMPT_PATH = SECRETARIUS_ROOT / "prompts" / "prompt_extracteur.txt"
 CHUNK_DATA_PATH = SECRETARIUS_ROOT / "vendor" / "chunk_data.py"
-NLTK_DATA_PATH = Path("/home/mauceric/Secretarius/.nltk_data")
-HF_CACHE_MODEL_ROOT = Path("/home/mauceric/.cache/huggingface/hub/models--sentence-transformers--paraphrase-multilingual-MiniLM-L12-v2")
 _CACHED_CHUNKER: Any | None = None
 
 _JSON_CODEBLOCK_RE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
 _JSON_STRING_RE = re.compile(r'"((?:\\.|[^"\\])*)"')
 LOGGER = logging.getLogger("secretarius.extractor")
 
+try:
+    from .runtime_paths import resolve_nltk_data_path, resolve_sentence_model_path
+except ImportError:
+    _RUNTIME_PATHS = SECRETARIUS_ROOT / "runtime_paths.py"
+    _RUNTIME_PATHS_SPEC = importlib.util.spec_from_file_location("secretarius_runtime_paths", _RUNTIME_PATHS)
+    if _RUNTIME_PATHS_SPEC is None or _RUNTIME_PATHS_SPEC.loader is None:
+        raise RuntimeError(f"unable to load runtime_paths from {_RUNTIME_PATHS}")
+    _runtime_paths_module = importlib.util.module_from_spec(_RUNTIME_PATHS_SPEC)
+    sys.modules[_RUNTIME_PATHS_SPEC.name] = _runtime_paths_module
+    _RUNTIME_PATHS_SPEC.loader.exec_module(_runtime_paths_module)
+    resolve_nltk_data_path = _runtime_paths_module.resolve_nltk_data_path
+    resolve_sentence_model_path = _runtime_paths_module.resolve_sentence_model_path
 
-def extract_expressions_with_llama_cpp(
+
+def extract_expressions(
     text: str,
     *,
     llama_cpp_url: str = "http://127.0.0.1:8989/v1/chat/completions",
@@ -37,7 +49,6 @@ def extract_expressions_with_llama_cpp(
     debug_return_raw: bool = False,
     per_chunk_llm: bool = False,
 ) -> dict[str, Any]:
-    LOGGER.info("")
     cleaned = (text or "").strip()
     if not cleaned:
         return {"chunks": [], "by_chunk": [], "expressions": [], "warning": "empty input text"}
@@ -61,7 +72,6 @@ def extract_expressions_with_llama_cpp(
         warnings = ["chunker returned no chunks; fallback to single raw-text chunk"]
     else:
         warnings = []
-    LOGGER.info("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++chunks: %s", chunks)
     by_chunk: list[dict[str, Any]] = []
     all_expressions: list[str] = []
     filtered_out_total = 0
@@ -169,33 +179,6 @@ def extract_expressions_with_llama_cpp(
         result["raw_llm_outputs"] = [entry.get("raw_llm_output", "") for entry in by_chunk]
     return result
 
-
-def extract_expressions_with_llama(
-    text: str,
-    *,
-    llama_cpp_url: str = "http://127.0.0.1:8989/v1/chat/completions",
-    model: str = "local-llama-cpp",
-    timeout_s: float = 120.0,
-    max_tokens: int = 512,
-    prompt_path: str | None = None,
-    seed: int = 42,
-    debug_return_raw: bool = False,
-    per_chunk_llm: bool = False,
-) -> dict[str, Any]:
-    # Deprecated wrapper kept for compatibility only.
-    return extract_expressions_with_llama_cpp(
-        text,
-        llama_cpp_url=llama_cpp_url,
-        llama_cpp_model=model,
-        timeout_s=timeout_s,
-        max_tokens=max_tokens,
-        prompt_path=prompt_path,
-        seed=seed,
-        debug_return_raw=debug_return_raw,
-        per_chunk_llm=per_chunk_llm,
-    )
-
-
 def _extract_expressions_for_single_text(
     text: str,
     *,
@@ -224,6 +207,15 @@ def _extract_expressions_for_single_text(
         "seed": seed,
         "stream": False,
     }
+    _append_extraction_prompt_log(
+        llama_cpp_url=llama_cpp_url,
+        llama_cpp_model=llama_cpp_model,
+        max_tokens=max_tokens,
+        timeout_s=timeout_s,
+        seed=seed,
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+    )
     raw, req_warning = _post_chat_completion(llama_cpp_url=llama_cpp_url, payload=payload, timeout_s=timeout_s)
     if raw is None:
         return [], req_warning, 0, ""
@@ -248,6 +240,7 @@ def _load_prompt_text(prompt_path: str | None) -> str | None:
             candidates.append(SECRETARIUS_ROOT.parent / p)
             candidates.append(SECRETARIUS_ROOT / p)
     candidates.append(DEFAULT_PROMPT_PATH)
+    candidates.append(SECRETARIUS_ROOT / "prompts" / "prompt.txt")
 
     for target in candidates:
         try:
@@ -266,11 +259,13 @@ def _load_chunker() -> tuple[Any | None, str | None]:
         return None, f"missing chunker module: {CHUNK_DATA_PATH}"
 
     try:
-        os.environ.setdefault("NLTK_DATA", str(NLTK_DATA_PATH))
+        nltk_data_path = resolve_nltk_data_path()
+        if nltk_data_path is not None:
+            os.environ.setdefault("NLTK_DATA", str(nltk_data_path))
         os.environ.setdefault("HF_HUB_OFFLINE", "1")
         os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
         os.environ.setdefault("SECRETARIUS_LOCAL_FILES_ONLY", "1")
-        local_model_path = _detect_local_sentence_model_path()
+        local_model_path = resolve_sentence_model_path()
         if local_model_path is not None:
             os.environ.setdefault("SECRETARIUS_SENTENCE_MODEL", str(local_model_path))
 
@@ -286,17 +281,6 @@ def _load_chunker() -> tuple[Any | None, str | None]:
         return None, f"unable to initialize SemanticChunker: {exc}"
 
 
-def _detect_local_sentence_model_path() -> Path | None:
-    snapshots_dir = HF_CACHE_MODEL_ROOT / "snapshots"
-    if not snapshots_dir.exists():
-        return None
-    candidates = [p for p in snapshots_dir.iterdir() if p.is_dir()]
-    if not candidates:
-        return None
-    candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-    return candidates[0]
-
-
 def _post_chat_completion(*, llama_cpp_url: str, payload: dict[str, Any], timeout_s: float) -> tuple[str | None, str | None]:
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = urlrequest.Request(
@@ -309,15 +293,15 @@ def _post_chat_completion(*, llama_cpp_url: str, payload: dict[str, Any], timeou
         with urlrequest.urlopen(req, timeout=timeout_s) as resp:
             raw = resp.read()
     except urlerror.HTTPError as exc:
-        return None, f"llama-server request failed: HTTP Error {exc.code}: {exc.reason}"
+        return None, f"llama.cpp server request failed: HTTP Error {exc.code}: {exc.reason}"
     except (urlerror.URLError, TimeoutError) as exc:
-        return None, f"llama-server request failed: {exc}"
+        return None, f"llama.cpp server request failed: {exc}"
 
     try:
         parsed = json.loads(raw.decode("utf-8"))
         content = parsed["choices"][0]["message"]["content"]
     except Exception as exc:
-        return None, f"invalid llama-server response shape: {exc}"
+        return None, f"invalid llama.cpp server response shape: {exc}"
     return str(content), None
 
 
@@ -458,3 +442,40 @@ def _request_fingerprint(
     }
     raw = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
+
+
+def _append_extraction_prompt_log(
+    *,
+    llama_cpp_url: str,
+    llama_cpp_model: str,
+    max_tokens: int,
+    timeout_s: float,
+    seed: int,
+    system_prompt: str,
+    user_prompt: str,
+) -> None:
+    journal_path = os.environ.get("SECRETARIUS_JOURNAL_LOG", "logs/guichet.log").strip()
+    if not journal_path:
+        return
+
+    channel = os.environ.get("SECRETARIUS_JOURNAL_CHANNEL", "mcp").strip() or "mcp"
+    timestamp = datetime.now().isoformat(timespec="seconds")
+    message = (
+        "llama.cpp extract request\n"
+        f"url={llama_cpp_url}\n"
+        f"model={llama_cpp_model}\n"
+        f"max_tokens={max_tokens}\n"
+        f"timeout_s={timeout_s}\n"
+        f"seed={seed}\n"
+        f"system_prompt:\n{system_prompt}\n"
+        f"user_prompt:\n{user_prompt}"
+    )
+    line = f"{timestamp}\t{channel}\tTHOUGHT\tASSISTANT\t{message}\n"
+
+    try:
+        path = Path(journal_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(line)
+    except OSError:
+        LOGGER.debug("failed to append extraction prompt log", exc_info=True)

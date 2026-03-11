@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import importlib.util
 import os
+import re
 import sys
 import threading
 import time
@@ -11,7 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 try:
-    from .expression_extractor import extract_expressions_with_llama_cpp
+    from .expression_extractor import extract_expressions
 except ImportError:
     module_path = Path(__file__).resolve().parent / "expression_extractor.py"
     spec = importlib.util.spec_from_file_location("secretarius_expression_extractor", module_path)
@@ -20,13 +21,9 @@ except ImportError:
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
-    extract_expressions_with_llama_cpp = module.extract_expressions_with_llama_cpp
-    # Backward-compat if only old symbol exists in local module.
-    if not callable(extract_expressions_with_llama_cpp) and hasattr(module, "extract_expressions_with_llama"):
-        extract_expressions_with_llama_cpp = module.extract_expressions_with_llama
-
-# Backward-compatible export name (used by tests/older code).
-extract_expressions_with_llama = extract_expressions_with_llama_cpp
+    if not hasattr(module, "extract_expressions"):
+        raise RuntimeError(f"Unable to resolve extractor function from {module_path}")
+    extract_expressions = module.extract_expressions
 
 try:
     from .embeddings import embed_expressions_multilingual
@@ -98,8 +95,10 @@ def _tools_catalog() -> list[MCPTool]:
         MCPTool(
             name="extract_expressions",
             description=(
-                "Extrait des expressions caracteristiques a partir d'un texte "
-                "ou d'un document attache via llama.cpp."
+                "Analyse un texte brut ou un document fourni par l'utilisateur "
+                "et en extrait des expressions caracteristiques via llama.cpp. "
+                "A utiliser pour un contenu a analyser, pas pour rechercher dans "
+                "Milvus ni pour lancer une recherche semantique."
             ),
             input_schema={
                 "type": "object",
@@ -153,7 +152,7 @@ def _tools_catalog() -> list[MCPTool]:
                     },
                     "prompt_path": {
                         "type": "string",
-                        "description": "Chemin vers le prompt texte (par defaut secretarius/prompts/prompt.txt).",
+                        "description": "Chemin vers le prompt texte (par defaut secretarius/prompts/prompt_extracteur.txt).",
                     },
                     "debug_return_raw": {
                         "type": "boolean",
@@ -173,8 +172,10 @@ def _tools_catalog() -> list[MCPTool]:
         MCPTool(
             name="semantic_graph_search",
             description=(
-                "Recherche/insertions unifiees dans Milvus a partir d'une liste de "
-                "plongements."
+                "Outil technique de bas niveau pour rechercher ou inserer dans "
+                "Milvus a partir d'embeddings, d'expressions deja extraites ou "
+                "d'un document structure. Ne pas utiliser pour extraire des "
+                "expressions d'un texte brut ni pour une simple requete textuelle."
             ),
             input_schema={
                 "type": "object",
@@ -260,7 +261,8 @@ def _tools_catalog() -> list[MCPTool]:
         MCPTool(
             name="index_text",
             description=(
-                "Pipeline metier: extrait les expressions d'un texte/document puis "
+                "Pipeline metier d'indexation: prend un texte ou un document "
+                "fourni par l'utilisateur, extrait les expressions puis les "
                 "insere dans Milvus."
             ),
             input_schema={
@@ -291,6 +293,11 @@ def _tools_catalog() -> list[MCPTool]:
                         "type": "string",
                         "description": "Metrique d'index (COSINE, IP, L2).",
                     },
+                    "debug_full": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Retourner le detail complet extract/index (payload volumineux).",
+                    },
                 },
                 "anyOf": [{"required": ["text"]}, {"required": ["document"]}],
                 "additionalProperties": True,
@@ -299,8 +306,9 @@ def _tools_catalog() -> list[MCPTool]:
         MCPTool(
             name="search_text",
             description=(
-                "Pipeline metier: recherche semantique dans Milvus a partir d'une "
-                "requete textuelle."
+                "Pipeline metier de recherche semantique dans Milvus a partir "
+                "d'une requete textuelle courte. A utiliser pour chercher des "
+                "resultats, pas pour analyser un texte fourni par l'utilisateur."
             ),
             input_schema={
                 "type": "object",
@@ -330,12 +338,22 @@ def _tools_catalog() -> list[MCPTool]:
                         "type": "string",
                         "description": "Metrique d'index (COSINE, IP, L2).",
                     },
+                    "debug_full": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Retourner le detail complet de la recherche (payload volumineux).",
+                    },
                 },
                 "required": ["query"],
                 "additionalProperties": True,
             },
         ),
     ]
+
+
+def _public_tools_catalog() -> list[MCPTool]:
+    hidden_tool_names = {"semantic_graph_search"}
+    return [tool for tool in _tools_catalog() if tool.name not in hidden_tool_names]
 
 
 def _tool_by_name(name: str) -> Optional[MCPTool]:
@@ -373,6 +391,121 @@ def _tool_result(payload: Dict[str, Any]) -> Dict[str, Any]:
             }
         ],
         "structuredContent": payload,
+    }
+
+
+def _analyse_texte_documentaire_index_text(text: str) -> dict[str, Any]:
+    hashtag_re = re.compile(r"(?<!\w)#([^\s#]+)")
+    date_re = re.compile(r"\b\d{2}-\d{2}-\d{4}\b")
+    url_re = re.compile(r'\bhttps?://[^\s<>\"]+')
+
+    def normalize(raw: str) -> str:
+        cleaned = raw.replace("\r\n", "\n").replace("\r", "\n")
+        cleaned = re.sub(r"[ \t]+", " ", cleaned)
+        cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+        return cleaned.strip()
+
+    def remove_spans(raw: str, spans: list[tuple[int, int]]) -> str:
+        if not spans:
+            return raw
+        merged: list[tuple[int, int]] = []
+        for start, end in sorted(spans):
+            if not merged or start > merged[-1][1]:
+                merged.append((start, end))
+            else:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        out: list[str] = []
+        cursor = 0
+        for start, end in merged:
+            out.append(raw[cursor:start])
+            cursor = end
+        out.append(raw[cursor:])
+        return "".join(out)
+
+    def compute_incipit_title(body: str, max_len: int = 40) -> str | None:
+        lines = [line.strip() for line in body.splitlines() if line.strip()]
+        if not lines:
+            return None
+        first = lines[0]
+        if len(first) <= max_len:
+            return first
+        cut = first[:max_len]
+        if " " in cut:
+            cut = cut.rsplit(" ", 1)[0]
+        return cut.rstrip(" ,;:-") + "..."
+
+    def detect_explicit_title(lines: list[str]) -> tuple[str | None, int | None]:
+        for idx in range(len(lines) - 1):
+            current = lines[idx].strip()
+            if not current:
+                continue
+            if hashtag_re.fullmatch(current):
+                continue
+            if date_re.fullmatch(current):
+                continue
+            if url_re.fullmatch(current):
+                continue
+
+            next_line = ""
+            for look_ahead in range(idx + 1, len(lines)):
+                candidate = lines[look_ahead].strip()
+                if not candidate:
+                    continue
+                next_line = candidate
+                break
+            if not next_line:
+                continue
+            if len(current) <= 120 and not current.endswith((".", "!", "?", ";")) and len(next_line) >= len(current):
+                return current, idx
+        return None, None
+
+    normalized = normalize(text or "")
+    spans_to_remove: list[tuple[int, int]] = []
+    keywords: list[str] = []
+
+    for match in hashtag_re.finditer(normalized):
+        keywords.append(f"#{match.group(1)}")
+        spans_to_remove.append((match.start(), match.end()))
+
+    date_match = date_re.search(normalized)
+    date_value = date_match.group(0) if date_match else None
+    if date_match:
+        spans_to_remove.append((date_match.start(), date_match.end()))
+
+    url_match = url_re.search(normalized)
+    url_value = url_match.group(0) if url_match else None
+    if url_match:
+        spans_to_remove.append((url_match.start(), url_match.end()))
+
+    deduped_keywords: list[str] = []
+    seen: set[str] = set()
+    for keyword in keywords:
+        if keyword in seen:
+            continue
+        seen.add(keyword)
+        deduped_keywords.append(keyword)
+
+    cleaned = remove_spans(normalized, spans_to_remove)
+    cleaned = re.sub(r"[ \t]+\n", "\n", cleaned)
+    cleaned = re.sub(r"\n[ \t]+", "\n", cleaned)
+    cleaned = re.sub(r" {2,}", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    cleaned = cleaned.strip(" \n\t-:")
+
+    lines = cleaned.splitlines()
+    title, title_idx = detect_explicit_title(lines)
+    if title is not None and title_idx is not None:
+        body = "\n".join(line for idx, line in enumerate(lines) if idx != title_idx).strip()
+    else:
+        body = cleaned.strip()
+        title = compute_incipit_title(body)
+
+    return {
+        "mots_clefs": deduped_keywords,
+        "titre": title,
+        "date": date_value,
+        "url": url_value,
+        "texte": normalize(body),
     }
 
 
@@ -437,29 +570,34 @@ def _handle_extract_expressions(arguments: Dict[str, Any]) -> Dict[str, Any]:
         if not text:
             set_indexing_state(normalized_doc, "queued")
             add_indexing_error(normalized_doc, "extracting", "No inline content to extract (fetching required)")
-            return _tool_result(
-                {
-                    "status": "ok",
-                    "tool": "extract_expressions",
-                    "backend": "llama_cpp_direct",
-                    "received": {
-                        "has_text": bool(arguments.get("text")),
-                        "has_document": True,
-                    },
-                    "text_length": 0,
-                    "chunk_count": 0,
-                    "by_chunk": [],
-                    "expressions": [],
-                    "request_fingerprint": None,
-                    "inference_params": None,
-                    "document": normalized_doc,
-                    "message": "Document accepté sans contenu inline: extraction différée.",
-                    "warning": "document has no inline text",
-                }
-            )
+            payload: Dict[str, Any] = {
+                "expressions": [],
+                "warning": "document has no inline text",
+                "document": normalized_doc,
+            }
+            if debug_return_raw:
+                payload.update(
+                    {
+                        "status": "ok",
+                        "tool": "extract_expressions",
+                        "backend": "llama_cpp_direct",
+                        "received": {
+                            "has_text": bool(arguments.get("text")),
+                            "has_document": True,
+                        },
+                        "text_length": 0,
+                        "chunk_count": 0,
+                        "by_chunk": [],
+                        "request_fingerprint": None,
+                        "inference_params": None,
+                        "message": "Document accepté sans contenu inline: extraction différée.",
+                        "raw_llm_outputs": None,
+                    }
+                )
+            return _tool_result(payload)
         set_indexing_state(normalized_doc, "extracting")
 
-    result = extract_expressions_with_llama_cpp(
+    result = extract_expressions(
         text,
         llama_cpp_url=llama_cpp_url,
         llama_cpp_model=llama_cpp_model,
@@ -495,27 +633,30 @@ def _handle_extract_expressions(arguments: Dict[str, Any]) -> Dict[str, Any]:
             expressions=expressions,
         )
 
-    payload = {
-        "status": "ok",
-        "tool": "extract_expressions",
-        "backend": "llama_cpp_direct",
-        "received": {
-            "has_text": bool(arguments.get("text")),
-            "has_document": isinstance(arguments.get("document"), dict),
-        },
-        "text_length": len(text),
-        "chunk_count": chunk_count,
-        "by_chunk": by_chunk,
-        "expressions": expressions,
-        "request_fingerprint": request_fingerprint,
-        "inference_params": inference_params,
-        "message": "Extraction d'expressions caracteristiques.",
-        "warning": warning,
-    }
+    payload: Dict[str, Any] = {"expressions": expressions}
+    if warning:
+        payload["warning"] = warning
     if normalized_doc is not None:
         payload["document"] = normalized_doc
     if debug_return_raw:
-        payload["raw_llm_outputs"] = raw_llm_outputs
+        payload.update(
+            {
+                "status": "ok",
+                "tool": "extract_expressions",
+                "backend": "llama_cpp_direct",
+                "received": {
+                    "has_text": bool(arguments.get("text")),
+                    "has_document": isinstance(arguments.get("document"), dict),
+                },
+                "text_length": len(text),
+                "chunk_count": chunk_count,
+                "by_chunk": by_chunk,
+                "request_fingerprint": request_fingerprint,
+                "inference_params": inference_params,
+                "message": "Extraction d'expressions caracteristiques.",
+                "raw_llm_outputs": raw_llm_outputs,
+            }
+        )
     return _tool_result(payload)
 
 
@@ -710,8 +851,35 @@ def _handle_semantic_graph_search(arguments: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _handle_index_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
+    debug_full = bool(arguments.get("debug_full", False))
+    extract_args = dict(arguments)
+    text, normalized_doc = resolve_text_for_extraction(arguments)
+    if text:
+        analysed = _analyse_texte_documentaire_index_text(text)
+        document_payload = normalized_doc if normalized_doc is not None else normalize_document({})
+        content = document_payload.setdefault("content", {})
+        if isinstance(content, dict):
+            content["text"] = analysed.get("texte") or text
+        source = document_payload.setdefault("source", {})
+        if isinstance(source, dict) and isinstance(analysed.get("url"), str) and analysed["url"].strip():
+            if not source.get("url"):
+                source["url"] = analysed["url"].strip()
+        user_fields = document_payload.setdefault("user_fields", {})
+        if isinstance(user_fields, dict):
+            if isinstance(analysed.get("titre"), str) and analysed["titre"].strip():
+                if not user_fields.get("title"):
+                    user_fields["title"] = analysed["titre"].strip()
+            if isinstance(analysed.get("date"), str) and analysed["date"].strip():
+                if not user_fields.get("document_date"):
+                    user_fields["document_date"] = analysed["date"].strip()
+            if isinstance(analysed.get("mots_clefs"), list) and analysed["mots_clefs"]:
+                if not user_fields.get("keywords"):
+                    user_fields["keywords"] = analysed["mots_clefs"]
+        extract_args["document"] = normalize_document(document_payload)
+        extract_args["text"] = (analysed.get("texte") or text).strip()
+
     # Reuse extraction pipeline, then index by expressions/doc.
-    extract_res = _handle_extract_expressions(arguments)
+    extract_res = _handle_extract_expressions(extract_args)
     extract_payload = extract_res.get("structuredContent", {}) if isinstance(extract_res, dict) else {}
     if not isinstance(extract_payload, dict):
         raise ValueError("extract_expressions returned invalid payload")
@@ -736,18 +904,32 @@ def _handle_index_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(graph_payload, dict):
         raise ValueError("semantic_graph_search returned invalid payload")
 
+    extract_expressions = extract_payload.get("expressions")
+    extract_count = len(extract_expressions) if isinstance(extract_expressions, list) else 0
+    index_hits = graph_payload.get("hits")
+    hit_lists = len(index_hits) if isinstance(index_hits, list) else 0
+    warning = extract_payload.get("warning") or graph_payload.get("warning")
     payload = {
         "status": "ok",
         "tool": "index_text",
         "message": "Indexation complete (extraction + insertion semantic graph).",
-        "extract": extract_payload,
-        "index": graph_payload,
-        "warning": extract_payload.get("warning") or graph_payload.get("warning"),
+        "summary": {
+            "expressions_count": extract_count,
+            "collection_name": graph_payload.get("collection_name"),
+            "inserted_count": graph_payload.get("inserted_count", 0),
+            "query_count": graph_payload.get("query_count", 0),
+            "hit_lists": hit_lists,
+        },
+        "warning": warning,
     }
+    if debug_full:
+        payload["extract"] = extract_payload
+        payload["index"] = graph_payload
     return _tool_result(payload)
 
 
 def _handle_search_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
+    debug_full = bool(arguments.get("debug_full", False))
     query = arguments.get("query")
     if not isinstance(query, str) or not query.strip():
         raise ValueError("'query' must be a non-empty string")
@@ -766,15 +948,55 @@ def _handle_search_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(graph_payload, dict):
         raise ValueError("semantic_graph_search returned invalid payload")
 
+    hits = graph_payload.get("hits")
+    hit_lists = len(hits) if isinstance(hits, list) else 0
+    documents = _extract_search_documents(hits)
     payload = {
         "status": "ok",
         "tool": "search_text",
         "message": "Recherche semantique executee.",
         "query": query.strip(),
-        "search": graph_payload,
+        "summary": {
+            "collection_name": graph_payload.get("collection_name"),
+            "query_count": graph_payload.get("query_count", 0),
+            "hit_lists": hit_lists,
+            "top_k": graph_args.get("top_k", 10),
+        },
+        "documents": documents,
         "warning": graph_payload.get("warning"),
     }
+    if debug_full:
+        payload["search"] = graph_payload
     return _tool_result(payload)
+
+
+def _extract_search_documents(hits: Any) -> list[Dict[str, Any]]:
+    if not isinstance(hits, list):
+        return []
+
+    documents: list[Dict[str, Any]] = []
+    for hit_list in hits:
+        if not isinstance(hit_list, list):
+            continue
+        for hit in hit_list:
+            if not isinstance(hit, dict):
+                continue
+            entity = hit.get("entity") if isinstance(hit.get("entity"), dict) else hit
+            payload_json = entity.get("payload_json")
+            document = None
+            if isinstance(payload_json, str):
+                try:
+                    document = json.loads(payload_json)
+                except json.JSONDecodeError:
+                    document = payload_json
+            documents.append(
+                {
+                    "id": hit.get("id", entity.get("id")),
+                    "score": hit.get("score", entity.get("score", hit.get("distance", entity.get("distance")))),
+                    "document": document,
+                }
+            )
+    return documents
 
 
 def _handle_tool_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -829,7 +1051,7 @@ def handle_mcp_message(message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                 "description": t.description,
                 "inputSchema": t.input_schema,
             }
-            for t in _tools_catalog()
+            for t in _public_tools_catalog()
         ]
         return _make_response(request_id, {"tools": tools})
 
@@ -878,7 +1100,7 @@ def start_background_warmup() -> None:
     def _worker() -> None:
         # Warmup chunker path via extraction call with tiny timeout.
         try:
-            extract_expressions_with_llama_cpp(
+            extract_expressions(
                 "warmup",
                 timeout_s=1.0,
                 max_tokens=8,

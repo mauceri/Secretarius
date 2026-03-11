@@ -49,7 +49,7 @@ async def _main() -> None:
     model_id = webui_cfg.get("model_id") or "secretarius-agent"
     host = webui_cfg.get("host") or "0.0.0.0"
     preferred_port = int(webui_cfg.get("port") or 8000)
-    port_fallback_attempts = int(webui_cfg.get("port_fallback_attempts") or 3)
+    port_fallback_attempts = int(webui_cfg.get("port_fallback_attempts") or 1)
     port = _pick_openwebui_port(host, preferred_port, port_fallback_attempts)
     request_timeout_s = float(webui_cfg.get("request_timeout_s") or 90.0)
 
@@ -60,6 +60,7 @@ async def _main() -> None:
         model_id=model_id,
         request_timeout_s=request_timeout_s,
     )
+    logging.getLogger(__name__).info("Starting OpenAI-compatible API on http://%s:%d/v1", host, port)
 
     server = uvicorn.Server(uvicorn.Config(app, host=host, port=port, reload=False))
     try:
