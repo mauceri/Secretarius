@@ -193,33 +193,11 @@ class ChefDOrchestre:
             return {k: v for k, v in action_input.items() if k in allowed}
 
         if action == "index_text":
-            allowed = {
-                "text",
-                "document",
-                "collection_name",
-                "milvus_uri",
-                "milvus_token",
-                "metric_type",
-                "model",
-                "normalize",
-                "batch_size",
-                "debug_full",
-            }
+            allowed = {"text", "document"}
             return {k: v for k, v in action_input.items() if k in allowed}
 
         if action == "search_text":
-            allowed = {
-                "query",
-                "top_k",
-                "collection_name",
-                "milvus_uri",
-                "milvus_token",
-                "metric_type",
-                "model",
-                "normalize",
-                "batch_size",
-                "debug_full",
-            }
+            allowed = {"query"}
             return {k: v for k, v in action_input.items() if k in allowed}
 
         return action_input

@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import importlib.util
 import os
-import re
 import sys
 import threading
 import time
@@ -75,6 +74,20 @@ except ImportError:
     resolve_text_for_extraction = module.resolve_text_for_extraction
     set_indexing_state = module.set_indexing_state
 
+try:
+    from .document_pipeline import analyse_texte_documentaire, index_document_text, search_documents_by_text
+except ImportError:
+    module_path = Path(__file__).resolve().parent / "document_pipeline.py"
+    spec = importlib.util.spec_from_file_location("secretarius_document_pipeline", module_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Unable to load document pipeline module from {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    analyse_texte_documentaire = module.analyse_texte_documentaire
+    index_document_text = module.index_document_text
+    search_documents_by_text = module.search_documents_by_text
+
 
 JSONRPC_VERSION = "2.0"
 SERVER_NAME = "secretarius-mcp"
@@ -95,10 +108,8 @@ def _tools_catalog() -> list[MCPTool]:
         MCPTool(
             name="extract_expressions",
             description=(
-                "Analyse un texte brut ou un document fourni par l'utilisateur "
-                "et en extrait des expressions caracteristiques via llama.cpp. "
-                "A utiliser pour un contenu a analyser, pas pour rechercher dans "
-                "Milvus ni pour lancer une recherche semantique."
+                "Extrait les expressions caracteristiques d'un texte brut. "
+                "Ne pas utiliser pour indexer un document ni pour interroger Milvus."
             ),
             input_schema={
                 "type": "object",
@@ -107,66 +118,9 @@ def _tools_catalog() -> list[MCPTool]:
                         "type": "string",
                         "description": "Texte brut a analyser.",
                     },
-                    "document": {
-                        "type": "object",
-                        "description": "Document Secretarius v0.1 (ou document attache).",
-                        "properties": {
-                            "schema": {"type": "string"},
-                            "doc_id": {"type": ["string", "null"]},
-                            "type": {"type": "string"},
-                            "name": {"type": "string"},
-                            "mime_type": {"type": "string"},
-                            "content": {"type": "string"},
-                        },
-                        "additionalProperties": True,
-                    },
-                    "llama_cpp_url": {
-                        "type": "string",
-                        "description": "Endpoint chat completions llama.cpp.",
-                    },
-                    "llama_url": {
-                        "type": "string",
-                        "description": "Alias de compatibilite (deprecated) pour 'llama_cpp_url'.",
-                    },
-                    "llama_cpp_model": {
-                        "type": "string",
-                        "description": "Nom logique du modele llama.cpp.",
-                    },
-                    "model": {
-                        "type": "string",
-                        "description": "Alias de compatibilite (deprecated) pour 'llama_cpp_model'.",
-                    },
-                    "timeout_s": {
-                        "type": "number",
-                        "minimum": 0.1,
-                        "default": 30.0,
-                    },
-                    "max_tokens": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "default": 512,
-                    },
-                    "seed": {
-                        "type": "integer",
-                        "default": 42,
-                    },
-                    "prompt_path": {
-                        "type": "string",
-                        "description": "Chemin vers le prompt texte (par defaut secretarius/prompts/prompt_extracteur.txt).",
-                    },
-                    "debug_return_raw": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "Inclure la sortie brute du modele pour debug.",
-                    },
-                    "per_chunk_llm": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "Si true, appelle le LLM par chunk. Par defaut, un seul appel global.",
-                    },
                 },
-                "anyOf": [{"required": ["text"]}, {"required": ["document"]}],
-                "additionalProperties": True,
+                "required": ["text"],
+                "additionalProperties": False,
             },
         ),
         MCPTool(
@@ -261,54 +215,26 @@ def _tools_catalog() -> list[MCPTool]:
         MCPTool(
             name="index_text",
             description=(
-                "Pipeline metier d'indexation: prend un texte ou un document "
-                "fourni par l'utilisateur, extrait les expressions puis les "
-                "insere dans Milvus."
+                "Indexe un document decrit par une chaine de caracteres. "
+                "Le texte peut contenir titre, date, URL ou mots-cles."
             ),
             input_schema={
                 "type": "object",
                 "properties": {
                     "text": {
                         "type": "string",
-                        "description": "Texte brut a indexer.",
-                    },
-                    "document": {
-                        "type": "object",
-                        "description": "Document Secretarius v0.1.",
-                        "additionalProperties": True,
-                    },
-                    "collection_name": {
-                        "type": "string",
-                        "description": "Collection cible Milvus.",
-                    },
-                    "milvus_uri": {
-                        "type": "string",
-                        "description": "URI Milvus.",
-                    },
-                    "milvus_token": {
-                        "type": "string",
-                        "description": "Token Milvus optionnel.",
-                    },
-                    "metric_type": {
-                        "type": "string",
-                        "description": "Metrique d'index (COSINE, IP, L2).",
-                    },
-                    "debug_full": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "Retourner le detail complet extract/index (payload volumineux).",
+                        "description": "Texte documentaire a indexer.",
                     },
                 },
-                "anyOf": [{"required": ["text"]}, {"required": ["document"]}],
-                "additionalProperties": True,
+                "required": ["text"],
+                "additionalProperties": False,
             },
         ),
         MCPTool(
             name="search_text",
             description=(
-                "Pipeline metier de recherche semantique dans Milvus a partir "
-                "d'une requete textuelle courte. A utiliser pour chercher des "
-                "resultats, pas pour analyser un texte fourni par l'utilisateur."
+                "Recherche dans la base des documents similaires a partir "
+                "d'une requete textuelle."
             ),
             input_schema={
                 "type": "object",
@@ -317,35 +243,9 @@ def _tools_catalog() -> list[MCPTool]:
                         "type": "string",
                         "description": "Requete textuelle a rechercher.",
                     },
-                    "top_k": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "default": 10,
-                    },
-                    "collection_name": {
-                        "type": "string",
-                        "description": "Collection cible Milvus.",
-                    },
-                    "milvus_uri": {
-                        "type": "string",
-                        "description": "URI Milvus.",
-                    },
-                    "milvus_token": {
-                        "type": "string",
-                        "description": "Token Milvus optionnel.",
-                    },
-                    "metric_type": {
-                        "type": "string",
-                        "description": "Metrique d'index (COSINE, IP, L2).",
-                    },
-                    "debug_full": {
-                        "type": "boolean",
-                        "default": False,
-                        "description": "Retourner le detail complet de la recherche (payload volumineux).",
-                    },
                 },
                 "required": ["query"],
-                "additionalProperties": True,
+                "additionalProperties": False,
             },
         ),
     ]
@@ -392,122 +292,6 @@ def _tool_result(payload: Dict[str, Any]) -> Dict[str, Any]:
         ],
         "structuredContent": payload,
     }
-
-
-def _analyse_texte_documentaire_index_text(text: str) -> dict[str, Any]:
-    hashtag_re = re.compile(r"(?<!\w)#([^\s#]+)")
-    date_re = re.compile(r"\b\d{2}-\d{2}-\d{4}\b")
-    url_re = re.compile(r'\bhttps?://[^\s<>\"]+')
-
-    def normalize(raw: str) -> str:
-        cleaned = raw.replace("\r\n", "\n").replace("\r", "\n")
-        cleaned = re.sub(r"[ \t]+", " ", cleaned)
-        cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
-        return cleaned.strip()
-
-    def remove_spans(raw: str, spans: list[tuple[int, int]]) -> str:
-        if not spans:
-            return raw
-        merged: list[tuple[int, int]] = []
-        for start, end in sorted(spans):
-            if not merged or start > merged[-1][1]:
-                merged.append((start, end))
-            else:
-                merged[-1] = (merged[-1][0], max(merged[-1][1], end))
-        out: list[str] = []
-        cursor = 0
-        for start, end in merged:
-            out.append(raw[cursor:start])
-            cursor = end
-        out.append(raw[cursor:])
-        return "".join(out)
-
-    def compute_incipit_title(body: str, max_len: int = 40) -> str | None:
-        lines = [line.strip() for line in body.splitlines() if line.strip()]
-        if not lines:
-            return None
-        first = lines[0]
-        if len(first) <= max_len:
-            return first
-        cut = first[:max_len]
-        if " " in cut:
-            cut = cut.rsplit(" ", 1)[0]
-        return cut.rstrip(" ,;:-") + "..."
-
-    def detect_explicit_title(lines: list[str]) -> tuple[str | None, int | None]:
-        for idx in range(len(lines) - 1):
-            current = lines[idx].strip()
-            if not current:
-                continue
-            if hashtag_re.fullmatch(current):
-                continue
-            if date_re.fullmatch(current):
-                continue
-            if url_re.fullmatch(current):
-                continue
-
-            next_line = ""
-            for look_ahead in range(idx + 1, len(lines)):
-                candidate = lines[look_ahead].strip()
-                if not candidate:
-                    continue
-                next_line = candidate
-                break
-            if not next_line:
-                continue
-            if len(current) <= 120 and not current.endswith((".", "!", "?", ";")) and len(next_line) >= len(current):
-                return current, idx
-        return None, None
-
-    normalized = normalize(text or "")
-    spans_to_remove: list[tuple[int, int]] = []
-    keywords: list[str] = []
-
-    for match in hashtag_re.finditer(normalized):
-        keywords.append(f"#{match.group(1)}")
-        spans_to_remove.append((match.start(), match.end()))
-
-    date_match = date_re.search(normalized)
-    date_value = date_match.group(0) if date_match else None
-    if date_match:
-        spans_to_remove.append((date_match.start(), date_match.end()))
-
-    url_match = url_re.search(normalized)
-    url_value = url_match.group(0) if url_match else None
-    if url_match:
-        spans_to_remove.append((url_match.start(), url_match.end()))
-
-    deduped_keywords: list[str] = []
-    seen: set[str] = set()
-    for keyword in keywords:
-        if keyword in seen:
-            continue
-        seen.add(keyword)
-        deduped_keywords.append(keyword)
-
-    cleaned = remove_spans(normalized, spans_to_remove)
-    cleaned = re.sub(r"[ \t]+\n", "\n", cleaned)
-    cleaned = re.sub(r"\n[ \t]+", "\n", cleaned)
-    cleaned = re.sub(r" {2,}", " ", cleaned)
-    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
-    cleaned = cleaned.strip(" \n\t-:")
-
-    lines = cleaned.splitlines()
-    title, title_idx = detect_explicit_title(lines)
-    if title is not None and title_idx is not None:
-        body = "\n".join(line for idx, line in enumerate(lines) if idx != title_idx).strip()
-    else:
-        body = cleaned.strip()
-        title = compute_incipit_title(body)
-
-    return {
-        "mots_clefs": deduped_keywords,
-        "titre": title,
-        "date": date_value,
-        "url": url_value,
-        "texte": normalize(body),
-    }
-
 
 def _handle_extract_expressions(arguments: Dict[str, Any]) -> Dict[str, Any]:
     started_at = time.monotonic()
@@ -852,58 +636,41 @@ def _handle_semantic_graph_search(arguments: Dict[str, Any]) -> Dict[str, Any]:
 
 def _handle_index_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
     debug_full = bool(arguments.get("debug_full", False))
-    extract_args = dict(arguments)
     text, normalized_doc = resolve_text_for_extraction(arguments)
-    if text:
-        analysed = _analyse_texte_documentaire_index_text(text)
-        document_payload = normalized_doc if normalized_doc is not None else normalize_document({})
-        content = document_payload.setdefault("content", {})
-        if isinstance(content, dict):
-            content["text"] = analysed.get("texte") or text
-        source = document_payload.setdefault("source", {})
-        if isinstance(source, dict) and isinstance(analysed.get("url"), str) and analysed["url"].strip():
-            if not source.get("url"):
-                source["url"] = analysed["url"].strip()
-        user_fields = document_payload.setdefault("user_fields", {})
-        if isinstance(user_fields, dict):
-            if isinstance(analysed.get("titre"), str) and analysed["titre"].strip():
-                if not user_fields.get("title"):
-                    user_fields["title"] = analysed["titre"].strip()
-            if isinstance(analysed.get("date"), str) and analysed["date"].strip():
-                if not user_fields.get("document_date"):
-                    user_fields["document_date"] = analysed["date"].strip()
-            if isinstance(analysed.get("mots_clefs"), list) and analysed["mots_clefs"]:
-                if not user_fields.get("keywords"):
-                    user_fields["keywords"] = analysed["mots_clefs"]
-        extract_args["document"] = normalize_document(document_payload)
-        extract_args["text"] = (analysed.get("texte") or text).strip()
+    if not isinstance(text, str) or not text.strip():
+        raise ValueError("'text' must be a non-empty string")
 
-    # Reuse extraction pipeline, then index by expressions/doc.
-    extract_res = _handle_extract_expressions(extract_args)
-    extract_payload = extract_res.get("structuredContent", {}) if isinstance(extract_res, dict) else {}
-    if not isinstance(extract_payload, dict):
-        raise ValueError("extract_expressions returned invalid payload")
-
-    expressions = extract_payload.get("expressions")
-    normalized_doc = extract_payload.get("document")
-    if not isinstance(expressions, list) or not expressions:
-        raise ValueError("No expressions extracted; cannot index")
-
-    graph_args: Dict[str, Any] = {
-        "expressions": expressions,
-        "upsert": True,
-    }
-    if isinstance(normalized_doc, dict):
-        graph_args["document"] = normalized_doc
-    for key in ("collection_name", "milvus_uri", "milvus_token", "metric_type", "model", "normalize", "batch_size"):
-        if key in arguments:
-            graph_args[key] = arguments[key]
-
-    graph_res = _handle_semantic_graph_search(graph_args)
-    graph_payload = graph_res.get("structuredContent", {}) if isinstance(graph_res, dict) else {}
-    if not isinstance(graph_payload, dict):
-        raise ValueError("semantic_graph_search returned invalid payload")
-
+    result = index_document_text(
+        text.strip(),
+        base_document=normalized_doc,
+        llama_cpp_url=arguments.get("llama_cpp_url")
+        or arguments.get("llama_url")
+        or os.environ.get("SECRETARIUS_LLAMA_CPP_URL")
+        or os.environ.get("SECRETARIUS_LLAMA_URL")
+        or "http://127.0.0.1:8989/v1/chat/completions",
+        llama_cpp_model=arguments.get("llama_cpp_model")
+        or arguments.get("model")
+        or os.environ.get("SECRETARIUS_LLAMA_CPP_MODEL")
+        or os.environ.get("SECRETARIUS_LLAMA_MODEL", "local-llama-cpp"),
+        timeout_s=arguments.get("timeout_s", float(os.environ.get("SECRETARIUS_TIMEOUT_S", "30.0"))),
+        max_tokens=arguments.get("max_tokens", int(os.environ.get("SECRETARIUS_MAX_TOKENS", "512"))),
+        seed=arguments.get("seed", int(os.environ.get("SECRETARIUS_SEED", "42"))),
+        prompt_path=arguments.get("prompt_path") or os.environ.get("SECRETARIUS_PROMPT_PATH"),
+        debug_return_raw=bool(arguments.get("debug_return_raw", False)),
+        per_chunk_llm=bool(arguments.get("per_chunk_llm", False)),
+        embedding_model=arguments.get("model"),
+        normalize_embeddings=arguments.get("normalize", True),
+        batch_size=arguments.get("batch_size", 32),
+        milvus_uri=arguments.get("milvus_uri") or os.environ.get("SECRETARIUS_MILVUS_URI", "http://127.0.0.1:19530"),
+        milvus_token=arguments.get("milvus_token") or os.environ.get("SECRETARIUS_MILVUS_TOKEN"),
+        collection_name=arguments.get("collection_name")
+        or os.environ.get("SECRETARIUS_MILVUS_COLLECTION", "secretarius_semantic_graph"),
+        metric_type=arguments.get("metric_type") or os.environ.get("SECRETARIUS_MILVUS_METRIC", "COSINE"),
+        top_k=arguments.get("top_k", 10),
+    )
+    extract_payload = result.get("extract", {})
+    graph_payload = result.get("index", {})
+    normalized_doc = result.get("document")
     extract_expressions = extract_payload.get("expressions")
     extract_count = len(extract_expressions) if isinstance(extract_expressions, list) else 0
     index_hits = graph_payload.get("hits")
@@ -933,20 +700,34 @@ def _handle_search_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
     query = arguments.get("query")
     if not isinstance(query, str) or not query.strip():
         raise ValueError("'query' must be a non-empty string")
-
-    graph_args: Dict[str, Any] = {
-        "expressions": [query.strip()],
-        "upsert": False,
-        "top_k": arguments.get("top_k", 10),
-    }
-    for key in ("collection_name", "milvus_uri", "milvus_token", "metric_type", "model", "normalize", "batch_size"):
-        if key in arguments:
-            graph_args[key] = arguments[key]
-
-    graph_res = _handle_semantic_graph_search(graph_args)
-    graph_payload = graph_res.get("structuredContent", {}) if isinstance(graph_res, dict) else {}
-    if not isinstance(graph_payload, dict):
-        raise ValueError("semantic_graph_search returned invalid payload")
+    result = search_documents_by_text(
+        query.strip(),
+        llama_cpp_url=arguments.get("llama_cpp_url")
+        or arguments.get("llama_url")
+        or os.environ.get("SECRETARIUS_LLAMA_CPP_URL")
+        or os.environ.get("SECRETARIUS_LLAMA_URL")
+        or "http://127.0.0.1:8989/v1/chat/completions",
+        llama_cpp_model=arguments.get("llama_cpp_model")
+        or arguments.get("model")
+        or os.environ.get("SECRETARIUS_LLAMA_CPP_MODEL")
+        or os.environ.get("SECRETARIUS_LLAMA_MODEL", "local-llama-cpp"),
+        timeout_s=arguments.get("timeout_s", float(os.environ.get("SECRETARIUS_TIMEOUT_S", "30.0"))),
+        max_tokens=arguments.get("max_tokens", int(os.environ.get("SECRETARIUS_MAX_TOKENS", "512"))),
+        seed=arguments.get("seed", int(os.environ.get("SECRETARIUS_SEED", "42"))),
+        prompt_path=arguments.get("prompt_path") or os.environ.get("SECRETARIUS_PROMPT_PATH"),
+        debug_return_raw=bool(arguments.get("debug_return_raw", False)),
+        per_chunk_llm=bool(arguments.get("per_chunk_llm", False)),
+        embedding_model=arguments.get("model"),
+        normalize_embeddings=arguments.get("normalize", True),
+        batch_size=arguments.get("batch_size", 32),
+        milvus_uri=arguments.get("milvus_uri") or os.environ.get("SECRETARIUS_MILVUS_URI", "http://127.0.0.1:19530"),
+        milvus_token=arguments.get("milvus_token") or os.environ.get("SECRETARIUS_MILVUS_TOKEN"),
+        collection_name=arguments.get("collection_name")
+        or os.environ.get("SECRETARIUS_MILVUS_COLLECTION", "secretarius_semantic_graph"),
+        metric_type=arguments.get("metric_type") or os.environ.get("SECRETARIUS_MILVUS_METRIC", "COSINE"),
+        top_k=arguments.get("top_k", 10),
+    )
+    graph_payload = result.get("search", {})
 
     hits = graph_payload.get("hits")
     hit_lists = len(hits) if isinstance(hits, list) else 0
@@ -960,7 +741,7 @@ def _handle_search_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
             "collection_name": graph_payload.get("collection_name"),
             "query_count": graph_payload.get("query_count", 0),
             "hit_lists": hit_lists,
-            "top_k": graph_args.get("top_k", 10),
+            "top_k": arguments.get("top_k", 10),
         },
         "documents": documents,
         "warning": graph_payload.get("warning"),

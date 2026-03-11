@@ -1,0 +1,346 @@
+from __future__ import annotations
+
+import copy
+import re
+from typing import Any
+
+from .document_schema import (
+    add_indexing_error,
+    enrich_document_with_embeddings,
+    enrich_document_with_extraction,
+    normalize_document,
+    set_indexing_state,
+)
+from .embeddings import embed_expressions_multilingual
+from .expression_extractor import extract_expressions
+from .semantic_graph import semantic_graph_search_milvus
+
+
+def analyse_texte_documentaire(text: str, *, base_document: dict[str, Any] | None = None) -> dict[str, Any]:
+    hashtag_re = re.compile(r"(?<!\w)#([^\s#]+)")
+    date_re = re.compile(r"\b\d{2}-\d{2}-\d{4}\b")
+    url_re = re.compile(r'\bhttps?://[^\s<>\"]+')
+
+    def normalize(raw: str) -> str:
+        cleaned = raw.replace("\r\n", "\n").replace("\r", "\n")
+        cleaned = re.sub(r"[ \t]+", " ", cleaned)
+        cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+        return cleaned.strip()
+
+    def remove_spans(raw: str, spans: list[tuple[int, int]]) -> str:
+        if not spans:
+            return raw
+        merged: list[tuple[int, int]] = []
+        for start, end in sorted(spans):
+            if not merged or start > merged[-1][1]:
+                merged.append((start, end))
+            else:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        out: list[str] = []
+        cursor = 0
+        for start, end in merged:
+            out.append(raw[cursor:start])
+            cursor = end
+        out.append(raw[cursor:])
+        return "".join(out)
+
+    def compute_incipit_title(body: str, max_len: int = 40) -> str | None:
+        lines = [line.strip() for line in body.splitlines() if line.strip()]
+        if not lines:
+            return None
+        first = lines[0]
+        if len(first) <= max_len:
+            return first
+        cut = first[:max_len]
+        if " " in cut:
+            cut = cut.rsplit(" ", 1)[0]
+        return cut.rstrip(" ,;:-") + "..."
+
+    def detect_explicit_title(lines: list[str]) -> tuple[str | None, int | None]:
+        for idx in range(len(lines) - 1):
+            current = lines[idx].strip()
+            if not current:
+                continue
+            if hashtag_re.fullmatch(current):
+                continue
+            if date_re.fullmatch(current):
+                continue
+            if url_re.fullmatch(current):
+                continue
+
+            next_line = ""
+            for look_ahead in range(idx + 1, len(lines)):
+                candidate = lines[look_ahead].strip()
+                if not candidate:
+                    continue
+                next_line = candidate
+                break
+            if not next_line:
+                continue
+            if len(current) <= 120 and not current.endswith((".", "!", "?", ";")) and len(next_line) >= len(current):
+                return current, idx
+        return None, None
+
+    normalized = normalize(text or "")
+    spans_to_remove: list[tuple[int, int]] = []
+    keywords: list[str] = []
+
+    for match in hashtag_re.finditer(normalized):
+        keywords.append(f"#{match.group(1)}")
+        spans_to_remove.append((match.start(), match.end()))
+
+    date_match = date_re.search(normalized)
+    date_value = date_match.group(0) if date_match else None
+    if date_match:
+        spans_to_remove.append((date_match.start(), date_match.end()))
+
+    url_match = url_re.search(normalized)
+    url_value = url_match.group(0) if url_match else None
+    if url_match:
+        spans_to_remove.append((url_match.start(), url_match.end()))
+
+    deduped_keywords: list[str] = []
+    seen: set[str] = set()
+    for keyword in keywords:
+        if keyword in seen:
+            continue
+        seen.add(keyword)
+        deduped_keywords.append(keyword)
+
+    cleaned = remove_spans(normalized, spans_to_remove)
+    cleaned = re.sub(r"[ \t]+\n", "\n", cleaned)
+    cleaned = re.sub(r"\n[ \t]+", "\n", cleaned)
+    cleaned = re.sub(r" {2,}", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    cleaned = cleaned.strip(" \n\t-:")
+
+    lines = cleaned.splitlines()
+    title, title_idx = detect_explicit_title(lines)
+    if title is not None and title_idx is not None:
+        body = "\n".join(line for idx, line in enumerate(lines) if idx != title_idx).strip()
+    else:
+        body = cleaned.strip()
+        title = compute_incipit_title(body)
+
+    document_payload = copy.deepcopy(base_document) if isinstance(base_document, dict) else {}
+    content = document_payload.setdefault("content", {})
+    if isinstance(content, dict):
+        content["text"] = normalize(body)
+    source = document_payload.setdefault("source", {})
+    if isinstance(source, dict) and isinstance(url_value, str) and url_value.strip() and not source.get("url"):
+        source["url"] = url_value.strip()
+    user_fields = document_payload.setdefault("user_fields", {})
+    if isinstance(user_fields, dict):
+        if isinstance(title, str) and title.strip() and not user_fields.get("title"):
+            user_fields["title"] = title.strip()
+        if isinstance(date_value, str) and date_value.strip() and not user_fields.get("document_date"):
+            user_fields["document_date"] = date_value.strip()
+        if deduped_keywords and not user_fields.get("keywords"):
+            user_fields["keywords"] = deduped_keywords
+    return normalize_document(document_payload)
+
+
+def index_document_text(
+    text: str,
+    *,
+    base_document: dict[str, Any] | None = None,
+    llama_cpp_url: str = "http://127.0.0.1:8989/v1/chat/completions",
+    llama_cpp_model: str = "local-llama-cpp",
+    timeout_s: float = 30.0,
+    max_tokens: int = 512,
+    seed: int = 42,
+    prompt_path: str | None = None,
+    debug_return_raw: bool = False,
+    per_chunk_llm: bool = False,
+    embedding_model: str | None = None,
+    normalize_embeddings: bool = True,
+    batch_size: int = 32,
+    milvus_uri: str = "http://127.0.0.1:19530",
+    milvus_token: str | None = None,
+    collection_name: str = "secretarius_semantic_graph",
+    metric_type: str = "COSINE",
+    top_k: int = 10,
+) -> dict[str, Any]:
+    document = analyse_texte_documentaire(text, base_document=base_document)
+    content = document.get("content") if isinstance(document.get("content"), dict) else {}
+    document_text = content.get("text") if isinstance(content.get("text"), str) else ""
+    if not document_text.strip():
+        add_indexing_error(document, "extracting", "document has no inline text")
+        return {
+            "document": document,
+            "extract": {"expressions": [], "warning": "document has no inline text"},
+            "index": {
+                "collection_name": collection_name,
+                "inserted_count": 0,
+                "query_count": 0,
+                "hits": [],
+                "warning": "document has no inline text",
+            },
+        }
+
+    set_indexing_state(document, "extracting")
+    extract_result = extract_expressions(
+        document_text,
+        llama_cpp_url=llama_cpp_url,
+        llama_cpp_model=llama_cpp_model,
+        timeout_s=timeout_s,
+        max_tokens=max_tokens,
+        prompt_path=prompt_path,
+        seed=seed,
+        debug_return_raw=debug_return_raw,
+        per_chunk_llm=per_chunk_llm,
+    )
+    expressions = extract_result.get("expressions", [])
+    if not isinstance(expressions, list):
+        expressions = []
+    expressions = [expr for expr in expressions if isinstance(expr, str)]
+
+    document = enrich_document_with_extraction(
+        document,
+        chunks=extract_result.get("chunks", []) if isinstance(extract_result.get("chunks"), list) else [],
+        by_chunk=extract_result.get("by_chunk", []) if isinstance(extract_result.get("by_chunk"), list) else [],
+        expressions=expressions,
+    )
+
+    if not expressions:
+        warning = extract_result.get("warning") or "no expressions extracted"
+        add_indexing_error(document, "extracting", str(warning))
+        return {
+            "document": document,
+            "extract": extract_result,
+            "index": {
+                "collection_name": collection_name,
+                "inserted_count": 0,
+                "query_count": 0,
+                "hits": [],
+                "warning": str(warning),
+            },
+        }
+
+    embedding_result = embed_expressions_multilingual(
+        expressions,
+        model=embedding_model,
+        normalize=normalize_embeddings,
+        batch_size=batch_size,
+    )
+    embeddings = embedding_result.get("embeddings", [])
+    if not isinstance(embeddings, list):
+        embeddings = []
+    document = enrich_document_with_embeddings(
+        document,
+        expressions=expressions,
+        embeddings=embeddings,
+    )
+
+    documents = _documents_for_expression_embeddings(document, expressions)
+    set_indexing_state(document, "upserting")
+    index_result = semantic_graph_search_milvus(
+        embeddings,
+        documents=documents,
+        top_k=top_k,
+        uri=milvus_uri,
+        token=milvus_token,
+        collection_name=collection_name,
+        metric_type=metric_type,
+    )
+    warning = index_result.get("warning")
+    if warning:
+        add_indexing_error(document, "upserting", str(warning))
+    else:
+        set_indexing_state(document, "done")
+    return {
+        "document": document,
+        "extract": extract_result,
+        "index": index_result,
+    }
+
+
+def search_documents_by_text(
+    text: str,
+    *,
+    llama_cpp_url: str = "http://127.0.0.1:8989/v1/chat/completions",
+    llama_cpp_model: str = "local-llama-cpp",
+    timeout_s: float = 30.0,
+    max_tokens: int = 512,
+    seed: int = 42,
+    prompt_path: str | None = None,
+    debug_return_raw: bool = False,
+    per_chunk_llm: bool = False,
+    embedding_model: str | None = None,
+    normalize_embeddings: bool = True,
+    batch_size: int = 32,
+    milvus_uri: str = "http://127.0.0.1:19530",
+    milvus_token: str | None = None,
+    collection_name: str = "secretarius_semantic_graph",
+    metric_type: str = "COSINE",
+    top_k: int = 10,
+) -> dict[str, Any]:
+    query_document = analyse_texte_documentaire(text)
+    content = query_document.get("content") if isinstance(query_document.get("content"), dict) else {}
+    query_text = content.get("text") if isinstance(content.get("text"), str) else text
+
+    extract_result = extract_expressions(
+        query_text,
+        llama_cpp_url=llama_cpp_url,
+        llama_cpp_model=llama_cpp_model,
+        timeout_s=timeout_s,
+        max_tokens=max_tokens,
+        prompt_path=prompt_path,
+        seed=seed,
+        debug_return_raw=debug_return_raw,
+        per_chunk_llm=per_chunk_llm,
+    )
+    expressions = extract_result.get("expressions", [])
+    if not isinstance(expressions, list):
+        expressions = []
+    expressions = [expr for expr in expressions if isinstance(expr, str)]
+
+    if not expressions:
+        return {
+            "document": query_document,
+            "extract": extract_result,
+            "search": {
+                "collection_name": collection_name,
+                "query_count": 0,
+                "hits": [],
+                "warning": extract_result.get("warning") or "no expressions extracted",
+            },
+        }
+
+    embedding_result = embed_expressions_multilingual(
+        expressions,
+        model=embedding_model,
+        normalize=normalize_embeddings,
+        batch_size=batch_size,
+    )
+    embeddings = embedding_result.get("embeddings", [])
+    if not isinstance(embeddings, list):
+        embeddings = []
+
+    search_result = semantic_graph_search_milvus(
+        embeddings,
+        documents=[],
+        top_k=top_k,
+        uri=milvus_uri,
+        token=milvus_token,
+        collection_name=collection_name,
+        metric_type=metric_type,
+    )
+    return {
+        "document": query_document,
+        "extract": extract_result,
+        "search": search_result,
+    }
+
+
+def _documents_for_expression_embeddings(document: dict[str, Any], expressions: list[str]) -> list[dict[str, Any]]:
+    documents: list[dict[str, Any]] = []
+    for idx, expression in enumerate(expressions):
+        doc_copy = copy.deepcopy(document)
+        indexing = doc_copy.setdefault("indexing", {})
+        if isinstance(indexing, dict):
+            indexing["source"] = "document_pipeline:index_text"
+            indexing["source_expression_idx"] = idx
+            indexing["source_expression"] = expression
+        documents.append(doc_copy)
+    return documents

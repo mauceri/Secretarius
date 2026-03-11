@@ -16,6 +16,14 @@ openwebui:
   journal_file: "logs/openwebui.log"
   request_timeout_s: 90
 
+notebook_api:
+  enabled: true
+  host: "0.0.0.0"
+  port: 8001
+  model_id: "secretarius-notebook"
+  journal_file: "logs/notebook.log"
+  request_timeout_s: 120
+
 mcp_servers:
   secretarius:
     command: "python"

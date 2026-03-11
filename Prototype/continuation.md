@@ -246,3 +246,128 @@ Résultat attendu: aucun match.
 - Si Qwen tronque encore `action_input.text`, décider entre:
   - renforcement supplémentaire du prompt routeur,
   - pré-routage déterministe pour certains cas très reconnaissables d'extraction.
+
+---
+
+## Mise à jour du 2026-03-11
+
+### Décision d'architecture entérinée
+- Séparation explicite entre :
+  - fonctions métier internes,
+  - outils MCP exposés au routeur,
+  - infrastructure interne.
+- Les outils MCP publics doivent refléter l'intention utilisateur, pas l'implémentation.
+- Contrat visé :
+  - `extract_expressions(text)` : extraction seule sur texte brut,
+  - `index_text(text)` : indexation documentaire à partir d'une chaîne,
+  - `search_text(query)` : interrogation documentaire par similarité.
+- La structure `Document` est désormais considérée comme structure métier interne canonique, pas comme schéma d'entrée public à exposer au routeur.
+
+### Spécification ajoutée
+- Nouveau document de référence :
+  - `spec_mcp_documentaire.md`
+- Cette note formalise :
+  - les fonctions métier attendues,
+  - les outils MCP minimaux,
+  - le rôle du `Document`,
+  - et l'interdiction de mélanger backend LLM, structure documentaire et schémas MCP publics.
+
+### Refactor métier / MCP
+- Nouveau module métier :
+  - `secretarius_local/document_pipeline.py`
+- Fonctions ajoutées :
+  - `analyse_texte_documentaire(...)`
+  - `index_document_text(...)`
+  - `search_documents_by_text(...)`
+- `mcp_server.py` a été allégé :
+  - les handlers MCP `index_text` et `search_text` délèguent maintenant au pipeline métier,
+  - l'extraction d'expressions reste exposée séparément avec une sortie minimale,
+  - les schémas publics MCP ont été simplifiés.
+
+### Simplification des schémas MCP publics
+- `extract_expressions` :
+  - entrée publique minimale : `text`
+  - suppression du faux schéma documentaire public et des paramètres LLM du `tools/list`.
+- `index_text` :
+  - entrée publique minimale : `text`
+- `search_text` :
+  - entrée publique minimale : `query`
+- Les détails techniques restent gérés en interne par les handlers et/ou via l'environnement.
+
+### Sorties d'outils
+- `extract_expressions` :
+  - en régime normal : sortie minimale (`expressions`, `warning`, `document` si nécessaire),
+  - en debug : diagnostics détaillés seulement si `debug_return_raw=True`.
+- `index_text` :
+  - conserve un résumé compact,
+  - détail `extract/index` seulement si `debug_full=True`.
+- `search_text` :
+  - conserve un résumé compact et les documents trouvés.
+
+### Pipeline documentaire
+- `index_text` :
+  - analyse la chaîne en document,
+  - extrait les expressions à partir du texte documentaire,
+  - calcule les plongements de toutes les expressions,
+  - insère en base le document enrichi via ces plongements.
+- Validation explicite :
+  - le document indexé n'est plus réduit conceptuellement à une simple liste de snippets,
+  - le pipeline insère bien le document enrichi en s'appuyant sur les plongements de l'ensemble de ses expressions.
+
+### Prompt routeur
+- Réécriture du prompt routeur :
+  - `secretarius_local/prompts/prompt_routeur.txt`
+- Objectif :
+  - réduire la verbosité,
+  - rendre explicite la priorité de l'intention principale,
+  - empêcher qu'une phrase contenue dans un document ("extraire les expressions...") soit prise pour l'instruction à exécuter.
+- Cas observé et corrigé :
+  - une demande commençant par `indexer :` contenant ensuite une phrase de type `Extraire les expressions...` était routée à tort vers `extract_expressions`,
+  - le nouveau prompt donne priorité à `index_text` si l'intention principale est l'indexation.
+
+### Nouveau canal notebook
+- Ajout d'un nouveau canal OpenAI-compatible pour usage depuis un carnet Jupyter :
+  - `notebook_api.py`
+  - `server_notebook.py`
+- Intégration dans le lancement multicanal :
+  - `main_multicanal.py`
+  - `config.yaml`
+- Configuration par défaut :
+  - port `8001`
+  - modèle `secretarius-notebook`
+  - journal `logs/notebook.log`
+- Ce canal est distinct d'OpenWebUI :
+  - canal logique `notebook`,
+  - déduplication propre par canal,
+  - pas d'heuristiques auxiliaires OpenWebUI (follow-ups, title, tags).
+
+### Tests ajoutés / adaptés
+- `tests/test_document_pipeline.py`
+  - vérifie que l'indexation s'appuie sur les plongements de toutes les expressions.
+- `tests/test_notebook_api.py`
+  - vérifie que le canal notebook route bien les requêtes via `gateway.submit("notebook", ...)`.
+- `tests/test_mcp_server_compact_responses.py`
+  - adaptés au nouveau découpage métier / MCP.
+- `tests/test_mcp_tools_catalog.py`
+  - vérifie aussi la minimalité des schémas publics.
+
+### Validation effectuée
+- Dans la venv du projet :
+```bash
+../.venv/bin/python -m unittest tests.test_notebook_api -v
+../.venv/bin/python -m unittest tests.test_document_pipeline tests.test_mcp_server_compact_responses tests.test_mcp_tools_catalog tests.test_chef_orchestre tests.test_guichet_unique -v
+```
+- Résultat :
+  - `tests.test_notebook_api` : OK
+  - `tests.test_document_pipeline` : OK
+  - `tests.test_mcp_server_compact_responses` : OK
+  - `tests.test_mcp_tools_catalog` : OK
+  - `tests.test_chef_orchestre` : OK
+  - `tests.test_guichet_unique` : OK
+
+### Points d'attention restants
+- `semantic_graph_search` et `expressions_to_embeddings` existent encore côté serveur MCP comme outils internes / bas niveau.
+- Une décision reste à prendre :
+  - les conserver cachés dans `mcp_server.py`,
+  - ou les sortir plus franchement de la surface MCP si l'on veut une séparation encore plus stricte.
+- Le canal notebook nécessite évidemment un redémarrage de `main_multicanal.py` pour ouvrir le port `8001`.
