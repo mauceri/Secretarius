@@ -1,0 +1,16 @@
+2026-03-11T18:43:57	notebook	CHAT	USER	indexer :
+11/03/2026
+#poésie
+Quand je considère ces têtes...
+2026-03-11T18:44:03	notebook	THOUGHT	ASSISTANT	Calling tool: index_text with inputs {'text': '11/03/2026\n#poésie\nQuand je considère ces têtes...'}
+2026-03-11T18:44:11	notebook	THOUGHT	ASSISTANT	Observation: {"status": "ok", "tool": "index_text", "message": "Indexation complete (extraction + insertion semantic graph).", "summary": {"expressions_count": 1, "collection_name": "secretarius_semantic_graph", "inserted_count": 1, "query_count": 1, "hit_lists": 1}, "warning": "chunker returned no chunks; fallback to single raw-text chunk"}
+2026-03-11T18:44:11	notebook	THOUGHT	ASSISTANT	Index summary: expressions=0, inserted=0, collection=-, warning=chunker returned no chunks; fallback to single raw-text chunk
+2026-03-11T18:44:11	notebook	CHAT	SECRETARIUS	{"status": "ok", "tool": "index_text", "message": "Indexation complete (extraction + insertion semantic graph).", "summary": {"expressions_count": 1, "collection_name": "secretarius_semantic_graph", "inserted_count": 1, "query_count": 1, "hit_lists": 1}, "warning": "chunker returned no chunks; fallback to single raw-text chunk"}
+2026-03-11T19:18:17	notebook	CHAT	USER	indexer :
+11/03/2026
+#poésie
+Quand je considère ces têtes...
+2026-03-11T19:18:23	notebook	THOUGHT	ASSISTANT	Calling tool: index_text with inputs {'text': '11/03/2026\n#poésie\nQuand je considère ces têtes...'}
+2026-03-11T19:18:31	notebook	THOUGHT	ASSISTANT	Observation: {"status": "ok", "tool": "index_text", "message": "Indexation complete (extraction + insertion semantic graph).", "summary": {"expressions_count": 1, "collection_name": "secretarius_semantic_graph", "inserted_count": 1, "query_count": 1, "hit_lists": 1}, "warning": "chunker returned no chunks; fallback to single raw-text chunk"}
+2026-03-11T19:18:31	notebook	THOUGHT	ASSISTANT	Index summary: expressions=0, inserted=0, collection=-, warning=chunker returned no chunks; fallback to single raw-text chunk
+2026-03-11T19:18:31	notebook	CHAT	SECRETARIUS	{"status": "ok", "tool": "index_text", "message": "Indexation complete (extraction + insertion semantic graph).", "summary": {"expressions_count": 1, "collection_name": "secretarius_semantic_graph", "inserted_count": 1, "query_count": 1, "hit_lists": 1}, "warning": "chunker returned no chunks; fallback to single raw-text chunk"}
