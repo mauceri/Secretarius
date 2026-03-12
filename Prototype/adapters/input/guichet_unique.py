@@ -27,8 +27,12 @@ class GuichetUnique(InputGatewayInterface):
         self._journal_path = Path(journal_path) if journal_path else None
         self._channel_journal_paths: dict[str, Path] = {}
         self._current_channel: ContextVar[str] = ContextVar("current_channel", default="default")
-        self._current_collector: ContextVar[Optional[list[tuple[str, str]]]] = ContextVar(
-            "current_collector",
+        self._current_message_collector: ContextVar[Optional[list[tuple[str, str]]]] = ContextVar(
+            "current_message_collector",
+            default=None,
+        )
+        self._current_thought_collector: ContextVar[Optional[list[str]]] = ContextVar(
+            "current_thought_collector",
             default=None,
         )
         self._channel_sinks: dict[str, tuple[Optional[ThoughtSink], Optional[MessageSink]]] = {}
@@ -91,6 +95,9 @@ class GuichetUnique(InputGatewayInterface):
     async def display_thought(self, thought: str):
         channel = self._current_channel.get()
         self._append_journal_line("THOUGHT", "ASSISTANT", thought, channel=channel)
+        collector = self._current_thought_collector.get()
+        if collector is not None:
+            collector.append(thought)
         thought_sink, _ = self._channel_sinks.get(channel, (None, None))
         if thought_sink is not None:
             await self._maybe_await(thought_sink(thought))
@@ -99,7 +106,7 @@ class GuichetUnique(InputGatewayInterface):
         channel = self._current_channel.get()
         normalized_role = role if isinstance(role, str) else "assistant"
         self._append_journal_line("CHAT", normalized_role.upper(), content, channel=channel)
-        collector = self._current_collector.get()
+        collector = self._current_message_collector.get()
         if collector is not None:
             collector.append((normalized_role, content))
         _, message_sink = self._channel_sinks.get(channel, (None, None))
@@ -117,17 +124,8 @@ class GuichetUnique(InputGatewayInterface):
         text = re.sub(r"\n+", "\n", text)
         return text.strip()
 
-    async def _run_submission(self, channel: str, user_input: str) -> str:
-        self._append_journal_line("CHAT", "USER", user_input, channel=channel)
-        collector: list[tuple[str, str]] = []
-        token_channel = self._current_channel.set(channel)
-        token_collector = self._current_collector.set(collector)
-        try:
-            await self._callback(user_input)
-        finally:
-            self._current_channel.reset(token_channel)
-            self._current_collector.reset(token_collector)
-
+    @staticmethod
+    def _extract_final_message(collector: list[tuple[str, str]]) -> str:
         for role, content in reversed(collector):
             if role.lower() in ("assistant", "secretarius"):
                 return content
@@ -135,6 +133,26 @@ class GuichetUnique(InputGatewayInterface):
             if role.lower() == "system":
                 return content
         return "Aucune reponse finale n'a ete produite."
+
+    async def _run_submission_with_trace(self, channel: str, user_input: str) -> tuple[str, list[str], list[tuple[str, str]]]:
+        self._append_journal_line("CHAT", "USER", user_input, channel=channel)
+        message_collector: list[tuple[str, str]] = []
+        thought_collector: list[str] = []
+        token_channel = self._current_channel.set(channel)
+        token_message_collector = self._current_message_collector.set(message_collector)
+        token_thought_collector = self._current_thought_collector.set(thought_collector)
+        try:
+            await self._callback(user_input)
+        finally:
+            self._current_channel.reset(token_channel)
+            self._current_message_collector.reset(token_message_collector)
+            self._current_thought_collector.reset(token_thought_collector)
+
+        return self._extract_final_message(message_collector), thought_collector, message_collector
+
+    async def _run_submission(self, channel: str, user_input: str) -> str:
+        result, _, _ = await self._run_submission_with_trace(channel, user_input)
+        return result
 
     async def submit(self, channel: str, user_input: str) -> str:
         if self._callback is None:
@@ -195,3 +213,14 @@ class GuichetUnique(InputGatewayInterface):
                 stale_keys = [k for k, (ts, _) in self._recent_results.items() if ts < stale_before]
                 for stale_key in stale_keys:
                     del self._recent_results[stale_key]
+
+    async def submit_with_trace(self, channel: str, user_input: str) -> dict[str, object]:
+        if self._callback is None:
+            raise RuntimeError("No orchestrator callback configured.")
+
+        result, thoughts, messages = await self._run_submission_with_trace(channel, user_input)
+        return {
+            "reply_text": result,
+            "thoughts": thoughts,
+            "messages": [{"role": role, "content": content} for role, content in messages],
+        }

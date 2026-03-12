@@ -43,11 +43,10 @@ def extract_expressions(
     llama_cpp_url: str = "http://127.0.0.1:8989/v1/chat/completions",
     llama_cpp_model: str = "local-llama-cpp",
     timeout_s: float = 120.0,
-    max_tokens: int = 512,
+    max_tokens: int = 20480,
     prompt_path: str | None = None,
     seed: int = 42,
     debug_return_raw: bool = False,
-    per_chunk_llm: bool = False,
 ) -> dict[str, Any]:
     cleaned = (text or "").strip()
     if not cleaned:
@@ -76,12 +75,8 @@ def extract_expressions(
     all_expressions: list[str] = []
     filtered_out_total = 0
 
-    if per_chunk_llm:
-        source_texts = chunks
-        warn_prefix = "chunk"
-    else:
-        source_texts = [cleaned]
-        warn_prefix = "global"
+    source_texts = chunks
+    warn_prefix = "chunk"
 
     extracted_by_source: list[tuple[list[str], str | None, int, str]] = []
     for idx, source_text in enumerate(source_texts):
@@ -95,53 +90,30 @@ def extract_expressions(
             seed=seed,
         )
         if warn:
-            warnings.append(f"{warn_prefix} {idx}: {warn}" if per_chunk_llm else f"{warn_prefix}: {warn}")
+            warnings.append(f"{warn_prefix} {idx}: {warn}")
         filtered_out_total += removed
         extracted_by_source.append((parsed, warn, removed, raw_output))
 
-    if per_chunk_llm:
-        for idx, chunk_text in enumerate(chunks):
-            parsed, _warn, _removed, raw_output = extracted_by_source[idx]
-            by_chunk.append(
-                {
-                    "id": idx,
-                    "chunk": chunk_text,
-                    "expressions": parsed,
-                    "request_fingerprint": _request_fingerprint(
-                        text=chunk_text,
-                        system_prompt=system_prompt,
-                        llama_cpp_url=llama_cpp_url,
-                        llama_cpp_model=llama_cpp_model,
-                        timeout_s=timeout_s,
-                        max_tokens=max_tokens,
-                        seed=seed,
-                    ),
-                    **({"raw_llm_output": raw_output} if debug_return_raw else {}),
-                }
-            )
-            all_expressions.extend(parsed)
-    else:
-        parsed_global, _warn, _removed, raw_global = extracted_by_source[0]
-        all_expressions.extend(parsed_global)
-        for idx, chunk_text in enumerate(chunks):
-            chunk_exprs = [expr for expr in parsed_global if expr in chunk_text]
-            by_chunk.append(
-                {
-                    "id": idx,
-                    "chunk": chunk_text,
-                    "expressions": chunk_exprs,
-                    "request_fingerprint": _request_fingerprint(
-                        text=chunk_text,
-                        system_prompt=system_prompt,
-                        llama_cpp_url=llama_cpp_url,
-                        llama_cpp_model=llama_cpp_model,
-                        timeout_s=timeout_s,
-                        max_tokens=max_tokens,
-                        seed=seed,
-                    ),
-                    **({"raw_llm_output": raw_global} if debug_return_raw else {}),
-                }
-            )
+    for idx, chunk_text in enumerate(chunks):
+        parsed, _warn, _removed, raw_output = extracted_by_source[idx]
+        by_chunk.append(
+            {
+                "id": idx,
+                "chunk": chunk_text,
+                "expressions": parsed,
+                "request_fingerprint": _request_fingerprint(
+                    text=chunk_text,
+                    system_prompt=system_prompt,
+                    llama_cpp_url=llama_cpp_url,
+                    llama_cpp_model=llama_cpp_model,
+                    timeout_s=timeout_s,
+                    max_tokens=max_tokens,
+                    seed=seed,
+                ),
+                **({"raw_llm_output": raw_output} if debug_return_raw else {}),
+            }
+        )
+        all_expressions.extend(parsed)
 
     dedup: list[str] = []
     seen: set[str] = set()
@@ -171,7 +143,6 @@ def extract_expressions(
             "top_k": 1,
             "repeat_penalty": 1.0,
             "seed": seed,
-            "per_chunk_llm": per_chunk_llm,
         },
         "warning": " | ".join(warnings) if warnings else None,
     }

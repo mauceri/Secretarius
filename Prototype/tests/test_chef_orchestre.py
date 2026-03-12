@@ -39,6 +39,11 @@ class FakeToolClient(ToolClientInterface):
                 "description": "Index text",
                 "inputSchema": {"type": "object"},
             },
+            {
+                "name": "search_text",
+                "description": "Search text",
+                "inputSchema": {"type": "object"},
+            },
         ]
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> str:
@@ -50,10 +55,12 @@ class FakeToolClient(ToolClientInterface):
         if name == "index_text":
             return (
                 '{"status":"ok","tool":"index_text",'
-                '"extract":{"expressions":["a","b"]},'
-                '"index":{"collection_name":"secretarius_semantic_graph","inserted_count":0,'
-                '"warning":"milvus connection failed"}}'
+                '"summary":{"expressions_count":2,"collection_name":"secretarius_semantic_graph","inserted_count":0,'
+                '"query_count":2,"hit_lists":2},'
+                '"warning":"milvus connection failed"}'
             )
+        if name == "search_text":
+            return '{"tool":"search_text","documents":[],"summary":{"query_count":1,"hit_lists":0,"collection_name":"secretarius_semantic_graph"}}'
         return "unknown"
 
     async def connect(self):
@@ -117,6 +124,21 @@ class TestChefDOrchestre(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any("Ignored model final_answer" in t for t in gateway.thoughts))
         self.assertEqual(gateway.messages[-1], ("Secretarius", '{"expressions":["a","b"]}'))
 
+    async def test_recovers_from_missing_final_brace_in_router_json(self):
+        llm = FakeLLM(
+            [
+                '{"action":"extract_expressions","action_input":{"text":"x"}',
+            ]
+        )
+        tools = FakeToolClient()
+        gateway = FakeGateway()
+        orchestrator = ChefDOrchestre(llm=llm, tool_client=tools, gateway=gateway)
+
+        await orchestrator.handle_user_input("Test")
+
+        self.assertEqual(len(tools.calls), 1)
+        self.assertEqual(gateway.messages[-1], ("Secretarius", '{"expressions":["a","b"]}'))
+
     async def test_state_is_trimmed(self):
         llm = FakeLLM(['{"action":"extract_expressions","action_input":{"text":"done"}}'])
         gateway = FakeGateway()
@@ -156,24 +178,83 @@ class TestChefDOrchestre(unittest.IsolatedAsyncioTestCase):
         await orchestrator.handle_user_input("Bonjour")
 
         self.assertEqual(llm.calls, 1)
-        self.assertEqual(len(tools.calls), 0)
-        self.assertEqual(gateway.messages[-1], ("Secretarius", "Aucun outil ne correspond a votre demande."))
+        self.assertEqual(len(tools.calls), 1)
+        self.assertEqual(tools.calls[0], ("index_text", {"text": "Bonjour"}))
+        self.assertTrue(any("defaulting to index_text" in t for t in gateway.thoughts))
 
-    async def test_extract_expressions_recovers_when_text_missing(self):
-        llm = FakeLLM(['{"action":"extract_expressions","action_input":{"document":"text"}}'])
+    async def test_direct_exp_command_bypasses_llm(self):
+        llm = FakeLLM(['{"action":null,"action_input":{}}'])
         tools = FakeToolClient()
         gateway = FakeGateway()
         orchestrator = ChefDOrchestre(llm=llm, tool_client=tools, gateway=gateway)
 
-        user_text = "Extraire les expressions de ce texte: Dans la plaine les baladins."
-        await orchestrator.handle_user_input(user_text)
+        await orchestrator.handle_user_input("/exp Bonjour")
+
+        self.assertEqual(llm.calls, 0)
+        self.assertEqual(tools.calls, [("extract_expressions", {"text": "Bonjour"})])
+        self.assertEqual(gateway.messages[-1], ("Secretarius", '{"expressions":["a","b"]}'))
+
+    async def test_direct_index_command_bypasses_llm(self):
+        llm = FakeLLM(['{"action":null,"action_input":{}}'])
+        tools = FakeToolClient()
+        gateway = FakeGateway()
+        orchestrator = ChefDOrchestre(llm=llm, tool_client=tools, gateway=gateway)
+
+        await orchestrator.handle_user_input("/index Corps documentaire")
+
+        self.assertEqual(llm.calls, 0)
+        self.assertEqual(tools.calls, [("index_text", {"text": "Corps documentaire"})])
+
+    async def test_direct_index_command_accepts_newline_payload(self):
+        llm = FakeLLM(['{"action":null,"action_input":{}}'])
+        tools = FakeToolClient()
+        gateway = FakeGateway()
+        orchestrator = ChefDOrchestre(llm=llm, tool_client=tools, gateway=gateway)
+
+        await orchestrator.handle_user_input("/index\n12/03/2026\nCorps documentaire")
+
+        self.assertEqual(llm.calls, 0)
+        self.assertEqual(tools.calls, [("index_text", {"text": "12/03/2026\nCorps documentaire"})])
+
+    async def test_direct_req_command_bypasses_llm(self):
+        llm = FakeLLM(['{"action":null,"action_input":{}}'])
+        tools = FakeToolClient()
+        gateway = FakeGateway()
+        orchestrator = ChefDOrchestre(llm=llm, tool_client=tools, gateway=gateway)
+
+        await orchestrator.handle_user_input("/req trou de verdure")
+
+        self.assertEqual(llm.calls, 0)
+        self.assertEqual(tools.calls, [("search_text", {"query": "trou de verdure"})])
+
+    async def test_direct_command_requires_payload(self):
+        llm = FakeLLM(['{"action":null,"action_input":{}}'])
+        tools = FakeToolClient()
+        gateway = FakeGateway()
+        orchestrator = ChefDOrchestre(llm=llm, tool_client=tools, gateway=gateway)
+
+        await orchestrator.handle_user_input("/exp")
+
+        self.assertEqual(llm.calls, 0)
+        self.assertEqual(len(tools.calls), 0)
+        self.assertTrue(gateway.messages[-1][1].startswith("Commande extract_expressions sans contenu"))
+
+    async def test_extract_expressions_drops_unsupported_args_without_rewriting(self):
+        llm = FakeLLM(['{"action":"extract_expressions","action_input":{"document":"text","text":"Texte brut"}}'])
+        tools = FakeToolClient()
+        gateway = FakeGateway()
+        orchestrator = ChefDOrchestre(llm=llm, tool_client=tools, gateway=gateway)
+
+        await orchestrator.handle_user_input("Extraire les expressions de ce texte: Dans la plaine les baladins.")
 
         self.assertEqual(len(tools.calls), 1)
         tool_name, tool_args = tools.calls[0]
         self.assertEqual(tool_name, "extract_expressions")
-        self.assertEqual(tool_args.get("text"), "Dans la plaine les baladins.")
+        self.assertEqual(tool_args.get("text"), "Texte brut")
+        self.assertNotIn("document", tool_args)
+        self.assertTrue(any("Dropped unsupported tool args" in t for t in gateway.thoughts))
 
-    async def test_extract_expressions_strips_instruction_prefix(self):
+    async def test_extract_expressions_keeps_router_payload_verbatim(self):
         llm = FakeLLM(
             ['{"action":"extract_expressions","action_input":{"text":"Extraire les expressions caractéristiques de : Dans la plaine les baladins"}}']
         )
@@ -185,9 +266,12 @@ class TestChefDOrchestre(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(tools.calls), 1)
         _, tool_args = tools.calls[0]
-        self.assertEqual(tool_args.get("text"), "Dans la plaine les baladins")
+        self.assertEqual(
+            tool_args.get("text"),
+            "Extraire les expressions caractéristiques de : Dans la plaine les baladins",
+        )
 
-    async def test_index_text_recovers_from_document_string_and_drops_bad_collection_name(self):
+    async def test_index_text_drops_unsupported_args_without_rewriting(self):
         llm = FakeLLM(
             [
                 '{"action":"index_text","action_input":{"collection_name":"text","document":"Indexer le texte : Dans la plaine les baladins"}}',
@@ -202,12 +286,13 @@ class TestChefDOrchestre(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(tools.calls), 1)
         tool_name, tool_args = tools.calls[0]
         self.assertEqual(tool_name, "index_text")
-        self.assertEqual(tool_args.get("text"), "Dans la plaine les baladins")
+        self.assertNotIn("text", tool_args)
         self.assertNotIn("collection_name", tool_args)
         self.assertNotIn("document", tool_args)
-        self.assertTrue(any("Index summary:" in t for t in gateway.thoughts))
+        self.assertTrue(any("Index summary: expressions=2, inserted=0" in t for t in gateway.thoughts))
+        self.assertTrue(any("Dropped unsupported tool args" in t for t in gateway.thoughts))
 
-    async def test_index_text_ignores_collection_name_unless_user_requests_it(self):
+    async def test_index_text_keeps_router_payload_verbatim_except_whitelist(self):
         llm = FakeLLM(
             [
                 '{"action":"index_text","action_input":{"collection_name":"tetes_charniers","text":"Quand je considere ces tetes entassees"}}',
@@ -221,21 +306,5 @@ class TestChefDOrchestre(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(tools.calls), 1)
         _, tool_args = tools.calls[0]
+        self.assertEqual(tool_args.get("text"), "Quand je considere ces tetes entassees")
         self.assertNotIn("collection_name", tool_args)
-
-    async def test_index_text_prefers_user_multiline_text_over_llm_rewrite(self):
-        llm = FakeLLM(
-            [
-                '{"action":"index_text","action_input":{"text":"Indexer le texte : version alteree sur une ligne"}}',
-            ]
-        )
-        tools = FakeToolClient()
-        gateway = FakeGateway()
-        orchestrator = ChefDOrchestre(llm=llm, tool_client=tools, gateway=gateway)
-
-        user_text = "Indexer le texte :\nVers un.\nVers deux."
-        await orchestrator.handle_user_input(user_text)
-
-        self.assertEqual(len(tools.calls), 1)
-        _, tool_args = tools.calls[0]
-        self.assertEqual(tool_args.get("text"), "Vers un.\nVers deux.")

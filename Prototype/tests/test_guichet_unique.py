@@ -62,6 +62,24 @@ class TestGuichetUniqueDedup(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res1, "ok:Bonjour:1")
         self.assertEqual(res2, "ok:Bonjour:1")
 
+    async def test_submit_with_trace_collects_thoughts_and_messages(self):
+        gateway = GuichetUnique(recent_result_ttl_s=0.0)
+
+        async def callback(user_input: str) -> None:
+            await gateway.display_thought(f"analyse:{user_input}")
+            await gateway.display_message("Secretarius", f"ok:{user_input}")
+
+        gateway.set_callback(callback)
+
+        payload = await gateway.submit_with_trace("tui", "Bonjour")
+
+        self.assertEqual(payload["reply_text"], "ok:Bonjour")
+        self.assertEqual(payload["thoughts"], ["analyse:Bonjour"])
+        self.assertEqual(
+            payload["messages"],
+            [{"role": "Secretarius", "content": "ok:Bonjour"}],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,9 @@
 import asyncio
+import json
 import threading
-from typing import Callable, Awaitable, Any, Optional
+import urllib.error
+import urllib.request
+from typing import Any, Callable, Awaitable, Optional
 
 from textual.app import App, ComposeResult
 from textual.containers import VerticalScroll
@@ -119,6 +122,72 @@ class TUIChannel:
 
     async def _on_user_input(self, user_input: str) -> None:
         await self._guichet.submit(self._channel_name, user_input)
+
+    async def run(self):
+        self._app = SecretariusTUI(
+            callback=self._on_user_input,
+            journal_hook=None,
+            show_thoughts=self._show_thoughts,
+        )
+        await self._app.run_async()
+
+
+class TUIAPIClient:
+    def __init__(self, base_url: str, timeout_s: float = 120.0):
+        self._url = f"{base_url.rstrip('/')}/tui/message"
+        self._timeout_s = timeout_s
+
+    async def submit(self, text: str) -> dict:
+        return await asyncio.to_thread(self._submit_blocking, text)
+
+    def _submit_blocking(self, text: str) -> dict:
+        payload = json.dumps({"text": text}).encode("utf-8")
+        request = urllib.request.Request(
+            self._url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self._timeout_s) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"TUI API HTTP {exc.code}: {body}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"TUI API unavailable: {exc.reason}") from exc
+
+
+class RemoteTUIChannel:
+    def __init__(self, api_base_url: str, show_thoughts: bool = True):
+        self._api_client = TUIAPIClient(api_base_url, timeout_s=120.0)
+        self._show_thoughts = show_thoughts
+        self._app: SecretariusTUI | None = None
+
+    async def _on_user_input(self, user_input: str) -> None:
+        if self._app is None:
+            return
+        try:
+            payload = await self._api_client.submit(user_input)
+        except Exception as exc:
+            self._app.log_message("system", str(exc))
+            return
+
+        if self._show_thoughts:
+            for thought in payload.get("thoughts", []):
+                self._app.log_thought(str(thought))
+
+        messages = payload.get("messages", [])
+        displayed_assistant = False
+        for message in messages:
+            role = str(message.get("role", "assistant"))
+            content = str(message.get("content", ""))
+            self._app.log_message(role, content)
+            if role.lower() in ("assistant", "secretarius", "system"):
+                displayed_assistant = True
+
+        if not displayed_assistant:
+            self._app.log_message("assistant", str(payload.get("reply_text", "")))
 
     async def run(self):
         self._app = SecretariusTUI(

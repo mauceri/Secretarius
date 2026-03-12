@@ -147,11 +147,10 @@ def index_document_text(
     llama_cpp_url: str = "http://127.0.0.1:8989/v1/chat/completions",
     llama_cpp_model: str = "local-llama-cpp",
     timeout_s: float = 30.0,
-    max_tokens: int = 512,
+    max_tokens: int = 20480,
     seed: int = 42,
     prompt_path: str | None = None,
     debug_return_raw: bool = False,
-    per_chunk_llm: bool = False,
     embedding_model: str | None = None,
     normalize_embeddings: bool = True,
     batch_size: int = 32,
@@ -188,7 +187,6 @@ def index_document_text(
         prompt_path=prompt_path,
         seed=seed,
         debug_return_raw=debug_return_raw,
-        per_chunk_llm=per_chunk_llm,
     )
     expressions = extract_result.get("expressions", [])
     if not isinstance(expressions, list):
@@ -261,11 +259,10 @@ def search_documents_by_text(
     llama_cpp_url: str = "http://127.0.0.1:8989/v1/chat/completions",
     llama_cpp_model: str = "local-llama-cpp",
     timeout_s: float = 30.0,
-    max_tokens: int = 512,
+    max_tokens: int = 20480,
     seed: int = 42,
     prompt_path: str | None = None,
     debug_return_raw: bool = False,
-    per_chunk_llm: bool = False,
     embedding_model: str | None = None,
     normalize_embeddings: bool = True,
     batch_size: int = 32,
@@ -288,7 +285,6 @@ def search_documents_by_text(
         prompt_path=prompt_path,
         seed=seed,
         debug_return_raw=debug_return_raw,
-        per_chunk_llm=per_chunk_llm,
     )
     expressions = extract_result.get("expressions", [])
     if not isinstance(expressions, list):

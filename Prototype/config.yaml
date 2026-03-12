@@ -1,6 +1,6 @@
 llm:
   base_url: "http://localhost:11434"
-  model: "qwen3:0.6b"
+  model: "qwen3.5:2B"
   think: false
   request_timeout_s: 180
   raw_log_file: "logs/llm_raw.log"
@@ -8,6 +8,13 @@ llm:
 ui:
   journal_file: "logs/guichet.log"
   show_thoughts: true
+
+tui_api:
+  enabled: true
+  host: "127.0.0.1"
+  port: 8003
+  journal_file: "logs/guichet.log"
+  request_timeout_s: 120
 
 openwebui:
   host: "0.0.0.0"
@@ -22,6 +29,13 @@ notebook_api:
   port: 8001
   model_id: "secretarius-notebook"
   journal_file: "logs/notebook.log"
+  request_timeout_s: 120
+
+session_messenger:
+  enabled: true
+  host: "127.0.0.1"
+  port: 8002
+  journal_file: "logs/session_messenger.log"
   request_timeout_s: 120
 
 mcp_servers:

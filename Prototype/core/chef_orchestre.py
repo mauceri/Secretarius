@@ -44,6 +44,31 @@ def _build_router_system_prompt(tools_schema: str) -> str:
     template = _load_router_system_prompt()
     return template.replace("{tools_schema}", tools_schema)
 
+
+def _parse_router_json_response(raw_response: str) -> dict:
+    clean_response = (raw_response or "").strip()
+    if clean_response.startswith("```json"):
+        clean_response = clean_response[7:]
+    elif clean_response.startswith("```"):
+        clean_response = clean_response[3:]
+    if clean_response.endswith("```"):
+        clean_response = clean_response[:-3]
+    clean_response = clean_response.strip()
+
+    try:
+        return json.loads(clean_response)
+    except json.JSONDecodeError:
+        pass
+
+    # Minimal structural recovery: close missing trailing braces/brackets.
+    brace_delta = clean_response.count("{") - clean_response.count("}")
+    bracket_delta = clean_response.count("[") - clean_response.count("]")
+    if brace_delta > 0 or bracket_delta > 0:
+        repaired = clean_response + ("]" * max(0, bracket_delta)) + ("}" * max(0, brace_delta))
+        return json.loads(repaired)
+
+    return json.loads(clean_response)
+
 NO_TOOL_FALLBACK_MESSAGE = "Aucun outil ne correspond a votre demande."
 MAX_TOOL_CALLS_PER_TURN = 2
 
@@ -167,7 +192,7 @@ class ChefDOrchestre:
             return {"question": str(question)}
 
         if action == "extract_expressions":
-            allowed = {"text", "document"}
+            allowed = {"text"}
             return {k: v for k, v in action_input.items() if k in allowed}
 
         if action == "expressions_to_embeddings":
@@ -193,7 +218,7 @@ class ChefDOrchestre:
             return {k: v for k, v in action_input.items() if k in allowed}
 
         if action == "index_text":
-            allowed = {"text", "document"}
+            allowed = {"text"}
             return {k: v for k, v in action_input.items() if k in allowed}
 
         if action == "search_text":
@@ -238,75 +263,60 @@ class ChefDOrchestre:
             return False
         return bool(re.search(r"\b(collection|collection_name|nom de collection)\b", user_text))
 
-    def _ensure_extract_expressions_payload(self, action_input: dict) -> dict:
-        if not isinstance(action_input, dict):
-            action_input = {}
+    def _parse_direct_tool_command(self, user_input: str) -> tuple[str, dict[str, str]] | None:
+        text = (user_input or "").strip()
+        if not text.startswith("/"):
+            return None
 
-        text = action_input.get("text")
-        has_text = isinstance(text, str) and bool(text.strip())
+        parts = text.split(None, 1)
+        command = parts[0]
+        payload = parts[1].strip() if len(parts) > 1 else ""
+        mapping = {
+            "/exp": ("extract_expressions", "text"),
+            "/index": ("index_text", "text"),
+            "/req": ("search_text", "query"),
+        }
+        target = mapping.get(command.lower())
+        if target is None:
+            return None
 
-        document = action_input.get("document")
-        has_document_text = False
-        if isinstance(document, dict):
-            content = document.get("content")
-            if isinstance(content, dict):
-                doc_text = content.get("text")
-                has_document_text = isinstance(doc_text, str) and bool(doc_text.strip())
+        action, key = target
+        return action, {key: payload}
 
-        if has_text or has_document_text:
-            return action_input
+    async def _execute_tool_and_respond(self, action: str, action_input: dict, phase: str) -> None:
+        await self._display_thought(
+            f"Calling tool: {action} with inputs {action_input}",
+            phase=f"{phase}_tool_call_start",
+        )
+        try:
+            observation = await self.tool_client.call_tool(action, action_input)
+        except Exception as exc:
+            observation = f"Error calling tool {action}: {exc}"
 
-        fallback_text = self._latest_user_text()
-        if fallback_text:
-            action_input["text"] = fallback_text
-            return action_input
+        await self._display_thought(
+            f"Observation: {observation}",
+            phase=f"{phase}_tool_call_observation",
+        )
+        await self._emit_tool_summary(action, observation)
 
-        return action_input
+        tool_context = f"Tool '{action}' returned: {observation}"
+        self.state.context_items.append(ContextItem(
+            priority=Priority.TOOL_RESULT,
+            content=tool_context
+        ))
+        self.state.messages.append(Message(
+            role=Role.TOOL,
+            name=action,
+            content=observation
+        ))
 
-    def _ensure_index_text_payload(self, action_input: dict) -> dict:
-        if not isinstance(action_input, dict):
-            action_input = {}
-
-        user_text = self._latest_user_text()
-        extracted_user_text = self._strip_extract_instruction_prefix(user_text) if user_text else ""
-
-        text = action_input.get("text")
-        document = action_input.get("document")
-
-        if extracted_user_text and extracted_user_text != user_text:
-            action_input["text"] = extracted_user_text
-        elif isinstance(text, str) and text.strip():
-            action_input["text"] = text.strip()
-        elif isinstance(document, str) and document.strip():
-            action_input["text"] = document.strip()
-
-        text_now = action_input.get("text")
-        if not isinstance(text_now, str) or not text_now.strip():
-            fallback_text = user_text
-            if fallback_text:
-                action_input["text"] = fallback_text
-
-        if isinstance(action_input.get("document"), str):
-            action_input.pop("document", None)
-
-        # Keep collection override only when explicitly requested by the user.
-        collection_name = action_input.get("collection_name")
-        if not self._user_explicitly_requests_collection():
-            action_input.pop("collection_name", None)
-        elif isinstance(collection_name, str) and collection_name.strip().lower() in {"text", "document", "doc"}:
-            action_input.pop("collection_name", None)
-
-        text_final = action_input.get("text")
-        if isinstance(text_final, str) and text_final.strip():
-            action_input["text"] = self._strip_extract_instruction_prefix(text_final)
-        return action_input
-
-    def _ensure_search_text_payload(self, action_input: dict) -> dict:
-        if not isinstance(action_input, dict):
-            return {}
-        if not self._user_explicitly_requests_collection():
-            action_input.pop("collection_name", None)
-        return action_input
+        tool_output = str(observation).strip()
+        self.state.messages.append(Message(role=Role.ASSISTANT, content=tool_output))
+        await self._display_message("Secretarius", tool_output, phase=f"{phase}_final_answer_from_tool")
+        self.state.context_items.append(
+            ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {tool_output}")
+        )
+        self._trim_state()
 
     async def _emit_tool_summary(self, action: str, observation: str) -> None:
         if not isinstance(observation, str):
@@ -319,15 +329,23 @@ class ChefDOrchestre:
             return
 
         if action == "index_text":
+            compact_summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
             extract = payload.get("extract") if isinstance(payload.get("extract"), dict) else {}
             index = payload.get("index") if isinstance(payload.get("index"), dict) else {}
-            extract_count = len(extract.get("expressions", [])) if isinstance(extract.get("expressions"), list) else 0
-            inserted_count = index.get("inserted_count", 0)
-            warning = index.get("warning") or payload.get("warning")
+            extract_count = compact_summary.get("expressions_count")
+            if not isinstance(extract_count, int):
+                extract_count = len(extract.get("expressions", [])) if isinstance(extract.get("expressions"), list) else 0
+            inserted_count = compact_summary.get("inserted_count")
+            if not isinstance(inserted_count, int):
+                inserted_count = index.get("inserted_count", 0)
+            collection_name = compact_summary.get("collection_name")
+            if not isinstance(collection_name, str) or not collection_name.strip():
+                collection_name = index.get("collection_name", "-")
+            warning = payload.get("warning") or index.get("warning")
             summary = (
                 "Index summary: "
                 f"expressions={extract_count}, inserted={inserted_count}, "
-                f"collection={index.get('collection_name', '-')}, "
+                f"collection={collection_name}, "
                 f"warning={warning or '-'}"
             )
             await self._display_thought(summary, phase="tool_summary_index_text")
@@ -358,34 +376,36 @@ class ChefDOrchestre:
             )
             await self._display_thought(summary, phase="tool_summary_semantic_graph")
 
-    @staticmethod
-    def _strip_extract_instruction_prefix(text: str) -> str:
-        if not isinstance(text, str):
-            return text
-        t = text.strip()
-        if not t:
-            return t
-
-        # Remove leading imperative prompt wrapper while preserving poem/content body.
-        # Examples:
-        # "extraire les expressions caractéristiques de : <body>"
-        # "peux-tu extraire ... ? <body>"
-        patterns = [
-            r"(?is)^\s*(?:\*+\s*)?(?:peux-tu|pouvez-vous|merci de|veuillez)?\s*"
-            r"(?:extraire|extrait|extrais|indexer|ins[eé]rer|inserer|rechercher|interroger)\b.*?(?::|\n)\s*(.+)$",
-            r"(?is)^\s*(?:\*+\s*)?(?:extraire|extrait|extrais|indexer|ins[eé]rer|inserer|rechercher|interroger)\b.*?\?\s*(.+)$",
-        ]
-        for pattern in patterns:
-            m = re.match(pattern, t)
-            if m:
-                body = (m.group(1) or "").strip()
-                if body:
-                    return body
-        return t
-
     async def _execute_react_cycle(self):
         tools = await self.tool_client.list_tools()
         tool_names = {t.get("name") for t in tools if isinstance(t, dict)}
+        direct_command = self._parse_direct_tool_command(self._latest_user_text())
+        if direct_command is not None:
+            action, action_input = direct_command
+            payload_value = next(iter(action_input.values()), "")
+            if not isinstance(payload_value, str) or not payload_value.strip():
+                await self._display_message(
+                    "Secretarius",
+                    f"Commande {action} sans contenu exploitable.",
+                    phase="direct_command_empty",
+                )
+                self.state.messages.append(Message(role=Role.ASSISTANT, content=f"Commande {action} sans contenu exploitable."))
+                self.state.context_items.append(
+                    ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: Commande {action} sans contenu exploitable.")
+                )
+                self._trim_state()
+                return
+            if action not in tool_names:
+                await self._display_message("Secretarius", NO_TOOL_FALLBACK_MESSAGE, phase="direct_command_tool_missing")
+                self.state.messages.append(Message(role=Role.ASSISTANT, content=NO_TOOL_FALLBACK_MESSAGE))
+                self.state.context_items.append(
+                    ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {NO_TOOL_FALLBACK_MESSAGE}")
+                )
+                self._trim_state()
+                return
+            await self._execute_tool_and_respond(action, action_input, phase="direct_command")
+            return
+
         tools_schema = self._build_router_tools_schema(tools)
         system_prompt = _build_router_system_prompt(tools_schema)
         # Router mode: avoid duplicating the current user message in both
@@ -404,17 +424,7 @@ class ChefDOrchestre:
 
                 # Try parsing JSON
                 try:
-                    # Some LLMs wrap JSON in markdown blocks
-                    clean_response = raw_response.strip()
-                    if clean_response.startswith('```json'):
-                        clean_response = clean_response[7:]
-                    elif clean_response.startswith('```'):
-                        clean_response = clean_response[3:]
-                    if clean_response.endswith('```'):
-                        clean_response = clean_response[:-3]
-                    clean_response = clean_response.strip()
-                        
-                    response_data = json.loads(clean_response)
+                    response_data = _parse_router_json_response(raw_response)
                 except json.JSONDecodeError:
                     await self._display_thought(
                         f"Failed to parse LLM JSON: {raw_response}",
@@ -442,6 +452,18 @@ class ChefDOrchestre:
                     )
 
                 if not action or action not in tool_names:
+                    fallback_text = self._latest_user_text()
+                    if "index_text" in tool_names and fallback_text:
+                        await self._display_thought(
+                            "Router returned no matching tool; defaulting to index_text with full user text.",
+                            phase="no_matching_tool_default_index",
+                        )
+                        await self._execute_tool_and_respond(
+                            "index_text",
+                            {"text": fallback_text},
+                            phase="no_matching_tool_default_index",
+                        )
+                        return
                     await self._display_message("Secretarius", NO_TOOL_FALLBACK_MESSAGE, phase="no_matching_tool")
                     self.state.messages.append(Message(role=Role.ASSISTANT, content=NO_TOOL_FALLBACK_MESSAGE))
                     self.state.context_items.append(
@@ -464,15 +486,6 @@ class ChefDOrchestre:
                     return
 
                 sanitized_action_input = self._sanitize_action_input(action, action_input)
-                if action == "extract_expressions":
-                    sanitized_action_input = self._ensure_extract_expressions_payload(sanitized_action_input)
-                    text_value = sanitized_action_input.get("text")
-                    if isinstance(text_value, str) and text_value.strip():
-                        sanitized_action_input["text"] = self._strip_extract_instruction_prefix(text_value)
-                if action == "index_text":
-                    sanitized_action_input = self._ensure_index_text_payload(sanitized_action_input)
-                if action == "search_text":
-                    sanitized_action_input = self._ensure_search_text_payload(sanitized_action_input)
                 removed_keys = sorted(set(action_input.keys()) - set(sanitized_action_input.keys()))
                 if removed_keys:
                     await self._display_thought(
@@ -491,41 +504,7 @@ class ChefDOrchestre:
                     return
                 called_actions_in_cycle.add(action_signature)
 
-                await self._display_thought(
-                    f"Calling tool: {action} with inputs {action_input}",
-                    phase="tool_call_start",
-                )
-                try:
-                    observation = await self.tool_client.call_tool(action, action_input)
-                except Exception as e:
-                    observation = f"Error calling tool {action}: {e}"
-
-                await self._display_thought(
-                    f"Observation: {observation}",
-                    phase="tool_call_observation",
-                )
-                await self._emit_tool_summary(action, observation)
-
-                tool_context = f"Tool '{action}' returned: {observation}"
-                self.state.context_items.append(ContextItem(
-                    priority=Priority.TOOL_RESULT,
-                    content=tool_context
-                ))
-
-                self.state.messages.append(Message(
-                    role=Role.TOOL,
-                    name=action,
-                    content=observation
-                ))
-
-                # Router mode: return tool output directly, no post-tool LLM formatting.
-                tool_output = str(observation).strip()
-                self.state.messages.append(Message(role=Role.ASSISTANT, content=tool_output))
-                await self._display_message("Secretarius", tool_output, phase="final_answer_from_tool")
-                self.state.context_items.append(
-                    ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {tool_output}")
-                )
-                self._trim_state()
+                await self._execute_tool_and_respond(action, action_input, phase="router")
                 return
             except Exception as e:
                 logger.error(f"Error in ReAct cycle: {e}")

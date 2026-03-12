@@ -109,7 +109,6 @@ def _tools_catalog() -> list[MCPTool]:
             name="extract_expressions",
             description=(
                 "Extrait les expressions caracteristiques d'un texte brut. "
-                "Ne pas utiliser pour indexer un document ni pour interroger Milvus."
             ),
             input_schema={
                 "type": "object",
@@ -313,15 +312,12 @@ def _handle_extract_expressions(arguments: Dict[str, Any]) -> Dict[str, Any]:
     )
     )
     timeout_s = arguments.get("timeout_s", float(os.environ.get("SECRETARIUS_TIMEOUT_S", "30.0")))
-    max_tokens = arguments.get("max_tokens", int(os.environ.get("SECRETARIUS_MAX_TOKENS", "512")))
+    max_tokens = arguments.get("max_tokens", int(os.environ.get("SECRETARIUS_MAX_TOKENS", "20480")))
     seed = arguments.get("seed", int(os.environ.get("SECRETARIUS_SEED", "42")))
     prompt_path = arguments.get("prompt_path") or os.environ.get("SECRETARIUS_PROMPT_PATH")
     debug_env = os.environ.get("SECRETARIUS_DEBUG_RETURN_RAW", "false").strip().lower()
     debug_default = debug_env in ("1", "true", "yes", "on")
     debug_return_raw = arguments.get("debug_return_raw", debug_default)
-    per_chunk_env = os.environ.get("SECRETARIUS_EXTRACT_PER_CHUNK", "false").strip().lower()
-    per_chunk_default = per_chunk_env in ("1", "true", "yes", "on")
-    per_chunk_llm = arguments.get("per_chunk_llm", per_chunk_default)
 
     _debug_log(
         "extract.args "
@@ -345,8 +341,6 @@ def _handle_extract_expressions(arguments: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError("'prompt_path' must be a string when provided")
     if not isinstance(debug_return_raw, bool):
         raise ValueError("'debug_return_raw' must be a boolean")
-    if not isinstance(per_chunk_llm, bool):
-        raise ValueError("'per_chunk_llm' must be a boolean")
     if not text and normalized_doc is None:
         raise ValueError("Provide non-empty 'text' or 'document.content.text'")
 
@@ -390,7 +384,6 @@ def _handle_extract_expressions(arguments: Dict[str, Any]) -> Dict[str, Any]:
         seed=seed,
         prompt_path=prompt_path,
         debug_return_raw=debug_return_raw,
-        per_chunk_llm=per_chunk_llm,
     )
     by_chunk = result.get("by_chunk", [])
     chunk_count = len(result.get("chunks", []))
@@ -653,11 +646,10 @@ def _handle_index_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
         or os.environ.get("SECRETARIUS_LLAMA_CPP_MODEL")
         or os.environ.get("SECRETARIUS_LLAMA_MODEL", "local-llama-cpp"),
         timeout_s=arguments.get("timeout_s", float(os.environ.get("SECRETARIUS_TIMEOUT_S", "30.0"))),
-        max_tokens=arguments.get("max_tokens", int(os.environ.get("SECRETARIUS_MAX_TOKENS", "512"))),
+        max_tokens=arguments.get("max_tokens", int(os.environ.get("SECRETARIUS_MAX_TOKENS", "20480"))),
         seed=arguments.get("seed", int(os.environ.get("SECRETARIUS_SEED", "42"))),
         prompt_path=arguments.get("prompt_path") or os.environ.get("SECRETARIUS_PROMPT_PATH"),
         debug_return_raw=bool(arguments.get("debug_return_raw", False)),
-        per_chunk_llm=bool(arguments.get("per_chunk_llm", False)),
         embedding_model=arguments.get("model"),
         normalize_embeddings=arguments.get("normalize", True),
         batch_size=arguments.get("batch_size", 32),
@@ -712,11 +704,10 @@ def _handle_search_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
         or os.environ.get("SECRETARIUS_LLAMA_CPP_MODEL")
         or os.environ.get("SECRETARIUS_LLAMA_MODEL", "local-llama-cpp"),
         timeout_s=arguments.get("timeout_s", float(os.environ.get("SECRETARIUS_TIMEOUT_S", "30.0"))),
-        max_tokens=arguments.get("max_tokens", int(os.environ.get("SECRETARIUS_MAX_TOKENS", "512"))),
+        max_tokens=arguments.get("max_tokens", int(os.environ.get("SECRETARIUS_MAX_TOKENS", "20480"))),
         seed=arguments.get("seed", int(os.environ.get("SECRETARIUS_SEED", "42"))),
         prompt_path=arguments.get("prompt_path") or os.environ.get("SECRETARIUS_PROMPT_PATH"),
         debug_return_raw=bool(arguments.get("debug_return_raw", False)),
-        per_chunk_llm=bool(arguments.get("per_chunk_llm", False)),
         embedding_model=arguments.get("model"),
         normalize_embeddings=arguments.get("normalize", True),
         batch_size=arguments.get("batch_size", 32),
