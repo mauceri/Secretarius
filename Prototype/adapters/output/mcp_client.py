@@ -1,4 +1,5 @@
 import logging
+import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
@@ -11,10 +12,17 @@ from core.ports import ToolClientInterface
 logger = logging.getLogger(__name__)
 
 class StdioMCPClient(ToolClientInterface):
-    def __init__(self, command: str, args: List[str], cwd: Optional[str] = None):
+    def __init__(
+        self,
+        command: str,
+        args: List[str],
+        cwd: Optional[str] = None,
+        env: Optional[Dict[str, str]] = None,
+    ):
         self.command = command
         self.args = args
         self.cwd = cwd
+        self.env = env
         self._session: Optional[ClientSession] = None
         self._exit_stack = AsyncExitStack()
 
@@ -22,7 +30,7 @@ class StdioMCPClient(ToolClientInterface):
         server_parameters = StdioServerParameters(
             command=self.command,
             args=self.args,
-            env=None,
+            env={**os.environ, **self.env} if self.env else None,
             cwd=Path(self.cwd) if self.cwd else None
         )
         try:

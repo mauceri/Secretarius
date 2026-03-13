@@ -27,6 +27,14 @@ def normalize_document(payload: dict[str, Any] | None) -> dict[str, Any]:
     # Accept envelope shortcuts at root level.
     if isinstance(src.get("url"), str) and src["url"].strip():
         doc["source"].setdefault("url", src["url"].strip())
+    if isinstance(src.get("urls"), list):
+        source_urls = doc["source"].get("urls")
+        if not isinstance(source_urls, list):
+            source_urls = []
+            doc["source"]["urls"] = source_urls
+        for value in src["urls"]:
+            if isinstance(value, str) and value.strip() and value.strip() not in source_urls:
+                source_urls.append(value.strip())
     if isinstance(raw_content, str) and raw_content.strip():
         doc["content"].setdefault("text", raw_content)
     if isinstance(src.get("note"), str) and src["note"].strip():
@@ -256,6 +264,17 @@ def _ensure_source_defaults(doc: dict[str, Any]) -> None:
     if not isinstance(source, dict):
         source = {}
         doc["source"] = source
+    urls = source.get("urls")
+    normalized_urls: list[str] = []
+    if isinstance(urls, list):
+        for value in urls:
+            if isinstance(value, str) and value.strip() and value.strip() not in normalized_urls:
+                normalized_urls.append(value.strip())
+    source["urls"] = normalized_urls
+    if normalized_urls and (not isinstance(source.get("url"), str) or not source["url"].strip()):
+        source["url"] = normalized_urls[0]
+    if isinstance(source.get("url"), str) and source["url"].strip() and source["url"].strip() not in source["urls"]:
+        source["urls"].insert(0, source["url"].strip())
     authors = source.get("authors")
     if not isinstance(authors, list):
         source["authors"] = []
@@ -290,17 +309,20 @@ def _ensure_stable_ids(doc: dict[str, Any]) -> None:
     source = doc.get("source") if isinstance(doc.get("source"), dict) else {}
     content = doc.get("content") if isinstance(doc.get("content"), dict) else {}
     if not doc.get("doc_id"):
+        source_urls = source.get("urls") if isinstance(source.get("urls"), list) else []
         basis = "|".join(
             [
                 str(source.get("canonical_url") or ""),
                 str(source.get("url") or ""),
+                ",".join(str(value) for value in source_urls),
                 str(content.get("hash") or ""),
                 str((content.get("text") or "")[:512]),
             ]
         )
         doc["doc_id"] = _stable_hash("doc", basis)
     if isinstance(source, dict) and not source.get("source_id"):
-        url_basis = str(source.get("canonical_url") or source.get("url") or doc.get("doc_id") or "")
+        urls = source.get("urls") if isinstance(source.get("urls"), list) else []
+        url_basis = str(source.get("canonical_url") or source.get("url") or ",".join(str(value) for value in urls) or doc.get("doc_id") or "")
         source["source_id"] = _stable_hash("src", url_basis)
 
 

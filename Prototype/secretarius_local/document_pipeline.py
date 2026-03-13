@@ -20,6 +20,8 @@ def analyse_texte_documentaire(text: str, *, base_document: dict[str, Any] | Non
     hashtag_re = re.compile(r"(?<!\w)#([^\s#]+)")
     date_re = re.compile(r"\b\d{2}-\d{2}-\d{4}\b")
     url_re = re.compile(r'\bhttps?://[^\s<>\"]+')
+    type_note_re = re.compile(r"(?mi)^[ \t]*type_note[ \t]*:[ \t]*([^\n\r]+?)\s*$")
+    allowed_type_notes = {"fugace", "lecture", "permanente"}
 
     def normalize(raw: str) -> str:
         cleaned = raw.replace("\r\n", "\n").replace("\r", "\n")
@@ -94,10 +96,21 @@ def analyse_texte_documentaire(text: str, *, base_document: dict[str, Any] | Non
     if date_match:
         spans_to_remove.append((date_match.start(), date_match.end()))
 
-    url_match = url_re.search(normalized)
-    url_value = url_match.group(0) if url_match else None
-    if url_match:
-        spans_to_remove.append((url_match.start(), url_match.end()))
+    type_note_match = type_note_re.search(normalized)
+    type_note_value = "fugace"
+    if type_note_match:
+        candidate = type_note_match.group(1).strip().lower()
+        if candidate in allowed_type_notes:
+            type_note_value = candidate
+            spans_to_remove.append((type_note_match.start(), type_note_match.end()))
+
+    url_matches = list(url_re.finditer(normalized))
+    url_values: list[str] = []
+    for match in url_matches:
+        value = match.group(0).strip()
+        if value and value not in url_values:
+            url_values.append(value)
+        spans_to_remove.append((match.start(), match.end()))
 
     deduped_keywords: list[str] = []
     seen: set[str] = set()
@@ -127,10 +140,24 @@ def analyse_texte_documentaire(text: str, *, base_document: dict[str, Any] | Non
     if isinstance(content, dict):
         content["text"] = normalize(body)
     source = document_payload.setdefault("source", {})
-    if isinstance(source, dict) and isinstance(url_value, str) and url_value.strip() and not source.get("url"):
-        source["url"] = url_value.strip()
+    if isinstance(source, dict):
+        existing_urls = source.get("urls")
+        merged_urls: list[str] = []
+        if isinstance(existing_urls, list):
+            for value in existing_urls:
+                if isinstance(value, str) and value.strip() and value.strip() not in merged_urls:
+                    merged_urls.append(value.strip())
+        for value in url_values:
+            if value not in merged_urls:
+                merged_urls.append(value)
+        if merged_urls:
+            source["urls"] = merged_urls
+            if not isinstance(source.get("url"), str) or not source.get("url", "").strip():
+                source["url"] = merged_urls[0]
     user_fields = document_payload.setdefault("user_fields", {})
     if isinstance(user_fields, dict):
+        if not isinstance(user_fields.get("type_note"), str) or not user_fields.get("type_note", "").strip():
+            user_fields["type_note"] = type_note_value
         if isinstance(title, str) and title.strip() and not user_fields.get("title"):
             user_fields["title"] = title.strip()
         if isinstance(date_value, str) and date_value.strip() and not user_fields.get("document_date"):

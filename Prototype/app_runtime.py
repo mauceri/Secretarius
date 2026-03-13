@@ -39,10 +39,14 @@ async def build_runtime(gateway: InputGatewayInterface, config_path: Path | None
 
     mcp_servers = config.get("mcp_servers", {})
     mcp_config = mcp_servers.get("secretarius") or mcp_servers.get("oracle", {})
+    mcp_log_file = mcp_config.get("log_file") or "logs/mcp_server.log"
+    mcp_log_path = _resolve_project_path(project_root, mcp_log_file)
+    Path(mcp_log_path).parent.mkdir(parents=True, exist_ok=True)
     mcp_client = StdioMCPClient(
         command=mcp_config.get("command") or sys.executable,
         args=mcp_config.get("args", ["tools/secretarius_server.py"]),
         cwd=str(project_root),
+        env={"SECRETARIUS_MCP_LOG": mcp_log_path},
     )
     await mcp_client.connect()
 

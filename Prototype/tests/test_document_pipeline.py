@@ -5,6 +5,31 @@ from secretarius_local import document_pipeline
 
 
 class TestDocumentPipeline(unittest.TestCase):
+    def test_analyse_texte_documentaire_sets_type_note_from_text(self):
+        document = document_pipeline.analyse_texte_documentaire(
+            "Titre\ntype_note: lecture\nCorps documentaire"
+        )
+
+        self.assertEqual(document["user_fields"]["type_note"], "lecture")
+        self.assertEqual(document["content"]["text"], "Corps documentaire")
+
+    def test_analyse_texte_documentaire_defaults_type_note_to_fugace(self):
+        document = document_pipeline.analyse_texte_documentaire("Titre\nCorps documentaire")
+
+        self.assertEqual(document["user_fields"]["type_note"], "fugace")
+
+    def test_analyse_texte_documentaire_collects_multiple_urls(self):
+        document = document_pipeline.analyse_texte_documentaire(
+            "Titre\nhttps://a.example/doc\nhttps://b.example/ref\nCorps documentaire"
+        )
+
+        self.assertEqual(document["source"]["url"], "https://a.example/doc")
+        self.assertEqual(
+            document["source"]["urls"],
+            ["https://a.example/doc", "https://b.example/ref"],
+        )
+        self.assertEqual(document["content"]["text"], "Corps documentaire")
+
     @patch("secretarius_local.document_pipeline.semantic_graph_search_milvus")
     @patch("secretarius_local.document_pipeline.embed_expressions_multilingual")
     @patch("secretarius_local.document_pipeline.extract_expressions")

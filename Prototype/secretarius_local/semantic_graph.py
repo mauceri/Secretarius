@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import hashlib
 import json
-import time
 from typing import Any
 
 DEFAULT_MILVUS_URI = "http://127.0.0.1:19530"
@@ -25,6 +25,7 @@ def semantic_graph_search_milvus(
             "graph": {"nodes": [], "edges": []},
             "hits": [],
             "inserted_count": 0,
+            "deleted_count": 0,
             "query_count": 0,
             "collection_name": collection_name,
             "metric_type": metric_type,
@@ -38,6 +39,7 @@ def semantic_graph_search_milvus(
             "graph": {"nodes": [], "edges": []},
             "hits": [],
             "inserted_count": 0,
+            "deleted_count": 0,
             "query_count": len(normalized),
             "collection_name": collection_name,
             "metric_type": metric_type,
@@ -53,6 +55,7 @@ def semantic_graph_search_milvus(
             "graph": {"nodes": [], "edges": []},
             "hits": [],
             "inserted_count": 0,
+            "deleted_count": 0,
             "query_count": len(normalized),
             "collection_name": collection_name,
             "metric_type": effective_metric,
@@ -66,6 +69,7 @@ def semantic_graph_search_milvus(
             "graph": {"nodes": [], "edges": []},
             "hits": [],
             "inserted_count": 0,
+            "deleted_count": 0,
             "query_count": len(normalized),
             "collection_name": collection_name,
             "metric_type": effective_metric,
@@ -84,6 +88,7 @@ def semantic_graph_search_milvus(
             "graph": {"nodes": [], "edges": []},
             "hits": [],
             "inserted_count": 0,
+            "deleted_count": 0,
             "query_count": len(normalized),
             "collection_name": collection_name,
             "metric_type": effective_metric,
@@ -91,23 +96,27 @@ def semantic_graph_search_milvus(
         }
 
     inserted_count = 0
+    deleted_count = 0
     if docs:
         try:
-            inserted_count = _insert_documents(
+            upsert_stats = _upsert_documents(
                 client=client,
                 collection_name=collection_name,
                 embeddings=normalized,
                 documents=docs,
             )
+            inserted_count = upsert_stats["upserted_count"]
+            deleted_count = upsert_stats["deleted_count"]
         except Exception as exc:
             return {
                 "graph": {"nodes": [], "edges": []},
                 "hits": [],
                 "inserted_count": 0,
+                "deleted_count": 0,
                 "query_count": len(normalized),
                 "collection_name": collection_name,
                 "metric_type": effective_metric,
-                "warning": f"milvus insert failed: {exc}",
+                "warning": f"milvus upsert failed: {exc}",
             }
 
     try:
@@ -122,6 +131,7 @@ def semantic_graph_search_milvus(
             "graph": {"nodes": [], "edges": []},
             "hits": [],
             "inserted_count": inserted_count,
+            "deleted_count": deleted_count,
             "query_count": len(normalized),
             "collection_name": collection_name,
             "metric_type": effective_metric,
@@ -133,6 +143,7 @@ def semantic_graph_search_milvus(
         "graph": graph,
         "hits": raw_hits,
         "inserted_count": inserted_count,
+        "deleted_count": deleted_count,
         "query_count": len(normalized),
         "collection_name": collection_name,
         "metric_type": effective_metric,
@@ -213,32 +224,139 @@ def _get_collection_dimension(*, client: Any, collection_name: str) -> int | Non
     return None
 
 
-def _insert_documents(
+def _upsert_documents(
     *,
     client: Any,
     collection_name: str,
     embeddings: list[list[float]],
     documents: list[dict[str, Any]],
-) -> int:
+) -> dict[str, int]:
     count = min(len(embeddings), len(documents))
     if count == 0:
-        return 0
-    base_id = time.time_ns()
+        return {"upserted_count": 0, "deleted_count": 0}
     rows: list[dict[str, Any]] = []
+    desired_expression_ids_by_doc: dict[str, set[str]] = {}
     for idx in range(count):
         payload = documents[idx]
         if not isinstance(payload, dict):
             payload = {"value": str(payload)}
-        rows.append(
-            {
-                "id": base_id + idx,
-                "vector": embeddings[idx],
-                "payload_json": json.dumps(payload, ensure_ascii=False),
-                "source_idx": idx,
-            }
+        row = _build_row(payload=payload, embedding=embeddings[idx], source_idx=idx)
+        doc_id = row.get("doc_id")
+        expression_id = row.get("expression_id")
+        if isinstance(doc_id, str) and doc_id and isinstance(expression_id, str) and expression_id:
+            desired_expression_ids_by_doc.setdefault(doc_id, set()).add(expression_id)
+        rows.append(row)
+
+    rows = _dedupe_rows_by_id(rows)
+    deleted_count = 0
+    for doc_id, desired_expression_ids in desired_expression_ids_by_doc.items():
+        stale_ids = _find_stale_primary_ids(
+            client=client,
+            collection_name=collection_name,
+            doc_id=doc_id,
+            desired_expression_ids=desired_expression_ids,
         )
-    client.insert(collection_name=collection_name, data=rows)
-    return count
+        if stale_ids:
+            result = client.delete(collection_name=collection_name, ids=stale_ids)
+            if isinstance(result, dict):
+                deleted_count += int(result.get("delete_count", len(stale_ids)))
+            else:
+                deleted_count += len(stale_ids)
+
+    client.upsert(collection_name=collection_name, data=rows)
+    return {"upserted_count": len(rows), "deleted_count": deleted_count}
+
+
+def _build_row(*, payload: dict[str, Any], embedding: list[float], source_idx: int) -> dict[str, Any]:
+    doc_id = _extract_doc_id(payload, source_idx=source_idx)
+    expression = _extract_source_expression(payload, source_idx=source_idx)
+    expression_norm = _normalize_expression(expression, source_idx=source_idx)
+    expression_id = _stable_key("expr", f"{doc_id}|{expression_norm}")
+    user_fields = payload.get("user_fields") if isinstance(payload.get("user_fields"), dict) else {}
+    return {
+        "id": _stable_int_id(f"{doc_id}|{expression_norm}"),
+        "vector": embedding,
+        "payload_json": json.dumps(payload, ensure_ascii=False),
+        "source_idx": source_idx,
+        "doc_id": doc_id,
+        "expression_id": expression_id,
+        "expression_norm": expression_norm,
+        "type_note": user_fields.get("type_note") if isinstance(user_fields.get("type_note"), str) else "fugace",
+    }
+
+
+def _dedupe_rows_by_id(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    deduped: dict[int, dict[str, Any]] = {}
+    for row in rows:
+        row_id = row.get("id")
+        if isinstance(row_id, int):
+            deduped[row_id] = row
+    return list(deduped.values())
+
+
+def _find_stale_primary_ids(
+    *,
+    client: Any,
+    collection_name: str,
+    doc_id: str,
+    desired_expression_ids: set[str],
+) -> list[int]:
+    if not doc_id:
+        return []
+    existing = client.query(
+        collection_name=collection_name,
+        filter=f'doc_id == "{_escape_filter_string(doc_id)}"',
+        output_fields=["expression_id"],
+    )
+    stale_ids: list[int] = []
+    if not isinstance(existing, list):
+        return stale_ids
+    for row in existing:
+        item = row if isinstance(row, dict) else {}
+        primary_id = item.get("id")
+        expression_id = item.get("expression_id")
+        if isinstance(primary_id, int) and (
+            not isinstance(expression_id, str) or expression_id not in desired_expression_ids
+        ):
+            stale_ids.append(primary_id)
+    return stale_ids
+
+
+def _extract_doc_id(payload: dict[str, Any], *, source_idx: int) -> str:
+    raw_doc_id = payload.get("doc_id")
+    if isinstance(raw_doc_id, str) and raw_doc_id.strip():
+        return raw_doc_id.strip()
+    return _stable_key("doc", f"{payload}|{source_idx}")
+
+
+def _extract_source_expression(payload: dict[str, Any], *, source_idx: int) -> str:
+    indexing = payload.get("indexing")
+    if isinstance(indexing, dict):
+        value = indexing.get("source_expression")
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return f"source_idx:{source_idx}"
+
+
+def _normalize_expression(expression: str, *, source_idx: int) -> str:
+    raw = expression.strip().lower() if isinstance(expression, str) else ""
+    if raw:
+        return " ".join(raw.split())
+    return f"source_idx:{source_idx}"
+
+
+def _stable_int_id(value: str) -> int:
+    digest = hashlib.sha256(value.encode("utf-8")).digest()
+    return max(1, int.from_bytes(digest[:8], byteorder="big", signed=False) & ((1 << 63) - 1))
+
+
+def _stable_key(prefix: str, value: str) -> str:
+    digest = hashlib.sha256(value.encode("utf-8")).hexdigest()
+    return f"{prefix}:{digest}"
+
+
+def _escape_filter_string(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def _build_graph_from_hits(raw_hits: Any) -> dict[str, list[dict[str, Any]]]:

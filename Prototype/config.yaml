@@ -41,4 +41,5 @@ session_messenger:
 mcp_servers:
   secretarius:
     command: "python"
-    args: ["tools/secretarius_server.py"]
+    args: ["-m", "secretarius_local.mcp_server"]
+    log_file: "logs/mcp_server.log"

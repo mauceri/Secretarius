@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import importlib.util
 import os
+import random
 import sys
 import threading
 import time
@@ -105,6 +106,21 @@ class MCPTool:
 
 def _tools_catalog() -> list[MCPTool]:
     return [
+        MCPTool(
+            name="ask_oracle",
+            description="Test tool: ask the oracle a yes/no question only when explicitly requested.",
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "question": {
+                        "type": "string",
+                        "description": "Question for the oracle.",
+                    },
+                },
+                "required": ["question"],
+                "additionalProperties": False,
+            },
+        ),
         MCPTool(
             name="extract_expressions",
             description=(
@@ -290,6 +306,21 @@ def _tool_result(payload: Dict[str, Any]) -> Dict[str, Any]:
             }
         ],
         "structuredContent": payload,
+    }
+
+
+def _handle_ask_oracle(arguments: Dict[str, Any]) -> Dict[str, Any]:
+    question = str(arguments.get("question", ""))
+    answer = random.choice(["OUI", "NON"])
+    _debug_log(f"ask_oracle question_len={len(question)}")
+    return {
+        "content": [
+            {
+                "type": "text",
+                "text": f"The oracle pondered your question: '{question}' and answered: {answer}",
+            }
+        ],
+        "isError": False,
     }
 
 def _handle_extract_expressions(arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -773,6 +804,7 @@ def _extract_search_documents(hits: Any) -> list[Dict[str, Any]]:
 
 def _handle_tool_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     handlers = {
+        "ask_oracle": _handle_ask_oracle,
         "extract_expressions": _handle_extract_expressions,
         "semantic_graph_search": _handle_semantic_graph_search,
         "index_text": _handle_index_text,
@@ -858,6 +890,10 @@ def run_stdio_server() -> None:
         if response is None:
             continue
         _write_framed_message(response)
+
+
+def main() -> None:
+    run_stdio_server()
 
 
 def start_background_warmup() -> None:
@@ -978,3 +1014,7 @@ def _debug_log(line: str) -> None:
             f.write(line + "\n")
     except OSError:
         return
+
+
+if __name__ == "__main__":
+    main()
