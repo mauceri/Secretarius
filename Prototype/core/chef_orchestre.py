@@ -274,6 +274,7 @@ class ChefDOrchestre:
         mapping = {
             "/exp": ("extract_expressions", "text"),
             "/index": ("index_text", "text"),
+            "/update": ("update_text", "text"),
             "/req": ("search_text", "query"),
         }
         target = mapping.get(command.lower())

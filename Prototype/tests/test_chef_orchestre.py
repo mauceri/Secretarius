@@ -44,6 +44,11 @@ class FakeToolClient(ToolClientInterface):
                 "description": "Search text",
                 "inputSchema": {"type": "object"},
             },
+            {
+                "name": "update_text",
+                "description": "Update text",
+                "inputSchema": {"type": "object"},
+            },
         ]
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> str:
@@ -61,6 +66,13 @@ class FakeToolClient(ToolClientInterface):
             )
         if name == "search_text":
             return '{"tool":"search_text","documents":[],"summary":{"query_count":1,"hit_lists":0,"collection_name":"secretarius_semantic_graph"}}'
+        if name == "update_text":
+            return (
+                '{"status":"ok","tool":"update_text",'
+                '"summary":{"expressions_count":2,"collection_name":"secretarius_semantic_graph","deleted_count":1,'
+                '"inserted_count":2,"query_count":2,"hit_lists":2},'
+                '"warning":null}'
+            )
         return "unknown"
 
     async def connect(self):
@@ -226,6 +238,20 @@ class TestChefDOrchestre(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(llm.calls, 0)
         self.assertEqual(tools.calls, [("search_text", {"query": "trou de verdure"})])
+
+    async def test_direct_update_command_bypasses_llm(self):
+        llm = FakeLLM(['{"action":null,"action_input":{}}'])
+        tools = FakeToolClient()
+        gateway = FakeGateway()
+        orchestrator = ChefDOrchestre(llm=llm, tool_client=tools, gateway=gateway)
+
+        await orchestrator.handle_user_input("/update\ndoc_id: doc:test-1\nTitre\nCorps documentaire")
+
+        self.assertEqual(llm.calls, 0)
+        self.assertEqual(
+            tools.calls,
+            [("update_text", {"text": "doc_id: doc:test-1\nTitre\nCorps documentaire"})],
+        )
 
     async def test_direct_command_requires_payload(self):
         llm = FakeLLM(['{"action":null,"action_input":{}}'])

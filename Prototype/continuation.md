@@ -475,3 +475,161 @@ Résultat attendu: aucun match.
 1. Definir une structure interne "note graph view model" a partir des documents complets deja recuperes.
 2. Produire un premier rendu Markdown lisible et compact pour ce graphe.
 3. N'ajouter qu'ensuite des raffinements de scoring, d'explication des liens et de presentation.
+
+---
+
+## Mise a jour du 2026-03-14
+
+### Reprise de session locale
+- Ajout de `Prototype/session_resume.py` :
+  - `python session_resume.py resume --last`
+  - `python session_resume.py snapshot ...`
+  - `python session_resume.py snapshot-auto ...`
+- Ajout de cibles Makefile :
+  - `make resume-last`
+  - `make snapshot-session TITLE="..." SUMMARY="..." NEXT="..." NOTES="..."`
+  - `make snapshot-auto`
+- Ajout du dossier `Prototype/sessions/` pour stocker les snapshots Markdown.
+- Premier snapshot cree :
+  - `Prototype/sessions/SESSION_20260314_153256.md`
+- Politique actuelle du resume local :
+  - si un snapshot existe, `resume --last` affiche le plus recent ;
+  - sinon fallback vers un resume construit a partir de `continuation.md` + etat git.
+
+### Snapshot automatique periodique
+- Ajout d'un mode auto avec garde-fous :
+  - snapshot seulement si `git status --short -- Prototype` contient des changements ;
+  - pas de nouveau snapshot si le precedent est trop recent.
+- Script :
+  - `Prototype/scripts/snapshot_auto.sh`
+- Units `systemd --user` ajoutees :
+  - `deploy/systemd-user/secretarius-prototype-session-snapshot.service`
+  - `deploy/systemd-user/secretarius-prototype-session-snapshot.timer`
+- Script d'installation :
+  - `deploy/scripts/setup_prototype_session_snapshot_timer.sh`
+- Etat actuel :
+  - timer active cote utilisateur ;
+  - frequence configuree : `OnBootSec=10m`, `OnUnitActiveSec=30m` ;
+  - le timer survit aux redemarrages de VSCode, car il est gere par `systemd --user`.
+
+### Services `systemd --user` operationnels
+- Ollama :
+  - unit : `deploy/systemd-user/secretarius_ollama.service`
+  - commande reelle utilisee : `/usr/local/bin/ollama serve`
+  - variables :
+    - `HSA_OVERRIDE_GFX_VERSION=10.3.0`
+    - `OLLAMA_HOST=0.0.0.0:11434`
+    - `OLLAMA_CONTEXT_LENGTH=8192`
+  - important : `ollama` n'existe pas dans `.venv/bin`, il faut utiliser `/usr/local/bin/ollama`.
+- Serveur Secretarius Prototype :
+  - unit : `deploy/systemd-user/secretarius_server.service`
+  - commande :
+    - `/home/mauceric/Secretarius/.venv/bin/python /home/mauceric/Secretarius/Prototype/server_secretarius.py`
+  - le service demarre correctement et lance aussi `python -m secretarius_local.mcp_server`.
+- Open WebUI :
+  - choix retenu : service utilisateur generique, non prefixe `secretarius_`, car Open WebUI n'est pas propre au projet ;
+  - unit : `deploy/systemd-user/open-webui.service`
+  - commande :
+    - `/home/mauceric/Secretarius/.venv/bin/open-webui serve`
+  - script d'installation :
+    - `deploy/scripts/setup_open_webui_service.sh`
+
+### Scripts d'installation services
+- `deploy/scripts/setup_secretarius_services.sh`
+  - installe et active :
+    - `secretarius_ollama.service`
+    - `secretarius_server.service`
+- `deploy/scripts/setup_open_webui_service.sh`
+  - installe et active :
+    - `open-webui.service`
+- Tous ces services sont en `enabled`, donc relances automatiquement a la prochaine session utilisateur.
+
+### Commandes utiles de verification
+```bash
+systemctl --user status --no-pager secretarius_ollama.service
+systemctl --user status --no-pager secretarius_server.service
+systemctl --user status --no-pager open-webui.service
+systemctl --user status --no-pager secretarius-prototype-session-snapshot.timer
+systemctl --user list-timers | grep secretarius-prototype-session-snapshot
+```
+
+### Point d'attention memoire / operations
+- En cas de services deja lances a la main, les units `systemd --user` peuvent echouer au premier demarrage (port deja pris / process deja present).
+- Procedure correcte :
+  1. arreter les processus manuels ;
+  2. `systemctl --user restart ...service` ;
+  3. verifier avec `systemctl --user status --no-pager ...service`.
+
+### Milvus Docker remis d'aplomb
+- Inspection realisee dans `/home/mauceric/milvus`.
+- Diagnostic retenu :
+  - la pile Docker Milvus ne definissait aucune politique `restart`;
+  - les conteneurs avaient donc `restart=no`;
+  - cela explique bien des arrets non suivis de redemarrage automatique.
+- Etat constate avant correction :
+  - `docker compose -f /home/mauceric/milvus/docker-compose.yml ps`
+  - les services etaient sains quand l'inspection a ete faite, mais rien n'assurait leur reprise automatique.
+- Corrections appliquees dans `/home/mauceric/milvus/docker-compose.yml` :
+  - suppression de `version: '3.5'` devenue obsolete ;
+  - ajout de `restart: unless-stopped` sur :
+    - `etcd`
+    - `minio`
+    - `standalone`
+- Verification apres recreation :
+  - `milvus-etcd`: `restart=unless-stopped`
+  - `milvus-minio`: `restart=unless-stopped`
+  - `milvus-standalone`: `restart=unless-stopped`
+
+### Service utilisateur Milvus
+- Ajout d'un service `systemd --user` :
+  - `deploy/systemd-user/milvus-compose.service`
+- Script d'installation :
+  - `deploy/scripts/setup_milvus_compose_service.sh`
+- Commandes du service :
+  - `ExecStart=/usr/bin/docker compose -f /home/mauceric/milvus/docker-compose.yml up -d`
+  - `ExecStop=/usr/bin/docker compose -f /home/mauceric/milvus/docker-compose.yml down`
+- Etat actuel :
+  - `milvus-compose.service` est `enabled`
+  - le service est `active (exited)` avec `RemainAfterExit=yes`
+  - la stack Docker est recreee / remontee correctement par `systemd --user`
+
+### Commandes utiles Milvus
+```bash
+systemctl --user status --no-pager milvus-compose.service
+docker compose -f /home/mauceric/milvus/docker-compose.yml ps
+docker inspect -f '{{.Name}} restart={{.HostConfig.RestartPolicy.Name}} status={{.State.Status}}' milvus-etcd milvus-minio milvus-standalone
+```
+
+### Utilitaire export / import Milvus
+- Ajout de `Prototype/scripts/milvus_collection_io.py`.
+- Objectif :
+  - exporter une collection Milvus dans un fichier JSON ;
+  - recharger une collection depuis un fichier du meme format ;
+  - supprimer proprement une collection de test ou de restauration.
+- Format de dump :
+  - `format`
+  - `collection_name`
+  - `schema`
+  - `indexes`
+  - `rows`
+- Commandes utiles :
+```bash
+cd /home/mauceric/Secretarius/Prototype
+source /home/mauceric/Secretarius/.venv/bin/activate
+
+python scripts/milvus_collection_io.py export \
+  --collection-name secretarius_semantic_graph \
+  --output /tmp/secretarius_semantic_graph_dump.json
+
+python scripts/milvus_collection_io.py import \
+  --input /tmp/secretarius_semantic_graph_dump.json \
+  --collection-name secretarius_semantic_graph_restored \
+  --drop-if-exists
+
+python scripts/milvus_collection_io.py drop \
+  --collection-name secretarius_semantic_graph_restored \
+  --require-exists
+```
+- Validation deja effectuee :
+  - export reel de `secretarius_semantic_graph` OK ;
+  - import reel vers `secretarius_semantic_graph_restore_test` OK.
