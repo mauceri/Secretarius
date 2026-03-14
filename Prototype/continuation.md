@@ -371,3 +371,107 @@ Résultat attendu: aucun match.
   - les conserver cachés dans `mcp_server.py`,
   - ou les sortir plus franchement de la surface MCP si l'on veut une séparation encore plus stricte.
 - Le canal notebook nécessite évidemment un redémarrage de `main_multicanal.py` pour ouvrir le port `8001`.
+
+---
+
+## Mise à jour du 2026-03-13
+
+### Changements effectués
+- Serveur MCP unifié autour de `secretarius_local/mcp_server.py` :
+  - `secretarius_local/mcp_server.py` est maintenant le vrai point d'entrée MCP,
+  - `tools/secretarius_server.py` est réduit a un shim,
+  - `ask_oracle` a ete reintegre dans `mcp_server.py`,
+  - `config.yaml` lance desormais `python -m secretarius_local.mcp_server`.
+- Journalisation MCP :
+  - `adapters/output/mcp_client.py` accepte maintenant un `env` explicite,
+  - `app_runtime.py` injecte `SECRETARIUS_MCP_LOG`,
+  - fichier de log cible : `logs/mcp_server.log`.
+- Parsing documentaire enrichi dans `secretarius_local/document_pipeline.py` :
+  - support de plusieurs URLs dans une meme chaine documentaire,
+  - stockage dans `source.urls` avec conservation de `source.url` comme URL primaire,
+  - support de `type_note: fugace|lecture|permanente`,
+  - support de `doc_id: ...` dans la chaine documentaire.
+- Indexation / mise a jour des notes :
+  - ajout de `update_document_text(...)` dans `document_pipeline.py`,
+  - ajout de l'outil MCP `update_text`,
+  - semantique choisie : remplacement complet d'une note a partir d'un `doc_id` explicite.
+- Couche Milvus (`secretarius_local/semantic_graph.py`) :
+  - abandon des IDs temporels au profit d'identifiants stables par note/expression,
+  - ajout de champs explicites `doc_id`, `expression_id`, `expression_norm`, `type_note`,
+  - suppression des expressions obsoletes d'une note,
+  - `upsert` des expressions encore presentes.
+- Recherche documentaire :
+  - `search_text` continue a partir des expressions caracteristiques de la requete,
+  - ajout d'un seuil configurable `mcp_servers.secretarius.search_min_score` dans `config.yaml`,
+  - renvoi de la structure document complete dans les resultats,
+  - deduplication des resultats par `doc_id`,
+  - reranking hybride :
+    - base semantique,
+    - bonus si des keywords de la requete matchent `user_fields.keywords`,
+    - petit bonus si le titre matche des termes de requete.
+
+### Tests / validation
+- Tests ajoutes / adaptes :
+  - `tests/test_document_pipeline.py`
+  - `tests/test_semantic_graph.py`
+  - `tests/test_mcp_server_compact_responses.py`
+  - `tests/test_mcp_tools_catalog.py`
+- Verifications executees dans la venv du projet :
+```bash
+../.venv/bin/python -m py_compile \
+  secretarius_local/document_pipeline.py \
+  secretarius_local/document_schema.py \
+  secretarius_local/semantic_graph.py \
+  secretarius_local/mcp_server.py
+
+../.venv/bin/python -m unittest -q \
+  tests/test_document_pipeline.py \
+  tests/test_semantic_graph.py \
+  tests/test_mcp_server_compact_responses.py \
+  tests/test_mcp_tools_catalog.py
+```
+- Resultat :
+  - validations OK sur le parsing documentaire,
+  - validations OK sur la couche Milvus,
+  - validations OK sur les sorties MCP compactes,
+  - validations OK sur le catalogue d'outils publics.
+
+### Decisions produit / technique enterinees
+- Travailler au niveau note entiere plutot qu'au niveau "update partiel d'expressions".
+- Introduire `/update` avant un eventuel `/upsert`.
+- Contrat utilisateur vise pour les chaines documentaires :
+  - `doc_id: ...` optionnel pour `/index`, obligatoire pour `/update`,
+  - `type_note: ...`,
+  - URLs multiples,
+  - hashtags / keywords,
+  - corps libre.
+- La recherche reste d'abord semantique, puis rerankee au niveau note.
+
+### Etat actuel utile pour demain
+- La structure `Document` est maintenant suffisante pour servir de noeud canonique d'un graphe de notes.
+- Les informations utiles pour un graphe de notes sont deja disponibles ou presque :
+  - `doc_id`
+  - `type_note`
+  - `user_fields.title`
+  - `user_fields.keywords`
+  - `source.url` / `source.urls`
+  - `derived.expressions`
+- `search_text` renvoie deja la note complete, ce qui facilitera une presentation Markdown orientee note plutot qu'orientee hit vectoriel.
+
+### Point d'attention pour la prochaine session
+- Le prochain chantier doit porter sur la gestion et la presentation en Markdown des graphes de notes, pas sur la couche d'indexation de base.
+- Il faudra clarifier des le depart :
+  - quel est le "graphe" a presenter :
+    - voisins semantiques retournes par Milvus,
+    - liens bases sur mots-cles partages,
+    - liens bases sur expressions partagees,
+    - ou combinaison de ces criteres.
+- Il faudra aussi decider du format Markdown cible :
+  - simple liste de notes trouvees,
+  - sections par voisin / score / mots-cles communs,
+  - ou rendu plus explicite de type noeuds + aretes.
+
+### Proposition de point de depart pour demain
+1. Definir une structure interne "note graph view model" a partir des documents complets deja recuperes.
+2. Produire un premier rendu Markdown lisible et compact pour ce graphe.
+3. N'ajouter qu'ensuite des raffinements de scoring, d'explication des liens et de presentation.

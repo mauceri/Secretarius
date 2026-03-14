@@ -1,0 +1,115 @@
+2026-03-12T09:31:42Z	session_messenger	SYSTEM	BOT	generated new Session mnemonic
+2026-03-12T09:31:42Z	session_messenger	SYSTEM	BOT	bot_session_id=0501238586cbbc90cc3776a4e78dd8a20645a4384f67d6eeec8cdf4c527360fb0d
+2026-03-12T09:34:15Z	session_messenger	CHAT	USER	from=05b39f84e5a9c23cd544798a4d2d69c3bad3f38dedeffd3ec5f626f665d9a1e127 message_id=HENvtwVWSERexs/GR8bxsWxiVeQ0nLmUYmg/DNXGwZw
+indexer : 
+11/03/2026
+#poésie #Villon #détachement
+Extrair les expressions clefs du texte suivant :
+Quand je considère ces têtes entassées en ces charniers,
+Tous furent maîtres des requêtes,
+Au moins de la Chambre aux Deniers,
+Ou tous furent portepaniers :
+Autant puis l’un que l’autre dire,
+Car d’évêques ou lanterniers,
+Je n’y connais rien à redire.
+2026-03-12T10:34:15	session_messenger	CHAT	USER	indexer : 
+11/03/2026
+#poésie #Villon #détachement
+Extrair les expressions clefs du texte suivant :
+Quand je considère ces têtes entassées en ces charniers,
+Tous furent maîtres des requêtes,
+Au moins de la Chambre aux Deniers,
+Ou tous furent portepaniers :
+Autant puis l’un que l’autre dire,
+Car d’évêques ou lanterniers,
+Je n’y connais rien à redire.
+2026-03-12T10:34:24	session_messenger	THOUGHT	ASSISTANT	Calling tool: index_text with inputs {'text': '11/03/2026\n#poésie #Villon #détachement\nExtrair les expressions clefs du texte suivant :\nQuand je considère ces têtes entassées en ces charniers,\nTous furent maîtres des requêtes,\nAu moins de la Chambre aux Deniers,\nOu tous furent portepaniers :\nAutant puis l’un que l’autre dire,\nCar d’évêques ou lanterniers,\nJe n’y connais rien à redire.'}
+2026-03-12T10:34:35	session_messenger	THOUGHT	ASSISTANT	Observation: {"status": "ok", "tool": "index_text", "message": "Indexation complete (extraction + insertion semantic graph).", "summary": {"expressions_count": 6, "collection_name": "secretarius_semantic_graph", "inserted_count": 6, "query_count": 6, "hit_lists": 6}, "warning": null}
+2026-03-12T10:34:35	session_messenger	THOUGHT	ASSISTANT	Index summary: expressions=0, inserted=0, collection=-, warning=-
+2026-03-12T10:34:35	session_messenger	CHAT	SECRETARIUS	{"status": "ok", "tool": "index_text", "message": "Indexation complete (extraction + insertion semantic graph).", "summary": {"expressions_count": 6, "collection_name": "secretarius_semantic_graph", "inserted_count": 6, "query_count": 6, "hit_lists": 6}, "warning": null}
+2026-03-12T09:34:35Z	session_messenger	CHAT	ASSISTANT	to=05b39f84e5a9c23cd544798a4d2d69c3bad3f38dedeffd3ec5f626f665d9a1e127 message_id=HENvtwVWSERexs/GR8bxsWxiVeQ0nLmUYmg/DNXGwZw
+{"status": "ok", "tool": "index_text", "message": "Indexation complete (extraction + insertion semantic graph).", "summary": {"expressions_count": 6, "collection_name": "secretarius_semantic_graph", "inserted_count": 6, "query_count": 6, "hit_lists": 6}, "warning": null}
+2026-03-12T09:35:33Z	session_messenger	CHAT	USER	from=05b39f84e5a9c23cd544798a4d2d69c3bad3f38dedeffd3ec5f626f665d9a1e127 message_id=Zw00OYrFfergJiwd59qJMuHlg3mIUZIV/PRLKbpUIHs
+expressions : 
+Quand je considère ces têtes entassées en ces charniers,
+Tous furent maîtres des requêtes,
+Au moins de la Chambre aux Deniers,
+Ou tous furent portepaniers :
+Autant puis l’un que l’autre dire,
+Car d’évêques ou lanterniers,
+Je n’y connais rien à redire.
+2026-03-12T10:35:33	session_messenger	CHAT	USER	expressions : 
+Quand je considère ces têtes entassées en ces charniers,
+Tous furent maîtres des requêtes,
+Au moins de la Chambre aux Deniers,
+Ou tous furent portepaniers :
+Autant puis l’un que l’autre dire,
+Car d’évêques ou lanterniers,
+Je n’y connais rien à redire.
+2026-03-12T10:35:36	session_messenger	THOUGHT	ASSISTANT	Calling tool: extract_expressions with inputs {'text': 'Quand je considère ces têtes entassées en ces charniers, Tous furent maîtres des requêtes, Au moins de la Chambre aux Deniers, Ou tous furent portepaniers : Autant puis l’un que l’autre dire, Car d’évêques ou lanterniers, Je n’y connais rien à redire.'}
+2026-03-12T10:35:40	session_messenger	THOUGHT	ASSISTANT	Observation: {"expressions": ["têtes entassées", "charniers", "Chambre aux Deniers", "portepaniers", "évêques", "lanterniers"]}
+2026-03-12T10:35:40	session_messenger	CHAT	SECRETARIUS	{"expressions": ["têtes entassées", "charniers", "Chambre aux Deniers", "portepaniers", "évêques", "lanterniers"]}
+2026-03-12T09:35:40Z	session_messenger	CHAT	ASSISTANT	to=05b39f84e5a9c23cd544798a4d2d69c3bad3f38dedeffd3ec5f626f665d9a1e127 message_id=Zw00OYrFfergJiwd59qJMuHlg3mIUZIV/PRLKbpUIHs
+{"expressions": ["têtes entassées", "charniers", "Chambre aux Deniers", "portepaniers", "évêques", "lanterniers"]}
+2026-03-12T09:53:37Z	session_messenger	CHAT	USER	from=05b39f84e5a9c23cd544798a4d2d69c3bad3f38dedeffd3ec5f626f665d9a1e127 message_id=R9ylkaqUnYLXa11kWoaYtnyIuwBOmfX+4fmvpAvj+9c
+expressions : 
+Quand je considère ces têtes entassées en ces charniers,
+Tous furent maîtres des requêtes,
+Au moins de la Chambre aux Deniers,
+Ou tous furent portepaniers :
+Autant puis l’un que l’autre dire,
+Car d’évêques ou lanterniers,
+Je n’y connais rien à redire.
+2026-03-12T10:53:37	session_messenger	CHAT	USER	expressions : 
+Quand je considère ces têtes entassées en ces charniers,
+Tous furent maîtres des requêtes,
+Au moins de la Chambre aux Deniers,
+Ou tous furent portepaniers :
+Autant puis l’un que l’autre dire,
+Car d’évêques ou lanterniers,
+Je n’y connais rien à redire.
+2026-03-12T10:53:44	session_messenger	THOUGHT	ASSISTANT	Calling tool: extract_expressions with inputs {'text': 'Quand je considère ces têtes entassées en ces charniers, Tous furent maîtres des requêtes, Au moins de la Chambre aux Deniers, Ou tous furent portepaniers : Autant puis l’un que l’autre dire, Car d’évêques ou lanterniers, Je n’y connais rien à redire.'}
+2026-03-12T10:53:52	session_messenger	THOUGHT	ASSISTANT	Observation: {"expressions": ["têtes entassées", "charniers", "Chambre aux Deniers", "portepaniers", "évêques", "lanterniers"]}
+2026-03-12T10:53:52	session_messenger	CHAT	SECRETARIUS	{"expressions": ["têtes entassées", "charniers", "Chambre aux Deniers", "portepaniers", "évêques", "lanterniers"]}
+2026-03-12T09:53:52Z	session_messenger	CHAT	ASSISTANT	to=05b39f84e5a9c23cd544798a4d2d69c3bad3f38dedeffd3ec5f626f665d9a1e127 message_id=R9ylkaqUnYLXa11kWoaYtnyIuwBOmfX+4fmvpAvj+9c
+{"expressions": ["têtes entassées", "charniers", "Chambre aux Deniers", "portepaniers", "évêques", "lanterniers"]}
+2026-03-12T13:04:14Z	session_messenger	CHAT	USER	from=05b39f84e5a9c23cd544798a4d2d69c3bad3f38dedeffd3ec5f626f665d9a1e127 message_id=0bvd0thnVVua934e5UtRqm3mTyEusO5EG1lWv4jbKUU
+expressions : 
+Quand je considère ces têtes entassées en ces charniers,
+Tous furent maîtres des requêtes,
+Au moins de la Chambre aux Deniers,
+Ou tous furent portepaniers :
+Autant puis l’un que l’autre dire,
+Car d’évêques ou lanterniers,
+Je n’y connais rien à redire.
+2026-03-12T14:04:14	session_messenger	CHAT	USER	expressions : 
+Quand je considère ces têtes entassées en ces charniers,
+Tous furent maîtres des requêtes,
+Au moins de la Chambre aux Deniers,
+Ou tous furent portepaniers :
+Autant puis l’un que l’autre dire,
+Car d’évêques ou lanterniers,
+Je n’y connais rien à redire.
+2026-03-12T14:04:20	session_messenger	THOUGHT	ASSISTANT	Calling tool: extract_expressions with inputs {'text': 'Quand je considère ces têtes entassées en ces charniers,\nTous furent maîtres des requêtes,\nAu moins de la Chambre aux Deniers,\nOu tous furent portepaniers :\nAutant puis l’un que l’autre dire,\nCar d’évêques ou lanterniers,\nJe n’y connais rien à redire.'}
+2026-03-12T14:04:25	session_messenger	THOUGHT	ASSISTANT	Observation: {"expressions": ["têtes entassées", "ces charniers", "la Chambre aux Deniers", "portepaniers", "évêques", "lanterniers"]}
+2026-03-12T14:04:25	session_messenger	CHAT	SECRETARIUS	{"expressions": ["têtes entassées", "ces charniers", "la Chambre aux Deniers", "portepaniers", "évêques", "lanterniers"]}
+2026-03-12T13:04:25Z	session_messenger	CHAT	ASSISTANT	to=05b39f84e5a9c23cd544798a4d2d69c3bad3f38dedeffd3ec5f626f665d9a1e127 message_id=0bvd0thnVVua934e5UtRqm3mTyEusO5EG1lWv4jbKUU
+{"expressions": ["têtes entassées", "ces charniers", "la Chambre aux Deniers", "portepaniers", "évêques", "lanterniers"]}
+2026-03-13T04:00:14Z	session_messenger	SYSTEM	BOT	bot_session_id=0501238586cbbc90cc3776a4e78dd8a20645a4384f67d6eeec8cdf4c527360fb0d
+2026-03-13T04:00:19Z	session_messenger	SYSTEM	BOT	bot_session_id=0501238586cbbc90cc3776a4e78dd8a20645a4384f67d6eeec8cdf4c527360fb0d
+2026-03-13T04:00:25Z	session_messenger	SYSTEM	BOT	bot_session_id=0501238586cbbc90cc3776a4e78dd8a20645a4384f67d6eeec8cdf4c527360fb0d
+2026-03-13T04:00:30Z	session_messenger	SYSTEM	BOT	bot_session_id=0501238586cbbc90cc3776a4e78dd8a20645a4384f67d6eeec8cdf4c527360fb0d
+2026-03-13T04:00:36Z	session_messenger	SYSTEM	BOT	bot_session_id=0501238586cbbc90cc3776a4e78dd8a20645a4384f67d6eeec8cdf4c527360fb0d
+2026-03-13T04:00:41Z	session_messenger	SYSTEM	BOT	bot_session_id=0501238586cbbc90cc3776a4e78dd8a20645a4384f67d6eeec8cdf4c527360fb0d
+2026-03-13T04:00:47Z	session_messenger	SYSTEM	BOT	bot_session_id=0501238586cbbc90cc3776a4e78dd8a20645a4384f67d6eeec8cdf4c527360fb0d
+2026-03-13T04:00:56Z	session_messenger	SYSTEM	BOT	bot_session_id=0501238586cbbc90cc3776a4e78dd8a20645a4384f67d6eeec8cdf4c527360fb0d
+2026-03-13T04:00:59Z	session_messenger	SYSTEM	DEDUP	ignored duplicate message_id=HENvtwVWSERexs/GR8bxsWxiVeQ0nLmUYmg/DNXGwZw
+2026-03-13T04:00:59Z	session_messenger	SYSTEM	DEDUP	ignored duplicate message_id=0bvd0thnVVua934e5UtRqm3mTyEusO5EG1lWv4jbKUU
+2026-03-13T04:00:59Z	session_messenger	SYSTEM	DEDUP	ignored duplicate message_id=Zw00OYrFfergJiwd59qJMuHlg3mIUZIV/PRLKbpUIHs
+2026-03-13T04:00:59Z	session_messenger	SYSTEM	DEDUP	ignored duplicate message_id=R9ylkaqUnYLXa11kWoaYtnyIuwBOmfX+4fmvpAvj+9c
+2026-03-13T19:01:15Z	session_messenger	SYSTEM	BOT	bot_session_id=0501238586cbbc90cc3776a4e78dd8a20645a4384f67d6eeec8cdf4c527360fb0d
+2026-03-13T19:01:21Z	session_messenger	SYSTEM	BOT	bot_session_id=0501238586cbbc90cc3776a4e78dd8a20645a4384f67d6eeec8cdf4c527360fb0d
+2026-03-13T19:01:23Z	session_messenger	SYSTEM	DEDUP	ignored duplicate message_id=HENvtwVWSERexs/GR8bxsWxiVeQ0nLmUYmg/DNXGwZw
+2026-03-13T19:01:23Z	session_messenger	SYSTEM	DEDUP	ignored duplicate message_id=R9ylkaqUnYLXa11kWoaYtnyIuwBOmfX+4fmvpAvj+9c
+2026-03-13T19:01:23Z	session_messenger	SYSTEM	DEDUP	ignored duplicate message_id=Zw00OYrFfergJiwd59qJMuHlg3mIUZIV/PRLKbpUIHs
+2026-03-13T19:01:23Z	session_messenger	SYSTEM	DEDUP	ignored duplicate message_id=0bvd0thnVVua934e5UtRqm3mTyEusO5EG1lWv4jbKUU

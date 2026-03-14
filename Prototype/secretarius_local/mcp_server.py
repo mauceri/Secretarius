@@ -76,7 +76,7 @@ except ImportError:
     set_indexing_state = module.set_indexing_state
 
 try:
-    from .document_pipeline import analyse_texte_documentaire, index_document_text, search_documents_by_text
+    from .document_pipeline import analyse_texte_documentaire, index_document_text, search_documents_by_text, update_document_text
 except ImportError:
     module_path = Path(__file__).resolve().parent / "document_pipeline.py"
     spec = importlib.util.spec_from_file_location("secretarius_document_pipeline", module_path)
@@ -88,6 +88,7 @@ except ImportError:
     analyse_texte_documentaire = module.analyse_texte_documentaire
     index_document_text = module.index_document_text
     search_documents_by_text = module.search_documents_by_text
+    update_document_text = module.update_document_text
 
 
 JSONRPC_VERSION = "2.0"
@@ -95,6 +96,8 @@ SERVER_NAME = "secretarius-mcp"
 SERVER_VERSION = "0.1.0"
 _LAST_INPUT_MODE = "framed"
 _WARMUP_STARTED = False
+_KEYWORD_MATCH_BONUS = 0.1
+_TITLE_MATCH_BONUS = 0.05
 
 
 @dataclass(frozen=True)
@@ -260,6 +263,24 @@ def _tools_catalog() -> list[MCPTool]:
                     },
                 },
                 "required": ["query"],
+                "additionalProperties": False,
+            },
+        ),
+        MCPTool(
+            name="update_text",
+            description=(
+                "Remplace une note existante a partir d'une chaine de caracteres "
+                "contenant un doc_id explicite."
+            ),
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": "Texte documentaire a mettre a jour, avec doc_id: ...",
+                    },
+                },
+                "required": ["text"],
                 "additionalProperties": False,
             },
         ),
@@ -748,12 +769,16 @@ def _handle_search_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
         or os.environ.get("SECRETARIUS_MILVUS_COLLECTION", "secretarius_semantic_graph"),
         metric_type=arguments.get("metric_type") or os.environ.get("SECRETARIUS_MILVUS_METRIC", "COSINE"),
         top_k=arguments.get("top_k", 10),
+        min_score=arguments.get("min_score", _read_optional_float_env("SECRETARIUS_MILVUS_MIN_SCORE")),
     )
     graph_payload = result.get("search", {})
+    query_document = result.get("document") if isinstance(result.get("document"), dict) else {}
+    query_keywords = _extract_document_keywords(query_document)
+    query_terms = _extract_query_terms(query)
 
     hits = graph_payload.get("hits")
     hit_lists = len(hits) if isinstance(hits, list) else 0
-    documents = _extract_search_documents(hits)
+    documents = _extract_search_documents(hits, query_keywords=query_keywords, query_terms=query_terms)
     payload = {
         "status": "ok",
         "tool": "search_text",
@@ -764,6 +789,8 @@ def _handle_search_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
             "query_count": graph_payload.get("query_count", 0),
             "hit_lists": hit_lists,
             "top_k": arguments.get("top_k", 10),
+            "min_score": graph_payload.get("min_score"),
+            "keyword_query_count": len(query_keywords),
         },
         "documents": documents,
         "warning": graph_payload.get("warning"),
@@ -773,11 +800,79 @@ def _handle_search_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
     return _tool_result(payload)
 
 
-def _extract_search_documents(hits: Any) -> list[Dict[str, Any]]:
+def _handle_update_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
+    debug_full = bool(arguments.get("debug_full", False))
+    text, normalized_doc = resolve_text_for_extraction(arguments)
+    if not isinstance(text, str) or not text.strip():
+        raise ValueError("'text' must be a non-empty string")
+
+    result = update_document_text(
+        text.strip(),
+        base_document=normalized_doc,
+        llama_cpp_url=arguments.get("llama_cpp_url")
+        or arguments.get("llama_url")
+        or os.environ.get("SECRETARIUS_LLAMA_CPP_URL")
+        or os.environ.get("SECRETARIUS_LLAMA_URL")
+        or "http://127.0.0.1:8989/v1/chat/completions",
+        llama_cpp_model=arguments.get("llama_cpp_model")
+        or arguments.get("model")
+        or os.environ.get("SECRETARIUS_LLAMA_CPP_MODEL")
+        or os.environ.get("SECRETARIUS_LLAMA_MODEL", "local-llama-cpp"),
+        timeout_s=arguments.get("timeout_s", float(os.environ.get("SECRETARIUS_TIMEOUT_S", "30.0"))),
+        max_tokens=arguments.get("max_tokens", int(os.environ.get("SECRETARIUS_MAX_TOKENS", "20480"))),
+        seed=arguments.get("seed", int(os.environ.get("SECRETARIUS_SEED", "42"))),
+        prompt_path=arguments.get("prompt_path") or os.environ.get("SECRETARIUS_PROMPT_PATH"),
+        debug_return_raw=bool(arguments.get("debug_return_raw", False)),
+        embedding_model=arguments.get("model"),
+        normalize_embeddings=arguments.get("normalize", True),
+        batch_size=arguments.get("batch_size", 32),
+        milvus_uri=arguments.get("milvus_uri") or os.environ.get("SECRETARIUS_MILVUS_URI", "http://127.0.0.1:19530"),
+        milvus_token=arguments.get("milvus_token") or os.environ.get("SECRETARIUS_MILVUS_TOKEN"),
+        collection_name=arguments.get("collection_name")
+        or os.environ.get("SECRETARIUS_MILVUS_COLLECTION", "secretarius_semantic_graph"),
+        metric_type=arguments.get("metric_type") or os.environ.get("SECRETARIUS_MILVUS_METRIC", "COSINE"),
+        top_k=arguments.get("top_k", 10),
+    )
+    extract_payload = result.get("extract", {})
+    graph_payload = result.get("index", {})
+    extract_expressions = extract_payload.get("expressions")
+    extract_count = len(extract_expressions) if isinstance(extract_expressions, list) else 0
+    index_hits = graph_payload.get("hits")
+    hit_lists = len(index_hits) if isinstance(index_hits, list) else 0
+    warning = extract_payload.get("warning") or graph_payload.get("warning")
+    payload = {
+        "status": "ok",
+        "tool": "update_text",
+        "message": "Mise a jour complete (suppression precedente + reindexation).",
+        "summary": {
+            "expressions_count": extract_count,
+            "collection_name": graph_payload.get("collection_name"),
+            "deleted_count": graph_payload.get("deleted_count", 0),
+            "inserted_count": graph_payload.get("inserted_count", 0),
+            "query_count": graph_payload.get("query_count", 0),
+            "hit_lists": hit_lists,
+        },
+        "warning": warning,
+    }
+    if debug_full:
+        payload["extract"] = extract_payload
+        payload["index"] = graph_payload
+    return _tool_result(payload)
+
+
+def _extract_search_documents(
+    hits: Any,
+    *,
+    query_keywords: list[str] | None = None,
+    query_terms: list[str] | None = None,
+) -> list[Dict[str, Any]]:
     if not isinstance(hits, list):
         return []
 
-    documents: list[Dict[str, Any]] = []
+    query_keyword_set = {value.lower() for value in (query_keywords or []) if isinstance(value, str) and value.strip()}
+    query_term_set = {value.lower() for value in (query_terms or []) if isinstance(value, str) and value.strip()}
+    by_doc_id: dict[str, Dict[str, Any]] = {}
+    anonymous_documents: list[Dict[str, Any]] = []
     for hit_list in hits:
         if not isinstance(hit_list, list):
             continue
@@ -792,14 +887,78 @@ def _extract_search_documents(hits: Any) -> list[Dict[str, Any]]:
                     document = json.loads(payload_json)
                 except json.JSONDecodeError:
                     document = payload_json
-            documents.append(
-                {
-                    "id": hit.get("id", entity.get("id")),
-                    "score": hit.get("score", entity.get("score", hit.get("distance", entity.get("distance")))),
-                    "document": document,
-                }
-            )
+            doc_id = document.get("doc_id") if isinstance(document, dict) else None
+            semantic_score = hit.get("score", entity.get("score", hit.get("distance", entity.get("distance"))))
+            keyword_matches = _keyword_matches(document, query_keyword_set)
+            title_matches = _title_matches(document, query_term_set)
+            keyword_bonus = len(keyword_matches) * _KEYWORD_MATCH_BONUS
+            title_bonus = _TITLE_MATCH_BONUS if title_matches else 0.0
+            combined_score = float(semantic_score) if isinstance(semantic_score, (int, float)) else 0.0
+            combined_score += keyword_bonus + title_bonus
+            record = {
+                "id": hit.get("id", entity.get("id")),
+                "score": semantic_score,
+                "combined_score": combined_score,
+                "keyword_matches": keyword_matches,
+                "document": document,
+            }
+            if not isinstance(doc_id, str) or not doc_id:
+                anonymous_documents.append(record)
+                continue
+            previous = by_doc_id.get(doc_id)
+            if previous is None or record["combined_score"] > previous["combined_score"]:
+                by_doc_id[doc_id] = record
+
+    documents = list(by_doc_id.values()) + anonymous_documents
+    documents.sort(key=lambda item: item.get("combined_score", 0.0), reverse=True)
     return documents
+
+
+def _extract_document_keywords(document: Any) -> list[str]:
+    if not isinstance(document, dict):
+        return []
+    user_fields = document.get("user_fields")
+    if not isinstance(user_fields, dict):
+        return []
+    keywords = user_fields.get("keywords")
+    if not isinstance(keywords, list):
+        return []
+    out: list[str] = []
+    for value in keywords:
+        if isinstance(value, str) and value.strip():
+            normalized = value.strip()
+            if normalized not in out:
+                out.append(normalized)
+    return out
+
+
+def _extract_query_terms(query: str) -> list[str]:
+    out: list[str] = []
+    for raw in query.split():
+        term = raw.strip(" \t\r\n,;:.!?()[]{}\"'").lower()
+        if len(term) >= 3 and not term.startswith("#") and term not in out:
+            out.append(term)
+    return out
+
+
+def _keyword_matches(document: Any, query_keyword_set: set[str]) -> list[str]:
+    if not query_keyword_set or not isinstance(document, dict):
+        return []
+    document_keywords = {value.lower() for value in _extract_document_keywords(document)}
+    return sorted(document_keywords & query_keyword_set)
+
+
+def _title_matches(document: Any, query_term_set: set[str]) -> bool:
+    if not query_term_set or not isinstance(document, dict):
+        return False
+    user_fields = document.get("user_fields")
+    if not isinstance(user_fields, dict):
+        return False
+    title = user_fields.get("title")
+    if not isinstance(title, str) or not title.strip():
+        return False
+    title_lower = title.lower()
+    return any(term in title_lower for term in query_term_set)
 
 
 def _handle_tool_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -809,6 +968,7 @@ def _handle_tool_call(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         "semantic_graph_search": _handle_semantic_graph_search,
         "index_text": _handle_index_text,
         "search_text": _handle_search_text,
+        "update_text": _handle_update_text,
     }
     handler = handlers.get(name)
     if handler is None:
@@ -1014,6 +1174,19 @@ def _debug_log(line: str) -> None:
             f.write(line + "\n")
     except OSError:
         return
+
+
+def _read_optional_float_env(name: str) -> float | None:
+    raw = os.environ.get(name)
+    if raw is None:
+        return None
+    raw = raw.strip()
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        return None
 
 
 if __name__ == "__main__":

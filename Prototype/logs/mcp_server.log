@@ -1,0 +1,383 @@
+extract.args text_len=255 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=12.578 text_len=255 chunk_count=1
+recv(line): initialize
+send: id=0
+recv(line): notifications/initialized
+recv(line): tools/list
+send: id=1
+recv(line): tools/call
+extract.args text_len=256 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=9.510 text_len=256 chunk_count=1
+send: id=2
+recv(line): initialize
+send: id=0
+recv(line): notifications/initialized
+recv(line): initialize
+send: id=0
+recv(line): notifications/initialized
+recv(line): tools/list
+send: id=1
+recv(line): tools/call
+extract.args text_len=36 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=7.694 text_len=36 chunk_count=1
+send: id=2
+recv(line): tools/list
+send: id=3
+recv(line): tools/call
+extract.args text_len=36 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=0.671 text_len=36 chunk_count=1
+send: id=4
+recv(line): tools/list
+send: id=5
+recv(line): tools/call
+send: id=6
+recv(line): tools/list
+send: id=7
+recv(line): tools/call
+send: id=8
+recv(line): tools/list
+send: id=9
+recv(line): tools/call
+send: id=10
+recv(line): tools/list
+send: id=11
+recv(line): tools/call
+send: id=12
+recv(line): tools/list
+send: id=13
+recv(line): tools/call
+send: id=14
+recv(line): tools/list
+send: id=15
+recv(line): tools/call
+send: id=16
+recv(line): tools/list
+send: id=17
+recv(line): tools/call
+send: id=18
+recv(line): tools/list
+send: id=19
+recv(line): tools/call
+send: id=20
+recv(line): tools/list
+send: id=21
+recv(line): tools/call
+send: id=22
+recv(line): tools/list
+send: id=23
+recv(line): tools/call
+extract.args text_len=36 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=0.939 text_len=36 chunk_count=1
+send: id=24
+recv(line): tools/list
+send: id=25
+recv(line): tools/call
+send: id=26
+recv(line): tools/list
+send: id=27
+recv(line): tools/call
+send: id=28
+recv(line): tools/list
+send: id=29
+recv(line): tools/call
+send: id=30
+recv(line): tools/list
+send: id=31
+recv(line): tools/call
+send: id=32
+recv(line): tools/list
+send: id=33
+recv(line): tools/call
+send: id=34
+recv(line): tools/list
+send: id=35
+recv(line): tools/call
+send: id=36
+recv(line): tools/list
+send: id=37
+recv(line): tools/call
+extract.args text_len=685 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=11.422 text_len=685 chunk_count=1
+send: id=38
+recv(line): tools/list
+send: id=39
+recv(line): tools/call
+extract.args text_len=36 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=0.929 text_len=36 chunk_count=1
+send: id=40
+recv(line): tools/list
+send: id=41
+recv(line): tools/call
+extract.args text_len=890 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=8.748 text_len=890 chunk_count=1
+send: id=42
+recv(line): tools/list
+send: id=43
+recv(line): tools/call
+extract.args text_len=602 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=8.951 text_len=602 chunk_count=1
+send: id=44
+recv(line): tools/list
+send: id=45
+recv(line): tools/call
+extract.args text_len=1500 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=20.086 text_len=1500 chunk_count=1
+send: id=46
+recv(line): tools/list
+send: id=47
+recv(line): tools/call
+extract.args text_len=672 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=8.923 text_len=672 chunk_count=1
+send: id=48
+recv(line): tools/list
+send: id=49
+recv(line): tools/call
+send: id=50
+recv(line): tools/list
+send: id=51
+recv(line): tools/call
+send: id=52
+recv(line): tools/list
+send: id=53
+recv(line): tools/call
+send: id=54
+recv(line): tools/list
+send: id=55
+recv(line): tools/call
+send: id=56
+recv(line): tools/list
+send: id=57
+recv(line): tools/call
+send: id=58
+recv(line): tools/list
+send: id=59
+recv(line): tools/call
+send: id=60
+recv(line): tools/list
+send: id=61
+recv(line): tools/call
+send: id=62
+recv(line): tools/list
+send: id=63
+recv(line): tools/call
+send: id=64
+recv(line): tools/list
+send: id=65
+recv(line): tools/call
+send: id=66
+recv(line): tools/list
+send: id=67
+recv(line): tools/call
+extract.args text_len=36 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=1.039 text_len=36 chunk_count=1
+send: id=68
+recv(line): tools/list
+send: id=69
+recv(line): tools/call
+send: id=70
+recv(line): tools/list
+send: id=71
+recv(line): tools/call
+send: id=72
+recv(line): tools/list
+send: id=73
+recv(line): tools/call
+send: id=74
+recv(line): tools/list
+send: id=75
+recv(line): tools/call
+send: id=76
+recv(line): tools/list
+send: id=77
+recv(line): tools/call
+extract.args text_len=36 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=0.936 text_len=36 chunk_count=1
+send: id=78
+recv(line): tools/list
+send: id=79
+recv(line): tools/call
+extract.args text_len=890 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=8.786 text_len=890 chunk_count=1
+send: id=80
+recv(line): tools/list
+send: id=81
+recv(line): tools/call
+extract.args text_len=602 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=8.997 text_len=602 chunk_count=1
+send: id=82
+recv(line): tools/list
+send: id=83
+recv(line): tools/call
+extract.args text_len=1500 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=20.175 text_len=1500 chunk_count=1
+send: id=84
+recv(line): tools/list
+send: id=85
+recv(line): tools/call
+extract.args text_len=672 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=8.980 text_len=672 chunk_count=1
+send: id=86
+recv(line): tools/list
+send: id=87
+recv(line): tools/call
+send: id=88
+recv(line): tools/list
+send: id=89
+recv(line): tools/call
+send: id=90
+recv(line): tools/list
+send: id=91
+recv(line): tools/call
+send: id=92
+recv(line): tools/list
+send: id=93
+recv(line): tools/call
+send: id=94
+recv(line): tools/list
+send: id=95
+recv(line): tools/call
+send: id=96
+recv(line): tools/list
+send: id=97
+recv(line): tools/call
+send: id=98
+recv(line): tools/list
+send: id=99
+recv(line): tools/call
+send: id=100
+recv(line): tools/list
+send: id=101
+recv(line): tools/call
+send: id=102
+recv(line): tools/list
+send: id=103
+recv(line): tools/call
+send: id=104
+recv(line): tools/list
+send: id=105
+recv(line): tools/call
+send: id=106
+recv(line): tools/list
+send: id=107
+recv(line): tools/call
+send: id=108
+recv(line): tools/list
+send: id=109
+recv(line): tools/call
+send: id=110
+recv(line): tools/list
+send: id=111
+recv(line): tools/call
+send: id=112
+recv(line): tools/list
+send: id=113
+recv(line): tools/call
+send: id=114
+recv(line): tools/list
+send: id=115
+recv(line): tools/call
+send: id=116
+recv(line): tools/list
+send: id=117
+recv(line): tools/call
+send: id=118
+recv(line): tools/list
+send: id=119
+recv(line): tools/call
+send: id=120
+recv(line): tools/list
+send: id=121
+recv(line): tools/call
+send: id=122
+recv(line): initialize
+send: id=0
+recv(line): notifications/initialized
+recv(line): tools/list
+send: id=1
+recv(line): tools/call
+send: id=2
+recv(line): initialize
+send: id=0
+recv(line): notifications/initialized
+recv(line): tools/list
+send: id=1
+recv(line): tools/call
+send: id=2
+recv(line): tools/list
+send: id=3
+recv(line): tools/call
+send: id=4
+recv(line): tools/list
+send: id=5
+recv(line): tools/call
+send: id=6
+recv(line): tools/list
+send: id=7
+recv(line): tools/call
+extract.args text_len=36 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=1.019 text_len=36 chunk_count=1
+send: id=8
+recv(line): tools/list
+send: id=9
+recv(line): tools/call
+extract.args text_len=890 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=8.686 text_len=890 chunk_count=1
+send: id=10
+recv(line): tools/list
+send: id=11
+recv(line): tools/call
+extract.args text_len=602 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=8.862 text_len=602 chunk_count=1
+send: id=12
+recv(line): tools/list
+send: id=13
+recv(line): tools/call
+extract.args text_len=1500 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=19.957 text_len=1500 chunk_count=1
+send: id=14
+recv(line): tools/list
+send: id=15
+recv(line): tools/call
+extract.args text_len=672 llama_cpp_url=http://127.0.0.1:8989/v1/chat/completions llama_cpp_model=local-llama-cpp prompt_path=None arg_keys=['text']
+extract_expressions timing: elapsed_s=8.848 text_len=672 chunk_count=1
+send: id=16
+recv(line): tools/list
+send: id=17
+recv(line): tools/call
+send: id=18
+recv(line): tools/list
+send: id=19
+recv(line): tools/call
+send: id=20
+recv(line): tools/list
+send: id=21
+recv(line): tools/call
+send: id=22
+recv(line): tools/list
+send: id=23
+recv(line): tools/call
+send: id=24
+recv(line): tools/list
+send: id=25
+recv(line): tools/call
+send: id=26
+recv(line): tools/list
+send: id=27
+recv(line): tools/call
+send: id=28
+recv(line): tools/list
+send: id=29
+recv(line): tools/call
+send: id=30
+recv(line): tools/list
+send: id=31
+recv(line): tools/call
+send: id=32
+recv(line): tools/list
+send: id=33
+recv(line): tools/call
+send: id=34
+recv(line): tools/list
+send: id=35
+recv(line): tools/call
+send: id=36

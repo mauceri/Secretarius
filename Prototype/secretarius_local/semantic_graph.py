@@ -14,6 +14,10 @@ def semantic_graph_search_milvus(
     *,
     documents: list[dict[str, Any]] | None = None,
     top_k: int = 10,
+    min_score: float | None = None,
+    required_keywords: list[str] | None = None,
+    optional_keywords: list[str] | None = None,
+    excluded_keywords: list[str] | None = None,
     uri: str = DEFAULT_MILVUS_URI,
     token: str | None = None,
     collection_name: str = DEFAULT_COLLECTION,
@@ -48,9 +52,8 @@ def semantic_graph_search_milvus(
 
     effective_metric = _resolve_metric_type(metric_type)
 
-    try:
-        from pymilvus import MilvusClient
-    except Exception as exc:
+    client_class = _resolve_milvus_client()
+    if client_class is None:
         return {
             "graph": {"nodes": [], "edges": []},
             "hits": [],
@@ -59,11 +62,11 @@ def semantic_graph_search_milvus(
             "query_count": len(normalized),
             "collection_name": collection_name,
             "metric_type": effective_metric,
-            "warning": f"pymilvus import failed: {exc}",
+            "warning": "pymilvus import failed",
         }
 
     try:
-        client = MilvusClient(uri=uri, token=token)
+        client = client_class(uri=uri, token=token)
     except Exception as exc:
         return {
             "graph": {"nodes": [], "edges": []},
@@ -120,11 +123,17 @@ def semantic_graph_search_milvus(
             }
 
     try:
+        search_filter = _build_keywords_filter(
+            required_keywords=required_keywords,
+            optional_keywords=optional_keywords,
+            excluded_keywords=excluded_keywords,
+        )
         raw_hits = client.search(
             collection_name=collection_name,
             data=normalized,
             limit=top_k,
             output_fields=["payload_json", "source_idx"],
+            filter=search_filter,
         )
     except Exception as exc:
         return {
@@ -138,17 +147,60 @@ def semantic_graph_search_milvus(
             "warning": f"milvus search failed: {exc}",
         }
 
-    graph = _build_graph_from_hits(raw_hits)
+    filtered_hits = _filter_hits_by_min_score(raw_hits, min_score=min_score)
+    graph = _build_graph_from_hits(filtered_hits)
     return {
         "graph": graph,
-        "hits": raw_hits,
+        "hits": filtered_hits,
         "inserted_count": inserted_count,
         "deleted_count": deleted_count,
         "query_count": len(normalized),
         "collection_name": collection_name,
         "metric_type": effective_metric,
+        "min_score": min_score,
         "warning": None,
     }
+
+
+def semantic_graph_delete_doc(
+    *,
+    doc_id: str,
+    uri: str = DEFAULT_MILVUS_URI,
+    token: str | None = None,
+    collection_name: str = DEFAULT_COLLECTION,
+) -> int:
+    normalized_doc_id = doc_id.strip() if isinstance(doc_id, str) else ""
+    if not normalized_doc_id:
+        return 0
+
+    client_class = _resolve_milvus_client()
+    if client_class is None:
+        return 0
+
+    try:
+        client = client_class(uri=uri, token=token)
+    except Exception:
+        return 0
+
+    if not client.has_collection(collection_name=collection_name):
+        return 0
+
+    existing = client.query(
+        collection_name=collection_name,
+        filter=f'doc_id == "{_escape_filter_string(normalized_doc_id)}"',
+        output_fields=["expression_id"],
+    )
+    ids_to_delete: list[int] = []
+    if isinstance(existing, list):
+        for row in existing:
+            if isinstance(row, dict) and isinstance(row.get("id"), int):
+                ids_to_delete.append(row["id"])
+    if not ids_to_delete:
+        return 0
+    result = client.delete(collection_name=collection_name, ids=ids_to_delete)
+    if isinstance(result, dict):
+        return int(result.get("delete_count", len(ids_to_delete)))
+    return len(ids_to_delete)
 
 
 def _normalize_embeddings(embeddings: Any) -> list[list[float]]:
@@ -173,6 +225,17 @@ def _resolve_metric_type(metric_type: str) -> str:
     if mt in ("IP", "L2"):
         return mt
     return "IP"
+
+
+def _resolve_milvus_client() -> Any | None:
+    client_class = globals().get("MilvusClient")
+    if client_class is not None:
+        return client_class
+    try:
+        from pymilvus import MilvusClient as imported_client_class
+    except Exception:
+        return None
+    return imported_client_class
 
 
 def _ensure_collection(*, client: Any, collection_name: str, dim: int, metric_type: str) -> None:
@@ -281,6 +344,7 @@ def _build_row(*, payload: dict[str, Any], embedding: list[float], source_idx: i
         "doc_id": doc_id,
         "expression_id": expression_id,
         "expression_norm": expression_norm,
+        "keywords": _extract_keywords(user_fields.get("keywords")),
         "type_note": user_fields.get("type_note") if isinstance(user_fields.get("type_note"), str) else "fugace",
     }
 
@@ -359,6 +423,54 @@ def _escape_filter_string(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
+def _extract_keywords(raw_keywords: Any) -> list[str]:
+    if not isinstance(raw_keywords, list):
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for value in raw_keywords:
+        if not isinstance(value, str):
+            continue
+        keyword = value.strip()
+        if not keyword or keyword in seen:
+            continue
+        seen.add(keyword)
+        out.append(keyword)
+    return out
+
+
+def _build_keywords_filter(
+    *,
+    required_keywords: list[str] | None = None,
+    optional_keywords: list[str] | None = None,
+    excluded_keywords: list[str] | None = None,
+) -> str | None:
+    clauses: list[str] = []
+
+    required = _extract_keywords(required_keywords)
+    optional = _extract_keywords(optional_keywords)
+    excluded = _extract_keywords(excluded_keywords)
+
+    if required:
+        clauses.append(
+            "(" + " and ".join(_keyword_contains_clause(keyword) for keyword in required) + ")"
+        )
+    if optional:
+        clauses.append(
+            "(" + " or ".join(_keyword_contains_clause(keyword) for keyword in optional) + ")"
+        )
+    if excluded:
+        clauses.extend(f"(not {_keyword_contains_clause(keyword)})" for keyword in excluded)
+
+    if not clauses:
+        return None
+    return " and ".join(clauses)
+
+
+def _keyword_contains_clause(keyword: str) -> str:
+    return f'array_contains(keywords, "{_escape_filter_string(keyword)}")'
+
+
 def _build_graph_from_hits(raw_hits: Any) -> dict[str, list[dict[str, Any]]]:
     nodes: list[dict[str, Any]] = []
     edges: list[dict[str, Any]] = []
@@ -409,3 +521,27 @@ def _build_graph_from_hits(raw_hits: Any) -> dict[str, list[dict[str, Any]]]:
             )
 
     return {"nodes": nodes, "edges": edges}
+
+
+def _filter_hits_by_min_score(raw_hits: Any, *, min_score: float | None) -> list[list[dict[str, Any]]]:
+    if not isinstance(raw_hits, list):
+        return []
+    if min_score is None:
+        return [hit_list if isinstance(hit_list, list) else [] for hit_list in raw_hits]
+
+    threshold = float(min_score)
+    filtered: list[list[dict[str, Any]]] = []
+    for hit_list in raw_hits:
+        if not isinstance(hit_list, list):
+            filtered.append([])
+            continue
+        kept: list[dict[str, Any]] = []
+        for hit in hit_list:
+            if not isinstance(hit, dict):
+                continue
+            entity = hit.get("entity") if isinstance(hit.get("entity"), dict) else hit
+            score = hit.get("score", entity.get("score", hit.get("distance", entity.get("distance"))))
+            if isinstance(score, (int, float)) and float(score) >= threshold:
+                kept.append(hit)
+        filtered.append(kept)
+    return filtered

@@ -117,9 +117,11 @@ class TestMCPServerCompactResponses(unittest.TestCase):
     @patch("secretarius_local.mcp_server.search_documents_by_text")
     def test_search_text_is_compact_by_default(self, mock_search):
         mock_search.return_value = {
+            "document": {"user_fields": {"keywords": ["#charniers"]}},
             "search": {
                 "collection_name": "secretarius_semantic_graph",
                 "query_count": 1,
+                "min_score": 0.75,
                 "hits": [[{"id": "x", "score": 0.91, "entity": {"payload_json": "{\"doc_id\":\"d1\",\"content\":\"bonjour\"}"}}]],
                 "warning": None,
             },
@@ -129,11 +131,98 @@ class TestMCPServerCompactResponses(unittest.TestCase):
         payload = _extract_payload(result)
         self.assertEqual(payload.get("tool"), "search_text")
         self.assertIn("summary", payload)
+        self.assertEqual(payload.get("summary", {}).get("min_score"), 0.75)
+        self.assertEqual(payload.get("summary", {}).get("keyword_query_count"), 1)
         self.assertEqual(
             payload.get("documents"),
-            [{"id": "x", "score": 0.91, "document": {"doc_id": "d1", "content": "bonjour"}}],
+            [{"id": "x", "score": 0.91, "combined_score": 0.91, "keyword_matches": [], "document": {"doc_id": "d1", "content": "bonjour"}}],
         )
         self.assertNotIn("search", payload)
+
+    @patch("secretarius_local.mcp_server.search_documents_by_text")
+    def test_search_text_counts_all_query_hashtags(self, mock_search):
+        mock_search.return_value = {
+            "document": {"user_fields": {"keywords": ["#psychologie", "#symbolisme", "#brouillon"]}},
+            "search": {
+                "collection_name": "secretarius_semantic_graph",
+                "query_count": 1,
+                "min_score": None,
+                "hits": [],
+                "warning": None,
+            },
+        }
+
+        result = mcp_server._handle_search_text({"query": "jung +#psychologie #symbolisme -#brouillon"})
+        payload = _extract_payload(result)
+
+        self.assertEqual(payload.get("summary", {}).get("keyword_query_count"), 3)
+
+    def test_extract_search_documents_dedupes_by_doc_id(self):
+        hits = [
+            [
+                {"id": "x1", "score": 0.91, "entity": {"payload_json": "{\"doc_id\":\"d1\",\"content\":\"bonjour\"}"}},
+                {"id": "x2", "score": 0.89, "entity": {"payload_json": "{\"doc_id\":\"d1\",\"content\":\"bonjour\"}"}},
+                {"id": "x3", "score": 0.88, "entity": {"payload_json": "{\"doc_id\":\"d2\",\"content\":\"salut\"}"}},
+            ]
+        ]
+
+        documents = mcp_server._extract_search_documents(hits)
+
+        self.assertEqual(
+            documents,
+            [
+                {"id": "x1", "score": 0.91, "combined_score": 0.91, "keyword_matches": [], "document": {"doc_id": "d1", "content": "bonjour"}},
+                {"id": "x3", "score": 0.88, "combined_score": 0.88, "keyword_matches": [], "document": {"doc_id": "d2", "content": "salut"}},
+            ],
+        )
+
+    def test_extract_search_documents_reranks_with_keyword_bonus(self):
+        hits = [
+            [
+                {
+                    "id": "x1",
+                    "score": 0.84,
+                    "entity": {
+                        "payload_json": "{\"doc_id\":\"d1\",\"user_fields\":{\"keywords\":[\"#stoicisme\"]},\"content\":{\"text\":\"a\"}}"
+                    },
+                },
+                {
+                    "id": "x2",
+                    "score": 0.9,
+                    "entity": {
+                        "payload_json": "{\"doc_id\":\"d2\",\"user_fields\":{\"keywords\":[\"#histoire\"]},\"content\":{\"text\":\"b\"}}"
+                    },
+                },
+            ]
+        ]
+
+        documents = mcp_server._extract_search_documents(hits, query_keywords=["#stoicisme"], query_terms=[])
+
+        self.assertEqual(documents[0]["document"]["doc_id"], "d1")
+        self.assertEqual(documents[0]["keyword_matches"], ["#stoicisme"])
+        self.assertGreater(documents[0]["combined_score"], documents[1]["combined_score"])
+
+    @patch("secretarius_local.mcp_server.update_document_text")
+    def test_update_text_is_compact_by_default(self, mock_update):
+        mock_update.return_value = {
+            "document": {"doc_id": "doc:test-1"},
+            "extract": {"expressions": ["a"], "warning": None},
+            "index": {
+                "collection_name": "secretarius_semantic_graph",
+                "inserted_count": 1,
+                "deleted_count": 2,
+                "query_count": 1,
+                "hits": [[]],
+                "warning": None,
+            },
+        }
+
+        result = mcp_server._handle_update_text({"text": "doc_id: doc:test-1\nbonjour"})
+        payload = _extract_payload(result)
+        self.assertEqual(payload.get("tool"), "update_text")
+        self.assertEqual(payload.get("summary", {}).get("deleted_count"), 2)
+        self.assertNotIn("extract", payload)
+        self.assertNotIn("index", payload)
 
 
 if __name__ == "__main__":

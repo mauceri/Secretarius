@@ -249,14 +249,10 @@ def _ensure_content_defaults(doc: dict[str, Any]) -> None:
     text = content.get("text")
     content_ref = content.get("content_ref")
     if isinstance(text, str) and text:
-        content["mode"] = "inline"
-        content["length_chars"] = len(text)
         if not content.get("hash"):
             content["hash"] = _stable_hash("sha256", text)
-    elif isinstance(content_ref, str) and content_ref:
-        content["mode"] = "ref"
-    else:
-        content["mode"] = "none"
+    elif not isinstance(content_ref, str) or not content_ref:
+        content.pop("hash", None)
 
 
 def _ensure_source_defaults(doc: dict[str, Any]) -> None:
@@ -275,9 +271,6 @@ def _ensure_source_defaults(doc: dict[str, Any]) -> None:
         source["url"] = normalized_urls[0]
     if isinstance(source.get("url"), str) and source["url"].strip() and source["url"].strip() not in source["urls"]:
         source["urls"].insert(0, source["url"].strip())
-    authors = source.get("authors")
-    if not isinstance(authors, list):
-        source["authors"] = []
 
 
 def _ensure_user_fields_defaults(doc: dict[str, Any]) -> None:
@@ -285,12 +278,8 @@ def _ensure_user_fields_defaults(doc: dict[str, Any]) -> None:
     if not isinstance(user_fields, dict):
         user_fields = {}
         doc["user_fields"] = user_fields
-    if not isinstance(user_fields.get("tags"), list):
-        user_fields["tags"] = []
     if not isinstance(user_fields.get("keywords"), list):
         user_fields["keywords"] = []
-    if not isinstance(user_fields.get("status"), str) or not user_fields["status"]:
-        user_fields["status"] = "draft"
     touch_updated_at(doc)
 
 
