@@ -5,6 +5,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+from localization import Translator
 from .models import Message, Role, SessionState, Priority, ContextItem
 from .ports import LLMInterface, ToolClientInterface, InputGatewayInterface
 
@@ -69,7 +70,6 @@ def _parse_router_json_response(raw_response: str) -> dict:
 
     return json.loads(clean_response)
 
-NO_TOOL_FALLBACK_MESSAGE = "Aucun outil ne correspond a votre demande."
 MAX_TOOL_CALLS_PER_TURN = 2
 
 class ChefDOrchestre:
@@ -77,16 +77,21 @@ class ChefDOrchestre:
         self,
         llm: LLMInterface,
         tool_client: ToolClientInterface,
-        gateway: InputGatewayInterface
+        gateway: InputGatewayInterface,
+        locale: str = "fr",
     ):
         self.llm = llm
         self.tool_client = tool_client
         self.gateway = gateway
         self.state = SessionState()
         self._cycle_lock = asyncio.Lock()
+        self.translator = Translator(locale)
         
         # Wire the gateway callback to our input handler
         self.gateway.set_callback(self.handle_user_input)
+
+    def _t(self, key: str, **kwargs) -> str:
+        return self.translator.get(key, **kwargs)
 
     async def _display_thought(self, thought: str, phase: str) -> None:
         try:
@@ -387,20 +392,20 @@ class ChefDOrchestre:
             if not isinstance(payload_value, str) or not payload_value.strip():
                 await self._display_message(
                     "Secretarius",
-                    f"Commande {action} sans contenu exploitable.",
+                    self._t("errors.direct_command_empty", action=action),
                     phase="direct_command_empty",
                 )
-                self.state.messages.append(Message(role=Role.ASSISTANT, content=f"Commande {action} sans contenu exploitable."))
+                self.state.messages.append(Message(role=Role.ASSISTANT, content=self._t("errors.direct_command_empty", action=action)))
                 self.state.context_items.append(
-                    ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: Commande {action} sans contenu exploitable.")
+                    ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {self._t('errors.direct_command_empty', action=action)}")
                 )
                 self._trim_state()
                 return
             if action not in tool_names:
-                await self._display_message("Secretarius", NO_TOOL_FALLBACK_MESSAGE, phase="direct_command_tool_missing")
-                self.state.messages.append(Message(role=Role.ASSISTANT, content=NO_TOOL_FALLBACK_MESSAGE))
+                await self._display_message("Secretarius", self._t("errors.no_tool_fallback"), phase="direct_command_tool_missing")
+                self.state.messages.append(Message(role=Role.ASSISTANT, content=self._t("errors.no_tool_fallback")))
                 self.state.context_items.append(
-                    ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {NO_TOOL_FALLBACK_MESSAGE}")
+                    ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {self._t('errors.no_tool_fallback')}")
                 )
                 self._trim_state()
                 return
@@ -431,10 +436,10 @@ class ChefDOrchestre:
                         f"Failed to parse LLM JSON: {raw_response}",
                         phase="parse_json_error",
                     )
-                    await self._display_message("Secretarius", NO_TOOL_FALLBACK_MESSAGE, phase="no_tool_json_error")
-                    self.state.messages.append(Message(role=Role.ASSISTANT, content=NO_TOOL_FALLBACK_MESSAGE))
+                    await self._display_message("Secretarius", self._t("errors.no_tool_fallback"), phase="no_tool_json_error")
+                    self.state.messages.append(Message(role=Role.ASSISTANT, content=self._t("errors.no_tool_fallback")))
                     self.state.context_items.append(
-                        ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {NO_TOOL_FALLBACK_MESSAGE}")
+                        ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {self._t('errors.no_tool_fallback')}")
                     )
                     self._trim_state()
                     return
@@ -465,10 +470,10 @@ class ChefDOrchestre:
                             phase="no_matching_tool_default_index",
                         )
                         return
-                    await self._display_message("Secretarius", NO_TOOL_FALLBACK_MESSAGE, phase="no_matching_tool")
-                    self.state.messages.append(Message(role=Role.ASSISTANT, content=NO_TOOL_FALLBACK_MESSAGE))
+                    await self._display_message("Secretarius", self._t("errors.no_tool_fallback"), phase="no_matching_tool")
+                    self.state.messages.append(Message(role=Role.ASSISTANT, content=self._t("errors.no_tool_fallback")))
                     self.state.context_items.append(
-                        ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {NO_TOOL_FALLBACK_MESSAGE}")
+                        ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {self._t('errors.no_tool_fallback')}")
                     )
                     self._trim_state()
                     return
@@ -478,10 +483,10 @@ class ChefDOrchestre:
                         "Blocked ask_oracle: user did not explicitly request oracle usage.",
                         phase="oracle_policy_block",
                     )
-                    await self._display_message("Secretarius", NO_TOOL_FALLBACK_MESSAGE, phase="oracle_policy_block_stop")
-                    self.state.messages.append(Message(role=Role.ASSISTANT, content=NO_TOOL_FALLBACK_MESSAGE))
+                    await self._display_message("Secretarius", self._t("errors.no_tool_fallback"), phase="oracle_policy_block_stop")
+                    self.state.messages.append(Message(role=Role.ASSISTANT, content=self._t("errors.no_tool_fallback")))
                     self.state.context_items.append(
-                        ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {NO_TOOL_FALLBACK_MESSAGE}")
+                        ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {self._t('errors.no_tool_fallback')}")
                     )
                     self._trim_state()
                     return
@@ -496,10 +501,10 @@ class ChefDOrchestre:
                 action_input = sanitized_action_input
                 action_signature = f"{action}:{json.dumps(action_input, sort_keys=True, ensure_ascii=False)}"
                 if action_signature in called_actions_in_cycle:
-                    await self._display_message("Secretarius", NO_TOOL_FALLBACK_MESSAGE, phase="duplicate_action_guard")
-                    self.state.messages.append(Message(role=Role.ASSISTANT, content=NO_TOOL_FALLBACK_MESSAGE))
+                    await self._display_message("Secretarius", self._t("errors.no_tool_fallback"), phase="duplicate_action_guard")
+                    self.state.messages.append(Message(role=Role.ASSISTANT, content=self._t("errors.no_tool_fallback")))
                     self.state.context_items.append(
-                        ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {NO_TOOL_FALLBACK_MESSAGE}")
+                        ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {self._t('errors.no_tool_fallback')}")
                     )
                     self._trim_state()
                     return
@@ -516,10 +521,10 @@ class ChefDOrchestre:
                 )
                 return
 
-        await self._display_message("Secretarius", NO_TOOL_FALLBACK_MESSAGE, phase="max_tool_calls_reached")
-        self.state.messages.append(Message(role=Role.ASSISTANT, content=NO_TOOL_FALLBACK_MESSAGE))
+        await self._display_message("Secretarius", self._t("errors.no_tool_fallback"), phase="max_tool_calls_reached")
+        self.state.messages.append(Message(role=Role.ASSISTANT, content=self._t("errors.no_tool_fallback")))
         self.state.context_items.append(
-            ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {NO_TOOL_FALLBACK_MESSAGE}")
+            ContextItem(priority=Priority.SESSION_HISTORY, content=f"Assistant: {self._t('errors.no_tool_fallback')}")
         )
         self._trim_state()
 

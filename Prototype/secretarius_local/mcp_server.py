@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from localization import Translator
+
 try:
     from .expression_extractor import extract_expressions
 except ImportError:
@@ -98,6 +100,7 @@ _LAST_INPUT_MODE = "framed"
 _WARMUP_STARTED = False
 _KEYWORD_MATCH_BONUS = 0.1
 _TITLE_MATCH_BONUS = 0.05
+_TRANSLATOR = Translator(os.environ.get("SECRETARIUS_LOCALE", "fr"))
 
 
 @dataclass(frozen=True)
@@ -723,7 +726,7 @@ def _handle_index_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
     payload = {
         "status": "ok",
         "tool": "index_text",
-        "message": "Indexation complete (extraction + insertion semantic graph).",
+        "message": _TRANSLATOR.get("messages.index_complete"),
         "summary": {
             "expressions_count": extract_count,
             "collection_name": graph_payload.get("collection_name"),
@@ -782,7 +785,7 @@ def _handle_search_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
     payload = {
         "status": "ok",
         "tool": "search_text",
-        "message": "Recherche semantique executee.",
+        "message": _TRANSLATOR.get("messages.search_complete"),
         "query": query.strip(),
         "summary": {
             "collection_name": graph_payload.get("collection_name"),
@@ -843,7 +846,7 @@ def _handle_update_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
     payload = {
         "status": "ok",
         "tool": "update_text",
-        "message": "Mise a jour complete (suppression precedente + reindexation).",
+        "message": _TRANSLATOR.get("messages.update_complete"),
         "summary": {
             "expressions_count": extract_count,
             "collection_name": graph_payload.get("collection_name"),

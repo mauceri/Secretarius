@@ -1,3 +1,5 @@
+locale: "fr"
+
 llm:
   base_url: "http://localhost:11434"
   model: "qwen3.5:2B"

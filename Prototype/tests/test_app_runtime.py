@@ -84,6 +84,7 @@ class TestAppRuntime(unittest.IsolatedAsyncioTestCase):
             _FakeMCPClient.last_instance.env.get("SECRETARIUS_MILVUS_MIN_SCORE"),
             "0.42",
         )
+        self.assertEqual(_FakeMCPClient.last_instance.env.get("SECRETARIUS_LOCALE"), "fr")
 
 
 if __name__ == "__main__":

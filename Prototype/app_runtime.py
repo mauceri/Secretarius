@@ -8,6 +8,7 @@ from adapters.output.llm_ollama import OllamaAdapter
 from adapters.output.mcp_client import StdioMCPClient
 from core.chef_orchestre import ChefDOrchestre
 from core.ports import InputGatewayInterface
+from localization import DEFAULT_LOCALE
 
 
 def load_config(path: str) -> dict[str, Any]:
@@ -28,6 +29,7 @@ async def build_runtime(gateway: InputGatewayInterface, config_path: Path | None
     config = load_config(str(cfg_path))
 
     llm_config = config.get("llm", {})
+    locale = str(config.get("locale") or DEFAULT_LOCALE)
     llm_raw_log = llm_config.get("raw_log_file") or "logs/llm_raw.log"
     llm_adapter = OllamaAdapter(
         base_url=llm_config.get("base_url") or "http://localhost:11434",
@@ -43,6 +45,7 @@ async def build_runtime(gateway: InputGatewayInterface, config_path: Path | None
     mcp_log_path = _resolve_project_path(project_root, mcp_log_file)
     Path(mcp_log_path).parent.mkdir(parents=True, exist_ok=True)
     mcp_env = {"SECRETARIUS_MCP_LOG": mcp_log_path}
+    mcp_env["SECRETARIUS_LOCALE"] = locale
     if mcp_config.get("search_min_score") is not None:
         mcp_env["SECRETARIUS_MILVUS_MIN_SCORE"] = str(mcp_config.get("search_min_score"))
     if mcp_config.get("collection_name"):
@@ -59,6 +62,7 @@ async def build_runtime(gateway: InputGatewayInterface, config_path: Path | None
         llm=llm_adapter,
         tool_client=mcp_client,
         gateway=gateway,
+        locale=locale,
     )
 
     return {

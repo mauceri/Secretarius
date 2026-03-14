@@ -1,0 +1,7 @@
+errors:
+  no_tool_fallback: "No tool matches your request."
+  direct_command_empty: "Command {action} has no usable content."
+messages:
+  index_complete: "Indexing complete (extraction + semantic graph insertion)."
+  search_complete: "Semantic search completed."
+  update_complete: "Update complete (previous entries removed and content reindexed)."

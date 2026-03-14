@@ -265,6 +265,16 @@ class TestChefDOrchestre(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(tools.calls), 0)
         self.assertTrue(gateway.messages[-1][1].startswith("Commande extract_expressions sans contenu"))
 
+    async def test_english_locale_translates_direct_command_error(self):
+        llm = FakeLLM(['{"action":null,"action_input":{}}'])
+        tools = FakeToolClient()
+        gateway = FakeGateway()
+        orchestrator = ChefDOrchestre(llm=llm, tool_client=tools, gateway=gateway, locale="en")
+
+        await orchestrator.handle_user_input("/exp")
+
+        self.assertEqual(gateway.messages[-1], ("Secretarius", "Command extract_expressions has no usable content."))
+
     async def test_extract_expressions_drops_unsupported_args_without_rewriting(self):
         llm = FakeLLM(['{"action":"extract_expressions","action_input":{"document":"text","text":"Texte brut"}}'])
         tools = FakeToolClient()
