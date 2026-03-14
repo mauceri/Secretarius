@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 import json
 from pathlib import Path
 from typing import Any
 
 from pymilvus import DataType
 from pymilvus import MilvusClient
+import yaml
 
 
 DEFAULT_URI = "http://127.0.0.1:19530"
 DEFAULT_BATCH_SIZE = 500
+DEFAULT_COLLECTION = "secretarius_semantic_graph"
+DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[1] / "config.yaml"
 
 
 def _datatype_name(value: Any) -> str:
@@ -24,6 +28,43 @@ def _datatype_name(value: Any) -> str:
     if isinstance(value, str):
         return value
     return str(value)
+
+
+def _load_config(config_path: Path) -> dict[str, Any]:
+    if not config_path.exists():
+        return {}
+    data = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    return data if isinstance(data, dict) else {}
+
+
+def _collection_from_config(config_path: Path) -> str | None:
+    config = _load_config(config_path)
+    mcp_servers = config.get("mcp_servers")
+    if not isinstance(mcp_servers, dict):
+        return None
+    secretarius = mcp_servers.get("secretarius")
+    if not isinstance(secretarius, dict):
+        return None
+    collection_name = secretarius.get("collection_name")
+    if isinstance(collection_name, str) and collection_name.strip():
+        return collection_name.strip()
+    return None
+
+
+def _resolve_collection_name(collection_name: str | None, config_path: Path) -> str:
+    if isinstance(collection_name, str) and collection_name.strip():
+        return collection_name.strip()
+    from_config = _collection_from_config(config_path)
+    if from_config:
+        return from_config
+    return DEFAULT_COLLECTION
+
+
+def _default_export_path(collection_name: str, output_path: str | None) -> Path:
+    if isinstance(output_path, str) and output_path.strip():
+        return Path(output_path).expanduser().resolve()
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return (Path(__file__).resolve().parents[1] / "backups" / f"{collection_name}_{timestamp}.json").resolve()
 
 
 def _primary_field_name(description: dict[str, Any]) -> str:
@@ -296,11 +337,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Export or import a Milvus collection to/from a JSON file.")
     parser.add_argument("--uri", default=DEFAULT_URI, help="Milvus URI, default: http://127.0.0.1:19530")
     parser.add_argument("--token", default=None, help="Optional Milvus token")
+    parser.add_argument(
+        "--config",
+        default=str(DEFAULT_CONFIG_PATH),
+        help="Path to Prototype config.yaml used to resolve the current collection by default",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     export_parser = subparsers.add_parser("export", help="Export a collection into a JSON file")
-    export_parser.add_argument("--collection-name", required=True, help="Milvus collection name to export")
-    export_parser.add_argument("--output", required=True, help="JSON file to write")
+    export_parser.add_argument("--collection-name", default=None, help="Milvus collection name to export")
+    export_parser.add_argument("--output", default=None, help="JSON file to write")
     export_parser.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE, help="Query batch size")
 
     import_parser = subparsers.add_parser("import", help="Import a collection from a JSON file")
@@ -328,22 +374,26 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.command == "export":
+        config_path = Path(args.config).expanduser().resolve()
+        resolved_collection = _resolve_collection_name(args.collection_name, config_path)
+        resolved_output = _default_export_path(resolved_collection, args.output)
         output_path = export_collection(
             uri=args.uri,
             token=args.token,
-            collection_name=args.collection_name,
-            output_path=Path(args.output),
+            collection_name=resolved_collection,
+            output_path=resolved_output,
             batch_size=args.batch_size,
         )
         print(output_path)
         return 0
 
     if args.command == "import":
+        config_path = Path(args.config).expanduser().resolve()
         collection_name = import_collection(
             uri=args.uri,
             token=args.token,
             input_path=Path(args.input),
-            collection_name=args.collection_name,
+            collection_name=_resolve_collection_name(args.collection_name, config_path),
             batch_size=args.batch_size,
             drop_if_exists=args.drop_if_exists,
         )
@@ -351,10 +401,11 @@ def main() -> int:
         return 0
 
     if args.command == "drop":
+        config_path = Path(args.config).expanduser().resolve()
         deleted = drop_collection(
             uri=args.uri,
             token=args.token,
-            collection_name=args.collection_name,
+            collection_name=_resolve_collection_name(args.collection_name, config_path),
             require_exists=args.require_exists,
         )
         print("DROPPED" if deleted else "SKIPPED")

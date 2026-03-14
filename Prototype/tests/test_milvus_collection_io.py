@@ -57,6 +57,25 @@ class _FakeClient:
 
 
 class TestMilvusCollectionIO(unittest.TestCase):
+    def test_resolve_collection_name_uses_config_default(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config_path = Path(tmp_dir) / "config.yaml"
+            config_path.write_text(
+                "mcp_servers:\n  secretarius:\n    collection_name: secretarius_semantic_graph_test\n",
+                encoding="utf-8",
+            )
+
+            resolved = milvus_collection_io._resolve_collection_name(None, config_path)
+
+            self.assertEqual(resolved, "secretarius_semantic_graph_test")
+
+    def test_default_export_path_uses_collection_name_and_backups_dir(self):
+        path = milvus_collection_io._default_export_path("secretarius_semantic_graph_test", None)
+
+        self.assertEqual(path.parent.name, "backups")
+        self.assertTrue(path.name.startswith("secretarius_semantic_graph_test_"))
+        self.assertTrue(path.name.endswith(".json"))
+
     def test_build_schema_from_dump_uses_dynamic_fields_and_vector_dim(self):
         client = _FakeClient()
         dump = {

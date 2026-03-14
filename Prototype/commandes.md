@@ -189,8 +189,16 @@ cd /home/mauceric/Secretarius/Prototype
 source /home/mauceric/Secretarius/.venv/bin/activate
 
 python scripts/milvus_collection_io.py export \
-  --collection-name secretarius_semantic_graph \
   --output /tmp/secretarius_semantic_graph_dump.json
+```
+
+Par defaut :
+- si `--collection-name` n'est pas fourni, le script prend la collection courante definie dans `config.yaml` ;
+- si `--output` n'est pas fourni, le script cree un fichier dans `Prototype/backups/` avec un nom derive de la collection.
+
+Exemple implicite avec `config.yaml` :
+```bash
+python scripts/milvus_collection_io.py export
 ```
 
 ### Import
@@ -198,19 +206,21 @@ python scripts/milvus_collection_io.py export \
 ```bash
 python scripts/milvus_collection_io.py import \
   --input /tmp/secretarius_semantic_graph_dump.json \
-  --collection-name secretarius_semantic_graph_restored \
   --drop-if-exists
 ```
+
+Par defaut :
+- si `--collection-name` n'est pas fourni, l'import cible la collection courante definie dans `config.yaml`.
 
 ### Suppression propre
 
 ```bash
 python scripts/milvus_collection_io.py drop \
-  --collection-name secretarius_semantic_graph_restored \
   --require-exists
 ```
 
 Notes :
+- `--collection-name` reste prioritaire si vous voulez viser explicitement une autre collection que celle du `config.yaml` ;
 - l'import recree une collection compatible avec le dump ;
 - `--drop-if-exists` permet de remplacer une collection existante ;
 - `drop` affiche `DROPPED` si la collection a ete supprimee, sinon `SKIPPED` si elle n'existe pas et que `--require-exists` n'est pas demande.

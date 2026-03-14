@@ -45,6 +45,8 @@ async def build_runtime(gateway: InputGatewayInterface, config_path: Path | None
     mcp_env = {"SECRETARIUS_MCP_LOG": mcp_log_path}
     if mcp_config.get("search_min_score") is not None:
         mcp_env["SECRETARIUS_MILVUS_MIN_SCORE"] = str(mcp_config.get("search_min_score"))
+    if mcp_config.get("collection_name"):
+        mcp_env["SECRETARIUS_MILVUS_COLLECTION"] = str(mcp_config.get("collection_name"))
     mcp_client = StdioMCPClient(
         command=mcp_config.get("command") or sys.executable,
         args=mcp_config.get("args", ["tools/secretarius_server.py"]),
