@@ -775,13 +775,21 @@ def _handle_search_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
         min_score=arguments.get("min_score", _read_optional_float_env("SECRETARIUS_MILVUS_MIN_SCORE")),
     )
     graph_payload = result.get("search", {})
+    extract_payload = result.get("extract") if isinstance(result.get("extract"), dict) else {}
     query_document = result.get("document") if isinstance(result.get("document"), dict) else {}
     query_keywords = _extract_document_keywords(query_document)
     query_terms = _extract_query_terms(query)
+    query_expressions = _extract_query_expressions(extract_payload)
 
     hits = graph_payload.get("hits")
     hit_lists = len(hits) if isinstance(hits, list) else 0
-    documents = _extract_search_documents(hits, query_keywords=query_keywords, query_terms=query_terms)
+    documents = _extract_search_documents(
+        hits,
+        query_expressions=query_expressions,
+        query_keywords=query_keywords,
+        query_terms=query_terms,
+        min_score=graph_payload.get("min_score"),
+    )
     payload = {
         "status": "ok",
         "tool": "search_text",
@@ -791,6 +799,7 @@ def _handle_search_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
             "collection_name": graph_payload.get("collection_name"),
             "query_count": graph_payload.get("query_count", 0),
             "hit_lists": hit_lists,
+            "document_count": len(documents),
             "top_k": arguments.get("top_k", 10),
             "min_score": graph_payload.get("min_score"),
             "keyword_query_count": len(query_keywords),
@@ -866,19 +875,23 @@ def _handle_update_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
 def _extract_search_documents(
     hits: Any,
     *,
+    query_expressions: list[str] | None = None,
     query_keywords: list[str] | None = None,
     query_terms: list[str] | None = None,
+    min_score: float | None = None,
 ) -> list[Dict[str, Any]]:
     if not isinstance(hits, list):
         return []
 
     query_keyword_set = {value.lower() for value in (query_keywords or []) if isinstance(value, str) and value.strip()}
     query_term_set = {value.lower() for value in (query_terms or []) if isinstance(value, str) and value.strip()}
+    query_expression_list = [value.strip() for value in (query_expressions or []) if isinstance(value, str) and value.strip()]
     by_doc_id: dict[str, Dict[str, Any]] = {}
     anonymous_documents: list[Dict[str, Any]] = []
-    for hit_list in hits:
+    for query_idx, hit_list in enumerate(hits):
         if not isinstance(hit_list, list):
             continue
+        query_expression = query_expression_list[query_idx] if query_idx < len(query_expression_list) else None
         for hit in hit_list:
             if not isinstance(hit, dict):
                 continue
@@ -891,30 +904,194 @@ def _extract_search_documents(
                 except json.JSONDecodeError:
                     document = payload_json
             doc_id = document.get("doc_id") if isinstance(document, dict) else None
-            semantic_score = hit.get("score", entity.get("score", hit.get("distance", entity.get("distance"))))
+            semantic_score = _coerce_score(hit.get("score", entity.get("score", hit.get("distance", entity.get("distance")))))
             keyword_matches = _keyword_matches(document, query_keyword_set)
             title_matches = _title_matches(document, query_term_set)
-            keyword_bonus = len(keyword_matches) * _KEYWORD_MATCH_BONUS
-            title_bonus = _TITLE_MATCH_BONUS if title_matches else 0.0
-            combined_score = float(semantic_score) if isinstance(semantic_score, (int, float)) else 0.0
-            combined_score += keyword_bonus + title_bonus
-            record = {
-                "id": hit.get("id", entity.get("id")),
-                "score": semantic_score,
-                "combined_score": combined_score,
-                "keyword_matches": keyword_matches,
-                "document": document,
-            }
+            line_id = hit.get("id", entity.get("id"))
+            document_expression = _extract_source_expression(document)
+            match = _build_match_record(
+                query_expression=query_expression,
+                document_expression=document_expression,
+                score=semantic_score,
+                min_score=min_score,
+            )
             if not isinstance(doc_id, str) or not doc_id:
-                anonymous_documents.append(record)
+                anonymous_documents.append(
+                    _build_compact_search_document(
+                        document=document,
+                        matches=[match] if match is not None else [],
+                        best_vector_score=semantic_score,
+                        keyword_matches=keyword_matches,
+                        title_matches=title_matches,
+                        query_expression_count=len(query_expression_list),
+                        query_keyword_count=len(query_keyword_set),
+                    )
+                )
                 continue
-            previous = by_doc_id.get(doc_id)
-            if previous is None or record["combined_score"] > previous["combined_score"]:
-                by_doc_id[doc_id] = record
+            aggregate = by_doc_id.get(doc_id)
+            if aggregate is None:
+                aggregate = {
+                    "document": document,
+                    "best_vector_score": semantic_score,
+                    "keyword_matches": set(keyword_matches),
+                    "title_matches": title_matches,
+                    "matches": {},
+                }
+                by_doc_id[doc_id] = aggregate
+            else:
+                if semantic_score > aggregate["best_vector_score"]:
+                    aggregate["best_vector_score"] = semantic_score
+                aggregate["title_matches"] = aggregate["title_matches"] or title_matches
+                aggregate["keyword_matches"].update(keyword_matches)
+            if match is not None:
+                match_key = (match.get("query_expression"), match.get("document_expression"))
+                previous_match = aggregate["matches"].get(match_key)
+                if previous_match is None or match["score"] > previous_match["score"]:
+                    aggregate["matches"][match_key] = match
 
-    documents = list(by_doc_id.values()) + anonymous_documents
-    documents.sort(key=lambda item: item.get("combined_score", 0.0), reverse=True)
+    documents = [
+        _build_compact_search_document(
+            document=aggregate["document"],
+            matches=list(aggregate["matches"].values()),
+            best_vector_score=aggregate["best_vector_score"],
+            keyword_matches=sorted(aggregate["keyword_matches"]),
+            title_matches=aggregate["title_matches"],
+            query_expression_count=len(query_expression_list),
+            query_keyword_count=len(query_keyword_set),
+        )
+        for aggregate in by_doc_id.values()
+    ] + anonymous_documents
+    documents.sort(
+        key=lambda item: (
+            -item.get("global_score", 0.0),
+            -item.get("best_vector_score", 0.0),
+            str(item.get("doc_id") or ""),
+        )
+    )
     return documents
+
+
+def _extract_query_expressions(extract_payload: Any) -> list[str]:
+    if not isinstance(extract_payload, dict):
+        return []
+    expressions = extract_payload.get("expressions")
+    if not isinstance(expressions, list):
+        return []
+    out: list[str] = []
+    for value in expressions:
+        if isinstance(value, str) and value.strip():
+            out.append(value.strip())
+    return out
+
+
+def _coerce_score(value: Any) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _extract_source_expression(document: Any) -> str | None:
+    if not isinstance(document, dict):
+        return None
+    indexing = document.get("indexing")
+    if not isinstance(indexing, dict):
+        return None
+    value = indexing.get("source_expression")
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
+
+
+def _build_match_record(
+    *,
+    query_expression: str | None,
+    document_expression: str | None,
+    score: float,
+    min_score: float | None,
+) -> Dict[str, Any] | None:
+    if min_score is not None and score < min_score:
+        return None
+    match: Dict[str, Any] = {"score": score}
+    if isinstance(query_expression, str) and query_expression.strip():
+        match["query_expression"] = query_expression.strip()
+    if isinstance(document_expression, str) and document_expression.strip():
+        match["document_expression"] = document_expression.strip()
+    return match
+
+
+def _build_compact_search_document(
+    *,
+    document: Any,
+    matches: list[Dict[str, Any]],
+    best_vector_score: float,
+    keyword_matches: list[str],
+    title_matches: bool,
+    query_expression_count: int,
+    query_keyword_count: int,
+) -> Dict[str, Any]:
+    normalized_document = document if isinstance(document, dict) else {}
+    user_fields = normalized_document.get("user_fields") if isinstance(normalized_document.get("user_fields"), dict) else {}
+    source = normalized_document.get("source") if isinstance(normalized_document.get("source"), dict) else {}
+    content = normalized_document.get("content") if isinstance(normalized_document.get("content"), dict) else {}
+    expressions = expressions_from_document(normalized_document)
+    best_match = max(matches, key=lambda item: item.get("score", 0.0), default=None)
+    avg_match_score = (
+        sum(_coerce_score(match.get("score")) for match in matches) / len(matches)
+        if matches
+        else 0.0
+    )
+    matched_query_expressions = {
+        match.get("query_expression")
+        for match in matches
+        if isinstance(match.get("query_expression"), str) and match.get("query_expression")
+    }
+    query_coverage = (
+        len(matched_query_expressions) / query_expression_count
+        if query_expression_count > 0
+        else 0.0
+    )
+    keyword_overlap = (
+        len(keyword_matches) / query_keyword_count
+        if keyword_matches and query_keyword_count > 0
+        else 0.0
+    )
+    title_bonus = _TITLE_MATCH_BONUS if title_matches else 0.0
+    global_score = (
+        0.50 * best_vector_score
+        + 0.20 * avg_match_score
+        + 0.20 * query_coverage
+        + 0.10 * keyword_overlap
+        + title_bonus
+    )
+
+    compact_document: Dict[str, Any] = {
+        "doc_id": normalized_document.get("doc_id"),
+        "title": user_fields.get("title"),
+        "type": normalized_document.get("type"),
+        "document_date": user_fields.get("document_date"),
+        "url": _extract_primary_url(source),
+        "text": content.get("text"),
+        "keywords": _extract_document_keywords(normalized_document),
+        "expressions": expressions,
+        "best_match": best_match,
+        "matches": sorted(matches, key=lambda item: item.get("score", 0.0), reverse=True),
+        "best_vector_score": best_vector_score,
+        "global_score": global_score,
+    }
+    return compact_document
+
+
+def _extract_primary_url(source: dict[str, Any]) -> str | None:
+    url = source.get("url")
+    if isinstance(url, str) and url.strip():
+        return url.strip()
+    urls = source.get("urls")
+    if isinstance(urls, list):
+        for value in urls:
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return None
 
 
 def _extract_document_keywords(document: Any) -> list[str]:

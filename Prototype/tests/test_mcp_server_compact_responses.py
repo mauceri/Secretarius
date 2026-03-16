@@ -118,11 +118,22 @@ class TestMCPServerCompactResponses(unittest.TestCase):
     def test_search_text_is_compact_by_default(self, mock_search):
         mock_search.return_value = {
             "document": {"user_fields": {"keywords": ["#charniers"]}},
+            "extract": {"expressions": ["charniers"]},
             "search": {
                 "collection_name": "secretarius_semantic_graph",
                 "query_count": 1,
                 "min_score": 0.75,
-                "hits": [[{"id": "x", "score": 0.91, "entity": {"payload_json": "{\"doc_id\":\"d1\",\"content\":\"bonjour\"}"}}]],
+                "hits": [
+                    [
+                        {
+                            "id": "x",
+                            "score": 0.91,
+                            "entity": {
+                                "payload_json": "{\"doc_id\":\"d1\",\"type\":\"note\",\"content\":{\"text\":\"bonjour\"},\"user_fields\":{\"title\":\"Doc 1\",\"keywords\":[\"#charniers\"]},\"derived\":{\"expressions\":[{\"expression\":\"charniers\"}]},\"indexing\":{\"source_expression\":\"charniers\"}}"
+                            },
+                        }
+                    ]
+                ],
                 "warning": None,
             },
         }
@@ -132,11 +143,20 @@ class TestMCPServerCompactResponses(unittest.TestCase):
         self.assertEqual(payload.get("tool"), "search_text")
         self.assertIn("summary", payload)
         self.assertEqual(payload.get("summary", {}).get("min_score"), 0.75)
+        self.assertEqual(payload.get("summary", {}).get("document_count"), 1)
         self.assertEqual(payload.get("summary", {}).get("keyword_query_count"), 1)
+        self.assertEqual(payload.get("documents")[0]["doc_id"], "d1")
+        self.assertEqual(payload.get("documents")[0]["title"], "Doc 1")
+        self.assertEqual(payload.get("documents")[0]["expressions"], ["charniers"])
         self.assertEqual(
-            payload.get("documents"),
-            [{"id": "x", "score": 0.91, "combined_score": 0.91, "keyword_matches": [], "document": {"doc_id": "d1", "content": "bonjour"}}],
+            payload.get("documents")[0]["best_match"],
+            {
+                "query_expression": "charniers",
+                "document_expression": "charniers",
+                "score": 0.91,
+            },
         )
+        self.assertNotIn("derived", payload.get("documents")[0])
         self.assertNotIn("search", payload)
 
     @patch("secretarius_local.mcp_server.search_documents_by_text")
@@ -160,21 +180,35 @@ class TestMCPServerCompactResponses(unittest.TestCase):
     def test_extract_search_documents_dedupes_by_doc_id(self):
         hits = [
             [
-                {"id": "x1", "score": 0.91, "entity": {"payload_json": "{\"doc_id\":\"d1\",\"content\":\"bonjour\"}"}},
-                {"id": "x2", "score": 0.89, "entity": {"payload_json": "{\"doc_id\":\"d1\",\"content\":\"bonjour\"}"}},
-                {"id": "x3", "score": 0.88, "entity": {"payload_json": "{\"doc_id\":\"d2\",\"content\":\"salut\"}"}},
+                {
+                    "id": "x1",
+                    "score": 0.91,
+                    "entity": {
+                        "payload_json": "{\"doc_id\":\"d1\",\"content\":{\"text\":\"bonjour\"},\"derived\":{\"expressions\":[{\"expression\":\"bonjour\"}]},\"indexing\":{\"source_expression\":\"bonjour\"}}"
+                    },
+                },
+                {
+                    "id": "x2",
+                    "score": 0.89,
+                    "entity": {
+                        "payload_json": "{\"doc_id\":\"d1\",\"content\":{\"text\":\"bonjour\"},\"derived\":{\"expressions\":[{\"expression\":\"salut\"}]},\"indexing\":{\"source_expression\":\"salut\"}}"
+                    },
+                },
+                {
+                    "id": "x3",
+                    "score": 0.88,
+                    "entity": {
+                        "payload_json": "{\"doc_id\":\"d2\",\"content\":{\"text\":\"salut\"},\"derived\":{\"expressions\":[{\"expression\":\"salut\"}]},\"indexing\":{\"source_expression\":\"salut\"}}"
+                    },
+                },
             ]
         ]
 
-        documents = mcp_server._extract_search_documents(hits)
+        documents = mcp_server._extract_search_documents(hits, query_expressions=["bonjour"])
 
-        self.assertEqual(
-            documents,
-            [
-                {"id": "x1", "score": 0.91, "combined_score": 0.91, "keyword_matches": [], "document": {"doc_id": "d1", "content": "bonjour"}},
-                {"id": "x3", "score": 0.88, "combined_score": 0.88, "keyword_matches": [], "document": {"doc_id": "d2", "content": "salut"}},
-            ],
-        )
+        self.assertEqual([document["doc_id"] for document in documents], ["d1", "d2"])
+        self.assertEqual(len(documents[0]["matches"]), 2)
+        self.assertEqual(documents[0]["best_match"]["score"], 0.91)
 
     def test_extract_search_documents_reranks_with_keyword_bonus(self):
         hits = [
@@ -198,9 +232,9 @@ class TestMCPServerCompactResponses(unittest.TestCase):
 
         documents = mcp_server._extract_search_documents(hits, query_keywords=["#stoicisme"], query_terms=[])
 
-        self.assertEqual(documents[0]["document"]["doc_id"], "d1")
-        self.assertEqual(documents[0]["keyword_matches"], ["#stoicisme"])
-        self.assertGreater(documents[0]["combined_score"], documents[1]["combined_score"])
+        self.assertEqual(documents[0]["doc_id"], "d1")
+        self.assertEqual(documents[0]["keywords"], ["#stoicisme"])
+        self.assertGreater(documents[0]["global_score"], documents[1]["global_score"])
 
     @patch("secretarius_local.mcp_server.update_document_text")
     def test_update_text_is_compact_by_default(self, mock_update):
