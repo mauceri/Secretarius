@@ -1,0 +1,280 @@
+{
+  "status": "ok",
+  "tool": "search_text",
+  "message": "Recherche semantique executee.",
+  "query": "cavalerie",
+  "summary": {
+    "collection_name": "secretarius_semantic_graph",
+    "query_count": 1,
+    "hit_lists": 1,
+    "top_k": 10,
+    "min_score": 0.75,
+    "keyword_query_count": 0
+  },
+  "documents": [
+    {
+      "id": 8048787132151029227,
+      "score": 0.962354838848114,
+      "combined_score": 0.962354838848114,
+      "keyword_matches": [],
+      "document": {
+        "schema": "secretarius.document.v0.1",
+        "doc_id": "doc:3da739c3da977f3131bb88db64c4eb2f3ffc4fc79c50d4e1d074af8cb71dde7d",
+        "type": "url",
+        "source": {
+          "urls": [
+            "https://archives.mil.ru/operations/boudienny_march_1920"
+          ],
+          "url": "https://archives.mil.ru/operations/boudienny_march_1920",
+          "source_id": "src:af6d2d2f9bc47e6e3c3066ad933735eec7e6530db328d38399d41062f589be6d"
+        },
+        "content": {
+          "text": "La marche de Boudienny, menée par le commandant de cavalerie soviétique Semion Boudienny, fut une opération décisive durant la guerre civile russe. En octobre 1920, ses unités de cavalerie, les fameux *Konarmia*, percèrent les lignes des Armées Blanches dans le sud de la Russie. Cette manœuvre rapide et audacieuse permit de désorganiser les arrières ennemis et de sécuriser des territoires clés pour l'Armée rouge. L'exploit contribua à renforcer la légende de Boudienny et démontra l'efficacité des grandes formations de cavalerie dans ce conflit.",
+          "hash": "sha256:56e175da8178433218079d6cf02e9bf8958ff45bb9dcfa538fe81a9e92753627"
+        },
+        "user_fields": {
+          "type_note": "fugace",
+          "title": "La marche de Boudienny, menée par le...",
+          "document_date": "12-10-1920",
+          "keywords": [
+            "#Boudienny",
+            "#cavalerie",
+            "#guerre_civile",
+            "#URSS",
+            "#stratégie"
+          ],
+          "updated_at": "2026-03-14T16:43:56Z",
+          "created_at": "2026-03-14T16:43:46Z"
+        },
+        "derived": {
+          "chunks": [
+            {
+              "chunk_id": "chunk:920667993f82ee887aecce9290e42d7bd56f82918a37b5190608ebdd5ff1b52f",
+              "start": 0,
+              "end": 550,
+              "text_ref": null
+            }
+          ],
+          "expressions": [
+            {
+              "expression": "marche de Boudienny",
+              "span": [
+                3,
+                22
+              ],
+              "weight": null,
+              "norm": "marche de boudienny",
+              "embedding_ref": "emb:8c5346b9148ca7cbdd9d4467777feffcda62f52efec6f53e7f4cdf31ede80434"
+            },
+            {
+              "expression": "commandant de cavalerie soviétique Semion Boudienny",
+              "span": [
+                37,
+                88
+              ],
+              "weight": null,
+              "norm": "commandant de cavalerie soviétique semion boudienny",
+              "embedding_ref": "emb:634d8845ca29bafa7caec22660199cdae20e21c0fbe9d61631def6c6ea1ace0f"
+            },
+            {
+              "expression": "guerre civile russe",
+              "span": [
+                127,
+                146
+              ],
+              "weight": null,
+              "norm": "guerre civile russe",
+              "embedding_ref": "emb:30ae4ed88515021647d446ff6f170bdf20e9a82799b544e0adcc926b8b565f88"
+            },
+            {
+              "expression": "octobre 1920",
+              "span": [
+                151,
+                163
+              ],
+              "weight": null,
+              "norm": "octobre 1920",
+              "embedding_ref": "emb:5adb67cb1f515b988a0fcb7f6b44b457002f5699caa84537caf910f958d30093"
+            },
+            {
+              "expression": "unités de cavalerie",
+              "span": [
+                169,
+                188
+              ],
+              "weight": null,
+              "norm": "unités de cavalerie",
+              "embedding_ref": "emb:9565af107af54e0ab8c071dac49b2e03f20cf9192156cd9b6fa595334b99a288"
+            },
+            {
+              "expression": "Armées Blanches",
+              "span": [
+                238,
+                253
+              ],
+              "weight": null,
+              "norm": "armées blanches",
+              "embedding_ref": "emb:4c8dcb816dc467478bd1697c3556a0f4b83c6030e7a8827bd7d7ca8fdeb7c879"
+            },
+            {
+              "expression": "territoires clés",
+              "span": [
+                380,
+                396
+              ],
+              "weight": null,
+              "norm": "territoires clés",
+              "embedding_ref": "emb:c735301ef986e041c280f9be47b11d0f0b3c638485b2cd3bc58b2d75d468d857"
+            },
+            {
+              "expression": "Armée rouge",
+              "span": [
+                404,
+                415
+              ],
+              "weight": null,
+              "norm": "armée rouge",
+              "embedding_ref": "emb:1fa85bf5bf98ee21fa8a9a41adf90572112bb0e8ca82548e30598d859cc8b847"
+            },
+            {
+              "expression": "légende de Boudienny",
+              "span": [
+                452,
+                472
+              ],
+              "weight": null,
+              "norm": "légende de boudienny",
+              "embedding_ref": "emb:39487f1ba1735e9bc522312bf4f45e1ecc747f1de47e341219e5b5217c1398f1"
+            },
+            {
+              "expression": "grandes formations de cavalerie",
+              "span": [
+                502,
+                533
+              ],
+              "weight": null,
+              "norm": "grandes formations de cavalerie",
+              "embedding_ref": "emb:9976f5aa6ca06c24c09410d1be5ac56ba1bdf1bd02f3308482133a8ff865468f"
+            }
+          ]
+        },
+        "indexing": {
+          "pipeline_version": "v0.1",
+          "state": "done",
+          "errors": [],
+          "source": "document_pipeline:index_text",
+          "source_expression_idx": 4,
+          "source_expression": "unités de cavalerie"
+        }
+      }
+    },
+    {
+      "id": 4288251992852010333,
+      "score": 0.8982072472572327,
+      "combined_score": 0.8982072472572327,
+      "keyword_matches": [],
+      "document": {
+        "schema": "secretarius.document.v0.1",
+        "doc_id": "doc:743d34af6bab3d2e2e4fb0036c9d9f1ef2f83c4355b399a5956ba4242794b887",
+        "type": "note",
+        "source": {
+          "urls": [],
+          "source_id": "src:38e8fb4bd807a3b24b0d8ae14ae3686d6aace5509c0269fe9bd3ebd9498886fe"
+        },
+        "content": {
+          "text": "La Marche de Boudienny est une célèbre marche militaire soviétique, composée en l'honneur de Semion Boudienny, commandant de la Première Armée de cavalerie pendant la guerre civile russe. Elle évoque le galop des chevaux et l'avancée irrésistible des cavaliers rouges. Son rythme entraînant et ses accents héroïques en ont fait un symbole de l'Armée rouge naissante. Aujourd'hui encore, elle est jouée lors de cérémonies militaires en Russie et reste associée à l'épopée révolutionnaire.",
+          "hash": "sha256:38e49fdccf62f1905dc581621aebb7263ef536342c4409b97ccb73fe81274d2d"
+        },
+        "user_fields": {
+          "type_note": "fugace",
+          "title": "La Marche de Boudienny",
+          "document_date": "12-10-1920",
+          "keywords": [],
+          "updated_at": "2026-03-14T16:40:02Z",
+          "created_at": "2026-03-14T16:39:55Z"
+        },
+        "derived": {
+          "chunks": [
+            {
+              "chunk_id": "chunk:98bfc7a1b12d6e90a551c794335678237aa5819397ccc6035b36ca37d8a80f10",
+              "start": 0,
+              "end": 487,
+              "text_ref": null
+            }
+          ],
+          "expressions": [
+            {
+              "expression": "Marche de Boudienny",
+              "span": [
+                3,
+                22
+              ],
+              "weight": null,
+              "norm": "marche de boudienny",
+              "embedding_ref": "emb:4f35aae239dbfb2568eebae32b3207f9690cab5fbe2d8883f628563b0828e43c"
+            },
+            {
+              "expression": "Semion Boudienny",
+              "span": [
+                93,
+                109
+              ],
+              "weight": null,
+              "norm": "semion boudienny",
+              "embedding_ref": "emb:135c6d292db4beaf5a37ca29171cdd6b60d49a9d9a11bb3c3875167c0a6dcca3"
+            },
+            {
+              "expression": "Première Armée de cavalerie",
+              "span": [
+                128,
+                155
+              ],
+              "weight": null,
+              "norm": "première armée de cavalerie",
+              "embedding_ref": "emb:c6d23d5ed43f0908299266749afbd48814ca7ae57cd46af3ab32140d1441c8bb"
+            },
+            {
+              "expression": "guerre civile russe",
+              "span": [
+                167,
+                186
+              ],
+              "weight": null,
+              "norm": "guerre civile russe",
+              "embedding_ref": "emb:8cd0b4b3528d4caaaded11b2212cb24d4b669a14231b6047c4ddd4b0e1525ab6"
+            },
+            {
+              "expression": "Armée rouge naissante",
+              "span": [
+                344,
+                365
+              ],
+              "weight": null,
+              "norm": "armée rouge naissante",
+              "embedding_ref": "emb:bdd1d2b3851498c7bf29d875c9bb6d08773324b88cc05c2fa6e9bb35c24b8790"
+            },
+            {
+              "expression": "épopée révolutionnaire",
+              "span": [
+                464,
+                486
+              ],
+              "weight": null,
+              "norm": "épopée révolutionnaire",
+              "embedding_ref": "emb:26563dc7e33f8f2216447933ccf4f14506f8d16048d150b60acb207a476ef203"
+            }
+          ]
+        },
+        "indexing": {
+          "pipeline_version": "v0.1",
+          "state": "done",
+          "errors": [],
+          "source": "document_pipeline:index_text",
+          "source_expression_idx": 2,
+          "source_expression": "Première Armée de cavalerie"
+        }
+      }
+    }
+  ],
+  "warning": null
+}

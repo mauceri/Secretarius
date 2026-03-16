@@ -23,7 +23,7 @@ def semantic_graph_search_milvus(
     collection_name: str = DEFAULT_COLLECTION,
     metric_type: str = DEFAULT_METRIC_TYPE,
 ) -> dict[str, Any]:
-    normalized = _normalize_embeddings(embeddings)
+    normalized = _sanitize_embeddings(embeddings)
     if not normalized:
         return {
             "graph": {"nodes": [], "edges": []},
@@ -203,7 +203,7 @@ def semantic_graph_delete_doc(
     return len(ids_to_delete)
 
 
-def _normalize_embeddings(embeddings: Any) -> list[list[float]]:
+def _sanitize_embeddings(embeddings: Any) -> list[list[float]]:
     if not isinstance(embeddings, list):
         return []
     valid: list[list[float]] = []
