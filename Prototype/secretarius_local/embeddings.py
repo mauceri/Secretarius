@@ -9,7 +9,7 @@ from typing import Any
 MODULE_ROOT = Path(__file__).resolve().parent
 
 try:
-    from .runtime_paths import DEFAULT_SENTENCE_MODEL, resolve_sentence_model_path
+    from .runtime_paths import DEFAULT_SENTENCE_MODEL, resolve_sentence_model_override, resolve_sentence_model_path
 except ImportError:
     _RUNTIME_PATHS = MODULE_ROOT / "runtime_paths.py"
     _RUNTIME_PATHS_SPEC = importlib.util.spec_from_file_location("secretarius_runtime_paths", _RUNTIME_PATHS)
@@ -19,6 +19,7 @@ except ImportError:
     sys.modules[_RUNTIME_PATHS_SPEC.name] = _runtime_paths_module
     _RUNTIME_PATHS_SPEC.loader.exec_module(_runtime_paths_module)
     DEFAULT_SENTENCE_MODEL = _runtime_paths_module.DEFAULT_SENTENCE_MODEL
+    resolve_sentence_model_override = _runtime_paths_module.resolve_sentence_model_override
     resolve_sentence_model_path = _runtime_paths_module.resolve_sentence_model_path
 
 DEFAULT_MODEL = DEFAULT_SENTENCE_MODEL
@@ -84,7 +85,7 @@ def embed_expressions_multilingual(
 
 def _load_encoder(model: str | None) -> tuple[Any | None, str | None]:
     global _CACHED_MODEL, _CACHED_MODEL_NAME
-    model_name = model or DEFAULT_MODEL
+    model_name = model or resolve_sentence_model_override() or DEFAULT_MODEL
     if _CACHED_MODEL is not None and _CACHED_MODEL_NAME == model_name:
         return _CACHED_MODEL, None
 
@@ -107,5 +108,5 @@ def _load_encoder(model: str | None) -> tuple[Any | None, str | None]:
         return None, f"unable to initialize sentence-transformers model: {exc}"
 
     _CACHED_MODEL = encoder
-    _CACHED_MODEL_NAME = model or DEFAULT_MODEL
+    _CACHED_MODEL_NAME = model_name
     return encoder, None

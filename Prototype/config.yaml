@@ -40,10 +40,27 @@ session_messenger:
   journal_file: "logs/session_messenger.log"
   request_timeout_s: 120
 
+memos:
+  enabled: true
+  host: "0.0.0.0"
+  port: 8004
+  base_url: "http://sanroque:5230"
+  access_token: "memos_pat_DYSjvpiJ2gYMY77XziBfcnuwTp4eouWR"
+  webhook_token: "q1**U&Qbs4JMu@g&C@^Z"
+  ignored_creator: ""
+  response_visibility: "PUBLIC"
+  journal_file: "logs/memos.log"
+  request_timeout_s: 120
+  publish_timeout_s: 30
+
 mcp_servers:
   secretarius:
     command: "python"
     args: ["-m", "secretarius_local.mcp_server"]
     log_file: "logs/mcp_server.log"
-    search_min_score: 0.75
+    semantic_graph_log_file: "logs/semantic_graph.log"
+    sentence_model: "BAAI/bge-m3"
+    local_files_only: false
+    top_k: 20
+    search_min_score: 0.1
     collection_name: "secretarius_semantic_graph"

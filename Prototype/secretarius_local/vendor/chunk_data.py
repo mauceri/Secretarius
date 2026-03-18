@@ -136,7 +136,7 @@ class SemanticChunker:
     """
     def __init__(
         self,
-        model_name: str = "paraphrase-multilingual-MiniLM-L12-v2",
+        model_name: str = "BAAI/bge-m3",
         batch_size: int = 64,
         max_words: int = 450,
         min_words_for_semantic_cut: int = 140,
@@ -437,7 +437,7 @@ def main():
     p.add_argument("--output", required=True, help="JSONL output (avec champ 'chunks')")
 
     # Embeddings / modèle
-    p.add_argument("--model", default="paraphrase-multilingual-MiniLM-L12-v2")
+    p.add_argument("--model", default="BAAI/bge-m3")
     p.add_argument("--batch-size", type=int, default=64)
 
     # Chunking sémantique

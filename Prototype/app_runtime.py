@@ -42,9 +42,26 @@ async def build_runtime(gateway: InputGatewayInterface, config_path: Path | None
     mcp_servers = config.get("mcp_servers", {})
     mcp_config = mcp_servers.get("secretarius") or mcp_servers.get("oracle", {})
     mcp_log_file = mcp_config.get("log_file") or "logs/mcp_server.log"
+    semantic_graph_log_file = mcp_config.get("semantic_graph_log_file")
+    sentence_model = mcp_config.get("sentence_model")
+    local_files_only = mcp_config.get("local_files_only")
+    mcp_top_k = mcp_config.get("top_k")
     mcp_log_path = _resolve_project_path(project_root, mcp_log_file)
     Path(mcp_log_path).parent.mkdir(parents=True, exist_ok=True)
     mcp_env = {"SECRETARIUS_MCP_LOG": mcp_log_path}
+    if semantic_graph_log_file:
+        semantic_graph_log_path = _resolve_project_path(project_root, semantic_graph_log_file)
+        Path(semantic_graph_log_path).parent.mkdir(parents=True, exist_ok=True)
+        mcp_env["SECRETARIUS_SEMANTIC_GRAPH_LOG"] = semantic_graph_log_path
+    if isinstance(sentence_model, str) and sentence_model.strip():
+        mcp_env["SECRETARIUS_SENTENCE_MODEL"] = sentence_model.strip()
+    if isinstance(local_files_only, bool):
+        mcp_env["SECRETARIUS_LOCAL_FILES_ONLY"] = "1" if local_files_only else "0"
+        if not local_files_only:
+            mcp_env["HF_HUB_OFFLINE"] = "0"
+            mcp_env["TRANSFORMERS_OFFLINE"] = "0"
+    if isinstance(mcp_top_k, int) and mcp_top_k >= 1:
+        mcp_env["SECRETARIUS_MILVUS_TOP_K"] = str(mcp_top_k)
     mcp_env["SECRETARIUS_LOCALE"] = locale
     if mcp_config.get("search_min_score") is not None:
         mcp_env["SECRETARIUS_MILVUS_MIN_SCORE"] = str(mcp_config.get("search_min_score"))

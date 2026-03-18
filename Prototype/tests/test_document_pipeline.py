@@ -187,6 +187,61 @@ class TestDocumentPipeline(unittest.TestCase):
         self.assertEqual(mock_search.call_args.kwargs["optional_keywords"], ["#trauma"])
         self.assertEqual(mock_search.call_args.kwargs["excluded_keywords"], ["#brouillon"])
 
+    @patch("secretarius_local.document_pipeline.semantic_graph_search_milvus")
+    @patch("secretarius_local.document_pipeline.embed_expressions_multilingual")
+    @patch("secretarius_local.document_pipeline.extract_expressions")
+    def test_index_document_surfaces_embedding_failure_without_calling_semantic_graph(
+        self,
+        mock_extract,
+        mock_embed,
+        mock_search,
+    ):
+        mock_extract.return_value = {
+            "chunks": ["Corps documentaire"],
+            "by_chunk": [{"id": 0, "expressions": ["alpha"]}],
+            "expressions": ["alpha"],
+            "warning": None,
+        }
+        mock_embed.return_value = {
+            "embeddings": [],
+            "dimension": 0,
+            "model": "BAAI/bge-m3",
+            "warning": "unable to initialize sentence-transformers model: test error",
+        }
+
+        result = document_pipeline.index_document_text("Titre\nCorps documentaire")
+
+        mock_search.assert_not_called()
+        self.assertEqual(
+            result["index"]["warning"],
+            "unable to initialize sentence-transformers model: test error",
+        )
+
+    @patch("secretarius_local.document_pipeline.semantic_graph_search_milvus")
+    @patch("secretarius_local.document_pipeline.embed_expressions_multilingual")
+    @patch("secretarius_local.document_pipeline.extract_expressions")
+    def test_search_document_surfaces_embedding_failure_without_calling_semantic_graph(
+        self,
+        mock_extract,
+        mock_embed,
+        mock_search,
+    ):
+        mock_extract.return_value = {
+            "expressions": ["memoire autobiographique"],
+            "warning": None,
+        }
+        mock_embed.return_value = {
+            "embeddings": [],
+            "dimension": 0,
+            "model": "BAAI/bge-m3",
+            "warning": "embedding encode failed: test error",
+        }
+
+        result = document_pipeline.search_documents_by_text("memoire autobiographique")
+
+        mock_search.assert_not_called()
+        self.assertEqual(result["search"]["warning"], "embedding encode failed: test error")
+
 
 if __name__ == "__main__":
     unittest.main()

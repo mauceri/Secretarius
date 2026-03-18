@@ -2,7 +2,36 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
+import os
 from typing import Any
+
+logger = logging.getLogger(__name__)
+
+
+def _configure_logger() -> None:
+    log_path = (os.environ.get("SECRETARIUS_SEMANTIC_GRAPH_LOG") or "").strip()
+    if not log_path:
+        return
+
+    target_path = os.path.abspath(log_path)
+    for handler in logger.handlers:
+        if isinstance(handler, logging.FileHandler) and getattr(handler, "baseFilename", None) == target_path:
+            return
+
+    try:
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+        handler = logging.FileHandler(target_path, encoding="utf-8")
+    except OSError:
+        return
+
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s [%(name)s] %(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+
+
+_configure_logger()
 
 DEFAULT_MILVUS_URI = "http://127.0.0.1:19530"
 DEFAULT_COLLECTION = "secretarius_semantic_graph"
@@ -13,7 +42,7 @@ def semantic_graph_search_milvus(
     embeddings: list[list[float]],
     *,
     documents: list[dict[str, Any]] | None = None,
-    top_k: int = 10,
+    top_k: int | None = None,
     min_score: float | None = None,
     required_keywords: list[str] | None = None,
     optional_keywords: list[str] | None = None,
@@ -23,8 +52,10 @@ def semantic_graph_search_milvus(
     collection_name: str = DEFAULT_COLLECTION,
     metric_type: str = DEFAULT_METRIC_TYPE,
 ) -> dict[str, Any]:
+    resolved_top_k = _resolve_top_k(top_k)
     normalized = _normalize_embeddings(embeddings)
     if not normalized:
+        logger.warning("semantic_graph_search skipped: no valid embeddings")
         return {
             "graph": {"nodes": [], "edges": []},
             "hits": [],
@@ -39,6 +70,7 @@ def semantic_graph_search_milvus(
     docs = documents if isinstance(documents, list) else []
     dim = len(normalized[0])
     if any(len(v) != dim for v in normalized):
+        logger.warning("semantic_graph_search skipped: inconsistent embedding dimensions")
         return {
             "graph": {"nodes": [], "edges": []},
             "hits": [],
@@ -54,6 +86,7 @@ def semantic_graph_search_milvus(
 
     client_class = _resolve_milvus_client()
     if client_class is None:
+        logger.warning("semantic_graph_search unavailable: pymilvus import failed")
         return {
             "graph": {"nodes": [], "edges": []},
             "hits": [],
@@ -68,6 +101,7 @@ def semantic_graph_search_milvus(
     try:
         client = client_class(uri=uri, token=token)
     except Exception as exc:
+        logger.exception("semantic_graph_search connection failed collection=%s uri=%s", collection_name, uri)
         return {
             "graph": {"nodes": [], "edges": []},
             "hits": [],
@@ -87,6 +121,12 @@ def semantic_graph_search_milvus(
             metric_type=effective_metric,
         )
     except Exception as exc:
+        logger.exception(
+            "semantic_graph_search unable to ensure collection=%s dim=%s metric=%s",
+            collection_name,
+            dim,
+            effective_metric,
+        )
         return {
             "graph": {"nodes": [], "edges": []},
             "hits": [],
@@ -111,6 +151,11 @@ def semantic_graph_search_milvus(
             inserted_count = upsert_stats["upserted_count"]
             deleted_count = upsert_stats["deleted_count"]
         except Exception as exc:
+            logger.exception(
+                "semantic_graph_search upsert failed collection=%s documents=%s",
+                collection_name,
+                len(docs),
+            )
             return {
                 "graph": {"nodes": [], "edges": []},
                 "hits": [],
@@ -131,11 +176,18 @@ def semantic_graph_search_milvus(
         raw_hits = client.search(
             collection_name=collection_name,
             data=normalized,
-            limit=top_k,
+            limit=resolved_top_k,
             output_fields=["payload_json", "source_idx"],
             filter=search_filter,
         )
     except Exception as exc:
+        logger.exception(
+            "semantic_graph_search failed collection=%s queries=%s top_k=%s filter=%r",
+            collection_name,
+            len(normalized),
+            resolved_top_k,
+            search_filter,
+        )
         return {
             "graph": {"nodes": [], "edges": []},
             "hits": [],
@@ -149,6 +201,14 @@ def semantic_graph_search_milvus(
 
     filtered_hits = _filter_hits_by_min_score(raw_hits, min_score=min_score)
     graph = _build_graph_from_hits(filtered_hits)
+    logger.info(
+        "semantic_graph_search completed collection=%s queries=%s top_k=%s inserted=%s deleted=%s",
+        collection_name,
+        len(normalized),
+        resolved_top_k,
+        inserted_count,
+        deleted_count,
+    )
     return {
         "graph": graph,
         "hits": filtered_hits,
@@ -158,6 +218,7 @@ def semantic_graph_search_milvus(
         "collection_name": collection_name,
         "metric_type": effective_metric,
         "min_score": min_score,
+        "top_k": resolved_top_k,
         "warning": None,
     }
 
@@ -171,18 +232,22 @@ def semantic_graph_delete_doc(
 ) -> int:
     normalized_doc_id = doc_id.strip() if isinstance(doc_id, str) else ""
     if not normalized_doc_id:
+        logger.warning("semantic_graph_delete_doc skipped: empty doc_id")
         return 0
 
     client_class = _resolve_milvus_client()
     if client_class is None:
+        logger.warning("semantic_graph_delete_doc unavailable: pymilvus import failed")
         return 0
 
     try:
         client = client_class(uri=uri, token=token)
     except Exception:
+        logger.exception("semantic_graph_delete_doc connection failed collection=%s uri=%s", collection_name, uri)
         return 0
 
     if not client.has_collection(collection_name=collection_name):
+        logger.info("semantic_graph_delete_doc skipped: missing collection=%s", collection_name)
         return 0
 
     existing = client.query(
@@ -196,11 +261,17 @@ def semantic_graph_delete_doc(
             if isinstance(row, dict) and isinstance(row.get("id"), int):
                 ids_to_delete.append(row["id"])
     if not ids_to_delete:
+        logger.info("semantic_graph_delete_doc no-op: doc_id=%s collection=%s", normalized_doc_id, collection_name)
         return 0
     result = client.delete(collection_name=collection_name, ids=ids_to_delete)
-    if isinstance(result, dict):
-        return int(result.get("delete_count", len(ids_to_delete)))
-    return len(ids_to_delete)
+    deleted_count = int(result.get("delete_count", len(ids_to_delete))) if isinstance(result, dict) else len(ids_to_delete)
+    logger.info(
+        "semantic_graph_delete_doc completed doc_id=%s collection=%s deleted=%s",
+        normalized_doc_id,
+        collection_name,
+        deleted_count,
+    )
+    return deleted_count
 
 
 def _normalize_embeddings(embeddings: Any) -> list[list[float]]:
@@ -215,6 +286,20 @@ def _normalize_embeddings(embeddings: Any) -> list[list[float]]:
         except (TypeError, ValueError):
             continue
     return valid
+
+
+def _resolve_top_k(top_k: Any) -> int:
+    if isinstance(top_k, int) and top_k >= 1:
+        return top_k
+    raw = (os.environ.get("SECRETARIUS_MILVUS_TOP_K") or "").strip()
+    if raw:
+        try:
+            parsed = int(raw)
+        except ValueError:
+            parsed = 0
+        if parsed >= 1:
+            return parsed
+    return 10
 
 
 def _resolve_metric_type(metric_type: str) -> str:

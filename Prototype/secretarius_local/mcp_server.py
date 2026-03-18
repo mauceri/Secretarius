@@ -552,7 +552,7 @@ def _handle_semantic_graph_search(arguments: Dict[str, Any]) -> Dict[str, Any]:
     documents = arguments.get("documents", [])
     normalized_doc = normalize_document(arguments.get("document")) if isinstance(arguments.get("document"), dict) else None
     upsert = arguments.get("upsert", True)
-    top_k = arguments.get("top_k", 10)
+    top_k = _resolve_top_k_argument(arguments)
     embed_model = arguments.get("model")
     normalize = arguments.get("normalize", True)
     batch_size = arguments.get("batch_size", 32)
@@ -668,6 +668,7 @@ def _handle_semantic_graph_search(arguments: Dict[str, Any]) -> Dict[str, Any]:
         "metric_type": result.get("metric_type", metric_type),
         "inserted_count": result.get("inserted_count", 0),
         "query_count": result.get("query_count", 0),
+        "top_k": result.get("top_k", top_k),
         "graph": graph,
         "hits": result.get("hits", []),
         "message": "Recherche/insertions semantiques via Milvus.",
@@ -713,7 +714,7 @@ def _handle_index_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
         collection_name=arguments.get("collection_name")
         or os.environ.get("SECRETARIUS_MILVUS_COLLECTION", "secretarius_semantic_graph"),
         metric_type=arguments.get("metric_type") or os.environ.get("SECRETARIUS_MILVUS_METRIC", "COSINE"),
-        top_k=arguments.get("top_k", 10),
+        top_k=_resolve_top_k_argument(arguments),
     )
     extract_payload = result.get("extract", {})
     graph_payload = result.get("index", {})
@@ -771,7 +772,7 @@ def _handle_search_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
         collection_name=arguments.get("collection_name")
         or os.environ.get("SECRETARIUS_MILVUS_COLLECTION", "secretarius_semantic_graph"),
         metric_type=arguments.get("metric_type") or os.environ.get("SECRETARIUS_MILVUS_METRIC", "COSINE"),
-        top_k=arguments.get("top_k", 10),
+        top_k=_resolve_top_k_argument(arguments),
         min_score=arguments.get("min_score", _read_optional_float_env("SECRETARIUS_MILVUS_MIN_SCORE")),
     )
     graph_payload = result.get("search", {})
@@ -800,7 +801,7 @@ def _handle_search_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
             "query_count": graph_payload.get("query_count", 0),
             "hit_lists": hit_lists,
             "document_count": len(documents),
-            "top_k": arguments.get("top_k", 10),
+            "top_k": graph_payload.get("top_k", _resolve_top_k_argument(arguments)),
             "min_score": graph_payload.get("min_score"),
             "keyword_query_count": len(query_keywords),
         },
@@ -843,7 +844,7 @@ def _handle_update_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
         collection_name=arguments.get("collection_name")
         or os.environ.get("SECRETARIUS_MILVUS_COLLECTION", "secretarius_semantic_graph"),
         metric_type=arguments.get("metric_type") or os.environ.get("SECRETARIUS_MILVUS_METRIC", "COSINE"),
-        top_k=arguments.get("top_k", 10),
+        top_k=_resolve_top_k_argument(arguments),
     )
     extract_payload = result.get("extract", {})
     graph_payload = result.get("index", {})
@@ -1367,6 +1368,28 @@ def _read_optional_float_env(name: str) -> float | None:
         return float(raw)
     except ValueError:
         return None
+
+
+def _read_optional_int_env(name: str) -> int | None:
+    raw = os.environ.get(name)
+    if raw is None:
+        return None
+    raw = raw.strip()
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
+def _resolve_top_k_argument(arguments: Dict[str, Any]) -> Any:
+    if "top_k" in arguments:
+        return arguments.get("top_k")
+    env_top_k = _read_optional_int_env("SECRETARIUS_MILVUS_TOP_K")
+    if env_top_k is not None and env_top_k >= 1:
+        return env_top_k
+    return 10
 
 
 if __name__ == "__main__":

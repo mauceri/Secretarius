@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+import logging
+import os
 import re
 from typing import Any
 
@@ -18,6 +20,7 @@ from .semantic_graph import semantic_graph_delete_doc
 
 
 _QUERY_KEYWORD_RE = re.compile(r"(?<!\w)(?P<op>[+-]?)(?P<keyword>#[^\s#]+)")
+logger = logging.getLogger(__name__)
 
 
 def analyse_texte_documentaire(text: str, *, base_document: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -197,8 +200,9 @@ def index_document_text(
     milvus_token: str | None = None,
     collection_name: str = "secretarius_semantic_graph",
     metric_type: str = "COSINE",
-    top_k: int = 10,
+    top_k: int | None = None,
 ) -> dict[str, Any]:
+    resolved_top_k = _resolve_top_k(top_k)
     document = analyse_texte_documentaire(text, base_document=base_document)
     content = document.get("content") if isinstance(document.get("content"), dict) else {}
     document_text = content.get("text") if isinstance(content.get("text"), str) else ""
@@ -263,6 +267,21 @@ def index_document_text(
     embeddings = embedding_result.get("embeddings", [])
     if not isinstance(embeddings, list):
         embeddings = []
+    if not embeddings:
+        warning = str(embedding_result.get("warning") or "no embeddings generated")
+        logger.warning("index_document_text skipped semantic graph: %s", warning)
+        add_indexing_error(document, "embedding", warning)
+        return {
+            "document": document,
+            "extract": extract_result,
+            "index": {
+                "collection_name": collection_name,
+                "inserted_count": 0,
+                "query_count": 0,
+                "hits": [],
+                "warning": warning,
+            },
+        }
     document = enrich_document_with_embeddings(
         document,
         expressions=expressions,
@@ -274,7 +293,7 @@ def index_document_text(
     index_result = semantic_graph_search_milvus(
         embeddings,
         documents=documents,
-        top_k=top_k,
+        top_k=resolved_top_k,
         uri=milvus_uri,
         token=milvus_token,
         collection_name=collection_name,
@@ -310,8 +329,9 @@ def update_document_text(
     milvus_token: str | None = None,
     collection_name: str = "secretarius_semantic_graph",
     metric_type: str = "COSINE",
-    top_k: int = 10,
+    top_k: int | None = None,
 ) -> dict[str, Any]:
+    resolved_top_k = _resolve_top_k(top_k)
     document = analyse_texte_documentaire(text, base_document=base_document)
     doc_id = document.get("doc_id")
     if not isinstance(doc_id, str) or not doc_id.strip():
@@ -390,6 +410,22 @@ def update_document_text(
     embeddings = embedding_result.get("embeddings", [])
     if not isinstance(embeddings, list):
         embeddings = []
+    if not embeddings:
+        warning = str(embedding_result.get("warning") or "no embeddings generated")
+        logger.warning("update_document_text skipped semantic graph: %s", warning)
+        add_indexing_error(document, "embedding", warning)
+        return {
+            "document": document,
+            "extract": extract_result,
+            "index": {
+                "collection_name": collection_name,
+                "inserted_count": 0,
+                "deleted_count": deleted_count,
+                "query_count": 0,
+                "hits": [],
+                "warning": warning,
+            },
+        }
     document = enrich_document_with_embeddings(
         document,
         expressions=expressions,
@@ -401,7 +437,7 @@ def update_document_text(
     index_result = semantic_graph_search_milvus(
         embeddings,
         documents=documents,
-        top_k=top_k,
+        top_k=resolved_top_k,
         uri=milvus_uri,
         token=milvus_token,
         collection_name=collection_name,
@@ -437,9 +473,10 @@ def search_documents_by_text(
     milvus_token: str | None = None,
     collection_name: str = "secretarius_semantic_graph",
     metric_type: str = "COSINE",
-    top_k: int = 10,
+    top_k: int | None = None,
     min_score: float | None = None,
 ) -> dict[str, Any]:
+    resolved_top_k = _resolve_top_k(top_k)
     query_document = analyse_texte_documentaire(text)
     parsed_query = _parse_keyword_query(text)
     query_text = parsed_query["text"]
@@ -484,11 +521,24 @@ def search_documents_by_text(
     embeddings = embedding_result.get("embeddings", [])
     if not isinstance(embeddings, list):
         embeddings = []
+    if not embeddings:
+        warning = str(embedding_result.get("warning") or "no embeddings generated")
+        logger.warning("search_documents_by_text skipped semantic graph: %s", warning)
+        return {
+            "document": query_document,
+            "extract": extract_result,
+            "search": {
+                "collection_name": collection_name,
+                "query_count": 0,
+                "hits": [],
+                "warning": warning,
+            },
+        }
 
     search_result = semantic_graph_search_milvus(
         embeddings,
         documents=[],
-        top_k=top_k,
+        top_k=resolved_top_k,
         required_keywords=parsed_query["required_keywords"],
         optional_keywords=parsed_query["optional_keywords"],
         excluded_keywords=parsed_query["excluded_keywords"],
@@ -503,6 +553,20 @@ def search_documents_by_text(
         "extract": extract_result,
         "search": search_result,
     }
+
+
+def _resolve_top_k(top_k: Any) -> int:
+    if isinstance(top_k, int) and top_k >= 1:
+        return top_k
+    raw = (os.environ.get("SECRETARIUS_MILVUS_TOP_K") or "").strip()
+    if raw:
+        try:
+            parsed = int(raw)
+        except ValueError:
+            parsed = 0
+        if parsed >= 1:
+            return parsed
+    return 10
 
 
 def _documents_for_expression_embeddings(document: dict[str, Any], expressions: list[str]) -> list[dict[str, Any]]:
