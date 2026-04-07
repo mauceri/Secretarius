@@ -5,3 +5,23 @@ __pycache__/
 .webui_secret_key
 infra/milvus/.env
 .nltk_data/
+
+# Logs
+logs/
+Prototype/logs/
+
+# Données volumineuses
+lora_local/
+lora_slm/data/
+lora_slm/checkpoints/
+lora_slm/models/
+lora_slm/output/
+
+# Base de données locale
+*.sqlite
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Sessions
+Prototype/sessions/
