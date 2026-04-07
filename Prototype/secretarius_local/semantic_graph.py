@@ -223,6 +223,60 @@ def semantic_graph_search_milvus(
     }
 
 
+def aggregate_late_interaction(hits: list[list[dict[str, Any]]]) -> dict[str, float]:
+    """Calcule le score ColBERT (MaxSim) par doc_id.
+
+    score(doc) = Σᵢ maxⱼ score(qᵢ, dⱼ)
+
+    où i = index du vecteur-requête et j = index d'expression du document dans la liste de hits de qᵢ.
+    Retourne un dict {doc_id: score_agrégé}.
+    """
+    if not isinstance(hits, list) or not hits:
+        return {}
+
+    # max_per_query[q_idx][doc_id] = score max de ce doc pour ce vecteur-requête
+    max_per_query: dict[int, dict[str, float]] = {}
+
+    for q_idx, hit_list in enumerate(hits):
+        if not isinstance(hit_list, list):
+            continue
+        for hit in hit_list:
+            if not isinstance(hit, dict):
+                continue
+            entity = hit.get("entity") if isinstance(hit.get("entity"), dict) else hit
+            payload_json = entity.get("payload_json")
+            if not isinstance(payload_json, str):
+                continue
+            try:
+                payload = json.loads(payload_json)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(payload, dict):
+                continue
+            doc_id = payload.get("doc_id")
+            if not isinstance(doc_id, str) or not doc_id:
+                continue
+            score_raw = hit.get("score", entity.get("score", hit.get("distance", entity.get("distance"))))
+            if not isinstance(score_raw, (int, float)):
+                continue
+            score_f = float(score_raw)
+            row = max_per_query.setdefault(q_idx, {})
+            if score_f > row.get(doc_id, float("-inf")):
+                row[doc_id] = score_f
+
+    if not max_per_query:
+        return {}
+
+    all_doc_ids: set[str] = set()
+    for row in max_per_query.values():
+        all_doc_ids.update(row.keys())
+
+    return {
+        doc_id: sum(row.get(doc_id, 0.0) for row in max_per_query.values())
+        for doc_id in all_doc_ids
+    }
+
+
 def semantic_graph_delete_doc(
     *,
     doc_id: str,

@@ -778,6 +778,7 @@ def _handle_search_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
     graph_payload = result.get("search", {})
     extract_payload = result.get("extract") if isinstance(result.get("extract"), dict) else {}
     query_document = result.get("document") if isinstance(result.get("document"), dict) else {}
+    late_interaction_scores = result.get("late_interaction_scores") if isinstance(result.get("late_interaction_scores"), dict) else {}
     query_keywords = _extract_document_keywords(query_document)
     query_terms = _extract_query_terms(query)
     query_expressions = _extract_query_expressions(extract_payload)
@@ -790,6 +791,7 @@ def _handle_search_text(arguments: Dict[str, Any]) -> Dict[str, Any]:
         query_keywords=query_keywords,
         query_terms=query_terms,
         min_score=graph_payload.get("min_score"),
+        late_interaction_scores=late_interaction_scores,
     )
     payload = {
         "status": "ok",
@@ -880,6 +882,7 @@ def _extract_search_documents(
     query_keywords: list[str] | None = None,
     query_terms: list[str] | None = None,
     min_score: float | None = None,
+    late_interaction_scores: dict[str, float] | None = None,
 ) -> list[Dict[str, Any]]:
     if not isinstance(hits, list):
         return []
@@ -931,9 +934,11 @@ def _extract_search_documents(
                 continue
             aggregate = by_doc_id.get(doc_id)
             if aggregate is None:
+                li_score = float(late_interaction_scores[doc_id]) if late_interaction_scores and doc_id in late_interaction_scores else 0.0
                 aggregate = {
                     "document": document,
                     "best_vector_score": semantic_score,
+                    "late_interaction_score": li_score,
                     "keyword_matches": set(keyword_matches),
                     "title_matches": title_matches,
                     "matches": {},
@@ -955,6 +960,7 @@ def _extract_search_documents(
             document=aggregate["document"],
             matches=list(aggregate["matches"].values()),
             best_vector_score=aggregate["best_vector_score"],
+            late_interaction_score=aggregate["late_interaction_score"],
             keyword_matches=sorted(aggregate["keyword_matches"]),
             title_matches=aggregate["title_matches"],
             query_expression_count=len(query_expression_list),
@@ -964,6 +970,7 @@ def _extract_search_documents(
     ] + anonymous_documents
     documents.sort(
         key=lambda item: (
+            -item.get("late_interaction_score", 0.0),
             -item.get("global_score", 0.0),
             -item.get("best_vector_score", 0.0),
             str(item.get("doc_id") or ""),
@@ -1026,6 +1033,7 @@ def _build_compact_search_document(
     document: Any,
     matches: list[Dict[str, Any]],
     best_vector_score: float,
+    late_interaction_score: float = 0.0,
     keyword_matches: list[str],
     title_matches: bool,
     query_expression_count: int,
@@ -1078,6 +1086,7 @@ def _build_compact_search_document(
         "best_match": best_match,
         "matches": sorted(matches, key=lambda item: item.get("score", 0.0), reverse=True),
         "best_vector_score": best_vector_score,
+        "late_interaction_score": late_interaction_score,
         "global_score": global_score,
     }
     return compact_document

@@ -4,6 +4,10 @@ Ce document regroupe :
 - les commandes `/` directement reconnues par le routeur local ;
 - les scripts utilitaires ajoutes pour la reprise de session et la gestion de Milvus.
 
+Documents complementaires :
+- [`Prototype/memos.md`](/home/mauceric/Secretarius/Prototype/memos.md) pour l'usage du canal Memos
+- [`Prototype/spec_secretarius_markdown.md`](/home/mauceric/Secretarius/Prototype/spec_secretarius_markdown.md) pour le DSL Markdown `secretarius`
+
 ## Commandes `/`
 
 Les commandes ci-dessous sont traitees directement par le routeur dans `core/chef_orchestre.py`.

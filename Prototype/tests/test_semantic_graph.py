@@ -174,5 +174,46 @@ class TestSemanticGraph(unittest.TestCase):
         )
 
 
+class TestAggregateLateInteraction(unittest.TestCase):
+    def test_sums_maxsim_per_query_vector(self):
+        # doc:A apparaît pour q0 (score 0.9) et q1 (score 0.8) → total 1.7
+        # doc:B apparaît uniquement pour q0 (score 0.7) → total 0.7
+        hits = [
+            [
+                {"score": 0.9, "entity": {"payload_json": '{"doc_id": "doc:A"}'}},
+                {"score": 0.7, "entity": {"payload_json": '{"doc_id": "doc:B"}'}},
+            ],
+            [
+                {"score": 0.8, "entity": {"payload_json": '{"doc_id": "doc:A"}'}},
+            ],
+        ]
+        scores = semantic_graph.aggregate_late_interaction(hits)
+        self.assertAlmostEqual(scores["doc:A"], 1.7)
+        self.assertAlmostEqual(scores["doc:B"], 0.7)
+
+    def test_takes_max_not_sum_for_same_query_vector(self):
+        # doc:A apparaît deux fois pour q0 avec scores différents → on prend le max
+        hits = [
+            [
+                {"score": 0.5, "entity": {"payload_json": '{"doc_id": "doc:A"}'}},
+                {"score": 0.9, "entity": {"payload_json": '{"doc_id": "doc:A"}'}},
+            ],
+        ]
+        scores = semantic_graph.aggregate_late_interaction(hits)
+        self.assertAlmostEqual(scores["doc:A"], 0.9)
+
+    def test_returns_empty_dict_for_empty_hits(self):
+        self.assertEqual(semantic_graph.aggregate_late_interaction([]), {})
+
+    def test_ignores_hits_without_doc_id(self):
+        hits = [
+            [
+                {"score": 0.8, "entity": {"payload_json": '{"title": "sans doc_id"}'}},
+            ],
+        ]
+        scores = semantic_graph.aggregate_late_interaction(hits)
+        self.assertEqual(scores, {})
+
+
 if __name__ == "__main__":
     unittest.main()

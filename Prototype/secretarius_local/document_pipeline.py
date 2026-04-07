@@ -15,6 +15,7 @@ from .document_schema import (
 )
 from .embeddings import embed_expressions_multilingual
 from .expression_extractor import extract_expressions
+from .semantic_graph import aggregate_late_interaction
 from .semantic_graph import semantic_graph_search_milvus
 from .semantic_graph import semantic_graph_delete_doc
 
@@ -548,10 +549,12 @@ def search_documents_by_text(
         metric_type=metric_type,
         min_score=min_score,
     )
+    late_interaction_scores = aggregate_late_interaction(search_result.get("hits", []))
     return {
         "document": query_document,
         "extract": extract_result,
         "search": search_result,
+        "late_interaction_scores": late_interaction_scores,
     }
 
 

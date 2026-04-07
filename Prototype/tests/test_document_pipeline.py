@@ -220,6 +220,49 @@ class TestDocumentPipeline(unittest.TestCase):
     @patch("secretarius_local.document_pipeline.semantic_graph_search_milvus")
     @patch("secretarius_local.document_pipeline.embed_expressions_multilingual")
     @patch("secretarius_local.document_pipeline.extract_expressions")
+    def test_search_includes_late_interaction_scores(
+        self,
+        mock_extract,
+        mock_embed,
+        mock_search,
+    ):
+        mock_extract.return_value = {
+            "expressions": ["memoire", "autobiographique"],
+            "warning": None,
+        }
+        mock_embed.return_value = {
+            "embeddings": [[0.1, 0.2], [0.3, 0.4]],
+            "warning": None,
+        }
+        # q0 → doc:A (score 0.9), doc:B (score 0.7)
+        # q1 → doc:A (score 0.8)
+        mock_search.return_value = {
+            "collection_name": "secretarius_semantic_graph",
+            "query_count": 2,
+            "hits": [
+                [
+                    {"score": 0.9, "entity": {"payload_json": '{"doc_id": "doc:A"}'}},
+                    {"score": 0.7, "entity": {"payload_json": '{"doc_id": "doc:B"}'}},
+                ],
+                [
+                    {"score": 0.8, "entity": {"payload_json": '{"doc_id": "doc:A"}'}},
+                ],
+            ],
+            "warning": None,
+        }
+
+        result = document_pipeline.search_documents_by_text("memoire autobiographique")
+
+        li_scores = result.get("late_interaction_scores", {})
+        self.assertIn("doc:A", li_scores)
+        self.assertIn("doc:B", li_scores)
+        self.assertAlmostEqual(li_scores["doc:A"], 1.7)
+        self.assertAlmostEqual(li_scores["doc:B"], 0.7)
+        self.assertGreater(li_scores["doc:A"], li_scores["doc:B"])
+
+    @patch("secretarius_local.document_pipeline.semantic_graph_search_milvus")
+    @patch("secretarius_local.document_pipeline.embed_expressions_multilingual")
+    @patch("secretarius_local.document_pipeline.extract_expressions")
     def test_search_document_surfaces_embedding_failure_without_calling_semantic_graph(
         self,
         mock_extract,

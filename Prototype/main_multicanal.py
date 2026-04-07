@@ -10,6 +10,7 @@ import uvicorn
 from adapters.input.guichet_unique import GuichetUnique
 from adapters.input.tui_guichet import TUIChannel
 from app_runtime import build_runtime, load_config
+from memos_api import create_memos_app
 from notebook_api import create_notebook_app
 from openwebui_api import create_openwebui_app
 from session_messenger_api import create_session_messenger_app
@@ -44,16 +45,19 @@ async def main() -> None:
     webui_cfg = config.get("openwebui", {})
     notebook_cfg = config.get("notebook_api", {})
     session_cfg = config.get("session_messenger", {})
+    memos_cfg = config.get("memos", {})
 
     journal_file = ui_cfg.get("journal_file") or "logs/guichet.log"
     openwebui_journal_file = webui_cfg.get("journal_file") or "logs/openwebui.log"
     notebook_journal_file = notebook_cfg.get("journal_file") or "logs/notebook.log"
     session_journal_file = session_cfg.get("journal_file") or "logs/session_messenger.log"
+    memos_journal_file = memos_cfg.get("journal_file") or "logs/memos.log"
     show_thoughts = bool(ui_cfg.get("show_thoughts", True))
     journal_path = str((project_root / journal_file).resolve())
     openwebui_journal_path = str((project_root / openwebui_journal_file).resolve())
     notebook_journal_path = str((project_root / notebook_journal_file).resolve())
     session_journal_path = str((project_root / session_journal_file).resolve())
+    memos_journal_path = str((project_root / memos_journal_file).resolve())
 
     host = webui_cfg.get("host") or "0.0.0.0"
     port = int(webui_cfg.get("port") or 8000)
@@ -68,6 +72,16 @@ async def main() -> None:
     session_host = session_cfg.get("host") or "127.0.0.1"
     session_port = int(session_cfg.get("port") or 8002)
     session_request_timeout_s = float(session_cfg.get("request_timeout_s") or 120.0)
+    memos_enabled = bool(memos_cfg.get("enabled", False))
+    memos_host = memos_cfg.get("host") or "127.0.0.1"
+    memos_port = int(memos_cfg.get("port") or 8004)
+    memos_request_timeout_s = float(memos_cfg.get("request_timeout_s") or 120.0)
+    memos_publish_timeout_s = float(memos_cfg.get("publish_timeout_s") or 30.0)
+    memos_base_url = memos_cfg.get("base_url") or "http://127.0.0.1:5230"
+    memos_access_token = str(memos_cfg.get("access_token") or "")
+    memos_response_visibility = str(memos_cfg.get("response_visibility") or "PRIVATE")
+    memos_webhook_token = str(memos_cfg.get("webhook_token") or "")
+    memos_ignored_creator = str(memos_cfg.get("ignored_creator") or "")
 
     guichet = GuichetUnique(
         journal_path=journal_path,
@@ -76,17 +90,20 @@ async def main() -> None:
             "openwebui": openwebui_journal_path,
             "notebook": notebook_journal_path,
             "session_messenger": session_journal_path,
+            "memos": memos_journal_path,
         },
     )
     runtime: dict[str, Any] | None = None
     server: uvicorn.Server | None = None
     notebook_server: uvicorn.Server | None = None
     session_server: uvicorn.Server | None = None
+    memos_server: uvicorn.Server | None = None
     tasks: list[asyncio.Task] = []
     tui_task: asyncio.Task | None = None
     api_task: asyncio.Task | None = None
     notebook_task: asyncio.Task | None = None
     session_task: asyncio.Task | None = None
+    memos_task: asyncio.Task | None = None
     stop_event = asyncio.Event()
     component_errors: list[tuple[str, BaseException]] = []
 
@@ -127,6 +144,25 @@ async def main() -> None:
             session_server = uvicorn.Server(
                 uvicorn.Config(session_app, host=session_host, port=session_port, reload=False)
             )
+        if memos_enabled:
+            memos_app = create_memos_app(
+                gateway=guichet,
+                memos_base_url=memos_base_url,
+                memos_access_token=memos_access_token,
+                request_timeout_s=memos_request_timeout_s,
+                publish_timeout_s=memos_publish_timeout_s,
+                response_visibility=memos_response_visibility,
+                webhook_token=memos_webhook_token,
+                ignored_creator=memos_ignored_creator,
+            )
+            logger.info(
+                "Starting Memos webhook API on http://%s:%d/memos/webhook",
+                memos_host,
+                memos_port,
+            )
+            memos_server = uvicorn.Server(
+                uvicorn.Config(memos_app, host=memos_host, port=memos_port, reload=False)
+            )
         tui_task = asyncio.create_task(_run_component("tui_channel", tui.run(), stop_event, component_errors))
         api_task = asyncio.create_task(_run_component("openwebui_api", server.serve(), stop_event, component_errors))
         tasks = [tui_task, api_task]
@@ -140,6 +176,11 @@ async def main() -> None:
                 _run_component("session_messenger_api", session_server.serve(), stop_event, component_errors)
             )
             tasks.append(session_task)
+        if memos_server is not None:
+            memos_task = asyncio.create_task(
+                _run_component("memos_api", memos_server.serve(), stop_event, component_errors)
+            )
+            tasks.append(memos_task)
         await stop_event.wait()
     finally:
         if server is not None:
@@ -148,6 +189,8 @@ async def main() -> None:
             notebook_server.should_exit = True
         if session_server is not None:
             session_server.should_exit = True
+        if memos_server is not None:
+            memos_server.should_exit = True
 
         # Prefer graceful API shutdown to avoid lifespan cancellation tracebacks.
         if api_task is not None and not api_task.done():
@@ -165,6 +208,11 @@ async def main() -> None:
                 await asyncio.wait_for(session_task, timeout=5.0)
             except asyncio.TimeoutError:
                 session_task.cancel()
+        if memos_task is not None and not memos_task.done():
+            try:
+                await asyncio.wait_for(memos_task, timeout=5.0)
+            except asyncio.TimeoutError:
+                memos_task.cancel()
 
         # TUI can be cancelled immediately if still running.
         if tui_task is not None and not tui_task.done():

@@ -633,3 +633,105 @@ python scripts/milvus_collection_io.py drop \
 - Validation deja effectuee :
   - export reel de `secretarius_semantic_graph` OK ;
   - import reel vers `secretarius_semantic_graph_restore_test` OK.
+
+---
+
+## Mise a jour du 2026-03-17
+
+### Changements effectues
+- Canal Memos ajoute au prototype :
+  - `memos_api.py`
+  - reception des webhooks Memos via `/memos/webhook`
+  - publication de la reponse en commentaire du memo source
+- Configuration Memos ajoutee dans `config.yaml` :
+  - `enabled`
+  - `host`
+  - `port`
+  - `base_url`
+  - `access_token`
+  - `webhook_token`
+  - `ignored_creator`
+  - `response_visibility`
+- Documentation Memos ajoutee :
+  - `memos.md`
+- DSL Markdown `secretarius` specifie puis implemente pour le canal Memos :
+  - spec : `spec_secretarius_markdown.md`
+  - parseur : `secretarius_markdown.py`
+- Le canal Memos accepte maintenant deux modes d'entree :
+  - commandes directes `/exp`, `/index`, `/req`, `/update`
+  - bloc Markdown ````secretarius````
+- Le DSL est converti en commandes deterministes existantes avant envoi au guichet.
+- `server_secretarius.py` a ete aligne avec le point d'entree reel du service systemd :
+  - demarrage effectif du canal Memos sur le port configure
+  - journal de canal `logs/memos.log`
+- Documentation generale ajustee :
+  - `commandes.md` renvoie maintenant vers `memos.md` et `spec_secretarius_markdown.md`
+
+### Validation effectuee
+- Tests cibles du parseur Markdown et du canal Memos :
+```bash
+source /home/mauceric/Secretarius/.venv/bin/activate
+python -m unittest -q tests/test_secretarius_markdown.py tests/test_memos_api.py
+```
+- Resultat :
+  - `11 tests OK`
+- Verification syntaxique :
+```bash
+source /home/mauceric/Secretarius/.venv/bin/activate
+python -m py_compile server_secretarius.py memos_api.py secretarius_markdown.py
+```
+- Service utilisateur redemarre :
+  - `systemctl --user restart secretarius_server.service`
+- Verification runtime :
+  - port `8004` ouvert
+  - `curl http://127.0.0.1:8004/health` -> `{"status":"ok"}`
+
+### Etat fonctionnel confirme
+- La liaison `Memos -> Secretarius` fonctionne.
+- La liaison `Secretarius -> Memos` fonctionne aussi :
+  - la reponse est bien publiee dans Memos sous forme de commentaire ;
+  - un webhook secondaire est emis par Memos sur ce commentaire puis ignore cote Secretarius car il ne contient pas de commande executable.
+- Le comportement a bien ete observe en conditions reelles sur une instance Memos Docker accessible sur `sanroque:5230`.
+
+### Point d'attention important
+- Le bloc DSL doit etre un vrai bloc Markdown avec backticks, par exemple :
+````markdown
+```secretarius
+action: req
+query: cavalerie rouge URSS
+```
+````
+- La forme sans backticks :
+```text
+secretarius
+action: req
+query: cavalerie rouge URSS
+```
+ne sera pas interpretee comme commande executable.
+
+### Limites / choix actuels
+- Le rendu de reponse Memos reste encore brut :
+  - la sortie publiee correspond encore essentiellement a l'observation outil / JSON ;
+  - il faudra plus tard un formatteur Markdown oriente utilisateur.
+- `response_visibility` peut influer sur la visibilite immediate des commentaires dans l'interface Memos.
+- Les secrets Memos (`access_token`, `webhook_token`) ont ete manipules pendant la session :
+  - il est prudent de les regenerer avant usage durable.
+
+### Tests restants a faire
+- Tester depuis Memos les autres commandes directes :
+  - `/index`
+  - `/update`
+  - `/exp`
+- Tester les equivalents via DSL `secretarius` :
+  - `action: index`
+  - `action: update`
+  - `action: exp`
+- Verifier en conditions reelles :
+  - comportement de `response_visibility`
+  - visibilite des commentaires selon le compte Memos utilise
+  - robustesse sur notes plus longues / multiligne
+
+### Priorite proposee pour la prochaine session
+1. Tester `index`, `update` et `exp` dans Memos, en mode commande directe et en mode bloc `secretarius`.
+2. Decider le format de sortie Markdown attendu pour les resultats Memos.
+3. Cadrer la presentation de liens Markdown vers les documents / sources dans les reponses.
