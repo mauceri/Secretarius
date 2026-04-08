@@ -11,7 +11,11 @@ logs/
 Prototype/logs/
 
 # Données volumineuses
-lora_local/
+lora_local/data
+lora_local/checkpoints/
+lora_local/models/
+lora_local/.git/
+lora_local/.gitignore/
 lora_slm/data/
 lora_slm/checkpoints/
 lora_slm/models/
