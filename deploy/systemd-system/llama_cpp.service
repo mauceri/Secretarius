@@ -7,7 +7,7 @@ Type=simple
 # utilisateur non-root conseillé, ex. "mauceric"
 User=mauceric
 WorkingDirectory=/home/mauceric/llama.cpp/build/bin
-llama.cpp/llama-cpp-python-env
+EnvironmentFile=/home/mauceric/llama.cpp/llama-cpp-python-env
 
 #ExecStart=/opt/venvs/monenv/bin/python -m llama_cpp.server \
 #  --model /home/mauceric/Modal/phi_4_mini_extraction_expression_qlora/artifacts/phi4-merged-Q4_K_M.gguf \
@@ -37,14 +37,3 @@ Environment=HSA_OVERRIDE_GFX_VERSION=10.3.0
 
 [Install]
 WantedBy=multi-user.target
-[channels_config.telegram]
-bot_token = "enc2:560ce0f37c1f7b4410cb2bf0b0cdb41c7f94f65b04147a501a148935585fa>
-allowed_users = [
-    "@sansgriffes",
-    "220537738",
-    "@AliochaK",
-]
-stream_mode = "off"
-draft_update_interval_ms = 1000
-interrupt_on_new_message = false
-mention_only = false

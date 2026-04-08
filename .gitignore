@@ -25,3 +25,5 @@ lora_slm/output/
 
 # Sessions
 Prototype/sessions/
+SESSION_*.md
+grenier/
