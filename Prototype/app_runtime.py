@@ -12,8 +12,10 @@ from localization import DEFAULT_LOCALE
 
 
 def load_config(path: str) -> dict[str, Any]:
+    import os
     with open(path, "r", encoding="utf-8") as handle:
-        return yaml.safe_load(handle) or {}
+        content = os.path.expandvars(handle.read())
+    return yaml.safe_load(content) or {}
 
 
 def _resolve_project_path(project_root: Path, maybe_relative_path: str) -> str:

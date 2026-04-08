@@ -45,13 +45,20 @@ memos:
   host: "0.0.0.0"
   port: 8004
   base_url: "http://sanroque:5230"
-  access_token: "memos_pat_DYSjvpiJ2gYMY77XziBfcnuwTp4eouWR"
-  webhook_token: "q1**U&Qbs4JMu@g&C@^Z"
+  access_token: "${MEMOS_ACCESS_TOKEN}"
+  webhook_token: "${MEMOS_WEBHOOK_TOKEN}"
   ignored_creator: ""
   response_visibility: "PUBLIC"
   journal_file: "logs/memos.log"
   request_timeout_s: 120
   publish_timeout_s: 30
+
+telegram:
+  enabled: true
+  journal_file: "logs/telegram.log"
+  request_timeout_s: 120
+  poll_timeout_s: 25
+  poll_interval_s: 0.5
 
 mcp_servers:
   secretarius:

@@ -14,6 +14,7 @@ from memos_api import create_memos_app
 from notebook_api import create_notebook_app
 from openwebui_api import create_openwebui_app
 from session_messenger_api import create_session_messenger_app
+from telegram_api import TelegramChannel
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,7 @@ async def main() -> None:
     notebook_cfg = config.get("notebook_api", {})
     session_cfg = config.get("session_messenger", {})
     memos_cfg = config.get("memos", {})
+    telegram_cfg = config.get("telegram", {})
 
     journal_file = ui_cfg.get("journal_file") or "logs/guichet.log"
     openwebui_journal_file = webui_cfg.get("journal_file") or "logs/openwebui.log"
@@ -73,6 +75,12 @@ async def main() -> None:
     session_port = int(session_cfg.get("port") or 8002)
     session_request_timeout_s = float(session_cfg.get("request_timeout_s") or 120.0)
     memos_enabled = bool(memos_cfg.get("enabled", False))
+    telegram_enabled = bool(telegram_cfg.get("enabled", False))
+    telegram_request_timeout_s = float(telegram_cfg.get("request_timeout_s") or 120.0)
+    telegram_poll_timeout_s = int(telegram_cfg.get("poll_timeout_s") or 25)
+    telegram_poll_interval_s = float(telegram_cfg.get("poll_interval_s") or 0.5)
+    telegram_journal_file = telegram_cfg.get("journal_file") or "logs/telegram.log"
+    telegram_journal_path = str((project_root / telegram_journal_file).resolve())
     memos_host = memos_cfg.get("host") or "127.0.0.1"
     memos_port = int(memos_cfg.get("port") or 8004)
     memos_request_timeout_s = float(memos_cfg.get("request_timeout_s") or 120.0)
@@ -83,15 +91,19 @@ async def main() -> None:
     memos_webhook_token = str(memos_cfg.get("webhook_token") or "")
     memos_ignored_creator = str(memos_cfg.get("ignored_creator") or "")
 
+    channel_journals: dict[str, str] = {
+        "tui": journal_path,
+        "openwebui": openwebui_journal_path,
+        "notebook": notebook_journal_path,
+        "session_messenger": session_journal_path,
+        "memos": memos_journal_path,
+    }
+    if telegram_enabled:
+        channel_journals["telegram"] = telegram_journal_path
+
     guichet = GuichetUnique(
         journal_path=journal_path,
-        channel_journal_paths={
-            "tui": journal_path,
-            "openwebui": openwebui_journal_path,
-            "notebook": notebook_journal_path,
-            "session_messenger": session_journal_path,
-            "memos": memos_journal_path,
-        },
+        channel_journal_paths=channel_journals,
     )
     runtime: dict[str, Any] | None = None
     server: uvicorn.Server | None = None
@@ -104,6 +116,7 @@ async def main() -> None:
     notebook_task: asyncio.Task | None = None
     session_task: asyncio.Task | None = None
     memos_task: asyncio.Task | None = None
+    telegram_task: asyncio.Task | None = None
     stop_event = asyncio.Event()
     component_errors: list[tuple[str, BaseException]] = []
 
@@ -144,6 +157,15 @@ async def main() -> None:
             session_server = uvicorn.Server(
                 uvicorn.Config(session_app, host=session_host, port=session_port, reload=False)
             )
+        if telegram_enabled:
+            telegram_channel = TelegramChannel(
+                guichet=guichet,
+                channel_name="telegram",
+                poll_timeout_s=telegram_poll_timeout_s,
+                poll_interval_s=telegram_poll_interval_s,
+                request_timeout_s=telegram_request_timeout_s,
+            )
+            logger.info("Canal Telegram activé (polling).")
         if memos_enabled:
             memos_app = create_memos_app(
                 gateway=guichet,
@@ -181,6 +203,11 @@ async def main() -> None:
                 _run_component("memos_api", memos_server.serve(), stop_event, component_errors)
             )
             tasks.append(memos_task)
+        if telegram_enabled:
+            telegram_task = asyncio.create_task(
+                _run_component("telegram_channel", telegram_channel.run(), stop_event, component_errors)
+            )
+            tasks.append(telegram_task)
         await stop_event.wait()
     finally:
         if server is not None:
@@ -214,6 +241,8 @@ async def main() -> None:
             except asyncio.TimeoutError:
                 memos_task.cancel()
 
+        if telegram_task is not None and not telegram_task.done():
+            telegram_task.cancel()
         # TUI can be cancelled immediately if still running.
         if tui_task is not None and not tui_task.done():
             tui_task.cancel()
