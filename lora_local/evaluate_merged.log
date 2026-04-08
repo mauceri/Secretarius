@@ -1,0 +1,238 @@
+2025-11-26 18:46:02,933 [INFO] === Évaluation modèle fusionné ===
+2025-11-26 18:46:02,933 [INFO] model=gguf_out/phi4_merged/merged_hf data_file=data/test.jsonl device=auto bf16=False
+2025-11-26 18:46:05,628 [INFO] Dataset chargé : 1026 exemples
+2025-11-26 18:46:07,756 [INFO] dtype=torch.float16 device_map=auto
+2025-11-26 18:46:08,038 [INFO] We will use 90% of the memory on device 0 for storing the model, and 10% for the buffer to avoid OOM. You can set `max_memory` in to a higher value to use more memory (at your own risk).
+2025-11-26 18:46:20,659 [INFO] Début de l'évaluation…
+2025-11-26 20:46:49,376 [INFO] === Évaluation modèle fusionné ===
+2025-11-26 20:46:49,376 [INFO] model=gguf_out/phi4_merged/merged_hf data_file=data/test.jsonl device=auto bf16=False
+2025-11-26 20:46:50,503 [INFO] Dataset chargé : 1026 exemples
+2025-11-26 20:46:53,182 [INFO] dtype=torch.float16 device_map=auto
+2025-11-26 20:46:53,456 [INFO] We will use 90% of the memory on device 0 for storing the model, and 10% for the buffer to avoid OOM. You can set `max_memory` in to a higher value to use more memory (at your own risk).
+2025-11-26 20:47:02,919 [INFO] Début de l'évaluation…
+2025-11-26 21:09:41,707 [INFO] eval_loss=0.4851  perplexity=1.6243
+2025-11-26 21:09:41,707 [INFO] Fin. Détails : {'eval_loss': 0.4850679934024811, 'eval_model_preparation_time': 0.0023, 'eval_runtime': 1358.778, 'eval_samples_per_second': 0.755, 'eval_steps_per_second': 0.755}
+2026-01-21 11:39:35,249 [INFO] === Évaluation modèle fusionné ===
+2026-01-21 11:39:35,249 [INFO] model=gguf_out/phi4_merged/merged_hf.brouillon data_file=data/test.jsonl device=auto bf16=False
+2026-01-21 11:42:08,254 [INFO] === Évaluation modèle fusionné ===
+2026-01-21 11:42:08,254 [INFO] model=gguf_out/phi4_merged/merged_hf data_file=data/test.jsonl device=auto bf16=False
+2026-01-21 11:42:19,129 [INFO] === Évaluation modèle fusionné ===
+2026-01-21 11:42:19,129 [INFO] model=gguf_out/phi4_merged/merged_hf data_file=data/test.jsonl device=auto bf16=False
+2026-01-21 11:42:30,458 [INFO] === Évaluation modèle fusionné ===
+2026-01-21 11:42:30,458 [INFO] model=gguf_out/phi4_merged/merged_hf data_file=data/test.jsonl device=auto bf16=False
+2026-01-21 11:43:25,075 [INFO] === Évaluation modèle fusionné ===
+2026-01-21 11:43:25,076 [INFO] model=gguf_out/phi4_merged/merged_hf data_file=data/test.jsonl device=auto bf16=False
+2026-01-21 11:43:25,568 [INFO] Dataset chargé : 10 exemples
+2026-01-21 11:43:25,568 [INFO] dtype=torch.float32 device_map=cpu
+2026-01-21 11:43:27,728 [INFO] Début de l'évaluation…
+2026-01-21 11:43:43,495 [INFO] === Évaluation modèle fusionné ===
+2026-01-21 11:43:43,496 [INFO] model=gguf_out/phi4_merged/merged_hf data_file=data/test.jsonl device=auto bf16=False
+2026-01-21 11:43:43,993 [INFO] Dataset chargé : 10 exemples
+2026-01-21 11:43:43,993 [INFO] dtype=torch.float32 device_map=cpu
+2026-01-21 11:43:47,526 [INFO] Début de l'évaluation…
+2026-01-21 11:45:01,525 [INFO] eval_loss=nan  perplexity=nan
+2026-01-21 11:45:01,525 [INFO] Fin. Détails : {'eval_loss': nan, 'eval_model_preparation_time': 0.0018, 'eval_runtime': 73.9916, 'eval_samples_per_second': 0.135, 'eval_steps_per_second': 0.135}
+2026-01-21 11:51:24,042 [INFO] === Évaluation modèle fusionné ===
+2026-01-21 11:51:24,042 [INFO] model=gguf_out/phi4_merged/merged_hf data_file=data/test.jsonl device=auto bf16=False
+2026-01-21 11:51:24,617 [INFO] Dataset chargé : 8 exemples
+2026-01-21 11:51:24,617 [INFO] dtype=torch.float32 device_map=cpu
+2026-01-21 11:51:26,637 [INFO] Début de l'évaluation…
+2026-01-21 11:52:25,474 [INFO] eval_loss=nan  perplexity=nan
+2026-01-21 11:52:25,474 [INFO] Fin. Détails : {'eval_loss': nan, 'eval_model_preparation_time': 0.002, 'eval_runtime': 58.8327, 'eval_samples_per_second': 0.136, 'eval_steps_per_second': 0.136}
+2026-01-21 11:53:31,898 [INFO] === Évaluation modèle fusionné ===
+2026-01-21 11:53:31,899 [INFO] model=gguf_out/phi4_merged/merged_hf data_file=data/test.jsonl device=auto bf16=False
+2026-01-21 11:53:32,457 [INFO] Dataset chargé : 8 exemples
+2026-01-21 11:53:32,457 [INFO] dtype=torch.float32 device_map=cpu
+2026-01-21 11:53:34,193 [INFO] Début de l'évaluation…
+2026-01-21 11:54:34,218 [INFO] eval_loss=0.8282  perplexity=2.2892
+2026-01-21 11:54:34,218 [INFO] Fin. Détails : {'eval_loss': 0.8282037973403931, 'eval_model_preparation_time': 0.002, 'eval_runtime': 60.0216, 'eval_samples_per_second': 0.133, 'eval_steps_per_second': 0.133}
+2026-01-21 11:57:59,651 [INFO] === Évaluation modèle fusionné ===
+2026-01-21 11:57:59,651 [INFO] model=gguf_out/phi4_merged/merged_hf data_file=data/test.jsonl device=auto bf16=False
+2026-01-21 11:58:00,091 [ERROR] Failed to load JSON from file '/home/mauceric/lora_local/data/test.jsonl' with error <class 'pyarrow.lib.ArrowInvalid'>: JSON parse error: Invalid value. in row 1
+2026-01-21 11:59:11,614 [INFO] === Évaluation modèle fusionné ===
+2026-01-21 11:59:11,615 [INFO] model=gguf_out/phi4_merged/merged_hf data_file=data/test.jsonl device=auto bf16=False
+2026-01-21 11:59:12,160 [INFO] Dataset chargé : 16 exemples
+2026-01-21 11:59:12,160 [INFO] dtype=torch.float32 device_map=cpu
+2026-01-21 11:59:13,722 [INFO] Début de l'évaluation…
+2026-01-21 12:01:20,372 [INFO] === Évaluation modèle fusionné ===
+2026-01-21 12:01:20,375 [INFO] model=gguf_out/phi4_merged/merged_hf data_file=data/test.jsonl device=auto bf16=False
+2026-01-21 12:01:20,923 [INFO] Dataset chargé : 16 exemples
+2026-01-21 12:01:20,923 [INFO] dtype=torch.float32 device_map=cpu
+2026-01-21 12:01:22,437 [INFO] Début de l'évaluation…
+2026-01-21 12:03:40,345 [INFO] eval_loss=0.9302  perplexity=2.5350
+2026-01-21 12:03:40,345 [INFO] Fin. Détails : {'eval_loss': 0.9301811456680298, 'eval_model_preparation_time': 0.002, 'eval_runtime': 137.9045, 'eval_samples_per_second': 0.116, 'eval_steps_per_second': 0.116}
+2026-01-21 12:27:52,516 [INFO] === Évaluation modèle fusionné ===
+2026-01-21 12:27:52,516 [INFO] model=gguf_out.précieux/phi4_merged/merged_hf data_file=data/test.jsonl device=auto bf16=False
+2026-01-21 12:27:53,109 [INFO] Dataset chargé : 100 exemples
+2026-01-21 12:27:53,109 [INFO] dtype=torch.float32 device_map=cpu
+2026-01-21 12:27:53,246 [INFO] Début de l'évaluation…
+2026-01-21 12:31:01,596 [INFO] === Évaluation modèle fusionné ===
+2026-01-21 12:31:01,596 [INFO] model=gguf_out.précieux/phi4_merged/merged_hf data_file=data/test.jsonl device=auto bf16=False
+2026-01-21 12:31:02,103 [INFO] Dataset chargé : 100 exemples
+2026-01-21 12:31:02,103 [INFO] dtype=torch.float32 device_map=cpu
+2026-01-21 12:31:02,158 [INFO] Début de l'évaluation…
+2026-01-21 12:35:12,361 [INFO] === Évaluation modèle fusionné ===
+2026-01-21 12:35:12,361 [INFO] model=gguf_out.précieux/phi4_merged/merged_hf data_file=data/test.jsonl device=auto bf16=False
+2026-01-21 12:35:12,887 [INFO] Dataset chargé : 100 exemples
+2026-01-21 12:35:12,887 [INFO] dtype=torch.float32 device_map=cpu
+2026-01-21 12:35:12,944 [INFO] Début de l'évaluation…
+2026-01-21 12:45:24,077 [INFO] === Évaluation modèle fusionné ===
+2026-01-21 12:45:24,077 [INFO] model=gguf_out.précieux/phi4_merged/merged_hf data_file=data/test.jsonl device=auto bf16=False
+2026-01-21 12:45:24,611 [INFO] Dataset chargé : 100 exemples
+2026-01-21 12:45:24,612 [INFO] dtype=torch.float32 device_map=cpu
+2026-01-21 12:45:24,670 [INFO] Début de l'évaluation…
+2026-01-21 12:56:43,552 [INFO] eval_loss=1.8995  perplexity=6.6827
+2026-01-21 12:56:43,552 [INFO] Fin. Détails : {'eval_loss': 1.8995176553726196, 'eval_model_preparation_time': 0.0022, 'eval_runtime': 678.8774, 'eval_samples_per_second': 0.147, 'eval_steps_per_second': 0.147}
+2026-01-21 17:06:25,556 [INFO] === Évaluation modèle fusionné ===
+2026-01-21 17:06:25,556 [INFO] model=gguf_out.précieux/phi4_merged/merged_hf data_file=data/test.jsonl device=auto bf16=False
+2026-01-21 17:06:26,212 [INFO] Dataset chargé : 239 exemples
+2026-01-21 17:06:26,213 [INFO] dtype=torch.float32 device_map=cpu
+2026-01-21 17:06:26,261 [INFO] Début de l'évaluation…
+2026-01-21 17:21:39,200 [INFO] === Évaluation modèle fusionné ===
+2026-01-21 17:21:39,200 [INFO] model=gguf_out.précieux/phi4_merged/merged_hf data_file=data/test.jsonl device=auto bf16=False
+2026-01-21 17:21:39,702 [INFO] Dataset chargé : 239 exemples
+2026-01-21 17:21:39,703 [INFO] dtype=torch.float32 device_map=cpu
+2026-01-21 17:21:39,758 [INFO] Début de l'évaluation…
+2026-01-21 17:52:02,109 [INFO] === Évaluation modèle fusionné ===
+2026-01-21 17:52:02,109 [INFO] model=gguf_out.précieux/phi4_merged/merged_hf data_file=data/test.jsonl device=auto bf16=False
+2026-01-21 17:52:02,627 [INFO] Dataset chargé : 239 exemples
+2026-01-21 17:52:02,628 [INFO] dtype=torch.float32 device_map=cpu
+2026-01-21 17:52:02,684 [INFO] Début de l'évaluation…
+2026-01-21 18:30:55,397 [INFO] eval_loss=0.9662  perplexity=2.6280
+2026-01-21 18:30:55,398 [INFO] Fin. Détails : {'eval_loss': 0.9662119746208191, 'eval_model_preparation_time': 0.0021, 'eval_runtime': 2332.7096, 'eval_samples_per_second': 0.102, 'eval_steps_per_second': 0.102}
+2026-01-21 18:37:03,196 [INFO] === Évaluation modèle fusionné ===
+2026-01-21 18:37:03,196 [INFO] model=gguf_out.précieux/phi4_merged/merged_hf data_file=data/test.jsonl device=auto bf16=False
+2026-01-21 18:37:03,701 [INFO] Dataset chargé : 16 exemples
+2026-01-21 18:37:03,701 [INFO] dtype=torch.float32 device_map=cpu
+2026-01-21 18:37:03,751 [INFO] Début de l'évaluation…
+2026-01-21 18:39:19,754 [INFO] eval_loss=0.9519  perplexity=2.5907
+2026-01-21 18:39:19,754 [INFO] Fin. Détails : {'eval_loss': 0.9519304037094116, 'eval_model_preparation_time': 0.0018, 'eval_runtime': 135.9986, 'eval_samples_per_second': 0.118, 'eval_steps_per_second': 0.118}
+2026-01-22 15:06:58,293 [INFO] === Évaluation modèle fusionné ===
+2026-01-22 15:06:58,294 [INFO] model=test_wikipedia_gguf/ data_file=data/test.jsonl device=auto bf16=False
+2026-01-22 15:06:59,085 [INFO] Dataset chargé : 16 exemples
+2026-01-22 15:07:02,962 [INFO] dtype=torch.float16 device_map=auto
+2026-01-22 15:11:32,269 [INFO] === Évaluation modèle fusionné ===
+2026-01-22 15:11:32,269 [INFO] model=test_wikipedia/ data_file=data/test.jsonl device=auto bf16=False
+2026-01-22 15:11:34,273 [INFO] Dataset chargé : 16 exemples
+2026-01-22 15:11:36,341 [INFO] dtype=torch.float16 device_map=auto
+2026-01-22 15:11:36,678 [INFO] We will use 90% of the memory on device 0 for storing the model, and 10% for the buffer to avoid OOM. You can set `max_memory` in to a higher value to use more memory (at your own risk).
+2026-01-22 15:12:03,683 [INFO] Début de l'évaluation…
+2026-01-22 15:12:45,783 [INFO] eval_loss=0.3734  perplexity=1.4527
+2026-01-22 15:12:45,783 [INFO] Fin. Détails : {'eval_loss': 0.3734486997127533, 'eval_model_preparation_time': 0.0052, 'eval_runtime': 42.0861, 'eval_samples_per_second': 0.38, 'eval_steps_per_second': 0.38}
+2026-01-22 15:17:08,359 [INFO] === Évaluation modèle fusionné ===
+2026-01-22 15:17:08,359 [INFO] model=test_wikipedia/ data_file=data/test_100.jsonl device=auto bf16=False
+2026-01-22 15:17:11,194 [INFO] Dataset chargé : 294 exemples
+2026-01-22 15:17:14,333 [INFO] dtype=torch.float16 device_map=auto
+2026-01-22 15:17:14,602 [INFO] We will use 90% of the memory on device 0 for storing the model, and 10% for the buffer to avoid OOM. You can set `max_memory` in to a higher value to use more memory (at your own risk).
+2026-01-22 15:17:28,278 [INFO] Début de l'évaluation…
+2026-01-22 15:30:29,346 [INFO] eval_loss=0.3057  perplexity=1.3576
+2026-01-22 15:30:29,347 [INFO] Fin. Détails : {'eval_loss': 0.3057045042514801, 'eval_model_preparation_time': 0.0061, 'eval_runtime': 781.0581, 'eval_samples_per_second': 0.376, 'eval_steps_per_second': 0.376}
+2026-01-22 15:33:13,433 [INFO] === Évaluation modèle fusionné ===
+2026-01-22 15:33:13,433 [INFO] model=test_wikipedia/ data_file=data/test_100.jsonl device=auto bf16=False
+2026-01-22 15:33:14,467 [INFO] Dataset chargé : 294 exemples
+2026-01-22 15:33:17,471 [INFO] dtype=torch.float16 device_map=auto
+2026-01-22 15:33:17,736 [INFO] We will use 90% of the memory on device 0 for storing the model, and 10% for the buffer to avoid OOM. You can set `max_memory` in to a higher value to use more memory (at your own risk).
+2026-01-22 15:33:30,679 [INFO] Début de l'évaluation…
+2026-01-22 15:37:15,300 [INFO] === Évaluation modèle fusionné ===
+2026-01-22 15:37:15,300 [INFO] model=test_wikipedia/ data_file=data/old_test.jsonl device=auto bf16=False
+2026-01-22 15:37:16,129 [ERROR] Failed to load JSON from file '/home/mauceric/lora_local/data/old_test.jsonl' with error <class 'pyarrow.lib.ArrowInvalid'>: JSON parse error: Missing a closing quotation mark in string. in row 65
+2026-01-22 15:41:56,973 [INFO] === Évaluation modèle fusionné ===
+2026-01-22 15:41:56,973 [INFO] model=test_wikipedia/ data_file=data/old_test_new_format.jsonl device=auto bf16=False
+2026-01-22 15:43:16,355 [INFO] === Évaluation modèle fusionné ===
+2026-01-22 15:43:16,355 [INFO] model=test_wikipedia/ data_file=data/old_test_new_format.jsonl device=auto bf16=False
+2026-01-22 15:51:58,891 [INFO] === Évaluation modèle fusionné ===
+2026-01-22 15:51:58,891 [INFO] model=test_wikipedia/ data_file=data/old_test.jsonl device=auto bf16=False
+2026-01-22 15:51:59,766 [ERROR] Failed to load JSON from file '/home/mauceric/lora_local/data/old_test.jsonl' with error <class 'pyarrow.lib.ArrowInvalid'>: JSON parse error: Missing a closing quotation mark in string. in row 65
+2026-01-22 16:47:38,686 [INFO] === Évaluation modèle fusionné ===
+2026-01-22 16:47:38,692 [INFO] model=test_wikipedia_gguf/ data_file=data/test.jsonl device=auto bf16=False
+2026-01-22 16:47:39,537 [INFO] Dataset chargé : 16 exemples
+2026-01-22 16:47:41,317 [INFO] dtype=torch.float16 device_map=auto
+2026-01-22 16:48:20,695 [INFO] === Évaluation modèle fusionné ===
+2026-01-22 16:48:20,695 [INFO] model=test_wikipedia data_file=data/test.jsonl device=auto bf16=False
+2026-01-22 16:48:22,616 [INFO] Dataset chargé : 16 exemples
+2026-01-22 16:48:24,436 [INFO] dtype=torch.float16 device_map=auto
+2026-01-22 16:48:24,954 [INFO] We will use 90% of the memory on device 0 for storing the model, and 10% for the buffer to avoid OOM. You can set `max_memory` in to a higher value to use more memory (at your own risk).
+2026-01-22 16:48:44,334 [INFO] Début de l'évaluation…
+2026-01-22 16:49:27,853 [INFO] eval_loss=0.3734  perplexity=1.4527
+2026-01-22 16:49:27,853 [INFO] Fin. Détails : {'eval_loss': 0.3734486997127533, 'eval_model_preparation_time': 0.0073, 'eval_runtime': 43.4545, 'eval_samples_per_second': 0.368, 'eval_steps_per_second': 0.368}
+2026-01-22 16:51:47,748 [INFO] === Évaluation modèle fusionné ===
+2026-01-22 16:51:47,749 [INFO] model=test_wikipedia data_file=data/old_test.jsonl device=auto bf16=False
+2026-01-22 16:51:48,718 [ERROR] Failed to load JSON from file '/home/mauceric/lora_local/data/old_test.jsonl' with error <class 'pyarrow.lib.ArrowInvalid'>: JSON parse error: Missing a closing quotation mark in string. in row 65
+2026-01-22 17:10:50,684 [INFO] === Évaluation modèle fusionné ===
+2026-01-22 17:10:50,684 [INFO] model=test_wikipedia/ data_file=data/old_test_new_format.jsonl device=auto bf16=False
+2026-01-22 17:10:53,272 [INFO] Dataset chargé : 1026 exemples
+2026-01-22 17:10:55,114 [INFO] dtype=torch.float16 device_map=auto
+2026-01-22 17:10:55,603 [INFO] We will use 90% of the memory on device 0 for storing the model, and 10% for the buffer to avoid OOM. You can set `max_memory` in to a higher value to use more memory (at your own risk).
+2026-01-22 17:11:59,880 [INFO] Début de l'évaluation…
+2026-01-22 17:38:07,891 [INFO] eval_loss=0.8896  perplexity=2.4341
+2026-01-22 17:38:07,892 [INFO] Fin. Détails : {'eval_loss': 0.8895899057388306, 'eval_model_preparation_time': 0.0062, 'eval_runtime': 1568.0019, 'eval_samples_per_second': 0.654, 'eval_steps_per_second': 0.654}
+2026-01-22 17:42:13,046 [INFO] === Évaluation modèle fusionné ===
+2026-01-22 17:42:13,046 [INFO] model=test_wikipedia/ data_file=data/test_100.jsonl device=auto bf16=False
+2026-01-22 17:42:13,975 [INFO] Dataset chargé : 294 exemples
+2026-01-22 17:42:15,855 [INFO] dtype=torch.float16 device_map=auto
+2026-01-22 17:42:16,108 [INFO] We will use 90% of the memory on device 0 for storing the model, and 10% for the buffer to avoid OOM. You can set `max_memory` in to a higher value to use more memory (at your own risk).
+2026-01-22 17:42:33,076 [INFO] Début de l'évaluation…
+2026-01-22 17:55:42,643 [INFO] eval_loss=0.3057  perplexity=1.3576
+2026-01-22 17:55:42,643 [INFO] Fin. Détails : {'eval_loss': 0.3057045042514801, 'eval_model_preparation_time': 0.0055, 'eval_runtime': 789.5586, 'eval_samples_per_second': 0.372, 'eval_steps_per_second': 0.372}
+2026-01-22 18:01:44,933 [INFO] === Évaluation modèle fusionné ===
+2026-01-22 18:01:44,933 [INFO] model=test_wikipedia/ data_file=data/tests_complets.jonl device=auto bf16=False
+2026-01-22 18:01:47,683 [INFO] Dataset chargé : 1320 exemples
+2026-01-22 18:01:49,565 [INFO] dtype=torch.float16 device_map=auto
+2026-01-22 18:01:49,837 [INFO] We will use 90% of the memory on device 0 for storing the model, and 10% for the buffer to avoid OOM. You can set `max_memory` in to a higher value to use more memory (at your own risk).
+2026-01-22 18:02:06,825 [INFO] Début de l'évaluation…
+2026-01-22 18:41:57,857 [INFO] eval_loss=0.7595  perplexity=2.1373
+2026-01-22 18:41:57,857 [INFO] Fin. Détails : {'eval_loss': 0.7595426440238953, 'eval_model_preparation_time': 0.0055, 'eval_runtime': 2391.0237, 'eval_samples_per_second': 0.552, 'eval_steps_per_second': 0.552}
+2026-01-23 16:26:10,930 [INFO] === Évaluation modèle fusionné ===
+2026-01-23 16:26:10,931 [INFO] model=test_wikipedia data_file=data/corpus_synth_indexed_1000.jsonl device=auto bf16=False
+2026-01-23 16:26:13,367 [INFO] Dataset chargé : 1000 exemples
+2026-01-23 16:26:19,611 [INFO] dtype=torch.float16 device_map=auto
+2026-01-23 16:26:20,084 [INFO] We will use 90% of the memory on device 0 for storing the model, and 10% for the buffer to avoid OOM. You can set `max_memory` in to a higher value to use more memory (at your own risk).
+2026-01-23 16:26:44,057 [INFO] Début de l'évaluation…
+2026-01-23 16:58:05,622 [INFO] eval_loss=0.2648  perplexity=1.3032
+2026-01-23 16:58:05,622 [INFO] Fin. Détails : {'eval_loss': 0.2648357152938843, 'eval_model_preparation_time': 0.005, 'eval_runtime': 1881.5462, 'eval_samples_per_second': 0.531, 'eval_steps_per_second': 0.531}
+2026-01-23 23:51:51,299 [INFO] === Évaluation modèle fusionné ===
+2026-01-23 23:51:51,299 [INFO] model=test_wikipedia/ data_file=data/corpus_synth_indexed_1000.jsonl device=auto bf16=False
+2026-01-23 23:51:53,581 [INFO] Dataset chargé : 1000 exemples
+2026-01-23 23:51:56,415 [INFO] dtype=torch.float16 device_map=auto
+2026-01-23 23:51:56,655 [INFO] We will use 90% of the memory on device 0 for storing the model, and 10% for the buffer to avoid OOM. You can set `max_memory` in to a higher value to use more memory (at your own risk).
+2026-01-23 23:53:42,131 [INFO] Début de l'évaluation…
+2026-01-24 00:25:17,301 [INFO] eval_loss=0.2648  perplexity=1.3032
+2026-01-24 00:25:17,301 [INFO] Fin. Détails : {'eval_loss': 0.2648357152938843, 'eval_model_preparation_time': 0.016, 'eval_runtime': 1894.869, 'eval_samples_per_second': 0.528, 'eval_steps_per_second': 0.528}
+2026-01-24 07:48:13,821 [INFO] === Évaluation modèle fusionné ===
+2026-01-24 07:48:13,822 [INFO] model=test_wikipedia/ data_file=data/corpus_wiki40b_fr_indexed_1000.jsonl device=auto bf16=False
+2026-01-24 07:48:18,053 [INFO] Dataset chargé : 2977 exemples
+2026-01-24 07:48:22,310 [INFO] dtype=torch.float16 device_map=auto
+2026-01-24 07:48:22,554 [INFO] We will use 90% of the memory on device 0 for storing the model, and 10% for the buffer to avoid OOM. You can set `max_memory` in to a higher value to use more memory (at your own risk).
+2026-01-24 07:48:41,378 [INFO] Début de l'évaluation…
+2026-01-24 07:52:26,590 [INFO] === Évaluation modèle fusionné ===
+2026-01-24 07:52:26,590 [INFO] model=test_wikipedia/ data_file=data/corpus_wiki40b_fr_indexed_200.jsonl device=auto bf16=False
+2026-01-24 07:52:28,925 [INFO] Dataset chargé : 461 exemples
+2026-01-24 07:52:32,984 [INFO] dtype=torch.float16 device_map=auto
+2026-01-24 07:52:33,228 [INFO] We will use 90% of the memory on device 0 for storing the model, and 10% for the buffer to avoid OOM. You can set `max_memory` in to a higher value to use more memory (at your own risk).
+2026-01-24 07:52:46,624 [INFO] Début de l'évaluation…
+2026-01-24 08:09:44,687 [INFO] eval_loss=0.3112  perplexity=1.3651
+2026-01-24 08:09:44,687 [INFO] Fin. Détails : {'eval_loss': 0.3112276494503021, 'eval_model_preparation_time': 0.0046, 'eval_runtime': 1018.053, 'eval_samples_per_second': 0.453, 'eval_steps_per_second': 0.453}
+2026-01-24 08:25:07,738 [INFO] === Évaluation modèle fusionné ===
+2026-01-24 08:25:07,738 [INFO] model=test_wikipedia/ data_file=data/corpus_synth_indexed_500.jsonl device=auto bf16=False
+2026-01-24 08:25:09,984 [INFO] Dataset chargé : 500 exemples
+2026-01-24 08:25:14,504 [INFO] dtype=torch.float16 device_map=auto
+2026-01-24 08:25:14,752 [INFO] We will use 90% of the memory on device 0 for storing the model, and 10% for the buffer to avoid OOM. You can set `max_memory` in to a higher value to use more memory (at your own risk).
+2026-01-24 08:25:28,284 [INFO] Début de l'évaluation…
+2026-01-24 08:40:56,860 [INFO] eval_loss=0.2599  perplexity=1.2968
+2026-01-24 08:40:56,863 [INFO] Fin. Détails : {'eval_loss': 0.25989124178886414, 'eval_model_preparation_time': 0.0045, 'eval_runtime': 928.5689, 'eval_samples_per_second': 0.538, 'eval_steps_per_second': 0.538}
+2026-01-24 16:46:34,549 [INFO] === Évaluation modèle fusionné ===
+2026-01-24 16:46:34,549 [INFO] model=test_wikipedia/ data_file=data/corpus_gutenberg_indexed.jsonl device=auto bf16=False
+2026-01-24 16:46:37,181 [INFO] Dataset chargé : 978 exemples
+2026-01-24 16:46:40,156 [INFO] dtype=torch.float16 device_map=auto
+2026-01-24 16:46:40,406 [INFO] We will use 90% of the memory on device 0 for storing the model, and 10% for the buffer to avoid OOM. You can set `max_memory` in to a higher value to use more memory (at your own risk).
+2026-01-24 16:47:09,919 [INFO] Début de l'évaluation…
+2026-01-24 17:22:53,174 [INFO] eval_loss=0.3614  perplexity=1.4353
+2026-01-24 17:22:53,174 [INFO] Fin. Détails : {'eval_loss': 0.3613533079624176, 'eval_model_preparation_time': 0.0061, 'eval_runtime': 2143.1689, 'eval_samples_per_second': 0.456, 'eval_steps_per_second': 0.456}
+2026-01-27 10:07:48,951 [INFO] === Évaluation modèle fusionné ===
+2026-01-27 10:07:48,951 [INFO] model=test_wikipedia/ data_file=data/corpus_gutenberg_indexed.jsonl device=auto bf16=False
+2026-01-27 10:07:49,985 [INFO] Dataset chargé : 978 exemples
+2026-01-27 10:07:55,652 [INFO] dtype=torch.float16 device_map=auto
+2026-01-27 10:07:55,965 [INFO] We will use 90% of the memory on device 0 for storing the model, and 10% for the buffer to avoid OOM. You can set `max_memory` in to a higher value to use more memory (at your own risk).
+2026-01-27 10:08:28,006 [INFO] Début de l'évaluation…
+2026-01-27 10:46:51,472 [INFO] Début de l'évaluation générative (Jaccard)...
+2026-01-27 10:46:51,646 [INFO] Nombre d'exemples pour évaluation Jaccard : 978

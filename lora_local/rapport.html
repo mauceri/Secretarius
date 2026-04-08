@@ -1,0 +1,43 @@
+<h1 id="rapport-danalyse-codex">Rapport d’analyse Codex</h1>
+<h2 id="perimetre">Perimetre</h2>
+<ul>
+<li>Fichiers inspectes: README.md, lora_local_train.py,
+evaluate_merged.py, merge_and_quantize.py, requirements.txt,
+.gitignore</li>
+</ul>
+<h2 id="problemes-potentiels-ordonnes-par-impact">Problemes potentiels
+(ordonnes par impact)</h2>
+<ul>
+<li>[Eleve] lora_local_train.py: TrainingArguments utilise
+<code>eval_strategy</code> au lieu de <code>evaluation_strategy</code>
+(risque de TypeError au runtime). Voir lora_local_train.py:277.</li>
+<li>[Moyen] lora_local_train.py: l’option <code>--device</code> est
+ignoree; <code>device_map</code> est fixe par
+<code>torch.cuda.is_available()</code> (impossible de forcer CPU/CUDA).
+Voir lora_local_train.py:166-225.</li>
+<li>[Moyen] lora_local_train.py: <code>--packing</code> est
+<code>store_true</code> avec <code>default=True</code>, donc impossible
+a desactiver; incoherent avec un toggle optionnel. Voir
+lora_local_train.py:147-201.</li>
+<li>[Moyen] evaluate_merged.py: variables d’environnement allocateur
+definies apres <code>import torch</code>, donc sans effet sur
+l’allocateur ROCm/CUDA. Voir evaluate_merged.py:18-33.</li>
+<li>[Faible] lora_local_train.py: <code>save_steps</code> passe a
+<code>None</code> quand <code>save_strategy != "steps"</code>, ce qui
+peut etre invalide selon la version de Transformers. Voir
+lora_local_train.py:269-271.</li>
+<li>[Faible] requirements.txt: dependances NVIDIA CUDA listees dans un
+contexte ROCm; risque de conflits ou d’installations inutiles selon
+l’environnement.</li>
+</ul>
+<h2 id="recommandations">Recommandations</h2>
+<ul>
+<li>Corriger les arguments Trainer (<code>evaluation_strategy</code>,
+<code>save_steps</code>) et respecter <code>--device</code>.</li>
+<li>Ajouter un flag <code>--no-packing</code> ou inverser la logique
+(<code>--packing</code> default False).</li>
+<li>Deplacer la configuration des variables d’environnement avant
+<code>import torch</code> dans evaluate_merged.py.</li>
+<li>Scinder ou documenter les requirements par cible (ROCm vs
+CUDA).</li>
+</ul>
