@@ -1,7 +1,0 @@
-errors:
-  no_tool_fallback: "Aucun outil ne correspond a votre demande."
-  direct_command_empty: "Commande {action} sans contenu exploitable."
-messages:
-  index_complete: "Indexation complete (extraction + insertion semantic graph)."
-  search_complete: "Recherche semantique executee."
-  update_complete: "Mise a jour complete (suppression precedente + reindexation)."
