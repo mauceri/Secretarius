@@ -1,0 +1,39 @@
+{
+  "config": {
+    "n_chunks": 200,
+    "n_queries": 200,
+    "corpus": "/home/mauceric/Secretarius/lora_local/data/corpus_synth_indexed_1000.jsonl",
+    "doc_exprs": "lora",
+    "query_exprs": "eval_rag2_query_exprs.json"
+  },
+  "results": {
+    "A": {
+      "MRR": 0.7933,
+      "Recall@1": 0.66,
+      "Recall@5": 0.985,
+      "Recall@10": 1.0,
+      "n": 200
+    },
+    "B": {
+      "MRR": 0.723,
+      "Recall@1": 0.535,
+      "Recall@5": 0.98,
+      "Recall@10": 1.0,
+      "n": 200
+    },
+    "C": {
+      "MRR": 0.593,
+      "Recall@1": 0.365,
+      "Recall@5": 0.95,
+      "Recall@10": 0.99,
+      "n": 200
+    },
+    "D": {
+      "MRR": 0.7247,
+      "Recall@1": 0.5561,
+      "Recall@5": 0.9745,
+      "Recall@10": 0.9847,
+      "n": 196
+    }
+  }
+}
