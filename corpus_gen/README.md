@@ -6,7 +6,7 @@
 - `promptGenGEPA.py` — optimise le prompt via GEPA, exporte le meilleur prompt et peut générer un corpus.
 - `generate_corpus_dspy.py` — programme de génération basé sur un prompt existant.
 - `prompt.txt` — consignes strictes pour produire exactement 7 clés JSON (peut être remplacé par `GEPAPrompt.txt` issu de GEPA).
-- `GEPAPrompt.txt` — meilleur prompt trouvé par GEPA (créé par `promptGenGEPA.py`).
+- `GEPAPrompt.txt` — meilleur prompt trouvé par GEPA (créé par `promptGenGEPA.py`). **Exemple uniquement** : ce fichier est le résultat d'une optimisation GEPA sur une configuration et un jeu de thèmes spécifiques. Il ne vaut pas comme prompt universel — relancez `promptGenGEPA.py` pour obtenir un prompt adapté à votre contexte.
 - `prompt-init.txt` — prompt initial utilisé pour l’optimisation GEPA (copié dans `prompt-init.original.txt` lors de l’exécution).
 - `thèmes.json` — liste de thèmes (format « Python assignment », pas du JSON strict).
 - `catégories.jsonl` — liste tolérante des catégories (extrait, commentaire, synthese, texte_libre).
