@@ -11,6 +11,7 @@ logs/
 Prototype/logs/
 
 # Données volumineuses
+corpus_gen/data/
 lora_local/data
 lora_local/checkpoints/
 lora_local/models/
