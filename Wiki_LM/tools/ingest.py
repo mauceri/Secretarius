@@ -367,10 +367,27 @@ class Ingestor:
     # ------------------------------------------------------------------
 
     def _save_raw(self, source: str, content: str, slug: str) -> None:
-        """Sauvegarde la source brute dans raw/ (immutable)."""
-        raw_path = self.raw_dir / f"{slug}.txt"
-        if not raw_path.exists():
-            raw_path.write_text(content, encoding="utf-8")
+        """Sauvegarde la source dans raw/ (immutable).
+
+        - URL  → fichier .url contenant l'URL et la date de récupération
+        - Fichier local → copie du fichier original (ou .txt si contenu déjà extrait)
+        """
+        if source.startswith("http://") or source.startswith("https://"):
+            raw_path = self.raw_dir / f"{slug}.url"
+            if not raw_path.exists():
+                raw_path.write_text(
+                    f"url: {source}\nfetched: {self.today}\n", encoding="utf-8"
+                )
+        else:
+            src_path = Path(source)
+            # Copier le fichier original si possible
+            raw_path = self.raw_dir / f"{slug}{src_path.suffix or '.txt'}"
+            if not raw_path.exists():
+                import shutil
+                try:
+                    shutil.copy2(src_path, raw_path)
+                except Exception:
+                    raw_path.with_suffix(".txt").write_text(content, encoding="utf-8")
 
     def _generate_source_page(self, content: str, source_name: str) -> str:
         prompt = _PROMPT_SOURCE_PAGE.format(
