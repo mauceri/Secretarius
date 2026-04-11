@@ -197,6 +197,9 @@ def _normalize_links(content: str, known_slugs: set[str]) -> str:
     """
     def _resolve(m: re.Match) -> str:
         raw = m.group(1).strip()
+        # Supprimer les annotations parenthétiques ajoutées par le LLM
+        # ex. "concept-memex (Memex)" → "concept-memex"
+        raw = re.sub(r"\s*\([^)]*\)", "", raw).strip()
         slug = _slugify(raw)
 
         if slug in known_slugs:
