@@ -173,6 +173,44 @@ def _truncate(text: str, max_chars: int = 12_000) -> str:
     return text[:max_chars] + f"\n\n[… texte tronqué à {max_chars} caractères …]"
 
 
+def _fix_mojibake(text: str) -> str:
+    """Corrige le mojibake latin-1→UTF-8 (entitÃ© → entité).
+
+    Se produit quand une API renvoie du UTF-8 interprété comme latin-1.
+    """
+    try:
+        return text.encode("latin-1").decode("utf-8")
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        return text
+
+
+_LINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
+
+
+def _normalize_links(content: str, known_slugs: set[str]) -> str:
+    """Normalise les [[liens]] LLM vers des slugs réels du wiki.
+
+    Stratégie :
+    1. Si le lien correspond déjà à un slug connu → inchangé
+    2. Sinon slugifie le texte et cherche une correspondance avec préfixes
+    3. Sinon garde le texte slugifié (lien vers page future)
+    """
+    def _resolve(m: re.Match) -> str:
+        raw = m.group(1).strip()
+        slug = _slugify(raw)
+
+        if slug in known_slugs:
+            return f"[[{slug}]]"
+        for prefix in ("concept-", "entity-", "src-", "synth-"):
+            candidate = prefix + slug
+            if candidate in known_slugs:
+                return f"[[{candidate}]]"
+        # Aucune correspondance — garder slugifié pour cohérence
+        return f"[[{slug}]]"
+
+    return _LINK_RE.sub(_resolve, content)
+
+
 # ---------------------------------------------------------------------------
 # Prompts
 # ---------------------------------------------------------------------------
@@ -181,7 +219,14 @@ _SYSTEM_INGEST = """\
 Tu es l'assistant d'un wiki personnel (Wiki_LM). \
 Tu reçois une source textuelle et tu produis des pages Markdown structurées. \
 Respecte scrupuleusement les formats demandés — frontmatter YAML complet, \
-pas de prose hors des blocs demandés, slugs en minuscules sans accents."""
+pas de prose hors des blocs demandés, slugs en minuscules sans accents.
+
+Conventions de liens internes (OBLIGATOIRE) :
+- Format [[slug-exact]] avec préfixe selon la catégorie : concept-, entity-, src-, synth-
+- Slugs : minuscules, tirets, sans accents, sans espaces
+- Exemples corrects : [[concept-memex]], [[entity-vannevar-bush]], [[src-as-we-may-think]]
+- Exemples INTERDITS : [[Memex]], [[Vannevar Bush]], [[mémex]]
+- Ne pas inventer de liens vers des pages qui n'existent pas encore"""
 
 
 _PROMPT_SOURCE_PAGE = """\
@@ -526,6 +571,9 @@ class Ingestor:
             self._update_index(entity_slug, entity, "entité")
 
     def _write_wiki_page(self, slug: str, content: str) -> None:
+        content = _fix_mojibake(content)
+        known_slugs = {p.stem for p in self.wiki_dir.glob("*.md")}
+        content = _normalize_links(content, known_slugs)
         path = self.wiki_dir / f"{slug}.md"
         path.write_text(content, encoding="utf-8")
 
