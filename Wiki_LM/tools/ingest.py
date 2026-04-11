@@ -321,6 +321,30 @@ class Ingestor:
     # Public API
     # ------------------------------------------------------------------
 
+    def ingest_batch(self, url_file: str | Path, max_concepts: int = 5) -> list[str]:
+        """Ingère toutes les URLs listées dans un fichier texte.
+
+        Format du fichier : une URL par ligne, les lignes vides et commençant
+        par '#' sont ignorées.
+        Retourne la liste des slugs créés.
+        """
+        path = Path(url_file)
+        urls = [
+            line.strip()
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.strip().startswith("#")
+        ]
+        print(f"[ingest] Batch : {len(urls)} URL(s) dans {path.name}")
+        slugs = []
+        for i, url in enumerate(urls, 1):
+            print(f"\n[ingest] ({i}/{len(urls)}) {url}")
+            try:
+                slug = self.ingest(url, max_concepts=max_concepts)
+                slugs.append(slug)
+            except Exception as e:
+                print(f"[ingest] ERREUR sur {url} : {e}")
+        return slugs
+
     def ingest(self, source: str, slug: str = "", max_concepts: int = 5) -> str:
         """Ingère une source et retourne le slug de la page créée."""
         print(f"[ingest] Lecture de la source : {source}")
@@ -514,7 +538,21 @@ def main() -> None:
 
     llm = LLM(backend=args.backend, model=args.model) if (args.backend or args.model) else LLM()
     ing = Ingestor(args.wiki, llm=llm)
-    slug = ing.ingest(args.source, slug=args.slug, max_concepts=args.top_entities)
+
+    # Détection automatique : fichier local dont toutes les lignes non-vides
+    # sont des URLs → batch mode
+    source = args.source
+    if not source.startswith("http") and Path(source).is_file():
+        lines = [
+            l.strip() for l in Path(source).read_text().splitlines()
+            if l.strip() and not l.strip().startswith("#")
+        ]
+        if lines and all(l.startswith("http://") or l.startswith("https://") for l in lines):
+            slugs = ing.ingest_batch(source, max_concepts=args.top_entities)
+            print(f"\n{len(slugs)} page(s) créée(s) : {', '.join(slugs)}")
+            return
+
+    slug = ing.ingest(source, slug=args.slug, max_concepts=args.top_entities)
     print(f"\nPage créée : wiki/{slug}.md")
 
 
