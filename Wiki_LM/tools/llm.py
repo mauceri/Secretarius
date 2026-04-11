@@ -99,8 +99,9 @@ class _OpenAIBackend:
             import openai
         except ImportError as e:
             raise ImportError("pip install openai") from e
+        api_key = _env("DEEPSEEK_API_KEY") or _env("OPENAI_API_KEY", "ollama")
         self._client = openai.OpenAI(
-            api_key=_env("OPENAI_API_KEY", "ollama"),
+            api_key=api_key,
             base_url=_env("OPENAI_BASE_URL", "http://localhost:11434/v1"),
         )
         self.model = model or _env("OPENAI_MODEL", "qwen2.5:7b")
