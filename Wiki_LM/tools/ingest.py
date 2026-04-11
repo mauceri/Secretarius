@@ -52,9 +52,21 @@ def _today() -> str:
     return datetime.date.today().isoformat()
 
 
+_USER_AGENT = "WikiLM/1.0 (personal wiki ingestor; python-urllib)"
+
+
 def _read_url(url: str) -> str:
-    """Télécharge une page web et retourne le texte brut (sans HTML)."""
+    """Télécharge une page web et retourne le texte brut.
+
+    Les URLs Wikipedia sont traitées via l'API REST (texte propre, sans HTML).
+    Les autres URLs passent par un extracteur HTML léger.
+    """
     import urllib.request
+
+    # Wikipedia : API REST → texte Wikitext extrait, sans HTML
+    if "wikipedia.org/wiki/" in url:
+        return _read_wikipedia(url)
+
     import html.parser
 
     class _Stripper(html.parser.HTMLParser):
@@ -77,12 +89,41 @@ def _read_url(url: str) -> str:
                 if stripped:
                     self.parts.append(stripped)
 
-    with urllib.request.urlopen(url, timeout=30) as resp:
+    req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
+    with urllib.request.urlopen(req, timeout=30) as resp:
         raw_html = resp.read().decode("utf-8", errors="replace")
 
     stripper = _Stripper()
     stripper.feed(raw_html)
     return "\n".join(stripper.parts)
+
+
+def _read_wikipedia(url: str) -> str:
+    """Récupère le texte d'un article Wikipedia via l'API REST."""
+    import urllib.request
+    import urllib.parse
+    import json
+
+    # Extraire le titre depuis l'URL
+    # ex. https://en.wikipedia.org/wiki/Gerard_Salton → Gerard_Salton
+    parts = url.split("/wiki/", 1)
+    if len(parts) < 2:
+        raise ValueError(f"URL Wikipedia non reconnue : {url}")
+
+    lang = url.split("//")[1].split(".")[0]  # "en", "fr", …
+    title = urllib.parse.unquote(parts[1].split("#")[0])
+
+    api_url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{urllib.parse.quote(title)}"
+    req = urllib.request.Request(api_url, headers={"User-Agent": _USER_AGENT})
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = json.loads(resp.read())
+
+    # summary donne titre + extrait (~500 mots) — suffisant pour ingest
+    extract = data.get("extract", "")
+    page_title = data.get("title", title)
+    description = data.get("description", "")
+
+    return f"# {page_title}\n\n{description}\n\n{extract}"
 
 
 def _read_source(source: str) -> tuple[str, str]:
