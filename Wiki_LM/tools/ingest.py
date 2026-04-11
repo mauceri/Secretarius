@@ -305,11 +305,23 @@ def _extract_title_from_page(content: str) -> str:
 # Moteur d'ingestion
 # ---------------------------------------------------------------------------
 
+_DEFAULT_RAW = Path.home() / "Secretarius" / "Wiki_LM" / "raw"
+
+
 class Ingestor:
-    def __init__(self, wiki_path: str | Path, llm: LLM | None = None) -> None:
+    def __init__(
+        self,
+        wiki_path: str | Path,
+        llm: LLM | None = None,
+        raw_path: str | Path | None = None,
+    ) -> None:
         self.wiki_root = Path(wiki_path)
         self.wiki_dir = self.wiki_root / "wiki"
-        self.raw_dir = self.wiki_root / "raw"
+        # raw/ hors du vault Obsidian — non synchronisé, local uniquement
+        self.raw_dir = Path(
+            raw_path
+            or os.environ.get("WIKI_RAW_PATH", str(_DEFAULT_RAW))
+        )
 
         for d in (self.wiki_dir, self.raw_dir):
             d.mkdir(parents=True, exist_ok=True)
