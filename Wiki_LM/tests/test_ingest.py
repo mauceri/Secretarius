@@ -164,6 +164,49 @@ class TestRawForce:
         assert (wiki_dir / "log.md").exists()
 
 
+class TestTags:
+    def test_extra_tags_in_frontmatter(self, ingestor, wiki_dir, tmp_path):
+        src = tmp_path / "article.txt"
+        src.write_text("Contenu.", encoding="utf-8")
+        slug = ingestor.ingest(str(src), extra_tags=["ia", "local"])
+        post = frontmatter.loads((wiki_dir / f"{slug}.md").read_text())
+        assert "ia" in post["tags"]
+        assert "local" in post["tags"]
+
+    def test_tags_md_created(self, ingestor, wiki_dir, tmp_path):
+        src = tmp_path / "article.txt"
+        src.write_text("Contenu.", encoding="utf-8")
+        ingestor.ingest(str(src))
+        assert (wiki_dir / "tags.md").exists()
+
+    def test_tags_md_contains_links(self, ingestor, wiki_dir, tmp_path):
+        src = tmp_path / "article.txt"
+        src.write_text("Contenu.", encoding="utf-8")
+        slug = ingestor.ingest(str(src), extra_tags=["ia"])
+        tags_md = (wiki_dir / "tags.md").read_text()
+        assert "## ia" in tags_md
+        assert f"[[{slug}]]" in tags_md
+
+    def test_parse_raw_tags_from_url_file(self, tmp_path):
+        f = tmp_path / "test.url"
+        f.write_text("https://example.com\ntags: ia, llm\n")
+        from ingest import Ingestor
+        assert Ingestor._parse_raw_tags(f) == ["ia", "llm"]
+
+    def test_parse_raw_tags_missing(self, tmp_path):
+        f = tmp_path / "test.url"
+        f.write_text("https://example.com\n")
+        from ingest import Ingestor
+        assert Ingestor._parse_raw_tags(f) == []
+
+    def test_tags_md_rebuilt_after_raw_ingest(self, ingestor, wiki_dir, raw_dir):
+        f = raw_dir / "20260101-000000-source.txt"
+        f.write_text("Contenu.\ntags: test-tag\n", encoding="utf-8")
+        ingestor.ingest_raw_dir()
+        tags_md = (wiki_dir / "tags.md").read_text()
+        assert "## test-tag" in tags_md
+
+
 class TestConceptLinks:
     def test_concepts_linked_in_source_page(self, ingestor, wiki_dir, tmp_path):
         src = tmp_path / "article.txt"
