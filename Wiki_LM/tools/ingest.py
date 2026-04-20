@@ -263,6 +263,33 @@ def _linkify_concepts_section(
     return content
 
 
+_YAML_UNSAFE = re.compile(r":\s|[#{}[\]]")
+
+
+def _fix_yaml_scalars(content: str) -> str:
+    """Quote les valeurs scalaires YAML non-quotées qui contiennent des caractères spéciaux.
+
+    Cible principalement le champ `title` que le LLM écrit souvent sans guillemets
+    même quand la valeur contient `: ` (ex. "Guest Post: Enhancing...").
+    """
+    def _quote(m: re.Match) -> str:
+        key, value = m.group(1), m.group(2).strip()
+        if not value or value[0] in ('"', "'"):
+            return m.group(0)
+        if _YAML_UNSAFE.search(value):
+            escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+            return f"{key}: \"{escaped}\""
+        return m.group(0)
+
+    # Appliqué uniquement aux scalaires simples (pas aux listes ni aux valeurs vides)
+    return re.sub(
+        r"^(title|description):\s+(.+)$",
+        _quote,
+        content,
+        flags=re.MULTILINE,
+    )
+
+
 def _merge_tags(page_md: str, extra_tags: list[str]) -> str:
     """Injecte extra_tags dans le frontmatter YAML sans doublons."""
     if not extra_tags:
@@ -900,8 +927,15 @@ class Ingestor:
             except Exception:
                 pass
         content = _fix_mojibake(content)
+        content = _fix_yaml_scalars(content)
         known_slugs = {p.stem for p in self.wiki_dir.glob("*.md")}
         content = _normalize_links(content, known_slugs)
+        # Re-sérialiser via PyYAML pour normaliser le frontmatter
+        try:
+            post = frontmatter.loads(content)
+            content = frontmatter.dumps(post)
+        except Exception:
+            pass
         path.write_text(content, encoding="utf-8")
 
     def _update_index(self, slug: str, title: str, category: str) -> None:
