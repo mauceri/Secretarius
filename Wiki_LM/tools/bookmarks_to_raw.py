@@ -147,7 +147,11 @@ def export_to_raw(
         fname = f"{ts_base}-{i:04d}-{domain_slug}-{title_slug}.url"
 
         if not dry_run:
-            (raw / fname).write_text(url + "\n", encoding="utf-8")
+            tag = _slugify(folder.split("/")[-1], max_words=2) if folder else ""
+            file_content = url + "\n"
+            if tag:
+                file_content += f"tags: {tag}\n"
+            (raw / fname).write_text(file_content, encoding="utf-8")
         else:
             print(f"  [dry] {fname}")
             print(f"        {url[:80]}")

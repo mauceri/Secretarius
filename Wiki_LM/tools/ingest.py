@@ -263,6 +263,19 @@ def _linkify_concepts_section(
     return content
 
 
+def _merge_tags(page_md: str, extra_tags: list[str]) -> str:
+    """Injecte extra_tags dans le frontmatter YAML sans doublons."""
+    if not extra_tags:
+        return page_md
+    try:
+        post = frontmatter.loads(page_md)
+        existing = list(post.get("tags", []))
+        post["tags"] = existing + [t for t in extra_tags if t not in existing]
+        return frontmatter.dumps(post)
+    except Exception:
+        return page_md
+
+
 def _normalize_links(content: str, known_slugs: set[str]) -> str:
     """Normalise les [[liens]] LLM vers des slugs réels du wiki.
 
@@ -313,7 +326,7 @@ Voici le contenu d'une source à intégrer dans le wiki.
 
 Source : {source_name}
 Date d'ingestion : {today}
-
+{required_tags_line}
 ---
 {content}
 ---
@@ -614,9 +627,11 @@ class Ingestor:
                     if not url:
                         print(f"[ingest] Fichier .url vide ou invalide : {path.name}")
                         continue
-                    slug = self.ingest(url, max_concepts=max_concepts)
+                    user_tags = self._parse_raw_tags(path)
+                    slug = self.ingest(url, max_concepts=max_concepts, extra_tags=user_tags or None)
                 else:
-                    slug = self.ingest(str(path), max_concepts=max_concepts)
+                    user_tags = self._parse_raw_tags(path)
+                    slug = self.ingest(str(path), max_concepts=max_concepts, extra_tags=user_tags or None)
                 slugs.append(slug)
                 self._mark_ingested(path.name)
             except Exception as e:
@@ -638,6 +653,16 @@ class Ingestor:
             if line.startswith("http://") or line.startswith("https://"):
                 return line
         return ""
+
+    @staticmethod
+    def _parse_raw_tags(path: Path) -> list[str]:
+        """Lit la ligne `tags: tag1, tag2` d'un fichier raw si présente."""
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if line.lower().startswith("tags:"):
+                raw = line[5:].strip()
+                return [t.strip() for t in raw.split(",") if t.strip()]
+        return []
 
     def ingest_batch(self, url_file: str | Path, max_concepts: int = 5) -> list[str]:
         """Ingère toutes les URLs listées dans un fichier texte.
@@ -663,7 +688,13 @@ class Ingestor:
                 print(f"[ingest] ERREUR sur {url} : {e}")
         return slugs
 
-    def ingest(self, source: str, slug: str = "", max_concepts: int = 5) -> str:
+    def ingest(
+        self,
+        source: str,
+        slug: str = "",
+        max_concepts: int = 5,
+        extra_tags: list[str] | None = None,
+    ) -> str:
         """Ingère une source et retourne le slug de la page créée."""
         print(f"[ingest] Lecture de la source : {source}")
         content, title = _read_source(source)
@@ -679,8 +710,10 @@ class Ingestor:
 
         # 2. Générer la page source
         print("[ingest] Génération de la page source…")
-        source_page_md = self._generate_source_page(content, title)
+        source_page_md = self._generate_source_page(content, title, extra_tags=extra_tags)
         source_page_md = _parse_frontmatter_block(source_page_md)
+        if extra_tags:
+            source_page_md = _merge_tags(source_page_md, extra_tags)
         source_title = _extract_title_from_page(source_page_md) or title
         self._write_wiki_page(src_slug, source_page_md)
 
@@ -707,6 +740,9 @@ class Ingestor:
 
         # 6. Appender à log.md
         self._append_log("ingest", source_title)
+
+        # 7. Reconstruire l'index des tags
+        self._rebuild_tags_index()
 
         print(f"[ingest] Terminé → wiki/{src_slug}.md")
         return src_slug
@@ -748,13 +784,46 @@ class Ingestor:
                     except Exception:
                         raw_path.with_suffix(".txt").write_text(content, encoding="utf-8")
 
-    def _generate_source_page(self, content: str, source_name: str) -> str:
+    def _generate_source_page(
+        self, content: str, source_name: str, extra_tags: list[str] | None = None
+    ) -> str:
+        required_tags_line = ""
+        if extra_tags:
+            tags_str = ", ".join(extra_tags)
+            required_tags_line = f"Tags requis (à inclure dans le frontmatter) : {tags_str}\n"
         prompt = _PROMPT_SOURCE_PAGE.format(
             source_name=source_name,
             today=self.today,
             content=_truncate(content),
+            required_tags_line=required_tags_line,
         )
         return self.llm.complete(prompt, system=_SYSTEM_INGEST, max_tokens=3000)
+
+    def _rebuild_tags_index(self) -> None:
+        """Reconstruit tags.md : index tag → pages du wiki."""
+        _META = {"index.md", "log.md", "schema.md", "tags.md"}
+        tag_map: dict[str, list[tuple[str, str, str]]] = {}
+        for page in sorted(self.wiki_dir.glob("*.md")):
+            if page.name in _META:
+                continue
+            try:
+                post = frontmatter.loads(page.read_text(encoding="utf-8"))
+                tags = post.get("tags", [])
+                title = str(post.get("title", page.stem))
+                category = str(post.get("category", ""))
+                for tag in tags:
+                    tag_map.setdefault(str(tag), []).append((page.stem, category, title))
+            except Exception:
+                continue
+
+        lines = ["# Tags\n"]
+        for tag in sorted(tag_map):
+            pages = tag_map[tag]
+            lines.append(f"\n## {tag} ({len(pages)})\n\n")
+            for slug, cat, title in sorted(pages):
+                lines.append(f"- [[{slug}]] | {cat} | {title}\n")
+
+        (self.wiki_dir / "tags.md").write_text("".join(lines), encoding="utf-8")
 
     def _update_concept_page(
         self, concept: str, source_title: str, src_slug: str, full_content: str
