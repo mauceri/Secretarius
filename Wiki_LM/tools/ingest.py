@@ -30,9 +30,12 @@ import unicodedata
 from pathlib import Path
 from typing import Any
 
+import hashlib
+
 import frontmatter
 
 from llm import LLM
+from wiki_lookup import WikiLookup
 
 
 # ---------------------------------------------------------------------------
@@ -173,6 +176,56 @@ def _truncate(text: str, max_chars: int = 12_000) -> str:
     return text[:max_chars] + f"\n\n[… texte tronqué à {max_chars} caractères …]"
 
 
+def _file_hash(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _extract_url_from_file(path: Path) -> str:
+    """Extrait l'URL d'un fichier .url (les deux formats)."""
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = line.strip()
+        if line.startswith("url:"):
+            return line[4:].strip()
+        if line.startswith("http://") or line.startswith("https://"):
+            return line
+    return ""
+
+
+def _dedup_files(files: list[Path]) -> list[Path]:
+    """Déduplique une liste de fichiers par contenu.
+
+    Pour les .url : clé = URL normalisée (ignore paramètres de tracking).
+    Pour les autres : clé = SHA256 du fichier.
+    Garde le fichier le plus ancien (premier par ordre alphabétique/timestamp).
+    """
+    seen: dict[str, Path] = {}
+    result: list[Path] = []
+    for f in files:
+        if f.suffix.lower() == ".url":
+            key = _extract_url_from_file(f)
+            # Normalisation minimale : supprimer fragment et trailing slash
+            key = key.split("#")[0].rstrip("/")
+        else:
+            try:
+                key = _file_hash(f)
+            except OSError:
+                result.append(f)
+                continue
+        if not key:
+            result.append(f)
+            continue
+        if key in seen:
+            print(f"[ingest] Doublon ignoré : {f.name} (même contenu que {seen[key].name})")
+        else:
+            seen[key] = f
+            result.append(f)
+    return result
+
+
 def _fix_mojibake(text: str) -> str:
     """Corrige le mojibake latin-1→UTF-8 (entitÃ© → entité).
 
@@ -204,7 +257,7 @@ def _normalize_links(content: str, known_slugs: set[str]) -> str:
 
         if slug in known_slugs:
             return f"[[{slug}]]"
-        for prefix in ("concept-", "entity-", "src-", "synth-"):
+        for prefix in ("c-", "e-", "src-", "synth-"):
             candidate = prefix + slug
             if candidate in known_slugs:
                 return f"[[{candidate}]]"
@@ -225,9 +278,9 @@ Respecte scrupuleusement les formats demandés — frontmatter YAML complet, \
 pas de prose hors des blocs demandés, slugs en minuscules sans accents.
 
 Conventions de liens internes (OBLIGATOIRE) :
-- Format [[slug-exact]] avec préfixe selon la catégorie : concept-, entity-, src-, synth-
+- Format [[slug-exact]] avec préfixe selon la catégorie : c-, e-, src-, synth-
 - Slugs : minuscules, tirets, sans accents, sans espaces
-- Exemples corrects : [[concept-memex]], [[entity-vannevar-bush]], [[src-as-we-may-think]]
+- Exemples corrects : [[c-memex]], [[e-vannevar-bush]], [[src-as-we-may-think]]
 - Exemples INTERDITS : [[Memex]], [[Vannevar Bush]], [[mémex]]
 - Ne pas inventer de liens vers des pages qui n'existent pas encore"""
 
@@ -279,6 +332,15 @@ importants, un par ligne, au format :
 """
 
 
+_PROMPT_WIKI_ANCHOR = """\
+
+Définition de référence (Wikipedia, à utiliser comme ancre factuelle) :
+---
+{abstract}
+---
+"""
+
+
 _PROMPT_CONCEPT_PAGE = """\
 Tu enrichis la page wiki du concept "{concept}" à partir d'une nouvelle source.
 
@@ -304,16 +366,25 @@ category: concept
 tags: [<tags>]
 created: <date originale ou {today}>
 sources: [{source_slug}<, anciens sources>]
+status: nouveau
 ---
 ```
 
 # <Nom du concept>
 
-<Corps de la page : définition, contexte, importance. 2 à 4 paragraphes.>
+<Corps de la page : définition factuelle et historique du concept, 2 à 4 paragraphes.>
+
+RÈGLES STRICTES :
+- Rester factuel et encyclopédique. Ne pas interpréter l'importance du concept pour ce wiki.
+- Ne pas écrire de phrases du type "dans le contexte de ce wiki" ou "ce concept est important car".
+- Ne pas spéculer sur les usages futurs ou la pertinence pour l'utilisateur.
+- Si le concept a plusieurs acceptions distinctes (ex. Jung peut désigner un psychanalyste \
+ou une querelle théorique), les traiter séparément sans en privilégier une.
+- S'en tenir strictement à ce que l'extrait source permet d'affirmer.
 
 ## Liens
 
-<Liens [[slug]] vers pages connexes>
+<Liens [[slug]] vers pages connexes, uniquement si clairement établis par la source>
 """
 
 
@@ -342,16 +413,23 @@ category: entité
 tags: [<tags>]
 created: <date originale ou {today}>
 sources: [{source_slug}<, anciens sources>]
+status: nouveau
 ---
 ```
 
 # <Nom de l'entité>
 
-<Corps : qui/quoi, rôle, importance dans le contexte du wiki. 1 à 3 paragraphes.>
+<Corps : identité factuelle, dates, domaine d'activité, faits établis. 1 à 3 paragraphes.>
+
+RÈGLES STRICTES :
+- Rester factuel. Ne pas écrire "dans le contexte de ce wiki" ni juger de l'importance pour l'utilisateur.
+- Ne pas spéculer au-delà de ce que l'extrait source permet d'affirmer.
+- Si l'entité a plusieurs facettes distinctes (ex. une personne connue pour plusieurs œuvres \
+ou controverses), les mentionner toutes sans en privilégier une arbitrairement.
 
 ## Liens
 
-<Liens [[slug]] vers pages connexes>
+<Liens [[slug]] vers pages connexes, uniquement si clairement établis par la source>
 """
 
 
@@ -417,10 +495,126 @@ class Ingestor:
 
         self.llm = llm or LLM()
         self.today = _today()
+        self._wiki_lookup = WikiLookup(wiki_path)
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
+
+    # Fichier manifeste des fichiers raw/ déjà ingérés
+    _MANIFEST = ".ingested"
+
+    def _load_manifest(self) -> set[str]:
+        """Retourne l'ensemble des noms de fichiers déjà ingérés."""
+        path = self.raw_dir / self._MANIFEST
+        if not path.exists():
+            return set()
+        return set(path.read_text(encoding="utf-8").splitlines())
+
+    def _mark_ingested(self, filename: str) -> None:
+        """Ajoute un fichier au manifeste."""
+        path = self.raw_dir / self._MANIFEST
+        with path.open("a", encoding="utf-8") as f:
+            f.write(filename + "\n")
+
+    def _reset_wiki(self) -> None:
+        """Supprime toutes les pages non-immuables et réinitialise index.md.
+
+        Appelé avant une reconstruction complète (--raw --force).
+        Les pages avec status: immuable sont préservées.
+        Les fichiers meta (log.md, schema.md) sont préservés.
+        """
+        _META = {"index.md", "log.md", "schema.md"}
+        _PAGE_PREFIXES = ("src-", "c-", "e-", "synth-")
+        deleted = 0
+        for page in self.wiki_dir.glob("*.md"):
+            if page.name in _META:
+                continue
+            if not any(page.stem.startswith(p) for p in _PAGE_PREFIXES):
+                continue
+            try:
+                post = frontmatter.loads(page.read_text(encoding="utf-8"))
+                if post.get("status") == "immuable":
+                    print(f"[ingest] Page immuable conservée : {page.name}")
+                    continue
+            except Exception:
+                pass
+            page.unlink()
+            deleted += 1
+        print(f"[ingest] reset : {deleted} page(s) supprimée(s)")
+        # Réinitialiser index.md
+        (self.wiki_dir / "index.md").write_text("# Index\n\n", encoding="utf-8")
+        print("[ingest] index.md réinitialisé")
+
+    def ingest_raw_dir(self, max_concepts: int = 5, force: bool = False) -> list[str]:
+        """Ingère les fichiers de raw/ non encore traités (mode incrémental par défaut).
+
+        - .url  → lit l'URL et ingère la page web
+        - .md   → ingère comme note locale
+        - .pdf  → ingère le PDF
+        - Autres extensions reconnues (.txt, .html) → ingère comme texte
+
+        force=True : réinitialise le wiki (pages + index) et retraite tout.
+        Retourne la liste des slugs créés ou mis à jour.
+        """
+        if force:
+            self._reset_wiki()
+        already_done = set() if force else self._load_manifest()
+
+        files = sorted(self.raw_dir.iterdir())
+        processable = [
+            f for f in files
+            if f.is_file()
+            and f.suffix.lower() in (".url", ".md", ".pdf", ".txt", ".html")
+            and f.name != self._MANIFEST
+        ]
+
+        pending = _dedup_files([f for f in processable if f.name not in already_done])
+        skipped = len(processable) - len(pending)
+
+        if skipped:
+            print(f"[ingest] raw/ : {len(pending)} nouveau(x) fichier(s) "
+                  f"({skipped} déjà ingéré(s), ignorés)")
+        else:
+            print(f"[ingest] raw/ : {len(pending)} fichier(s) à traiter")
+
+        if not pending:
+            print("[ingest] Rien de nouveau à ingérer.")
+            return []
+
+        slugs = []
+        for i, path in enumerate(pending, 1):
+            print(f"\n[ingest] ({i}/{len(pending)}) {path.name}")
+            try:
+                if path.suffix.lower() == ".url":
+                    url = self._parse_url_file(path)
+                    if not url:
+                        print(f"[ingest] Fichier .url vide ou invalide : {path.name}")
+                        continue
+                    slug = self.ingest(url, max_concepts=max_concepts)
+                else:
+                    slug = self.ingest(str(path), max_concepts=max_concepts)
+                slugs.append(slug)
+                self._mark_ingested(path.name)
+            except Exception as e:
+                print(f"[ingest] ERREUR sur {path.name} : {e}")
+
+        return slugs
+
+    @staticmethod
+    def _parse_url_file(path: Path) -> str:
+        """Lit l'URL depuis un fichier .url (deux formats supportés).
+
+        Format capture.py : première ligne = URL nue
+        Format _save_raw() : ligne "url: https://..."
+        """
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line.startswith("url:"):
+                return line[4:].strip()
+            if line.startswith("http://") or line.startswith("https://"):
+                return line
+        return ""
 
     def ingest_batch(self, url_file: str | Path, max_concepts: int = 5) -> list[str]:
         """Ingère toutes les URLs listées dans un fichier texte.
@@ -451,8 +645,10 @@ class Ingestor:
         print(f"[ingest] Lecture de la source : {source}")
         content, title = _read_source(source)
 
-        # Slug de la page source
-        src_slug = f"src-{slug or _slugify(title)}"
+        # Slug de la page source (éviter le double préfixe si le titre commence déjà par src-)
+        base_slug = slug or _slugify(title)
+        base_slug = re.sub(r"^src-", "", base_slug)
+        src_slug = f"src-{base_slug}"
         print(f"[ingest] Slug : {src_slug}")
 
         # 1. Sauvegarder dans raw/ (immutable)
@@ -505,14 +701,24 @@ class Ingestor:
                 )
         else:
             src_path = Path(source)
-            # Copier le fichier original si possible
+            # Si le fichier source est déjà dans raw/, pas de copie nécessaire
+            if src_path.parent.resolve() == self.raw_dir.resolve():
+                return
             raw_path = self.raw_dir / f"{slug}{src_path.suffix or '.txt'}"
             if not raw_path.exists():
-                import shutil
-                try:
-                    shutil.copy2(src_path, raw_path)
-                except Exception:
-                    raw_path.with_suffix(".txt").write_text(content, encoding="utf-8")
+                # Ne pas copier si un fichier de même contenu existe déjà dans raw/
+                src_hash = _file_hash(src_path) if src_path.exists() else None
+                already_there = src_hash and any(
+                    p != src_path and _file_hash(p) == src_hash
+                    for p in self.raw_dir.iterdir()
+                    if p.is_file() and p.suffix == src_path.suffix
+                )
+                if not already_there:
+                    import shutil
+                    try:
+                        shutil.copy2(src_path, raw_path)
+                    except Exception:
+                        raw_path.with_suffix(".txt").write_text(content, encoding="utf-8")
 
     def _generate_source_page(self, content: str, source_name: str) -> str:
         prompt = _PROMPT_SOURCE_PAGE.format(
@@ -525,12 +731,18 @@ class Ingestor:
     def _update_concept_page(
         self, concept: str, source_title: str, src_slug: str, full_content: str
     ) -> None:
-        concept_slug = f"concept-{_slugify(concept)}"
+        concept_slug = f"c-{_slugify(concept)}"
         page_path = self.wiki_dir / f"{concept_slug}.md"
         existing = page_path.read_text(encoding="utf-8") if page_path.exists() else ""
 
         # Extrait contextuel : premières occurrences du concept dans la source
         excerpt = self._find_excerpt(full_content, concept)
+
+        wiki_anchor = ""
+        wp = self._wiki_lookup.lookup(concept)
+        if wp:
+            wiki_anchor = _PROMPT_WIKI_ANCHOR.format(abstract=wp["abstract"])
+            print(f"[ingest] Wikipedia trouvé pour concept '{concept}' ({wp['lang']})")
 
         prompt = _PROMPT_CONCEPT_PAGE.format(
             concept=concept,
@@ -539,7 +751,7 @@ class Ingestor:
             source_slug=src_slug,
             excerpt=excerpt,
             today=self.today,
-        )
+        ) + wiki_anchor
         print(f"[ingest] Mise à jour concept : {concept_slug}")
         page_md = self.llm.complete(prompt, system=_SYSTEM_INGEST, max_tokens=1500)
         page_md = _parse_frontmatter_block(page_md)
@@ -551,11 +763,17 @@ class Ingestor:
     def _update_entity_page(
         self, entity: str, source_title: str, src_slug: str, full_content: str
     ) -> None:
-        entity_slug = f"entity-{_slugify(entity)}"
+        entity_slug = f"e-{_slugify(entity)}"
         page_path = self.wiki_dir / f"{entity_slug}.md"
         existing = page_path.read_text(encoding="utf-8") if page_path.exists() else ""
 
         excerpt = self._find_excerpt(full_content, entity)
+
+        wiki_anchor = ""
+        wp = self._wiki_lookup.lookup(entity)
+        if wp:
+            wiki_anchor = _PROMPT_WIKI_ANCHOR.format(abstract=wp["abstract"])
+            print(f"[ingest] Wikipedia trouvé pour entité '{entity}' ({wp['lang']})")
 
         prompt = _PROMPT_ENTITY_PAGE.format(
             entity=entity,
@@ -564,7 +782,7 @@ class Ingestor:
             source_slug=src_slug,
             excerpt=excerpt,
             today=self.today,
-        )
+        ) + wiki_anchor
         print(f"[ingest] Mise à jour entité : {entity_slug}")
         page_md = self.llm.complete(prompt, system=_SYSTEM_INGEST, max_tokens=1500)
         page_md = _parse_frontmatter_block(page_md)
@@ -574,17 +792,26 @@ class Ingestor:
             self._update_index(entity_slug, entity, "entité")
 
     def _write_wiki_page(self, slug: str, content: str) -> None:
+        path = self.wiki_dir / f"{slug}.md"
+        # Respecter le statut immuable : ne jamais écraser une page verrouillée
+        if path.exists():
+            try:
+                existing = frontmatter.loads(path.read_text(encoding="utf-8"))
+                if existing.get("status") == "immuable":
+                    print(f"[ingest] Page immuable, ignorée : {slug}.md")
+                    return
+            except Exception:
+                pass
         content = _fix_mojibake(content)
         known_slugs = {p.stem for p in self.wiki_dir.glob("*.md")}
         content = _normalize_links(content, known_slugs)
-        path = self.wiki_dir / f"{slug}.md"
         path.write_text(content, encoding="utf-8")
 
     def _update_index(self, slug: str, title: str, category: str) -> None:
         """Ajoute ou met à jour la ligne du slug dans index.md."""
         index_path = self.wiki_dir / "index.md"
         if not index_path.exists():
-            return
+            index_path.write_text("# Index\n\n", encoding="utf-8")
 
         text = index_path.read_text(encoding="utf-8")
         entry = f"- [[{slug}]] | {category} | {title}"
@@ -628,7 +855,10 @@ class Ingestor:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Ingère une source dans Wiki_LM")
-    parser.add_argument("source", help="Chemin fichier ou URL https://…")
+    parser.add_argument(
+        "source", nargs="?", default="",
+        help="Chemin fichier ou URL https://… (omis si --raw)"
+    )
     parser.add_argument("--slug", default="", help="Slug personnalisé (sans préfixe src-)")
     parser.add_argument("--top-entities", type=int, default=5, help="Nombre max de concepts/entités à enrichir")
     parser.add_argument(
@@ -638,10 +868,27 @@ def main() -> None:
     )
     parser.add_argument("--backend", default="", help="Backend LLM : claude | ollama | openai")
     parser.add_argument("--model", default="", help="Modèle LLM (ex: qwen2.5:7b)")
+    parser.add_argument(
+        "--raw", action="store_true",
+        help="Ingère les nouveaux fichiers de raw/ (.url, .md, .pdf, .txt)",
+    )
+    parser.add_argument(
+        "--force", action="store_true",
+        help="Avec --raw : retraite tous les fichiers, même déjà ingérés",
+    )
     args = parser.parse_args()
 
     llm = LLM(backend=args.backend, model=args.model) if (args.backend or args.model) else LLM()
     ing = Ingestor(args.wiki, llm=llm)
+
+    # Mode --raw : ingestion incrémentale (ou complète avec --force)
+    if args.raw:
+        slugs = ing.ingest_raw_dir(max_concepts=args.top_entities, force=args.force)
+        print(f"\n{len(slugs)} page(s) créée(s) ou mises à jour : {', '.join(slugs)}")
+        return
+
+    if not args.source:
+        parser.error("Fournir une source ou utiliser --raw")
 
     # Détection automatique : fichier local dont toutes les lignes non-vides
     # sont des URLs → batch mode

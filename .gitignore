@@ -1,0 +1,22 @@
+# Environnements Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Données runtime Wiki_LM
+Wiki_LM/wiki/
+Wiki_LM/raw/
+Wiki_LM/zim/
+Wiki_LM/wiki_cache.db
+Wiki_LM/bookmarks.json
+Wiki_LM/corpus-pkm.txt
+
+# Secrets / config locale
+.env
+*.key
+
+# Divers
+*.log
+.DS_Store
