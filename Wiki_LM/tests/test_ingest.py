@@ -164,6 +164,32 @@ class TestRawForce:
         assert (wiki_dir / "log.md").exists()
 
 
+class TestConceptLinks:
+    def test_concepts_linked_in_source_page(self, ingestor, wiki_dir, tmp_path):
+        src = tmp_path / "article.txt"
+        src.write_text("Contenu.", encoding="utf-8")
+        slug = ingestor.ingest(str(src))
+        text = (wiki_dir / f"{slug}.md").read_text()
+        # MockLLM injecte "zettelkasten" et "Vannevar Bush"
+        assert "[[c-zettelkasten]]" in text
+        assert "[[e-vannevar-bush]]" in text
+
+    def test_raw_names_replaced_not_duplicated(self, ingestor, wiki_dir, tmp_path):
+        src = tmp_path / "article.txt"
+        src.write_text("Contenu.", encoding="utf-8")
+        slug = ingestor.ingest(str(src))
+        text = (wiki_dir / f"{slug}.md").read_text()
+        # Les noms nus ne doivent plus apparaître dans la section
+        import re
+        section = re.search(
+            r"## Concepts et entités mentionnés(.+?)(?=##|\Z)", text, re.DOTALL
+        )
+        assert section is not None
+        body = section.group(1)
+        assert "- concept: zettelkasten" not in body
+        assert "- entité: Vannevar Bush" not in body
+
+
 class TestParseUrlFile:
     def test_bare_url(self, tmp_path):
         f = tmp_path / "test.url"
