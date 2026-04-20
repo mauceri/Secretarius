@@ -63,6 +63,21 @@ def _normalize_url(url: str) -> str:
         return url.strip()
 
 
+def _folder_tag(folder: str) -> str:
+    """Convertit le chemin Brave en tag hiérarchique Obsidian.
+
+    Ex. "Favoris/Humain/Philo/Heidegger" → "humain/philo/heidegger"
+    Le premier composant (racine Brave) est supprimé.
+    """
+    parts = [p for p in folder.split("/") if p]
+    if len(parts) > 1:
+        parts = parts[1:]   # supprimer "Favoris" ou équivalent
+    elif not parts:
+        return ""
+    slugged = [_slugify(p, max_words=3) for p in parts]
+    return "/".join(s for s in slugged if s)
+
+
 def _slugify(text: str, max_words: int = 5) -> str:
     text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
     text = re.sub(r"[^\w\s-]", "", text.lower())
@@ -147,7 +162,7 @@ def export_to_raw(
         fname = f"{ts_base}-{i:04d}-{domain_slug}-{title_slug}.url"
 
         if not dry_run:
-            tag = _slugify(folder.split("/")[-1], max_words=2) if folder else ""
+            tag = _folder_tag(folder)
             file_content = url + "\n"
             if tag:
                 file_content += f"tags: {tag}\n"
