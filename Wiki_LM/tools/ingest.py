@@ -240,6 +240,29 @@ def _fix_mojibake(text: str) -> str:
 _LINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 
 
+def _linkify_concepts_section(
+    content: str, concepts: list[str], entities: list[str]
+) -> str:
+    """Remplace les noms nus par [[c-slug]] / [[e-slug]] dans la section concepts/entités."""
+    for name in concepts:
+        slug = f"c-{_slugify(name)}"
+        content = re.sub(
+            rf"^(-\s+concept:\s+){re.escape(name)}$",
+            rf"\1[[{slug}]]",
+            content,
+            flags=re.MULTILINE | re.IGNORECASE,
+        )
+    for name in entities:
+        slug = f"e-{_slugify(name)}"
+        content = re.sub(
+            rf"^(-\s+entit[eé]:\s+){re.escape(name)}$",
+            rf"\1[[{slug}]]",
+            content,
+            flags=re.MULTILINE | re.IGNORECASE,
+        )
+    return content
+
+
 def _normalize_links(content: str, known_slugs: set[str]) -> str:
     """Normalise les [[liens]] LLM vers des slugs réels du wiki.
 
@@ -673,6 +696,11 @@ class Ingestor:
 
         for entity in entities:
             self._update_entity_page(entity, source_title, src_slug, content)
+
+        # 4b. Réécrire la page source avec des [[liens]] dans la section concepts/entités
+        if concepts or entities:
+            source_page_md = _linkify_concepts_section(source_page_md, concepts, entities)
+            self._write_wiki_page(src_slug, source_page_md)
 
         # 5. Mettre à jour index.md
         self._update_index(src_slug, source_title, "source")
