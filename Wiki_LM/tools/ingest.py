@@ -101,12 +101,16 @@ def _read_arxiv(url: str) -> str:
 
 
 def _is_binary_content(text: str) -> bool:
-    """Détecte un contenu PDF non décodé (binaire, flux d'objets)."""
-    if len(text) < 100:
-        return True
-    printable = sum(1 for c in text[:2000] if c.isprintable() or c in "\n\r\t")
-    ratio = printable / min(len(text), 2000)
-    return ratio < 0.70
+    """Détecte un contenu PDF non décodé (binaire, flux d'objets).
+
+    N'est significatif que pour des contenus longs (> 200 chars) — les sources
+    courtes mais lisibles (notes, stubs) ne doivent pas être marquées illisibles.
+    """
+    if len(text.strip()) < 200:
+        return False
+    sample = text[:2000]
+    printable = sum(1 for c in sample if c.isprintable() or c in "\n\r\t")
+    return printable / len(sample) < 0.70
 
 
 def _read_url(url: str) -> str:
@@ -797,7 +801,18 @@ class Ingestor:
         # 1. Sauvegarder dans raw/ (immutable)
         self._save_raw(source, content, src_slug)
 
-        # 2. Générer la page source
+        # 2. Générer la page source (ou page "illisible" si contenu dégradé)
+        if _is_binary_content(content):
+            print(f"[ingest] Contenu illisible → page stub")
+            source_page_md = self._stub_page(title, src_slug, extra_tags)
+            source_title = title
+            self._write_wiki_page(src_slug, source_page_md)
+            self._update_index(src_slug, source_title, "source")
+            self._append_log("illisible", source_title)
+            self._rebuild_tags_index()
+            print(f"[ingest] Stub créé → wiki/{src_slug}.md")
+            return src_slug
+
         print("[ingest] Génération de la page source…")
         source_page_md = self._generate_source_page(content, title, extra_tags=extra_tags)
         source_page_md = _parse_frontmatter_block(source_page_md)
@@ -872,6 +887,24 @@ class Ingestor:
                         shutil.copy2(src_path, raw_path)
                     except Exception:
                         raw_path.with_suffix(".txt").write_text(content, encoding="utf-8")
+
+    def _stub_page(self, title: str, slug: str, extra_tags: list[str] | None = None) -> str:
+        """Génère une page minimale pour une source illisible (PDF chiffré, binaire…)."""
+        tags = ["illisible"] + (extra_tags or [])
+        tags_yaml = "[" + ", ".join(tags) + "]"
+        return (
+            f"---\n"
+            f"title: \"{title}\"\n"
+            f"category: source\n"
+            f"tags: {tags_yaml}\n"
+            f"created: {self.today}\n"
+            f"sources: []\n"
+            f"status: illisible\n"
+            f"---\n\n"
+            f"# {title}\n\n"
+            f"Source illisible — contenu binaire, chiffré ou corrompu.\n"
+            f"À réingérer manuellement si le document devient accessible.\n"
+        )
 
     def _generate_source_page(
         self, content: str, source_name: str, extra_tags: list[str] | None = None
