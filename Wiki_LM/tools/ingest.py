@@ -58,13 +58,69 @@ def _today() -> str:
 _USER_AGENT = "WikiLM/1.0 (personal wiki ingestor; python-urllib)"
 
 
+def _read_arxiv(url: str) -> str:
+    """Récupère les métadonnées d'un papier ArXiv via l'API Atom."""
+    import urllib.request
+    import urllib.parse
+    import re as _re
+
+    # Extraire l'identifiant ArXiv depuis l'URL (pdf ou abs)
+    # ex. https://arxiv.org/pdf/1204.1550.pdf  → 1204.1550
+    # ex. https://arxiv.org/abs/1607.01668v2   → 1607.01668v2
+    m = _re.search(r"arxiv\.org/(?:pdf|abs)/([^/?#]+?)(?:\.pdf)?$", url, _re.IGNORECASE)
+    if not m:
+        raise ValueError(f"Identifiant ArXiv non trouvé dans : {url}")
+    arxiv_id = m.group(1)
+
+    api_url = f"https://export.arxiv.org/api/query?id_list={urllib.parse.quote(arxiv_id)}"
+    req = urllib.request.Request(api_url, headers={"User-Agent": _USER_AGENT})
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        xml = resp.read().decode("utf-8", errors="replace")
+
+    def _tag(name: str) -> str:
+        m2 = _re.search(rf"<{name}[^>]*>(.*?)</{name}>", xml, _re.DOTALL)
+        return m2.group(1).strip() if m2 else ""
+
+    title = _tag("title").replace("\n", " ").strip()
+    # Le premier <title> est le titre de l'entrée Atom ("ArXiv Query…"), le second est le papier
+    titles = _re.findall(r"<title[^>]*>(.*?)</title>", xml, _re.DOTALL)
+    paper_title = titles[1].strip().replace("\n", " ") if len(titles) > 1 else title
+
+    summary = _tag("summary").replace("\n", " ").strip()
+    authors = ", ".join(_re.findall(r"<name>(.*?)</name>", xml))
+    categories = " ".join(_re.findall(r'term="([^"]+)"', xml))
+    published = _tag("published")[:10]
+
+    return (
+        f"# {paper_title}\n\n"
+        f"Auteurs : {authors}\n"
+        f"Publié : {published}\n"
+        f"Catégories : {categories}\n\n"
+        f"## Résumé\n\n{summary}\n"
+    )
+
+
+def _is_binary_content(text: str) -> bool:
+    """Détecte un contenu PDF non décodé (binaire, flux d'objets)."""
+    if len(text) < 100:
+        return True
+    printable = sum(1 for c in text[:2000] if c.isprintable() or c in "\n\r\t")
+    ratio = printable / min(len(text), 2000)
+    return ratio < 0.70
+
+
 def _read_url(url: str) -> str:
     """Télécharge une page web et retourne le texte brut.
 
     Les URLs Wikipedia sont traitées via l'API REST (texte propre, sans HTML).
+    Les URLs ArXiv (pdf ou abs) sont traitées via l'API Atom.
     Les autres URLs passent par un extracteur HTML léger.
     """
     import urllib.request
+
+    # ArXiv : API Atom → métadonnées structurées
+    if "arxiv.org/pdf/" in url or "arxiv.org/abs/" in url:
+        return _read_arxiv(url)
 
     # Wikipedia : API REST → texte Wikitext extrait, sans HTML
     if "wikipedia.org/wiki/" in url:
@@ -154,19 +210,25 @@ def _read_source(source: str) -> tuple[str, str]:
 
 def _read_pdf(path: Path) -> str:
     """Extrait le texte d'un PDF via pypdf (si disponible) ou pdfminer."""
+    text = ""
     try:
         import pypdf
         reader = pypdf.PdfReader(str(path))
-        return "\n".join(page.extract_text() or "" for page in reader.pages)
+        text = "\n".join(page.extract_text() or "" for page in reader.pages)
     except ImportError:
-        pass
-    try:
-        from pdfminer.high_level import extract_text
-        return extract_text(str(path))
-    except ImportError:
-        raise ImportError(
-            "Installez pypdf ou pdfminer.six pour lire les PDF : pip install pypdf"
+        try:
+            from pdfminer.high_level import extract_text
+            text = extract_text(str(path))
+        except ImportError:
+            raise ImportError(
+                "Installez pypdf ou pdfminer.six pour lire les PDF : pip install pypdf"
+            )
+    if _is_binary_content(text):
+        raise ValueError(
+            f"PDF illisible (contenu binaire ou chiffré) : {path.name}. "
+            "Vérifiez que le fichier n'est pas protégé ou corrompu."
         )
+    return text
 
 
 def _truncate(text: str, max_chars: int = 12_000) -> str:
