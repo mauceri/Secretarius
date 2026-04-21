@@ -735,7 +735,8 @@ class Ingestor:
 
         slugs = []
         for i, path in enumerate(pending, 1):
-            print(f"\n[ingest] ({i}/{len(pending)}) {path.name}")
+            ts = datetime.datetime.now().strftime("%H:%M:%S")
+            print(f"\n[ingest] ({i}/{len(pending)}) {ts} — {path.name}")
             try:
                 if path.suffix.lower() == ".url":
                     url = self._parse_url_file(path)
