@@ -473,10 +473,24 @@ _WIKI_ANCHOR_RE = re.compile(
 )
 
 
+def _format_wiki_abstract(abstract: str) -> str:
+    """Nettoie l'abstract Wikipedia pour un rendu Markdown propre."""
+    lines = []
+    for line in abstract.splitlines():
+        # Listes wikicode séparées par ";" → tirets Markdown
+        stripped = line.strip()
+        if stripped.startswith(";"):
+            lines.append("- " + stripped[1:].strip())
+        elif stripped:
+            lines.append(stripped)
+    return "\n".join(lines)
+
+
 def _append_wiki_section(page_md: str, wp: dict) -> str:
     """Ajoute une section ## Extrait Wikipedia en bas de page."""
     url_line = f"\n*[Source Wikipedia]({wp['url']})*\n" if wp.get("url") else ""
-    section = f"\n## Extrait Wikipedia\n\n{wp['abstract']}\n{url_line}"
+    abstract = _format_wiki_abstract(wp["abstract"])
+    section = f"\n## Extrait Wikipedia\n\n{abstract}\n{url_line}"
     return page_md.rstrip() + "\n" + section
 
 
