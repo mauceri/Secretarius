@@ -473,6 +473,13 @@ _WIKI_ANCHOR_RE = re.compile(
 )
 
 
+def _append_wiki_section(page_md: str, wp: dict) -> str:
+    """Ajoute une section ## Extrait Wikipedia en bas de page."""
+    url_line = f"\n*[Source Wikipedia]({wp['url']})*\n" if wp.get("url") else ""
+    section = f"\n## Extrait Wikipedia\n\n{wp['abstract']}\n{url_line}"
+    return page_md.rstrip() + "\n" + section
+
+
 def _strip_wiki_anchor(content: str) -> str:
     """Supprime le bloc ancre Wikipedia si le LLM l'a recopié dans sa sortie."""
     return _WIKI_ANCHOR_RE.sub("", content).rstrip() + "\n"
@@ -990,6 +997,8 @@ class Ingestor:
         page_md = self.llm.complete(prompt, system=_SYSTEM_INGEST, max_tokens=1500)
         page_md = _parse_frontmatter_block(page_md)
         page_md = _strip_wiki_anchor(page_md)
+        if wp:
+            page_md = _append_wiki_section(page_md, wp)
         self._write_wiki_page(concept_slug, page_md)
 
         if not existing:
@@ -1022,6 +1031,8 @@ class Ingestor:
         page_md = self.llm.complete(prompt, system=_SYSTEM_INGEST, max_tokens=1500)
         page_md = _parse_frontmatter_block(page_md)
         page_md = _strip_wiki_anchor(page_md)
+        if wp:
+            page_md = _append_wiki_section(page_md, wp)
         self._write_wiki_page(entity_slug, page_md)
 
         if not existing:
