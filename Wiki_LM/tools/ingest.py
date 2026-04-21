@@ -468,7 +468,7 @@ importants, un par ligne, au format :
 
 
 _WIKI_ANCHOR_RE = re.compile(
-    r"\n*>\s*\*\*R[eé]f[eé]rence Wikipedia\*\*.*",
+    r"\n*R[eé]f[eé]rence Wikipedia\b.*",
     re.DOTALL | re.IGNORECASE,
 )
 
