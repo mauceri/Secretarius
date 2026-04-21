@@ -1022,7 +1022,8 @@ class Ingestor:
         log_path = self.wiki_dir / "log.md"
         if not log_path.exists():
             return
-        entry = f"\n## [{self.today}] {operation} | {title}\n"
+        ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        entry = f"\n## [{ts}] {operation} | {title}\n"
         with log_path.open("a", encoding="utf-8") as f:
             f.write(entry)
 
