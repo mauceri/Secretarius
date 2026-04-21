@@ -468,7 +468,7 @@ importants, un par ligne, au format :
 
 
 _WIKI_ANCHOR_RE = re.compile(
-    r"\n*D[eé]finition de r[eé]f[eé]rence\s*\([^)]*Wikipedia[^)]*\)\s*:?\s*\n[-]{3,}.*?[-]{3,}\s*$",
+    r"\n*>\s*\*\*R[eé]f[eé]rence Wikipedia\*\*.*",
     re.DOTALL | re.IGNORECASE,
 )
 
@@ -480,10 +480,8 @@ def _strip_wiki_anchor(content: str) -> str:
 
 _PROMPT_WIKI_ANCHOR = """\
 
-Définition de référence (Wikipedia, à utiliser comme ancre factuelle) :
----
+Référence Wikipedia (contexte factuel — utiliser comme base, ne pas recopier verbatim) :
 {abstract}
----
 """
 
 
