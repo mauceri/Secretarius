@@ -307,25 +307,31 @@ _LINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 
 
 def _linkify_concepts_section(
-    content: str, concepts: list[str], entities: list[str]
+    content: str, concepts: list[str] | None = None, entities: list[str] | None = None
 ) -> str:
-    """Remplace les noms nus par [[c-slug]] / [[e-slug]] dans la section concepts/entités."""
-    for name in concepts:
-        slug = f"c-{_slugify(name)}"
-        content = re.sub(
-            rf"^(-\s+concept:\s+){re.escape(name)}$",
-            rf"\1[[{slug}]]",
-            content,
-            flags=re.MULTILINE | re.IGNORECASE,
-        )
-    for name in entities:
-        slug = f"e-{_slugify(name)}"
-        content = re.sub(
-            rf"^(-\s+entit[eé]:\s+){re.escape(name)}$",
-            rf"\1[[{slug}]]",
-            content,
-            flags=re.MULTILINE | re.IGNORECASE,
-        )
+    """Remplace les noms nus par [[c-slug]] / [[e-slug]] dans la section concepts/entités.
+
+    Opère directement sur le texte — indépendant de la liste concepts/entities,
+    ce qui évite les omissions dues à la troncature max_concepts.
+    """
+    def _replace(m: re.Match, prefix: str) -> str:
+        leader, name = m.group(1), m.group(2).strip()
+        if name.startswith("[["):
+            return m.group(0)
+        return f"{leader}[[{prefix}{_slugify(name)}]]"
+
+    content = re.sub(
+        r"^(-\s+concept:\s+)([^\[].+)$",
+        lambda m: _replace(m, "c-"),
+        content,
+        flags=re.MULTILINE,
+    )
+    content = re.sub(
+        r"^(-\s+entit[eé]:\s+)([^\[].+)$",
+        lambda m: _replace(m, "e-"),
+        content,
+        flags=re.MULTILINE,
+    )
     return content
 
 
@@ -459,6 +465,17 @@ importants, un par ligne, au format :
 
 <Liens wiki [[slug]] vers des pages existantes si pertinent, sinon "Aucun">
 """
+
+
+_WIKI_ANCHOR_RE = re.compile(
+    r"\n*D[eé]finition de r[eé]f[eé]rence\s*\([^)]*Wikipedia[^)]*\)\s*:?\s*\n[-]{3,}.*?[-]{3,}\s*$",
+    re.DOTALL | re.IGNORECASE,
+)
+
+
+def _strip_wiki_anchor(content: str) -> str:
+    """Supprime le bloc ancre Wikipedia si le LLM l'a recopié dans sa sortie."""
+    return _WIKI_ANCHOR_RE.sub("", content).rstrip() + "\n"
 
 
 _PROMPT_WIKI_ANCHOR = """\
@@ -974,6 +991,7 @@ class Ingestor:
         print(f"[ingest] Mise à jour concept : {concept_slug}")
         page_md = self.llm.complete(prompt, system=_SYSTEM_INGEST, max_tokens=1500)
         page_md = _parse_frontmatter_block(page_md)
+        page_md = _strip_wiki_anchor(page_md)
         self._write_wiki_page(concept_slug, page_md)
 
         if not existing:
@@ -1005,6 +1023,7 @@ class Ingestor:
         print(f"[ingest] Mise à jour entité : {entity_slug}")
         page_md = self.llm.complete(prompt, system=_SYSTEM_INGEST, max_tokens=1500)
         page_md = _parse_frontmatter_block(page_md)
+        page_md = _strip_wiki_anchor(page_md)
         self._write_wiki_page(entity_slug, page_md)
 
         if not existing:
