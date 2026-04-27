@@ -17,6 +17,9 @@ Wiki_LM/corpus-pkm.txt
 .env
 *.key
 
+# Worktrees
+worktrees/
+
 # Divers
 *.log
 .DS_Store
