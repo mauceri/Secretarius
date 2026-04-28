@@ -17,6 +17,9 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
+import sys
+import threading
 from pathlib import Path
 
 from flask import Flask, jsonify, request
@@ -26,6 +29,7 @@ from query import WikiQuery
 
 app = Flask(__name__)
 _wq: WikiQuery | None = None
+_embed_status: dict = {"running": False, "last": None, "error": None}
 
 
 @app.after_request
@@ -63,6 +67,43 @@ def handle_query():
 @app.get("/health")
 def health():
     return jsonify({"status": "ok", "pages": len(_wq._search._pages)})
+
+
+@app.post("/reload")
+def reload_index():
+    """Reconstruit l'index BM25 et recharge les embeddings depuis le disque."""
+    _wq._search.reload()
+    _wq._semantic._load_index()
+    return jsonify({"status": "ok", "pages": len(_wq._search._pages)})
+
+
+@app.post("/embed")
+def start_embed():
+    """Lance embed.py en arrière-plan, puis recharge les embeddings à la fin."""
+    if _embed_status["running"]:
+        return jsonify({"status": "already_running"})
+
+    def _run():
+        _embed_status["running"] = True
+        _embed_status["error"] = None
+        try:
+            script = Path(__file__).parent / "embed.py"
+            subprocess.run([sys.executable, str(script)], check=True)
+            _wq._semantic._load_index()
+            import datetime
+            _embed_status["last"] = datetime.datetime.now().isoformat()
+        except Exception as e:
+            _embed_status["error"] = str(e)
+        finally:
+            _embed_status["running"] = False
+
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"status": "started"})
+
+
+@app.get("/embed-status")
+def embed_status():
+    return jsonify(_embed_status)
 
 
 def main() -> None:
