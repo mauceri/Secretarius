@@ -5,6 +5,13 @@
 
 const WIKI_SERVER = "http://sanroque:5051";
 
+const mode = await tp.system.suggester(
+    ["Hybride (BM25 + sémantique)", "Sémantique", "BM25"],
+    ["hybrid", "semantic", "bm25"],
+    false,
+    "Mode de recherche"
+) || "hybrid";
+
 const question = await tp.system.prompt("Question pour Wiki_LM");
 if (!question) { return; }
 
@@ -13,7 +20,7 @@ try {
     const resp = await fetch(`${WIKI_SERVER}/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: question, top_k: 5 }),
+        body: JSON.stringify({ question: question, top_k: 5, mode: mode }),
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     data = await resp.json();
