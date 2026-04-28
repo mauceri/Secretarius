@@ -28,8 +28,18 @@ app = Flask(__name__)
 _wq: WikiQuery | None = None
 
 
-@app.post("/query")
+@app.after_request
+def _cors(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    return response
+
+
+@app.route("/query", methods=["POST", "OPTIONS"])
 def handle_query():
+    if request.method == "OPTIONS":
+        return "", 204
     data = request.get_json(silent=True) or {}
     question = str(data.get("question", "")).strip()
     if not question:
