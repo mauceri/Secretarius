@@ -45,11 +45,34 @@ python -m pytest Wiki_LM/tests/
 
 ```
 Secretarius/
-├── Wiki_LM/
-│   ├── tools/          ← pipeline (ingest, capture, search, query…)
-│   ├── tests/          ← suite pytest
-│   ├── PATTERN.md      ← description du patron LLM Wiki
+├── install.sh                 # Script d'installation principal
+├── install.conf               # Configuration par défaut (sourceable)
+├── CLAUDE.md                  # Instructions pour Claude Code / agents
+├── README.md                  # Ce fichier
+│
+├── Wiki_LM/                   # Coeur du projet LLM Wiki
+│   ├── tools/                 # Pipeline CLI (ingest, query, search…)
+│   ├── tests/                 # Suite pytest (74 tests)
+│   ├── .env.template          # Template de configuration LLM
+│   ├── PATTERN.md             # Description du pattern LLM Wiki
 │   └── requirements.txt
-├── CLAUDE.md           ← instructions pour Claude Code
-└── README.md
+│
+├── openclaw-config/           # Templates pour OpenClaw
+│   ├── openclaw.json.template # Config OpenClaw (placeholders)
+│   ├── gateway.systemd.env.template # Secrets (généré à l'install)
+│   ├── openclaw-gateway.service     # Unité systemd user
+│   └── install.sh             # Sous-script de génération
+│
+├── docs/                      # Documentation
+│   ├── architecture/          # Décisions d'architecture, patterns
+│   ├── history/               # Historique du projet
+│   └── superpowers/           # Specs et plans d'implémentation
+│       ├── specs/
+│       └── plans/
+│
+├── data/                      # Données runtime (hors git)
+│   ├── raw/                   # Sources brutes ingérées
+│   └── wiki/                  # Wiki généré
+│
+└── worktrees/                 # Git worktrees (hors git)
 ```
