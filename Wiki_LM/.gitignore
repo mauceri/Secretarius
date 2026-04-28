@@ -5,3 +5,4 @@ __pycache__/
 raw/
 embeddings/
 nohup.out
+wiki_bm25_cache.pkl
