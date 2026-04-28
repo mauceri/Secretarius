@@ -1,0 +1,16 @@
+[Unit]
+Description=OpenClaw Gateway Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.openclaw/gateway.systemd.env
+ExecStart=/usr/bin/openclaw gateway
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
