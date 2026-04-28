@@ -65,6 +65,8 @@ def main() -> None:
         default=os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Arbath/Wiki_LM")),
     )
     parser.add_argument("--mode", default="hybrid", choices=["bm25", "semantic", "hybrid"])
+    parser.add_argument("--public", action="store_true",
+                        help="Écouter sur 0.0.0.0 (accessible via Tailscale/réseau local)")
     parser.add_argument("--backend", default="")
     parser.add_argument("--model", default="")
     args = parser.parse_args()
@@ -73,9 +75,10 @@ def main() -> None:
     print(f"[server] Chargement Wiki_LM ({args.wiki})…")
     _wq = WikiQuery(args.wiki, llm=llm, mode=args.mode)
     print(f"[server] {len(_wq._search._pages)} pages indexées, mode={_wq.mode}")
-    print(f"[server] Écoute sur http://127.0.0.1:{args.port}")
+    host = "0.0.0.0" if args.public else "127.0.0.1"
+    print(f"[server] Écoute sur http://{host}:{args.port}")
 
-    app.run(host="127.0.0.1", port=args.port, debug=False)
+    app.run(host=host, port=args.port, debug=False)
 
 
 if __name__ == "__main__":
