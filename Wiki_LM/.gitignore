@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 .env
 raw/
+embeddings/
+nohup.out
+wiki_bm25_cache.pkl

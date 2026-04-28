@@ -27,7 +27,7 @@ from pathlib import Path
 import frontmatter
 
 from llm import LLM
-from search import WikiSearch
+from search import WikiSearch, WikiSemanticSearch, hybrid_search
 
 
 # ---------------------------------------------------------------------------
@@ -102,17 +102,34 @@ sources: [<slugs utilisés, séparés par des virgules>]
 # ---------------------------------------------------------------------------
 
 class WikiQuery:
-    def __init__(self, wiki_path: str | Path, llm: LLM | None = None) -> None:
+    def __init__(
+        self,
+        wiki_path: str | Path,
+        llm: LLM | None = None,
+        mode: str = "hybrid",
+    ) -> None:
         self.wiki_root = Path(wiki_path)
         self.wiki_dir = self.wiki_root / "wiki"
+        self.mode = mode
         self._search = WikiSearch(wiki_path)
+        self._semantic = WikiSemanticSearch(self.wiki_dir)
+        if mode != "bm25" and not self._semantic.available:
+            print("[query] Embeddings absents — mode BM25 uniquement. Lancez embed.py.")
+            self.mode = "bm25"
         self.llm = llm or LLM()
 
     def query(self, question: str, top_k: int = 5, save: bool = False) -> QueryResult:
         """Répond à une question en cherchant dans le wiki puis en synthétisant."""
 
-        # 1. Recherche BM25
-        results = self._search.search(question, top_k=top_k)
+        # 1. Recherche
+        if self.mode == "semantic":
+            results = self._semantic.search(question, top_k=top_k)
+        elif self.mode == "hybrid":
+            bm25 = self._search.search(question, top_k=top_k)
+            sem = self._semantic.search(question, top_k=top_k)
+            results = hybrid_search(bm25, sem, top_k=top_k)
+        else:
+            results = self._search.search(question, top_k=top_k)
         if not results:
             return QueryResult(
                 question=question,
@@ -224,11 +241,17 @@ def main() -> None:
         help="Chemin vers Wiki_LM",
     )
     parser.add_argument("--backend", default="", help="Backend LLM : claude | ollama | openai")
-    parser.add_argument("--model", default="", help="Modèle LLM")
+    parser.add_argument("--model", default="", help="Modèle LLM (ex: qwen2.5:7b)")
+    parser.add_argument(
+        "--mode",
+        default="hybrid",
+        choices=["bm25", "semantic", "hybrid"],
+        help="Mode de recherche (défaut : hybrid)",
+    )
     args = parser.parse_args()
 
     llm = LLM(backend=args.backend, model=args.model) if (args.backend or args.model) else LLM()
-    wq = WikiQuery(args.wiki, llm=llm)
+    wq = WikiQuery(args.wiki, llm=llm, mode=args.mode)
     result = wq.query(args.question, top_k=args.top, save=args.save)
     print(result)
 
