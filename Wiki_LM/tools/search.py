@@ -97,8 +97,13 @@ class WikiSearch:
     # Cache BM25
     # ------------------------------------------------------------------
 
-    def _dir_mtime(self) -> float:
-        return self.wiki_dir.stat().st_mtime
+    def _max_mtime(self) -> float:
+        """Mtime le plus récent parmi toutes les pages .md — détecte créations ET modifications."""
+        return max(
+            (p.stat().st_mtime for p in self.wiki_dir.glob("*.md")
+             if p.name not in ("index.md", "log.md")),
+            default=0.0,
+        )
 
     def _try_load_cache(self) -> bool:
         if not _CACHE_PATH.exists():
@@ -110,7 +115,7 @@ class WikiSearch:
                 return False
             if cached.get("wiki_dir") != str(self.wiki_dir):
                 return False
-            if cached.get("dir_mtime") != self._dir_mtime():
+            if cached.get("dir_mtime") != self._max_mtime():
                 return False
             self._pages = cached["pages"]
             self._corpus = cached["corpus"]
@@ -125,7 +130,7 @@ class WikiSearch:
                 pickle.dump({
                     "version": _CACHE_VERSION,
                     "wiki_dir": str(self.wiki_dir),
-                    "dir_mtime": self._dir_mtime(),
+                    "dir_mtime": self._max_mtime(),
                     "pages": self._pages,
                     "corpus": self._corpus,
                 }, f, protocol=pickle.HIGHEST_PROTOCOL)
