@@ -25,9 +25,12 @@ from pathlib import Path
 
 import frontmatter
 import numpy as np
+import pickle
 from rank_bm25 import BM25Plus
 
 _EMBED_DIR = Path(__file__).resolve().parent.parent / "embeddings"
+_CACHE_PATH = Path(__file__).resolve().parent.parent / "wiki_bm25_cache.pkl"
+_CACHE_VERSION = 1
 
 # ---------------------------------------------------------------------------
 # Stopwords français (liste embarquée — pas de dépendance nltk)
@@ -86,16 +89,66 @@ class WikiSearch:
         if not self.wiki_dir.exists():
             raise FileNotFoundError(f"Répertoire wiki introuvable : {self.wiki_dir}")
         self._pages: list[dict] = []
+        self._corpus: list[list[str]] = []
         self._bm25: BM25Plus | None = None
         self._load()
 
+    # ------------------------------------------------------------------
+    # Cache BM25
+    # ------------------------------------------------------------------
+
+    def _dir_mtime(self) -> float:
+        return self.wiki_dir.stat().st_mtime
+
+    def _try_load_cache(self) -> bool:
+        if not _CACHE_PATH.exists():
+            return False
+        try:
+            with open(_CACHE_PATH, "rb") as f:
+                cached = pickle.load(f)
+            if cached.get("version") != _CACHE_VERSION:
+                return False
+            if cached.get("wiki_dir") != str(self.wiki_dir):
+                return False
+            if cached.get("dir_mtime") != self._dir_mtime():
+                return False
+            self._pages = cached["pages"]
+            self._corpus = cached["corpus"]
+            self._bm25 = BM25Plus(self._corpus)
+            return True
+        except Exception:
+            return False
+
+    def _save_cache(self) -> None:
+        try:
+            with open(_CACHE_PATH, "wb") as f:
+                pickle.dump({
+                    "version": _CACHE_VERSION,
+                    "wiki_dir": str(self.wiki_dir),
+                    "dir_mtime": self._dir_mtime(),
+                    "pages": self._pages,
+                    "corpus": self._corpus,
+                }, f, protocol=pickle.HIGHEST_PROTOCOL)
+        except Exception as e:
+            print(f"[search] Cache BM25 non sauvegardé : {e}")
+
+    # ------------------------------------------------------------------
+    # Construction de l'index
+    # ------------------------------------------------------------------
+
     def _load(self) -> None:
-        """Charge et indexe toutes les pages Markdown du wiki."""
+        """Charge l'index BM25 depuis le cache ou reconstruit depuis le disque."""
+        if self._try_load_cache():
+            return
+        self._build_index()
+        self._save_cache()
+
+    def _build_index(self) -> None:
+        """Reconstruit l'index BM25 complet depuis les fichiers wiki."""
         self._pages = []
-        corpus: list[list[str]] = []
+        self._corpus = []
 
         for path in sorted(self.wiki_dir.glob("**/*.md")):
-            # Ignorer index et log (fichiers meta)
             if path.name in ("index.md", "log.md"):
                 continue
             try:
@@ -109,18 +162,18 @@ class WikiSearch:
             body = post.content
 
             tokens = tokenize(f"{title} {body}")
-            corpus.append(tokens)
+            self._corpus.append(tokens)
+            # body exclu du cache — rechargé à la demande dans search()
             self._pages.append({
                 "slug": slug,
                 "path": path,
                 "title": title,
                 "category": category,
-                "body": body,
                 "metadata": dict(post.metadata),
             })
 
-        if corpus:
-            self._bm25 = BM25Plus(corpus)
+        if self._corpus:
+            self._bm25 = BM25Plus(self._corpus)
 
     def search(self, query: str, top_k: int = 5) -> list[SearchResult]:
         """Retourne les top_k pages les plus pertinentes pour la query."""
@@ -141,20 +194,25 @@ class WikiSearch:
             if score < 0.001:
                 break
             page = self._pages[idx]
+            try:
+                body = frontmatter.load(page["path"]).content
+            except Exception:
+                body = ""
             results.append(SearchResult(
                 slug=page["slug"],
                 path=page["path"],
                 title=page["title"],
                 category=page["category"],
                 score=score,
-                excerpt=self._excerpt(page["body"], tokens),
+                excerpt=self._excerpt(body, tokens),
                 metadata=page["metadata"],
             ))
         return results
 
     def reload(self) -> None:
-        """Recharge l'index depuis le disque (après ingestion)."""
-        self._load()
+        """Reconstruit l'index depuis le disque et invalide le cache."""
+        self._build_index()
+        self._save_cache()
 
     @staticmethod
     def _excerpt(body: str, tokens: list[str], window: int = 30) -> str:
