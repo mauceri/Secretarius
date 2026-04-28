@@ -1,0 +1,17 @@
+{
+  "assistant_name": "${ASSISTANT_NAME}",
+  "obsidian_path": "${OBSIDIAN_PATH}",
+  "llm": {
+    "provider": "${LLM_BACKEND}",
+    "model": "",
+    "api_key": ""
+  },
+  "agents": {
+    "main": {
+      "name": "${ASSISTANT_NAME}",
+      "llm": "${LLM_BACKEND}"
+    }
+  },
+  "skills": [],
+  "commands": {}
+}
