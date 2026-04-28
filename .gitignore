@@ -16,9 +16,13 @@ Wiki_LM/corpus-pkm.txt
 # Secrets / config locale
 .env
 *.key
+gateway.systemd.env
 
 # Worktrees
 worktrees/
+
+# OpenClaw généré
+openclaw-config/gateway.systemd.env
 
 # Divers
 *.log
