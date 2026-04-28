@@ -100,6 +100,41 @@ def _read_arxiv(url: str) -> str:
     )
 
 
+def _inject_url(page_md: str, url: str) -> str:
+    """Ajoute url: dans le frontmatter si absent."""
+    if not url or "lien_source:" in page_md[:400]:
+        return page_md
+    return page_md.replace("---\n", f"---\nlien_source: {url}\n", 1)
+
+
+_ERROR_PAGE_SIGNALS = [
+    # WAF / CDN
+    "incapsula incident id",
+    "request unsuccessful. blocking enabled",
+    "access denied | incapsula",
+    # Cloudflare
+    "sorry, you have been blocked",
+    "cloudflare ray id",
+    "error 1020", "error 1015", "error 1009",
+    # Génériques
+    "403 forbidden",
+    "this page requires javascript",
+    "enable javascript to continue",
+    "your browser does not support javascript",
+    "captcha",
+    "please verify you are a human",
+    "ddos protection by",
+]
+
+
+def _is_error_page(text: str) -> bool:
+    """Détecte les pages d'erreur WAF/CDN/captcha renvoyées avec un statut 200."""
+    if len(text.strip()) > 5000:
+        return False  # trop long pour être une page d'erreur pure
+    lower = text.lower()
+    return any(signal in lower for signal in _ERROR_PAGE_SIGNALS)
+
+
 def _is_binary_content(text: str) -> bool:
     """Détecte un contenu PDF non décodé (binaire, flux d'objets).
 
@@ -667,20 +702,129 @@ class Ingestor:
     # ------------------------------------------------------------------
 
     # Fichier manifeste des fichiers raw/ déjà ingérés
+    # Format TSV : filename\tslug\thash  (rétrocompatible : lignes sans tab = ancien format)
     _MANIFEST = ".ingested"
 
-    def _load_manifest(self) -> set[str]:
-        """Retourne l'ensemble des noms de fichiers déjà ingérés."""
+    def _load_manifest(self) -> dict[str, dict]:
+        """Retourne {filename: {"slug": str, "hash": str}} pour les fichiers déjà ingérés."""
         path = self.raw_dir / self._MANIFEST
         if not path.exists():
-            return set()
-        return set(path.read_text(encoding="utf-8").splitlines())
+            return {}
+        result: dict[str, dict] = {}
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line:
+                continue
+            parts = line.split("\t")
+            filename = parts[0]
+            result[filename] = {
+                "slug": parts[1] if len(parts) > 1 else "",
+                "hash": parts[2] if len(parts) > 2 else "",
+            }
+        return result
 
-    def _mark_ingested(self, filename: str) -> None:
-        """Ajoute un fichier au manifeste."""
-        path = self.raw_dir / self._MANIFEST
-        with path.open("a", encoding="utf-8") as f:
-            f.write(filename + "\n")
+    def _mark_ingested(self, filename: str, slug: str = "", file_hash: str = "") -> None:
+        """Ajoute ou met à jour une entrée dans le manifeste."""
+        manifest_path = self.raw_dir / self._MANIFEST
+        existing = self._load_manifest()
+        existing[filename] = {"slug": slug, "hash": file_hash}
+        lines = [
+            f"{fn}\t{meta['slug']}\t{meta['hash']}"
+            for fn, meta in sorted(existing.items())
+        ]
+        manifest_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def _trash_page(self, page: Path, poubelle_dir: Path, dry_run: bool) -> None:
+        """Déplace une page vers poubelle/ avec status: archivé."""
+        if dry_run:
+            return
+        poubelle_dir.mkdir(exist_ok=True)
+        dest = poubelle_dir / page.name
+        page.rename(dest)
+        try:
+            post = frontmatter.loads(dest.read_text(encoding="utf-8"))
+            post["status"] = "archivé"
+            dest.write_text(frontmatter.dumps(post), encoding="utf-8")
+        except Exception:
+            pass
+
+    def _sync_deletions(self, dry_run: bool = False) -> list[str]:
+        """Détecte les fichiers raw supprimés, met à jour les pages c-/e- dépendantes.
+
+        Pour chaque fichier raw disparu :
+        - La page src- correspondante → poubelle/
+        - Les pages c-/e- qui la référencent :
+            - Si sources: devient vide → poubelle/
+            - Sinon → retire le slug de sources: + status: à-réviser
+
+        Retourne la liste des slugs mis en poubelle ou marqués à-réviser.
+        """
+        manifest = self._load_manifest()
+        actual_files = {f.name for f in self.raw_dir.iterdir() if f.is_file()}
+        poubelle_dir = self.wiki_dir / "poubelle"
+        affected = []
+
+        # Slugs des src supprimées
+        deleted_slugs: set[str] = set()
+        for filename, meta in manifest.items():
+            if filename in actual_files:
+                continue
+            slug = meta.get("slug", "")
+            if not slug:
+                continue
+            src_page = self.wiki_dir / f"{slug}.md"
+            if not src_page.exists():
+                deleted_slugs.add(slug)
+                continue
+            try:
+                post = frontmatter.loads(src_page.read_text(encoding="utf-8"))
+                if post.get("status") == "immuable":
+                    continue
+            except Exception:
+                pass
+            deleted_slugs.add(slug)
+            self._trash_page(src_page, poubelle_dir, dry_run)
+            affected.append(slug)
+            print(f"[ingest] {'[dry]' if dry_run else '[trash]'} {slug} → poubelle/")
+
+        if not deleted_slugs:
+            return affected
+
+        # Mettre à jour les pages c-/e- qui référencent ces slugs
+        for page in sorted(self.wiki_dir.glob("*.md")):
+            if not any(page.stem.startswith(p) for p in ("c-", "e-")):
+                continue
+            try:
+                content = page.read_text(encoding="utf-8")
+                post = frontmatter.loads(content)
+            except Exception:
+                continue
+            if post.get("status") == "immuable":
+                continue
+
+            sources = post.get("sources", []) or []
+            if not isinstance(sources, list):
+                sources = [sources]
+            remaining = [s for s in sources if s not in deleted_slugs]
+            if len(remaining) == len(sources):
+                continue  # pas affecté
+
+            if not remaining:
+                # Plus aucune source → poubelle
+                self._trash_page(page, poubelle_dir, dry_run)
+                affected.append(page.stem)
+                print(f"[ingest] {'[dry]' if dry_run else '[trash]'} {page.stem} → poubelle/ (plus de sources)")
+            else:
+                # Sources partiellement supprimées → marquer à-réviser
+                if not dry_run:
+                    post["sources"] = remaining
+                    post["status"] = "à-réviser"
+                    page.write_text(frontmatter.dumps(post), encoding="utf-8")
+                affected.append(page.stem)
+                removed = set(sources) - set(remaining)
+                print(f"[ingest] {'[dry]' if dry_run else '[réviser]'} {page.stem} : "
+                      f"retrait {removed}, status → à-réviser")
+
+        return affected
 
     def _reset_wiki(self) -> None:
         """Supprime toutes les pages non-immuables et réinitialise index.md.
@@ -711,7 +855,13 @@ class Ingestor:
         (self.wiki_dir / "index.md").write_text("# Index\n\n", encoding="utf-8")
         print("[ingest] index.md réinitialisé")
 
-    def ingest_raw_dir(self, max_concepts: int = 5, force: bool = False) -> list[str]:
+    def ingest_raw_dir(
+        self,
+        max_concepts: int = 5,
+        force: bool = False,
+        update: bool = False,
+        sync: bool = False,
+    ) -> list[str]:
         """Ingère les fichiers de raw/ non encore traités (mode incrémental par défaut).
 
         - .url  → lit l'URL et ingère la page web
@@ -719,12 +869,19 @@ class Ingestor:
         - .pdf  → ingère le PDF
         - Autres extensions reconnues (.txt, .html) → ingère comme texte
 
-        force=True : réinitialise le wiki (pages + index) et retraite tout.
+        force=True  : réinitialise le wiki (pages + index) et retraite tout.
+        update=True : ré-ingère les fichiers dont le hash a changé depuis la dernière ingestion.
+        sync=True   : déplace en poubelle les pages dont le fichier raw a été supprimé.
         Retourne la liste des slugs créés ou mis à jour.
         """
+        if sync:
+            self._sync_deletions()
+
         if force:
             self._reset_wiki()
-        already_done = set() if force else self._load_manifest()
+
+        manifest = {} if force else self._load_manifest()
+        already_done_names = set(manifest.keys())
 
         files = sorted(self.raw_dir.iterdir())
         processable = [
@@ -734,7 +891,15 @@ class Ingestor:
             and f.name != self._MANIFEST
         ]
 
-        pending = _dedup_files([f for f in processable if f.name not in already_done])
+        def _needs_processing(f: Path) -> bool:
+            if f.name not in already_done_names:
+                return True
+            if update:
+                stored_hash = manifest[f.name].get("hash", "")
+                return stored_hash != _file_hash(f)
+            return False
+
+        pending = _dedup_files([f for f in processable if _needs_processing(f)])
         skipped = len(processable) - len(pending)
 
         if skipped:
@@ -756,16 +921,18 @@ class Ingestor:
                     url = self._parse_url_file(path)
                     if not url:
                         print(f"[ingest] Fichier .url vide ou invalide : {path.name}")
+                        self._mark_ingested(path.name, slug="", file_hash=_file_hash(path))
                         continue
                     user_tags = self._parse_raw_tags(path)
-                    slug = self.ingest(url, max_concepts=max_concepts, extra_tags=user_tags or None)
+                    slug = self.ingest(url, max_concepts=max_concepts, extra_tags=user_tags or None, rename_raw=False)
                 else:
                     user_tags = self._parse_raw_tags(path)
-                    slug = self.ingest(str(path), max_concepts=max_concepts, extra_tags=user_tags or None)
+                    slug = self.ingest(str(path), max_concepts=max_concepts, extra_tags=user_tags or None, rename_raw=False)
                 slugs.append(slug)
-                self._mark_ingested(path.name)
+                self._mark_ingested(path.name, slug=slug, file_hash=_file_hash(path))
             except Exception as e:
                 print(f"[ingest] ERREUR sur {path.name} : {e}")
+                self._mark_ingested(path.name, slug="", file_hash=_file_hash(path))
 
         return slugs
 
@@ -824,10 +991,12 @@ class Ingestor:
         slug: str = "",
         max_concepts: int = 5,
         extra_tags: list[str] | None = None,
+        rename_raw: bool = True,
     ) -> str:
         """Ingère une source et retourne le slug de la page créée."""
         print(f"[ingest] Lecture de la source : {source}")
         content, title = _read_source(source)
+        source_url = source if source.startswith("http") else ""
 
         # Slug de la page source (éviter le double préfixe si le titre commence déjà par src-)
         base_slug = slug or _slugify(title)
@@ -838,14 +1007,21 @@ class Ingestor:
         # 1. Sauvegarder dans raw/ (immutable)
         self._save_raw(source, content, src_slug)
 
-        # 2. Générer la page source (ou page "illisible" si contenu dégradé)
+        # 2. Générer la page source (ou stub si contenu dégradé/inaccessible)
+        stub_status = None
         if _is_binary_content(content):
-            print(f"[ingest] Contenu illisible → page stub")
-            source_page_md = self._stub_page(title, src_slug, extra_tags)
+            stub_status = "illisible"
+        elif _is_error_page(content):
+            stub_status = "inaccessible"
+        if stub_status:
+            print(f"[ingest] Contenu {stub_status} → page stub")
+            source_page_md = self._stub_page(title, src_slug, extra_tags, status=stub_status)
+            if source_url:
+                source_page_md = _inject_url(source_page_md, source_url)
             source_title = title
             self._write_wiki_page(src_slug, source_page_md)
             self._update_index(src_slug, source_title, "source")
-            self._append_log("illisible", source_title)
+            self._append_log(stub_status, source_title)
             self._rebuild_tags_index()
             print(f"[ingest] Stub créé → wiki/{src_slug}.md")
             return src_slug
@@ -856,6 +1032,23 @@ class Ingestor:
         if extra_tags:
             source_page_md = _merge_tags(source_page_md, extra_tags)
         source_title = _extract_title_from_page(source_page_md) or title
+
+        # Recalculer le slug depuis le titre LLM (plus lisible que le titre brut)
+        if not slug:
+            llm_base = re.sub(r"^src-", "", _slugify(source_title))
+            llm_slug = f"src-{llm_base}"
+            if llm_slug != src_slug:
+                # Remplacer le slug provisoire dans le contenu généré
+                source_page_md = source_page_md.replace(src_slug, llm_slug)
+                # Renommer le fichier raw si déjà écrit (pas quand vient de ingest_raw_dir)
+                if rename_raw:
+                    for old in self.raw_dir.glob(f"{src_slug}.*"):
+                        old.rename(old.with_name(llm_slug + old.suffix))
+                print(f"[ingest] Slug renommé : {src_slug} → {llm_slug}")
+                src_slug = llm_slug
+
+        if source_url:
+            source_page_md = _inject_url(source_page_md, source_url)
         self._write_wiki_page(src_slug, source_page_md)
 
         # 3. Extraire concepts et entités
@@ -925,10 +1118,20 @@ class Ingestor:
                     except Exception:
                         raw_path.with_suffix(".txt").write_text(content, encoding="utf-8")
 
-    def _stub_page(self, title: str, slug: str, extra_tags: list[str] | None = None) -> str:
-        """Génère une page minimale pour une source illisible (PDF chiffré, binaire…)."""
-        tags = ["illisible"] + (extra_tags or [])
+    def _stub_page(
+        self,
+        title: str,
+        slug: str,
+        extra_tags: list[str] | None = None,
+        status: str = "illisible",
+    ) -> str:
+        """Génère une page minimale pour une source illisible ou inaccessible."""
+        tags = [status] + (extra_tags or [])
         tags_yaml = "[" + ", ".join(tags) + "]"
+        reason_text = {
+            "illisible":    "Source illisible — contenu binaire, chiffré ou corrompu.",
+            "inaccessible": "Source inaccessible — page d'erreur WAF/CDN ou contenu protégé.",
+        }.get(status, "Source non disponible.")
         return (
             f"---\n"
             f"title: \"{title}\"\n"
@@ -936,10 +1139,10 @@ class Ingestor:
             f"tags: {tags_yaml}\n"
             f"created: {self.today}\n"
             f"sources: []\n"
-            f"status: illisible\n"
+            f"status: {status}\n"
             f"---\n\n"
             f"# {title}\n\n"
-            f"Source illisible — contenu binaire, chiffré ou corrompu.\n"
+            f"{reason_text}\n"
             f"À réingérer manuellement si le document devient accessible.\n"
         )
 
@@ -1146,6 +1349,14 @@ def main() -> None:
         "--force", action="store_true",
         help="Avec --raw : retraite tous les fichiers, même déjà ingérés",
     )
+    parser.add_argument(
+        "--update", action="store_true",
+        help="Avec --raw : ré-ingère les fichiers dont le contenu a changé depuis la dernière ingestion",
+    )
+    parser.add_argument(
+        "--sync", action="store_true",
+        help="Avec --raw : déplace en poubelle les pages dont le fichier raw a été supprimé",
+    )
     args = parser.parse_args()
 
     llm = LLM(backend=args.backend, model=args.model) if (args.backend or args.model) else LLM()
@@ -1153,7 +1364,12 @@ def main() -> None:
 
     # Mode --raw : ingestion incrémentale (ou complète avec --force)
     if args.raw:
-        slugs = ing.ingest_raw_dir(max_concepts=args.top_entities, force=args.force)
+        slugs = ing.ingest_raw_dir(
+            max_concepts=args.top_entities,
+            force=args.force,
+            update=args.update,
+            sync=args.sync,
+        )
         print(f"\n{len(slugs)} page(s) créée(s) ou mises à jour : {', '.join(slugs)}")
         return
 
@@ -1163,9 +1379,11 @@ def main() -> None:
     # Détection automatique : fichier local dont toutes les lignes non-vides
     # sont des URLs → batch mode
     source = args.source
-    if not source.startswith("http") and Path(source).is_file():
+    _TEXT_EXTS = {".txt", ".md", ""}
+    if not source.startswith("http") and Path(source).is_file() \
+            and Path(source).suffix.lower() in _TEXT_EXTS:
         lines = [
-            l.strip() for l in Path(source).read_text().splitlines()
+            l.strip() for l in Path(source).read_text(encoding="utf-8", errors="replace").splitlines()
             if l.strip() and not l.strip().startswith("#")
         ]
         if lines and all(l.startswith("http://") or l.startswith("https://") for l in lines):
