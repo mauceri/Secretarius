@@ -139,6 +139,9 @@ class CombinedSimilarity(BaseSimilarity):
         weights: list[float] | None = None,
     ) -> None:
         self._signals = signals
+        if not signals:
+            self._weights = []
+            return
         if weights is None:
             w = 1.0 / len(signals)
             self._weights = [w] * len(signals)
