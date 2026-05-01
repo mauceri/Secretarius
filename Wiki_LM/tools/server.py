@@ -26,10 +26,12 @@ from flask import Flask, jsonify, request
 
 from llm import LLM
 from query import WikiQuery
+from cluster import run_clustering
 
 app = Flask(__name__)
 _wq: WikiQuery | None = None
 _embed_status: dict = {"running": False, "last": None, "error": None}
+_cluster_status: dict = {"running": False, "last": None, "error": None}
 
 
 @app.after_request
@@ -104,6 +106,44 @@ def start_embed():
 @app.get("/embed-status")
 def embed_status():
     return jsonify(_embed_status)
+
+
+@app.post("/cluster")
+def start_cluster():
+    """Lance cluster.py en arrière-plan."""
+    data = request.get_json(silent=True) or {}
+    if "param" not in data:
+        return jsonify({"error": "Paramètre 'param' manquant"}), 400
+
+    signal = str(data.get("signal", "embeddings"))
+    param = int(data["param"])
+
+    if _cluster_status["running"]:
+        return jsonify({"status": "already_running"})
+
+    def _run():
+        _cluster_status["running"] = True
+        _cluster_status["error"] = None
+        try:
+            wiki_dir = Path(_wq._search.wiki_dir)
+            embed_dir = Path(__file__).resolve().parent.parent / "embeddings"
+            llm = LLM()
+            stats = run_clustering(wiki_dir, embed_dir, signal, param, llm=llm)
+            _wq._search.reload()
+            import datetime
+            _cluster_status["last"] = {**stats, "timestamp": datetime.datetime.now().isoformat()}
+        except Exception as e:
+            _cluster_status["error"] = str(e)
+        finally:
+            _cluster_status["running"] = False
+
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"status": "started"})
+
+
+@app.get("/cluster-status")
+def cluster_status():
+    return jsonify(_cluster_status)
 
 
 def main() -> None:

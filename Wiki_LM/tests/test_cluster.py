@@ -207,3 +207,42 @@ def test_run_clustering_returns_two_clusters_for_well_separated_data(tmp_path):
     stats = run_clustering(wiki_dir, embed_dir, "embeddings", param=2, llm=None)
 
     assert stats["clusters"] == 2
+
+
+# ---------------------------------------------------------------------------
+# Endpoints serveur /cluster + /cluster-status
+# ---------------------------------------------------------------------------
+
+def test_cluster_status_initial(tmp_path):
+    """GET /cluster-status retourne running=False initialement."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
+
+    import server as srv_module
+
+    # Réinitialiser le statut
+    srv_module._cluster_status["running"] = False
+    srv_module._cluster_status["last"] = None
+    srv_module._cluster_status["error"] = None
+
+    client = srv_module.app.test_client()
+    resp = client.get("/cluster-status")
+    data = resp.get_json()
+
+    assert resp.status_code == 200
+    assert data["running"] is False
+    assert data["last"] is None
+
+
+def test_cluster_endpoint_missing_param(tmp_path):
+    """POST /cluster sans 'param' retourne une erreur 400."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
+
+    import server as srv_module
+
+    client = srv_module.app.test_client()
+    resp = client.post("/cluster", json={"signal": "embeddings"})
+
+    assert resp.status_code == 400
+    assert "param" in resp.get_json().get("error", "")
