@@ -106,3 +106,104 @@ def test_describe_cluster_no_llm_returns_defaults():
 
     assert isinstance(title, str)
     assert isinstance(desc, str)
+
+
+# ---------------------------------------------------------------------------
+# run_clustering — intégration
+# ---------------------------------------------------------------------------
+
+def _setup_wiki_with_embeds(tmp_path: Path, n: int = 6) -> tuple[Path, Path]:
+    """
+    Crée n pages src- + embeddings factices formant 2 groupes bien séparés.
+    Retourne (wiki_dir, embed_dir).
+    """
+    import json
+
+    wiki_dir = tmp_path / "wiki"
+    wiki_dir.mkdir()
+
+    slugs = [f"src-{i:02d}" for i in range(n)]
+    for i, slug in enumerate(slugs):
+        (wiki_dir / f"{slug}.md").write_text(
+            f"---\ntitle: Source {i}\ncategory: source\ntags: [test]\n---\n\n"
+            f"## Résumé\n\nTexte de test numéro {i}.\n",
+            encoding="utf-8",
+        )
+
+    # Groupes : 0..n//2-1 vs n//2..n-1, vecteurs bien séparés
+    rng = np.random.default_rng(0)
+    vecs = np.zeros((n, 16), dtype=np.float32)
+    half = n // 2
+    vecs[:half, :8] = 1.0
+    vecs[half:, 8:] = 1.0
+    vecs += rng.standard_normal((n, 16)).astype(np.float32) * 0.05
+    vecs /= np.linalg.norm(vecs, axis=1, keepdims=True)
+
+    embed_dir = tmp_path / "embeddings"
+    embed_dir.mkdir()
+    np.save(embed_dir / "embeddings.npy", vecs)
+    (embed_dir / "embeddings_index.json").write_text(
+        json.dumps({"slugs": slugs}), encoding="utf-8"
+    )
+
+    return wiki_dir, embed_dir
+
+
+def test_run_clustering_creates_output_dir(tmp_path):
+    from cluster import run_clustering
+
+    wiki_dir, embed_dir = _setup_wiki_with_embeds(tmp_path)
+    run_clustering(wiki_dir, embed_dir, "embeddings", param=2, llm=None)
+
+    out_dir = wiki_dir / "clustering-embeddings-hdbscan-2"
+    assert out_dir.exists()
+
+
+def test_run_clustering_creates_index_and_unclustered(tmp_path):
+    from cluster import run_clustering
+
+    wiki_dir, embed_dir = _setup_wiki_with_embeds(tmp_path)
+    run_clustering(wiki_dir, embed_dir, "embeddings", param=2, llm=None)
+
+    out_dir = wiki_dir / "clustering-embeddings-hdbscan-2"
+    assert (out_dir / "index.md").exists()
+    assert (out_dir / "unclustered.md").exists()
+
+
+def test_run_clustering_cluster_files_have_members(tmp_path):
+    from cluster import run_clustering
+
+    wiki_dir, embed_dir = _setup_wiki_with_embeds(tmp_path)
+    stats = run_clustering(wiki_dir, embed_dir, "embeddings", param=2, llm=None)
+
+    assert stats["clusters"] >= 1
+    out_dir = wiki_dir / "clustering-embeddings-hdbscan-2"
+    cluster_files = [f for f in out_dir.glob("cluster-*.md")]
+    assert len(cluster_files) == stats["clusters"]
+
+    for f in cluster_files:
+        content = f.read_text(encoding="utf-8")
+        assert "[[src-" in content
+
+
+def test_run_clustering_stats_dict(tmp_path):
+    from cluster import run_clustering
+
+    wiki_dir, embed_dir = _setup_wiki_with_embeds(tmp_path)
+    stats = run_clustering(wiki_dir, embed_dir, "embeddings", param=2, llm=None)
+
+    assert "clusters" in stats
+    assert "noise" in stats
+    assert stats["clusters"] + stats["noise"] <= 6
+    assert stats["signal"] == "embeddings"
+    assert stats["param"] == 2
+
+
+def test_run_clustering_returns_two_clusters_for_well_separated_data(tmp_path):
+    """Données bien séparées en 2 groupes → exactement 2 clusters (param=2)."""
+    from cluster import run_clustering
+
+    wiki_dir, embed_dir = _setup_wiki_with_embeds(tmp_path, n=10)
+    stats = run_clustering(wiki_dir, embed_dir, "embeddings", param=2, llm=None)
+
+    assert stats["clusters"] == 2
