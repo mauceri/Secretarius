@@ -47,7 +47,7 @@ def _load_src_pages(wiki_dir: Path) -> list[dict]:
             post = frontmatter.load(path)
         except Exception:
             continue
-        m = re.search(r"## Résumé\n(.+?)(?=\n## |\Z)", post.content, re.DOTALL)
+        m = re.search(r"## Résumé[ \t]*\n(.+?)(?=\n## |\Z)", post.content, re.DOTALL)
         abstract = m.group(1).strip() if m else ""
         pages.append({
             "slug": path.stem,
@@ -130,9 +130,15 @@ def _describe_cluster(
 
     title = "Cluster"
     description = ""
-    for line in response.splitlines():
+    lines = response.splitlines()
+    for i, line in enumerate(lines):
         if line.startswith("TITRE:"):
             title = line[6:].strip()
         elif line.startswith("DESCRIPTION:"):
-            description = line[12:].strip()
+            parts = [line[12:].strip()]
+            for cont in lines[i + 1:]:
+                if cont.startswith("TITRE:") or cont.startswith("DESCRIPTION:"):
+                    break
+                parts.append(cont)
+            description = " ".join(p for p in parts if p)
     return title, description
