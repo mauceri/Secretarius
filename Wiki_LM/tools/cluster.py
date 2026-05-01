@@ -299,3 +299,54 @@ def run_clustering(
         "param": param,
         "out_dir": str(out_dir),
     }
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Clustering des pages src- du wiki")
+    parser.add_argument(
+        "--wiki",
+        default=_DEFAULT_WIKI,
+        help="Chemin vers le wiki (défaut : $WIKI_PATH ou ~/Documents/Arbath/Wiki_LM)",
+    )
+    parser.add_argument(
+        "--signal",
+        default="embeddings",
+        help="Signal(s) : embeddings, colinks, tags, ou combinaison ex. embeddings+colinks",
+    )
+    parser.add_argument(
+        "--param",
+        default="30",
+        help="min_cluster_size(s), virgule-séparés ex. 10,30,60",
+    )
+    parser.add_argument("--no-llm", action="store_true", help="Ne pas appeler le LLM")
+    parser.add_argument("--embed-dir", default="")
+    parser.add_argument("--backend", default="")
+    parser.add_argument("--model", default="")
+    args = parser.parse_args()
+
+    wiki_dir = Path(args.wiki) / "wiki"
+    embed_dir = Path(args.embed_dir) if args.embed_dir else _EMBED_DIR
+
+    if args.no_llm:
+        llm = None
+    elif args.backend or args.model:
+        llm = LLM(backend=args.backend, model=args.model)
+    else:
+        llm = LLM()
+
+    params = [int(p.strip()) for p in args.param.split(",") if p.strip()]
+    for param in params:
+        print(f"[cluster] signal={args.signal} param={param} …")
+        stats = run_clustering(wiki_dir, embed_dir, args.signal, param, llm=llm)
+        print(
+            f"[cluster] {stats['clusters']} clusters, {stats['noise']} non assignés"
+            f" → {stats['out_dir']}"
+        )
+
+
+if __name__ == "__main__":
+    main()
