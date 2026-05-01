@@ -162,6 +162,7 @@ def _get_embed_rows(slugs: list[str], embed_dir: Path) -> np.ndarray | None:
         for i, s in enumerate(slugs):
             if s in slug_to_idx:
                 rows[i] = full[slug_to_idx[s]]
+            # slugs absent du fichier d'index restent à zéro → biais centroïde possible
         return rows
     except Exception:
         return None
@@ -200,6 +201,7 @@ def run_clustering(
         min_cluster_size=param,
         metric="precomputed",
         cluster_selection_method="eom",
+        copy=True,
     ).fit_predict(dist)
 
     clusters: dict[int, list[int]] = {}
