@@ -142,3 +142,158 @@ def _describe_cluster(
                 parts.append(cont)
             description = " ".join(p for p in parts if p)
     return title, description
+
+
+# ---------------------------------------------------------------------------
+# Embeddings bruts pour calcul de centroïdes
+# ---------------------------------------------------------------------------
+
+def _get_embed_rows(slugs: list[str], embed_dir: Path) -> np.ndarray | None:
+    """Retourne un tableau (N, dim) des vecteurs d'embedding pour les slugs donnés."""
+    index_path = embed_dir / "embeddings_index.json"
+    matrix_path = embed_dir / "embeddings.npy"
+    if not index_path.exists() or not matrix_path.exists():
+        return None
+    try:
+        full = np.load(matrix_path)
+        all_slugs = json.loads(index_path.read_text(encoding="utf-8"))["slugs"]
+        slug_to_idx = {s: i for i, s in enumerate(all_slugs)}
+        rows = np.zeros((len(slugs), full.shape[1]), dtype=np.float32)
+        for i, s in enumerate(slugs):
+            if s in slug_to_idx:
+                rows[i] = full[slug_to_idx[s]]
+        return rows
+    except Exception:
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Clustering principal
+# ---------------------------------------------------------------------------
+
+def run_clustering(
+    wiki_dir: Path,
+    embed_dir: Path,
+    signal_str: str,
+    param: int,
+    llm: LLM | None = None,
+    algo: str = "hdbscan",
+) -> dict:
+    """
+    Lance le clustering et écrit les fichiers wiki.
+    Retourne un dict de stats : clusters, noise, signal, algo, param, out_dir.
+    """
+    pages = _load_src_pages(wiki_dir)
+    if not pages:
+        return {"clusters": 0, "noise": 0, "signal": signal_str, "algo": algo, "param": param, "out_dir": ""}
+
+    slugs = [p["slug"] for p in pages]
+    pages_by_slug = {p["slug"]: p for p in pages}
+
+    signal = _build_signal(signal_str, wiki_dir, embed_dir)
+    sim = signal.compute(slugs)
+
+    dist = (1.0 - sim).clip(0.0).astype(np.float64)
+    np.fill_diagonal(dist, 0.0)
+
+    labels = HDBSCAN(
+        min_cluster_size=param,
+        metric="precomputed",
+        cluster_selection_method="eom",
+    ).fit_predict(dist)
+
+    clusters: dict[int, list[int]] = {}
+    noise: list[int] = []
+    for i, label in enumerate(labels):
+        if label == -1:
+            noise.append(i)
+        else:
+            clusters.setdefault(int(label), []).append(i)
+
+    embed_rows = _get_embed_rows(slugs, embed_dir)
+
+    centroids: dict[int, np.ndarray] = {}
+    for cid, idx_list in clusters.items():
+        if embed_rows is not None:
+            centroids[cid] = embed_rows[idx_list].mean(axis=0)
+        else:
+            centroids[cid] = sim[idx_list].mean(axis=0)
+
+    out_dir = wiki_dir / f"clustering-{signal_str}-{algo}-{param}"
+    out_dir.mkdir(exist_ok=True)
+    today = datetime.date.today().isoformat()
+
+    cluster_slugs = {cid: f"cluster-{signal_str}-{algo}-{param}-{cid:04d}" for cid in clusters}
+
+    for cid, idx_list in clusters.items():
+        paragon_idx = _find_paragon(idx_list, sim)
+        paragon_slug = slugs[paragon_idx]
+        member_slugs = [slugs[i] for i in idx_list]
+
+        near = _nearest_clusters(cid, centroids) if len(centroids) > 1 else []
+        title, description = _describe_cluster(paragon_slug, pages_by_slug, llm)
+        cluster_file_slug = cluster_slugs[cid]
+
+        lines = [
+            "---",
+            "category: cluster",
+            f"signal: {signal_str}",
+            f"algo: {algo}",
+            f"param: {param}",
+            f"members: {len(idx_list)}",
+            f"paragon: {paragon_slug}",
+            f"created: {today}",
+            "---", "",
+            f"# {title}", "",
+        ]
+        if description:
+            lines += [description, ""]
+        lines += ["## Parangon", ""]
+        paragon_title = pages_by_slug.get(paragon_slug, {}).get("title", paragon_slug)
+        lines.append(f"[[{paragon_slug}]] — {paragon_title}")
+        lines += ["", "## Documents membres", ""]
+        for s in member_slugs:
+            t = pages_by_slug.get(s, {}).get("title", s)
+            lines.append(f"- [[{s}]] — {t}")
+        lines += ["", "## Clusters proches", ""]
+        for near_cid, near_score in near:
+            near_slug = cluster_slugs.get(near_cid, f"cluster-{near_cid}")
+            lines.append(f"- [[{near_slug}]] (similarité : {near_score:.2f})")
+
+        (out_dir / f"{cluster_file_slug}.md").write_text(
+            "\n".join(lines), encoding="utf-8"
+        )
+
+    # unclustered.md
+    unclustered_lines = [
+        f"# Sources non assignées ({len(noise)} documents)", "",
+        "Ces sources sont thématiquement isolées (bruit HDBSCAN).", "",
+    ]
+    for i in noise:
+        s = slugs[i]
+        t = pages_by_slug.get(s, {}).get("title", s)
+        unclustered_lines.append(f"- [[{s}]] — {t}")
+    (out_dir / "unclustered.md").write_text("\n".join(unclustered_lines), encoding="utf-8")
+
+    # index.md
+    index_lines = [
+        f"# Index — clustering-{signal_str}-{algo}-{param}", "",
+        f"- **Signal :** {signal_str}",
+        f"- **Algorithme :** {algo}, param={param}",
+        f"- **Clusters :** {len(clusters)}",
+        f"- **Sources non assignées :** {len(noise)}",
+        f"- **Généré le :** {today}", "",
+        "## Clusters", "",
+    ]
+    for cid in sorted(clusters):
+        index_lines.append(f"- [[{cluster_slugs[cid]}]]")
+    (out_dir / "index.md").write_text("\n".join(index_lines), encoding="utf-8")
+
+    return {
+        "clusters": len(clusters),
+        "noise": len(noise),
+        "signal": signal_str,
+        "algo": algo,
+        "param": param,
+        "out_dir": str(out_dir),
+    }
