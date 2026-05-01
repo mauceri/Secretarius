@@ -45,9 +45,13 @@ class EmbeddingSimilarity(BaseSimilarity):
         matrix_path = self._embed_dir / "embeddings.npy"
         if not index_path.exists() or not matrix_path.exists():
             return
-        self._full_matrix = np.load(matrix_path)
-        slugs = json.loads(index_path.read_text(encoding="utf-8"))["slugs"]
-        self._slug_to_idx = {s: i for i, s in enumerate(slugs)}
+        try:
+            self._full_matrix = np.load(matrix_path)
+            slugs = json.loads(index_path.read_text(encoding="utf-8"))["slugs"]
+            self._slug_to_idx = {s: i for i, s in enumerate(slugs)}
+        except Exception:
+            self._full_matrix = None
+            self._slug_to_idx = {}
 
     def compute(self, slugs: list[str]) -> np.ndarray:
         n = len(slugs)
