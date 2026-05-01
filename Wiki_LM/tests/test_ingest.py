@@ -112,6 +112,30 @@ class TestRawIncremental:
         slugs2 = ingestor.ingest_raw_dir()
         assert slugs2 == []
 
+    def test_raw_file_not_renamed_after_slug_update(self, ingestor, raw_dir):
+        """Le fichier raw horodaté ne doit pas être renommé même si le slug LLM diffère."""
+        f = raw_dir / "20260101-000000-source.txt"
+        f.write_text("Contenu source.", encoding="utf-8")
+        ingestor.ingest_raw_dir()
+        # Le fichier original doit toujours exister sous son nom d'origine
+        assert f.exists(), "Le fichier raw a été renommé — regression du bug rename_raw"
+
+    def test_manifest_recorded_after_slug_update(self, ingestor, raw_dir):
+        """Même si le slug est renommé, le fichier doit être enregistré dans le manifeste."""
+        f = raw_dir / "20260101-000000-source.txt"
+        f.write_text("Contenu source.", encoding="utf-8")
+        ingestor.ingest_raw_dir()
+        manifest = (raw_dir / ".ingested").read_text()
+        assert "20260101-000000-source.txt" in manifest
+
+    def test_no_reprocess_after_slug_update(self, ingestor, raw_dir):
+        """Un fichier ingéré ne doit pas être retraité au second lancement."""
+        f = raw_dir / "20260101-000000-source.txt"
+        f.write_text("Contenu source.", encoding="utf-8")
+        ingestor.ingest_raw_dir()
+        slugs2 = ingestor.ingest_raw_dir()
+        assert slugs2 == [], "Le fichier a été retraité après un slug renommé — regression"
+
     def test_new_file_only_processed(self, ingestor, raw_dir):
         self._populate_raw(raw_dir)
         ingestor.ingest_raw_dir()
