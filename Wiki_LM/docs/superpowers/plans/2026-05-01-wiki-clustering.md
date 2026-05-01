@@ -616,15 +616,9 @@ def test_describe_cluster_with_mock_llm():
         def complete(self, prompt: str, **kwargs) -> str:
             return "TITRE: Philosophie du langage\nDESCRIPTION: Ce groupe traite du langage."
 
-    sim = np.eye(3, dtype=np.float32)
-    slugs = ["src-a", "src-b", "src-c"]
-    pages = {
-        "src-a": {"title": "A", "abstract": "Résumé A"},
-        "src-b": {"title": "B", "abstract": "Résumé B"},
-        "src-c": {"title": "C", "abstract": "Résumé C"},
-    }
+    pages = {"src-a": {"title": "Titre A", "abstract": "Résumé A long."}}
 
-    title, desc = _describe_cluster(slugs, pages, sim, slugs, MockLLM())
+    title, desc = _describe_cluster("src-a", pages, MockLLM())
 
     assert title == "Philosophie du langage"
     assert "langage" in desc
@@ -633,11 +627,9 @@ def test_describe_cluster_with_mock_llm():
 def test_describe_cluster_no_llm_returns_defaults():
     from cluster import _describe_cluster
 
-    sim = np.eye(2, dtype=np.float32)
-    slugs = ["src-a", "src-b"]
-    pages = {"src-a": {"title": "A", "abstract": ""}, "src-b": {"title": "B", "abstract": ""}}
+    pages = {"src-a": {"title": "A", "abstract": ""}}
 
-    title, desc = _describe_cluster(slugs, pages, sim, slugs, llm=None)
+    title, desc = _describe_cluster("src-a", pages, llm=None)
 
     assert isinstance(title, str)
     assert isinstance(desc, str)
@@ -760,41 +752,28 @@ def _nearest_clusters(
 
 
 def _describe_cluster(
-    cluster_slugs: list[str],
+    paragon_slug: str,
     pages_by_slug: dict[str, dict],
-    sim: np.ndarray,
-    all_slugs: list[str],
     llm,  # LLM | None
 ) -> tuple[str, str]:
-    """Retourne (titre, description) via LLM, ou valeurs par défaut si llm=None."""
+    """Retourne (titre, description) à partir du parangon via LLM, ou défauts si llm=None."""
     if llm is None:
         return "Cluster", ""
 
-    slug_to_idx = {s: i for i, s in enumerate(all_slugs)}
-    indices = [slug_to_idx[s] for s in cluster_slugs if s in slug_to_idx]
-    if not indices:
-        return "Cluster", ""
-
-    sub = sim[np.ix_(indices, indices)]
-    top5_local = np.argsort(-sub.mean(axis=1))[:5]
-    top_slugs = [cluster_slugs[i] for i in top5_local]
-
-    excerpts = []
-    for s in top_slugs:
-        p = pages_by_slug.get(s, {})
-        title = p.get("title", s)
-        abstract = p.get("abstract", "")[:300]
-        excerpts.append(f"- {title} : {abstract}")
+    p = pages_by_slug.get(paragon_slug, {})
+    paragon_title = p.get("title", paragon_slug)
+    paragon_abstract = p.get("abstract", "")[:300]
 
     prompt = (
-        "Voici les résumés des documents les plus représentatifs d'un groupe thématique :\n\n"
-        + "\n".join(excerpts)
-        + "\n\nDonne :\n"
-        "1. Un titre court (4-6 mots) caractérisant le thème commun\n"
-        "2. Une description de 2-3 phrases résumant ce que ces documents ont en commun\n\n"
+        "Voici le titre et le résumé du document le plus représentatif d'un groupe thématique :\n\n"
+        f"Titre : {paragon_title}\n"
+        f"Résumé : {paragon_abstract}\n\n"
+        "Donne :\n"
+        "1. Un titre court (4-6 mots) caractérisant le thème du groupe\n"
+        "2. Une description de 2-3 phrases résumant ce groupe\n\n"
         "Format de réponse strict :\nTITRE: <titre>\nDESCRIPTION: <description>"
     )
-    response = llm.complete(prompt, max_tokens=300)
+    response = llm.complete(prompt, max_tokens=200)
 
     title = "Cluster"
     description = ""
@@ -1031,7 +1010,7 @@ def run_clustering(
         member_slugs = [slugs[i] for i in idx_list]
 
         near = _nearest_clusters(cid, centroids) if len(centroids) > 1 else []
-        title, description = _describe_cluster(member_slugs, pages_by_slug, sim, slugs, llm)
+        title, description = _describe_cluster(paragon_slug, pages_by_slug, llm)
         cluster_file_slug = cluster_slugs[cid]
 
         lines = [
