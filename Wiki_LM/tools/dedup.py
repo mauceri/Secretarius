@@ -22,6 +22,8 @@ from pathlib import Path
 import frontmatter
 import numpy as np
 
+from wiki_paths import iter_pages, slug_to_path
+
 EMBED_DIR = Path(__file__).resolve().parent.parent / "embeddings"
 INDEX_FILE = "embeddings_index.json"
 MATRIX_FILE = "embeddings.npy"
@@ -86,7 +88,7 @@ def _select_canonical(slugs: set[str], wiki_dir: Path) -> str:
     5. Ordre alphabétique (déterministe)
     """
     def _score(slug: str) -> tuple:
-        path = wiki_dir / f"{slug}.md"
+        path = slug_to_path(wiki_dir, slug)
         try:
             post = frontmatter.load(path)
             bad = 1 if str(post.get("status", "")) in _BAD_STATUS else 0
@@ -142,9 +144,7 @@ def _raw_files_for_slug(slug: str, manifest: dict[str, dict], raw_dir: Path) -> 
 
 def _build_sources_index(wiki_dir: Path) -> dict[str, list[Path]]:
     index: dict[str, list[Path]] = {}
-    for page in sorted(wiki_dir.glob("*.md")):
-        if not (page.stem.startswith("c-") or page.stem.startswith("e-")):
-            continue
+    for page in iter_pages(wiki_dir, subdirs=["concepts", "entités"]):
         try:
             post = frontmatter.load(page)
         except Exception:
@@ -186,7 +186,7 @@ def _clean(
             print(f"  doublon   : {slug}")
 
             # Suppression page wiki
-            wiki_page = wiki_dir / f"{slug}.md"
+            wiki_page = slug_to_path(wiki_dir, slug)
             if wiki_page.exists():
                 if apply:
                     wiki_page.unlink()
