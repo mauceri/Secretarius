@@ -123,8 +123,10 @@ def _setup_wiki_with_embeds(tmp_path: Path, n: int = 6) -> tuple[Path, Path]:
     wiki_dir.mkdir()
 
     slugs = [f"src-{i:02d}" for i in range(n)]
+    sources_dir = wiki_dir / "sources"
+    sources_dir.mkdir(parents=True, exist_ok=True)
     for i, slug in enumerate(slugs):
-        (wiki_dir / f"{slug}.md").write_text(
+        (sources_dir / f"{slug}.md").write_text(
             f"---\ntitle: Source {i}\ncategory: source\ntags: [test]\n---\n\n"
             f"## Résumé\n\nTexte de test numéro {i}.\n",
             encoding="utf-8",

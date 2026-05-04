@@ -16,13 +16,13 @@ class TestIngestSingle:
         src.write_text("Contenu de l'article de test.", encoding="utf-8")
         slug = ingestor.ingest(str(src))
         assert slug.startswith("src-")
-        assert (wiki_dir / f"{slug}.md").exists()
+        assert (wiki_dir / "sources" / f"{slug}.md").exists()
 
     def test_source_page_has_valid_frontmatter(self, ingestor, wiki_dir, tmp_path):
         src = tmp_path / "article.txt"
         src.write_text("Contenu.", encoding="utf-8")
         slug = ingestor.ingest(str(src))
-        post = frontmatter.loads((wiki_dir / f"{slug}.md").read_text())
+        post = frontmatter.loads((wiki_dir / "sources" / f"{slug}.md").read_text())
         assert post["category"] == "source"
         assert "title" in post
 
@@ -45,8 +45,8 @@ class TestIngestSingle:
         src.write_text("Contenu.", encoding="utf-8")
         ingestor.ingest(str(src))
         # MockLLM extrait "zettelkasten" et "Vannevar Bush"
-        assert (wiki_dir / "c-zettelkasten.md").exists()
-        assert (wiki_dir / "e-vannevar-bush.md").exists()
+        assert (wiki_dir / "concepts" / "c-zettelkasten.md").exists()
+        assert (wiki_dir / "entités" / "e-vannevar-bush.md").exists()
 
     def test_no_double_src_prefix(self, ingestor, wiki_dir, tmp_path):
         src = tmp_path / "src-already-prefixed.txt"
@@ -58,13 +58,13 @@ class TestIngestSingle:
         src = tmp_path / "article.txt"
         src.write_text("Contenu.", encoding="utf-8")
         slug = ingestor.ingest(str(src))
-        post = frontmatter.loads((wiki_dir / f"{slug}.md").read_text())
+        post = frontmatter.loads((wiki_dir / "sources" / f"{slug}.md").read_text())
         assert post.get("status") == "nouveau"
 
 
 class TestImmuable:
     def test_immuable_page_not_overwritten(self, ingestor, wiki_dir, tmp_path):
-        page = wiki_dir / "c-zettelkasten.md"
+        page = wiki_dir / "concepts" / "c-zettelkasten.md"
         page.write_text(
             "---\ntitle: Zettelkasten\ncategory: concept\nstatus: immuable\n---\n\nContenu protégé.\n",
             encoding="utf-8",
@@ -75,7 +75,7 @@ class TestImmuable:
         assert "Contenu protégé." in page.read_text()
 
     def test_non_immuable_page_overwritten(self, ingestor, wiki_dir, tmp_path):
-        page = wiki_dir / "c-zettelkasten.md"
+        page = wiki_dir / "concepts" / "c-zettelkasten.md"
         page.write_text(
             "---\ntitle: Zettelkasten\ncategory: concept\nstatus: nouveau\n---\n\nAncien contenu.\n",
             encoding="utf-8",
