@@ -28,6 +28,8 @@ import numpy as np
 import pickle
 from rank_bm25 import BM25Plus
 
+from wiki_paths import iter_pages, slug_to_path
+
 _EMBED_DIR = Path(__file__).resolve().parent.parent / "embeddings"
 _CACHE_PATH = Path(__file__).resolve().parent.parent / "wiki_bm25_cache.pkl"
 _CACHE_VERSION = 1
@@ -100,8 +102,7 @@ class WikiSearch:
     def _max_mtime(self) -> float:
         """Mtime le plus récent parmi toutes les pages .md — détecte créations ET modifications."""
         return max(
-            (p.stat().st_mtime for p in self.wiki_dir.glob("*.md")
-             if p.name not in ("index.md", "log.md")),
+            (p.stat().st_mtime for p in iter_pages(self.wiki_dir)),
             default=0.0,
         )
 
@@ -153,9 +154,7 @@ class WikiSearch:
         self._pages = []
         self._corpus = []
 
-        for path in sorted(self.wiki_dir.glob("**/*.md")):
-            if path.name in ("index.md", "log.md"):
-                continue
+        for path in iter_pages(self.wiki_dir):
             try:
                 post = frontmatter.load(path)
             except Exception:
@@ -291,7 +290,7 @@ class WikiSemanticSearch:
             if score < min_score or len(results) >= top_k:
                 break
             slug = self._slugs[idx]
-            path = self.wiki_dir / f"{slug}.md"
+            path = slug_to_path(self.wiki_dir, slug)
             if not path.exists():
                 continue
             try:
