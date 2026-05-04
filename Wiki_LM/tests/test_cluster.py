@@ -157,7 +157,7 @@ def test_run_clustering_creates_output_dir(tmp_path):
     wiki_dir, embed_dir = _setup_wiki_with_embeds(tmp_path)
     run_clustering(wiki_dir, embed_dir, "embeddings", param=2, llm=None)
 
-    out_dir = wiki_dir / "clustering-embeddings-hdbscan-2"
+    out_dir = wiki_dir / "clusterings" / "clustering-embeddings-hdbscan-2"
     assert out_dir.exists()
 
 
@@ -167,7 +167,7 @@ def test_run_clustering_creates_index_and_unclustered(tmp_path):
     wiki_dir, embed_dir = _setup_wiki_with_embeds(tmp_path)
     run_clustering(wiki_dir, embed_dir, "embeddings", param=2, llm=None)
 
-    out_dir = wiki_dir / "clustering-embeddings-hdbscan-2"
+    out_dir = wiki_dir / "clusterings" / "clustering-embeddings-hdbscan-2"
     assert (out_dir / "index.md").exists()
     assert (out_dir / "unclustered.md").exists()
 
@@ -179,7 +179,7 @@ def test_run_clustering_cluster_files_have_members(tmp_path):
     stats = run_clustering(wiki_dir, embed_dir, "embeddings", param=2, llm=None)
 
     assert stats["clusters"] >= 1
-    out_dir = wiki_dir / "clustering-embeddings-hdbscan-2"
+    out_dir = wiki_dir / "clusterings" / "clustering-embeddings-hdbscan-2"
     cluster_files = [f for f in out_dir.glob("cluster-*.md")]
     assert len(cluster_files) == stats["clusters"]
 

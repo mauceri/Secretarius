@@ -30,6 +30,7 @@ from similarity import (
     EmbeddingSimilarity,
     TagSimilarity,
 )
+from wiki_paths import CLUSTERING_SUBDIR
 
 _EMBED_DIR = Path(__file__).resolve().parent.parent / "embeddings"
 _DEFAULT_WIKI = os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Arbath/Wiki_LM"))
@@ -42,7 +43,7 @@ _DEFAULT_WIKI = os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Arbath/
 def _load_src_pages(wiki_dir: Path) -> list[dict]:
     """Retourne la liste de dicts {slug, title, abstract} pour toutes les pages src-."""
     pages = []
-    for path in sorted(wiki_dir.glob("src-*.md")):
+    for path in sorted((wiki_dir / "sources").glob("src-*.md")):
         try:
             post = frontmatter.load(path)
         except Exception:
@@ -221,8 +222,8 @@ def run_clustering(
         else:
             centroids[cid] = sim[idx_list].mean(axis=0)
 
-    out_dir = wiki_dir / f"clustering-{signal_str}-{algo}-{param}"
-    out_dir.mkdir(exist_ok=True)
+    out_dir = wiki_dir / CLUSTERING_SUBDIR / f"clustering-{signal_str}-{algo}-{param}"
+    out_dir.mkdir(parents=True, exist_ok=True)
     today = datetime.date.today().isoformat()
 
     cluster_slugs = {cid: f"cluster-{signal_str}-{algo}-{param}-{cid:04d}" for cid in clusters}
