@@ -119,9 +119,11 @@ def mock_llm() -> MockLLM:
 
 @pytest.fixture
 def wiki_dir(tmp_path: Path) -> Path:
-    """Répertoire wiki vide avec index.md et log.md."""
+    """Répertoire wiki avec sous-répertoires et fichiers méta."""
     w = tmp_path / "wiki"
     w.mkdir()
+    for subdir in ("sources", "concepts", "entités", "clusterings"):
+        (w / subdir).mkdir()
     (w / "index.md").write_text("# Index\n\n", encoding="utf-8")
     (w / "log.md").write_text("", encoding="utf-8")
     return w

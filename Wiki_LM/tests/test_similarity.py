@@ -90,10 +90,11 @@ def test_embedding_similarity_subset(tmp_path):
 # ---------------------------------------------------------------------------
 
 def _write_page(wiki_dir: Path, slug: str, body: str, tags: list[str] | None = None) -> None:
+    from wiki_paths import slug_to_path
     tags_yaml = f"tags: {tags}\n" if tags else ""
-    (wiki_dir / f"{slug}.md").write_text(
-        f"---\ntitle: {slug}\n{tags_yaml}---\n\n{body}", encoding="utf-8"
-    )
+    path = slug_to_path(wiki_dir, slug)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"---\ntitle: {slug}\n{tags_yaml}---\n\n{body}", encoding="utf-8")
 
 
 def test_colink_identical_pages(tmp_path):
