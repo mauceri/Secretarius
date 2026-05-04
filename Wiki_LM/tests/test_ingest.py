@@ -160,12 +160,12 @@ class TestRawForce:
         f = raw_dir / "20260101-000000-source.txt"
         f.write_text("Contenu.", encoding="utf-8")
         ingestor.ingest_raw_dir()
-        pages_before = list(wiki_dir.glob("src-*.md"))
+        pages_before = list((wiki_dir / "sources").glob("src-*.md"))
         assert len(pages_before) > 0
         ingestor.ingest_raw_dir(force=True)
         # Les pages sont recréées — pas de pages orphelines de l'ancien run
         old_slugs = {p.stem for p in pages_before}
-        current_slugs = {p.stem for p in wiki_dir.glob("src-*.md")}
+        current_slugs = {p.stem for p in (wiki_dir / "sources").glob("src-*.md")}
         # Les pages de l'ancien run ne sont présentes que si recréées
         assert old_slugs == current_slugs or not (old_slugs - current_slugs)
 
@@ -193,7 +193,7 @@ class TestTags:
         src = tmp_path / "article.txt"
         src.write_text("Contenu.", encoding="utf-8")
         slug = ingestor.ingest(str(src), extra_tags=["ia", "local"])
-        post = frontmatter.loads((wiki_dir / f"{slug}.md").read_text())
+        post = frontmatter.loads((wiki_dir / "sources" / f"{slug}.md").read_text())
         assert "ia" in post["tags"]
         assert "local" in post["tags"]
 
@@ -236,7 +236,7 @@ class TestConceptLinks:
         src = tmp_path / "article.txt"
         src.write_text("Contenu.", encoding="utf-8")
         slug = ingestor.ingest(str(src))
-        text = (wiki_dir / f"{slug}.md").read_text()
+        text = (wiki_dir / "sources" / f"{slug}.md").read_text()
         # MockLLM injecte "zettelkasten" et "Vannevar Bush"
         assert "[[c-zettelkasten]]" in text
         assert "[[e-vannevar-bush]]" in text
@@ -245,7 +245,7 @@ class TestConceptLinks:
         src = tmp_path / "article.txt"
         src.write_text("Contenu.", encoding="utf-8")
         slug = ingestor.ingest(str(src))
-        text = (wiki_dir / f"{slug}.md").read_text()
+        text = (wiki_dir / "sources" / f"{slug}.md").read_text()
         # Les noms nus ne doivent plus apparaître dans la section
         import re
         section = re.search(

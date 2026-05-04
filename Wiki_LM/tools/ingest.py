@@ -36,6 +36,7 @@ import frontmatter
 
 from llm import LLM
 from wiki_lookup import WikiLookup
+from wiki_paths import CONTENT_SUBDIRS, CLUSTERING_SUBDIR, iter_pages, slug_to_path
 
 
 # ---------------------------------------------------------------------------
@@ -693,6 +694,9 @@ class Ingestor:
         for d in (self.wiki_dir, self.raw_dir):
             d.mkdir(parents=True, exist_ok=True)
 
+        for subdir in CONTENT_SUBDIRS + [CLUSTERING_SUBDIR]:
+            (self.wiki_dir / subdir).mkdir(parents=True, exist_ok=True)
+
         self.llm = llm or LLM()
         self.today = _today()
         self._wiki_lookup = WikiLookup(wiki_path)
@@ -771,7 +775,7 @@ class Ingestor:
             slug = meta.get("slug", "")
             if not slug:
                 continue
-            src_page = self.wiki_dir / f"{slug}.md"
+            src_page = slug_to_path(self.wiki_dir, slug)
             if not src_page.exists():
                 deleted_slugs.add(slug)
                 continue
@@ -790,9 +794,7 @@ class Ingestor:
             return affected
 
         # Mettre à jour les pages c-/e- qui référencent ces slugs
-        for page in sorted(self.wiki_dir.glob("*.md")):
-            if not any(page.stem.startswith(p) for p in ("c-", "e-")):
-                continue
+        for page in iter_pages(self.wiki_dir, subdirs=["concepts", "entités"]):
             try:
                 content = page.read_text(encoding="utf-8")
                 post = frontmatter.loads(content)
@@ -833,14 +835,8 @@ class Ingestor:
         Les pages avec status: immuable sont préservées.
         Les fichiers meta (log.md, schema.md) sont préservés.
         """
-        _META = {"index.md", "log.md", "schema.md"}
-        _PAGE_PREFIXES = ("src-", "c-", "e-", "synth-")
         deleted = 0
-        for page in self.wiki_dir.glob("*.md"):
-            if page.name in _META:
-                continue
-            if not any(page.stem.startswith(p) for p in _PAGE_PREFIXES):
-                continue
+        for page in iter_pages(self.wiki_dir):
             try:
                 post = frontmatter.loads(page.read_text(encoding="utf-8"))
                 if post.get("status") == "immuable":
@@ -1163,11 +1159,8 @@ class Ingestor:
 
     def _rebuild_tags_index(self) -> None:
         """Reconstruit tags.md : index tag → pages du wiki."""
-        _META = {"index.md", "log.md", "schema.md", "tags.md"}
         tag_map: dict[str, list[tuple[str, str, str]]] = {}
-        for page in sorted(self.wiki_dir.glob("*.md")):
-            if page.name in _META:
-                continue
+        for page in sorted(iter_pages(self.wiki_dir)):
             try:
                 post = frontmatter.loads(page.read_text(encoding="utf-8"))
                 tags = post.get("tags", [])
@@ -1191,8 +1184,8 @@ class Ingestor:
         self, concept: str, source_title: str, src_slug: str, full_content: str
     ) -> None:
         concept_slug = f"c-{_slugify(concept)}"
-        page_path = self.wiki_dir / f"{concept_slug}.md"
-        existing = page_path.read_text(encoding="utf-8") if page_path.exists() else ""
+        page_file = slug_to_path(self.wiki_dir, concept_slug)
+        existing = page_file.read_text(encoding="utf-8") if page_file.exists() else ""
 
         # Extrait contextuel : premières occurrences du concept dans la source
         excerpt = self._find_excerpt(full_content, concept)
@@ -1226,8 +1219,8 @@ class Ingestor:
         self, entity: str, source_title: str, src_slug: str, full_content: str
     ) -> None:
         entity_slug = f"e-{_slugify(entity)}"
-        page_path = self.wiki_dir / f"{entity_slug}.md"
-        existing = page_path.read_text(encoding="utf-8") if page_path.exists() else ""
+        page_file = slug_to_path(self.wiki_dir, entity_slug)
+        existing = page_file.read_text(encoding="utf-8") if page_file.exists() else ""
 
         excerpt = self._find_excerpt(full_content, entity)
 
@@ -1257,7 +1250,7 @@ class Ingestor:
             self._update_index(entity_slug, entity, "entité")
 
     def _write_wiki_page(self, slug: str, content: str) -> None:
-        path = self.wiki_dir / f"{slug}.md"
+        path = slug_to_path(self.wiki_dir, slug)
         # Respecter le statut immuable : ne jamais écraser une page verrouillée
         if path.exists():
             try:
@@ -1269,7 +1262,7 @@ class Ingestor:
                 pass
         content = _fix_mojibake(content)
         content = _fix_yaml_scalars(content)
-        known_slugs = {p.stem for p in self.wiki_dir.glob("*.md")}
+        known_slugs = {p.stem for p in iter_pages(self.wiki_dir)}
         content = _normalize_links(content, known_slugs)
         # Re-sérialiser via PyYAML pour normaliser le frontmatter
         try:
