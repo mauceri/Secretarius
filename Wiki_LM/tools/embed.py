@@ -16,14 +16,12 @@ from pathlib import Path
 import frontmatter
 import numpy as np
 from sentence_transformers import SentenceTransformer
+from wiki_paths import iter_pages
 
 MODEL_NAME = "BAAI/bge-m3"
 EMBED_DIR = Path(__file__).resolve().parent.parent / "embeddings"
 INDEX_FILE = "embeddings_index.json"
 MATRIX_FILE = "embeddings.npy"
-
-SKIP_NAMES = {"index.md", "log.md"}
-
 
 def _extract_text(post: frontmatter.Post) -> str:
     title = str(post.get("title", ""))
@@ -35,9 +33,7 @@ def _extract_text(post: frontmatter.Post) -> str:
 
 def load_pages(wiki_dir: Path) -> list[dict]:
     pages = []
-    for path in sorted(wiki_dir.glob("*.md")):
-        if path.name in SKIP_NAMES:
-            continue
+    for path in iter_pages(wiki_dir):
         try:
             post = frontmatter.load(path)
         except Exception:
