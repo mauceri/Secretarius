@@ -21,6 +21,8 @@ from pathlib import Path
 import frontmatter
 import numpy as np
 
+from wiki_paths import slug_to_path
+
 _EMBED_DIR = Path(__file__).resolve().parent.parent / "embeddings"
 
 
@@ -78,7 +80,7 @@ class CoLinkSimilarity(BaseSimilarity):
         self._wiki_dir = Path(wiki_dir)
 
     def _links(self, slug: str) -> frozenset[str]:
-        path = self._wiki_dir / f"{slug}.md"
+        path = slug_to_path(self._wiki_dir, slug)
         if not path.exists():
             return frozenset()
         try:
@@ -106,7 +108,7 @@ class TagSimilarity(BaseSimilarity):
         self._wiki_dir = Path(wiki_dir)
 
     def _tags(self, slug: str) -> frozenset[str]:
-        path = self._wiki_dir / f"{slug}.md"
+        path = slug_to_path(self._wiki_dir, slug)
         if not path.exists():
             return frozenset()
         try:
