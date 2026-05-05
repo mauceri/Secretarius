@@ -133,12 +133,13 @@ def test_run_transfers_max_k():
 
 
 def test_run_transfers_force_assign_no_poubelle():
-    """force_assign=True : tous les docs dans un cluster, aucun en poubelle."""
+    """force_assign=True + max_k=1 : tous les docs assignés, aucun en poubelle."""
     from transfers import run_transfers
     sim = _make_sim(n=10)
     slugs = [f"s{i}" for i in range(10)]
-    # theta très élevé : sans force_assign, beaucoup seraient en poubelle
-    result = run_transfers(slugs, sim, theta=0.99, force_assign=True,
+    # max_k=1 : Algo 1 crée 1 cluster max, le reste va en poubelle.
+    # force_assign=True : les docs en poubelle doivent être assignés au seul cluster.
+    result = run_transfers(slugs, sim, theta=0.5, max_k=1, force_assign=True,
                            rng=np.random.default_rng(0))
     all_idx = {i for m in result.values() for i in m}
     assert all_idx == set(range(10))
