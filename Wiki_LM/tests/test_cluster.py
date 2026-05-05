@@ -261,7 +261,7 @@ def test_run_clustering_transfers_creates_output(tmp_path):
     stats = run_clustering(wiki_dir, embed_dir, "embeddings", param=75, llm=None,
                            algo="transfers", theta=0.5)
     assert "error" not in stats
-    out_dir = wiki_dir / "clusterings" / "clustering-embeddings-transfers-75"
+    out_dir = wiki_dir / "clusterings" / "clustering-embeddings-transfers-0.500"
     assert out_dir.exists()
     assert (out_dir / "index.md").exists()
     assert (out_dir / "unclustered.md").exists()
@@ -303,9 +303,9 @@ def test_run_clustering_transfers_dry_run_on_existing(tmp_path):
     # Créer d'abord le clustering
     run_clustering(wiki_dir, embed_dir, "embeddings", param=75, llm=None,
                    algo="transfers", theta=0.5)
-    # Dry-run sur le clustering existant
+    # Dry-run sur le clustering existant (même theta pour retrouver le bon répertoire)
     stats = run_clustering(wiki_dir, embed_dir, "embeddings", param=75, llm=None,
-                           algo="transfers", dry_run=True)
+                           algo="transfers", theta=0.5, dry_run=True)
     assert "error" not in stats
     for key in ("proposed_transfers", "total", "ratio", "adequate"):
         assert key in stats

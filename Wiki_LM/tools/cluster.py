@@ -247,7 +247,7 @@ def run_clustering(
                 "error": f"Corpus trop petit : {len(pages)} pages < {MIN_PAGES_FOR_CLUSTERING}",
             }
         effective_theta = theta if theta is not None else estimate_theta(sim)
-        out_dir = wiki_dir / CLUSTERING_SUBDIR / f"clustering-{signal_str}-transfers-{param}"
+        out_dir = wiki_dir / CLUSTERING_SUBDIR / f"clustering-{signal_str}-transfers-{effective_theta:.3f}"
         initial_partition: dict[int, list[int]] | None = None
         if incremental and out_dir.exists():
             initial_partition = _load_existing_partition(out_dir, slugs)
