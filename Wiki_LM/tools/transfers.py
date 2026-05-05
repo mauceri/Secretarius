@@ -44,7 +44,7 @@ def run_transfers(
     max_iter: int = 100,
     min_gain_delta: float = 1e-4,
     rng: np.random.Generator | None = None,
-) -> dict[int, list[int]]:
+) -> dict[int, list[int]] | dict:
     n = len(slugs)
     if rng is None:
         rng = np.random.default_rng()
@@ -115,6 +115,30 @@ def run_transfers(
         elif max_k is None or len(clusters) < max_k:
             _new_cluster(x)
         # else : stays -1 (poubelle)
+
+    # --- Dry run : compter les transferts proposés par Algo 2 sans les appliquer ---
+    if dry_run:
+        proposed = 0
+        total_assigned = int(np.sum(labels >= 0))
+        for x in range(n):
+            cx = int(labels[x])
+            if cx == -1:
+                continue
+            size_cx = len(clusters[cx])
+            if size_cx > 1:
+                contrib = (size_cx * float(centroids[cx][x]) - float(sim[x, x])) / (size_cx - 1)
+            else:
+                contrib = 0.0
+            _, best_gain = _best_other(x, exclude=cx)
+            if best_gain > contrib + min_gain_delta:
+                proposed += 1
+        ratio = proposed / total_assigned if total_assigned > 0 else 0.0
+        return {
+            "proposed_transfers": proposed,
+            "total": total_assigned,
+            "ratio": ratio,
+            "adequate": ratio <= QUALITY_THRESHOLD,
+        }
 
     # --- Algo 2 : amélioration par transferts ---
     for _ in range(max_iter):
