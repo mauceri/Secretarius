@@ -116,4 +116,28 @@ def run_transfers(
             _new_cluster(x)
         # else : stays -1 (poubelle)
 
+    # --- Algo 2 : amélioration par transferts ---
+    for _ in range(max_iter):
+        changed = False
+        for x in range(n):
+            cx = int(labels[x])
+            if cx == -1:
+                continue
+            size_cx = len(clusters[cx])
+            if size_cx > 1:
+                contrib = (size_cx * float(centroids[cx][x]) - float(sim[x, x])) / (size_cx - 1)
+            else:
+                contrib = 0.0
+            best_cid, best_gain = _best_other(x, exclude=cx)
+            if best_cid >= 0 and best_gain > contrib + min_gain_delta:
+                old_cx = cx
+                _remove(x, old_cx)
+                if best_cid in clusters:
+                    _add(x, best_cid)
+                else:
+                    _new_cluster(x)
+                changed = True
+        if not changed:
+            break
+
     return {cid: list(m) for cid, m in clusters.items()}

@@ -81,12 +81,41 @@ def test_run_transfers_group_coherence():
 
 
 def test_run_transfers_high_theta_creates_singletons():
-    """Sans max_k, theta=0.99 → chaque doc isolé crée son propre singleton."""
+    """Sans max_k, theta=0.99 → Algo 1 crée des singletons.
+    Algo 2 peut ensuite fusionner certains singletons par transfert.
+    On vérifie : tous les docs sont assignés et chaque cluster est ≥ 1."""
     from transfers import run_transfers
     sim = _make_sim(n=10)
     slugs = [f"s{i}" for i in range(10)]
     result = run_transfers(slugs, sim, theta=0.99, rng=np.random.default_rng(0))
-    # Pas de gain > 0.99 entre docs inter-groupes → tous singletons
-    assert len(result) == 10
+    all_idx = {i for m in result.values() for i in m}
+    assert all_idx == set(range(10))
+    assert len(result) >= 1
     for members in result.values():
-        assert len(members) == 1
+        assert len(members) >= 1
+
+
+def test_run_transfers_terminates_with_max_iter():
+    """L'algorithme s'arrête après max_iter même sans convergence."""
+    from transfers import run_transfers
+    # Matrice presque uniforme : beaucoup d'ambiguïté, oscillations potentielles
+    n = 8
+    sim = np.full((n, n), 0.5, dtype=np.float32)
+    np.fill_diagonal(sim, 1.0)
+    slugs = [f"s{i}" for i in range(n)]
+    result = run_transfers(slugs, sim, theta=0.3, max_iter=3, min_gain_delta=0.0,
+                           rng=np.random.default_rng(0))
+    assert isinstance(result, dict)
+    assert len(result) >= 1
+
+
+def test_run_transfers_min_gain_delta_stops_marginal():
+    """min_gain_delta très élevé → Algo 2 n'effectue aucun transfert (résultat valide)."""
+    from transfers import run_transfers
+    sim = _make_sim(n=10)
+    slugs = [f"s{i}" for i in range(10)]
+    result = run_transfers(slugs, sim, theta=0.5, min_gain_delta=999.0,
+                           rng=np.random.default_rng(0))
+    all_idx = {i for m in result.values() for i in m}
+    assert isinstance(result, dict)
+    assert len(all_idx) == 10
