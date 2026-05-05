@@ -169,6 +169,26 @@ def _get_embed_rows(slugs: list[str], embed_dir: Path) -> np.ndarray | None:
         return None
 
 
+def _load_existing_partition(out_dir: Path, slugs: list[str]) -> dict[int, list[int]]:
+    """Charge la partition depuis les sections '## Documents membres' des cluster-*.md."""
+    slug_to_idx = {s: i for i, s in enumerate(slugs)}
+    partition: dict[int, list[int]] = {}
+    for path in sorted(out_dir.glob("cluster-*.md")):
+        m_id = re.search(r"-(\d{4})\.md$", path.name)
+        if not m_id:
+            continue
+        cid = int(m_id.group(1))
+        content = path.read_text(encoding="utf-8")
+        m = re.search(r"## Documents membres\n(.*?)(?=\n## |\Z)", content, re.DOTALL)
+        if not m:
+            continue
+        member_slugs = re.findall(r"\[\[([^\]]+)\]\]", m.group(1))
+        indices = [slug_to_idx[s] for s in member_slugs if s in slug_to_idx]
+        if indices:
+            partition[cid] = indices
+    return partition
+
+
 # ---------------------------------------------------------------------------
 # Clustering principal
 # ---------------------------------------------------------------------------
@@ -180,6 +200,11 @@ def run_clustering(
     param: int,
     llm: LLM | None = None,
     algo: str = "hdbscan",
+    theta: float | None = None,
+    max_k: int | None = None,
+    force_assign: bool = False,
+    incremental: bool = False,
+    dry_run: bool = False,
 ) -> dict:
     """
     Lance le clustering et écrit les fichiers wiki.
@@ -195,34 +220,65 @@ def run_clustering(
     signal = _build_signal(signal_str, wiki_dir, embed_dir)
     sim = signal.compute(slugs)
 
-    dist = (1.0 - sim).clip(0.0).astype(np.float64)
-    np.fill_diagonal(dist, 0.0)
+    if algo == "hdbscan":
+        dist = (1.0 - sim).clip(0.0).astype(np.float64)
+        np.fill_diagonal(dist, 0.0)
+        labels = HDBSCAN(
+            min_cluster_size=param,
+            metric="precomputed",
+            cluster_selection_method="eom",
+            copy=True,
+        ).fit_predict(dist)
+        clusters: dict[int, list[int]] = {}
+        noise: list[int] = []
+        for i, label in enumerate(labels):
+            if label == -1:
+                noise.append(i)
+            else:
+                clusters.setdefault(int(label), []).append(i)
+        out_dir = wiki_dir / CLUSTERING_SUBDIR / f"clustering-{signal_str}-hdbscan-{param}"
 
-    labels = HDBSCAN(
-        min_cluster_size=param,
-        metric="precomputed",
-        cluster_selection_method="eom",
-        copy=True,
-    ).fit_predict(dist)
+    elif algo == "transfers":
+        from transfers import run_transfers, estimate_theta, MIN_PAGES_FOR_CLUSTERING
+        if len(pages) < MIN_PAGES_FOR_CLUSTERING:
+            return {
+                "clusters": 0, "noise": 0, "signal": signal_str,
+                "algo": algo, "param": param, "out_dir": "",
+                "error": f"Corpus trop petit : {len(pages)} pages < {MIN_PAGES_FOR_CLUSTERING}",
+            }
+        effective_theta = theta if theta is not None else estimate_theta(sim)
+        out_dir = wiki_dir / CLUSTERING_SUBDIR / f"clustering-{signal_str}-transfers-{param}"
+        initial_partition: dict[int, list[int]] | None = None
+        if incremental and out_dir.exists():
+            initial_partition = _load_existing_partition(out_dir, slugs)
+        if dry_run:
+            if not out_dir.exists():
+                return {"error": "Aucun clustering existant pour ce signal/param"}
+            _ip = initial_partition or _load_existing_partition(out_dir, slugs)
+            return run_transfers(slugs, sim, effective_theta, dry_run=True,
+                                 initial_partition=_ip)
+        partition = run_transfers(
+            slugs, sim, effective_theta,
+            max_k=max_k,
+            force_assign=force_assign,
+            initial_partition=initial_partition,
+        )
+        clusters = {cid: list(m) for cid, m in partition.items()}
+        in_clusters: set[int] = {i for m in clusters.values() for i in m}
+        noise = [i for i in range(len(slugs)) if i not in in_clusters]
 
-    clusters: dict[int, list[int]] = {}
-    noise: list[int] = []
-    for i, label in enumerate(labels):
-        if label == -1:
-            noise.append(i)
-        else:
-            clusters.setdefault(int(label), []).append(i)
+    else:
+        raise ValueError(
+            f"Algorithme inconnu : {algo!r}. Valeurs valides : hdbscan, transfers"
+        )
 
     embed_rows = _get_embed_rows(slugs, embed_dir)
-
     centroids: dict[int, np.ndarray] = {}
     for cid, idx_list in clusters.items():
         if embed_rows is not None:
-            centroids[cid] = embed_rows[idx_list].mean(axis=0)
+            centroids[cid] = embed_rows[np.array(idx_list)].mean(axis=0)
         else:
-            centroids[cid] = sim[idx_list].mean(axis=0)
-
-    out_dir = wiki_dir / CLUSTERING_SUBDIR / f"clustering-{signal_str}-{algo}-{param}"
+            centroids[cid] = sim[np.array(idx_list)].mean(axis=0)
     out_dir.mkdir(parents=True, exist_ok=True)
     today = datetime.date.today().isoformat()
 
@@ -268,9 +324,14 @@ def run_clustering(
         )
 
     # unclustered.md
+    noise_desc = (
+        "bruit HDBSCAN"
+        if algo == "hdbscan"
+        else "non assignées par l'algorithme des transferts"
+    )
     unclustered_lines = [
         f"# Sources non assignées ({len(noise)} documents)", "",
-        "Ces sources sont thématiquement isolées (bruit HDBSCAN).", "",
+        f"Ces sources sont thématiquement isolées ({noise_desc}).", "",
     ]
     for i in noise:
         s = slugs[i]
@@ -324,6 +385,30 @@ def main() -> None:
         help="min_cluster_size(s), virgule-séparés ex. 10,30,60",
     )
     parser.add_argument("--no-llm", action="store_true", help="Ne pas appeler le LLM")
+    parser.add_argument(
+        "--algo", default="hdbscan", choices=["hdbscan", "transfers"],
+        help="Algorithme de clustering : hdbscan (défaut) ou transfers",
+    )
+    parser.add_argument(
+        "--theta", type=float, default=None,
+        help="Seuil θ pour algo=transfers (auto-estimé si absent)",
+    )
+    parser.add_argument(
+        "--max-k", type=int, default=None,
+        help="Nombre maximum de clusters pour algo=transfers",
+    )
+    parser.add_argument(
+        "--force-assign", action="store_true",
+        help="Forcer l'assignation des docs en poubelle au cluster le plus proche",
+    )
+    parser.add_argument(
+        "--incremental", action="store_true",
+        help="Partir du clustering existant (Algo 1 seulement sur les nouvelles pages)",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Évaluer la qualité du clustering existant sans recalculer",
+    )
     parser.add_argument("--embed-dir", default="")
     parser.add_argument("--backend", default="")
     parser.add_argument("--model", default="")
@@ -341,12 +426,26 @@ def main() -> None:
 
     params = [int(p.strip()) for p in args.param.split(",") if p.strip()]
     for param in params:
-        print(f"[cluster] signal={args.signal} param={param} …")
-        stats = run_clustering(wiki_dir, embed_dir, args.signal, param, llm=llm)
-        print(
-            f"[cluster] {stats['clusters']} clusters, {stats['noise']} non assignés"
-            f" → {stats['out_dir']}"
+        print(f"[cluster] signal={args.signal} algo={args.algo} param={param} …")
+        stats = run_clustering(
+            wiki_dir, embed_dir, args.signal, param, llm=llm,
+            algo=args.algo, theta=args.theta, max_k=args.max_k,
+            force_assign=args.force_assign, incremental=args.incremental,
+            dry_run=args.dry_run,
         )
+        if "error" in stats:
+            print(f"[cluster] Erreur : {stats['error']}")
+        elif args.dry_run:
+            print(
+                f"[cluster] Qualité : ratio={stats['ratio']:.2%}, "
+                f"adequate={stats['adequate']}, "
+                f"transferts proposés={stats['proposed_transfers']}/{stats['total']}"
+            )
+        else:
+            print(
+                f"[cluster] {stats['clusters']} clusters, {stats['noise']} non assignés"
+                f" → {stats['out_dir']}"
+            )
 
 
 if __name__ == "__main__":
