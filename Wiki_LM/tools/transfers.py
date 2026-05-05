@@ -61,10 +61,12 @@ def run_transfers(
     new_indices: list[int] = list(range(n))
     if initial_partition is not None:
         for cid, idx_list in initial_partition.items():
-            clusters[cid] = set(idx_list)
-            for idx in idx_list:
-                if 0 <= idx < n:
-                    labels[idx] = cid
+            valid = [idx for idx in idx_list if 0 <= idx < n]
+            if not valid:
+                continue
+            clusters[cid] = set(valid)
+            for idx in valid:
+                labels[idx] = cid
             next_id[0] = max(next_id[0], cid + 1)
         centroids = {cid: _centroid(m) for cid, m in clusters.items()}
         new_indices = [i for i in range(n) if labels[i] == -1]

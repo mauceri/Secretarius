@@ -132,6 +132,9 @@ def start_cluster():
     if _cluster_status["running"]:
         return jsonify({"status": "already_running"})
 
+    if _wq is None:
+        return jsonify({"error": "Serveur non initialisé"}), 503
+
     def _run():
         _cluster_status["running"] = True
         _cluster_status["error"] = None
