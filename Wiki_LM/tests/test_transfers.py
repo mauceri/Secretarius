@@ -6,7 +6,6 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
 
@@ -96,17 +95,17 @@ def test_run_transfers_high_theta_creates_singletons():
 
 
 def test_run_transfers_terminates_with_max_iter():
-    """L'algorithme s'arrête après max_iter même sans convergence."""
+    """max_iter=0 désactive Algo 2 — la partition est celle d'Algo 1 seul."""
     from transfers import run_transfers
-    # Matrice presque uniforme : beaucoup d'ambiguïté, oscillations potentielles
-    n = 8
-    sim = np.full((n, n), 0.5, dtype=np.float32)
-    np.fill_diagonal(sim, 1.0)
-    slugs = [f"s{i}" for i in range(n)]
-    result = run_transfers(slugs, sim, theta=0.3, max_iter=3, min_gain_delta=0.0,
+    sim = _make_sim(n=10)
+    slugs = [f"s{i}" for i in range(10)]
+    result = run_transfers(slugs, sim, theta=0.5, max_iter=0,
                            rng=np.random.default_rng(0))
     assert isinstance(result, dict)
-    assert len(result) >= 1
+    all_idx = {i for m in result.values() for i in m}
+    assert all_idx == set(range(10))
+    for members in result.values():
+        assert len(members) >= 1
 
 
 def test_run_transfers_min_gain_delta_stops_marginal():

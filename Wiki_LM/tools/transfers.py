@@ -44,7 +44,7 @@ def run_transfers(
     max_iter: int = 100,
     min_gain_delta: float = 1e-4,
     rng: np.random.Generator | None = None,
-) -> "dict[int, list[int]] | dict":
+) -> dict[int, list[int]]:
     n = len(slugs)
     if rng is None:
         rng = np.random.default_rng()
@@ -132,10 +132,7 @@ def run_transfers(
             if best_cid >= 0 and best_gain > contrib + min_gain_delta:
                 old_cx = cx
                 _remove(x, old_cx)
-                if best_cid in clusters:
-                    _add(x, best_cid)
-                else:
-                    _new_cluster(x)
+                _add(x, best_cid)
                 changed = True
         if not changed:
             break
