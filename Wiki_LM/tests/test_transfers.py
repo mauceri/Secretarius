@@ -143,3 +143,43 @@ def test_run_transfers_force_assign_no_poubelle():
                            rng=np.random.default_rng(0))
     all_idx = {i for m in result.values() for i in m}
     assert all_idx == set(range(10))
+
+
+def test_run_transfers_dry_run_returns_stats():
+    """dry_run=True retourne un dict de statistiques, pas une partition."""
+    from transfers import run_transfers
+    sim = _make_sim(n=10)
+    slugs = [f"s{i}" for i in range(10)]
+    # Partition optimale (groupes corrects)
+    initial = {0: list(range(5)), 1: list(range(5, 10))}
+    result = run_transfers(slugs, sim, theta=0.5, dry_run=True,
+                           initial_partition=initial)
+    assert isinstance(result, dict)
+    for key in ("proposed_transfers", "total", "ratio", "adequate"):
+        assert key in result
+    assert 0.0 <= result["ratio"] <= 1.0
+    assert isinstance(result["adequate"], bool)
+
+
+def test_run_transfers_dry_run_optimal_partition():
+    """Partition optimale → ratio bas (clustering toujours adéquat)."""
+    from transfers import run_transfers
+    sim = _make_sim(n=10)
+    slugs = [f"s{i}" for i in range(10)]
+    initial = {0: list(range(5)), 1: list(range(5, 10))}
+    result = run_transfers(slugs, sim, theta=0.5, dry_run=True,
+                           initial_partition=initial)
+    assert result["ratio"] < 0.3  # partition correcte → peu de transferts
+
+
+def test_quality_threshold_bad_partition():
+    """Partition mélangée → ratio > QUALITY_THRESHOLD → adequate=False."""
+    from transfers import run_transfers, QUALITY_THRESHOLD
+    sim = _make_sim(n=10)
+    slugs = [f"s{i}" for i in range(10)]
+    # Partition mélangée : clusters contenant les deux groupes
+    initial = {0: [0, 1, 5, 6, 7], 1: [2, 3, 4, 8, 9]}
+    result = run_transfers(slugs, sim, theta=0.5, dry_run=True,
+                           initial_partition=initial)
+    assert result["ratio"] > QUALITY_THRESHOLD
+    assert result["adequate"] is False
