@@ -56,3 +56,35 @@ def test_estimate_theta_small_matrix_no_crash():
     sim = _make_sim(n=4)
     theta = estimate_theta(sim, sample_size=1_000_000, rng=np.random.default_rng(0))
     assert 0.0 <= theta <= 1.0
+
+
+def test_run_transfers_two_clusters():
+    """Données bien séparées → exactement 2 clusters, tous docs assignés."""
+    from transfers import run_transfers
+    sim = _make_sim(n=10)
+    slugs = [f"s{i}" for i in range(10)]
+    result = run_transfers(slugs, sim, theta=0.5, rng=np.random.default_rng(0))
+    assert len(result) == 2
+    all_idx = {i for m in result.values() for i in m}
+    assert all_idx == set(range(10))
+
+
+def test_run_transfers_group_coherence():
+    """Chaque cluster ne contient que des membres du même groupe thématique."""
+    from transfers import run_transfers
+    sim = _make_sim(n=10)
+    slugs = [f"s{i}" for i in range(10)]
+    result = run_transfers(slugs, sim, theta=0.5, rng=np.random.default_rng(0))
+    for members in result.values():
+        groups = {i < 5 for i in members}
+        assert len(groups) == 1, f"Cluster mélangé : {members}"
+
+
+def test_run_transfers_high_theta_creates_noise():
+    """theta=0.99 → la plupart des docs restent en poubelle."""
+    from transfers import run_transfers
+    sim = _make_sim(n=10)
+    slugs = [f"s{i}" for i in range(10)]
+    result = run_transfers(slugs, sim, theta=0.99, rng=np.random.default_rng(0))
+    in_cluster = sum(len(m) for m in result.values())
+    assert in_cluster < 10
