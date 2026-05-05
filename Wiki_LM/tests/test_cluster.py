@@ -311,3 +311,47 @@ def test_run_clustering_transfers_dry_run_on_existing(tmp_path):
         assert key in stats
     assert 0.0 <= stats["ratio"] <= 1.0
     assert isinstance(stats["adequate"], bool)
+
+
+# ---------------------------------------------------------------------------
+# Endpoints /cluster (mise à jour) + /cluster-quality (nouveau)
+# ---------------------------------------------------------------------------
+
+def test_cluster_quality_endpoint_invalid_param():
+    """GET /cluster-quality avec param non entier → 400."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
+    import server as srv_module
+
+    client = srv_module.app.test_client()
+    resp = client.get("/cluster-quality?signal=embeddings&param=notanint")
+    assert resp.status_code == 400
+    assert "error" in resp.get_json()
+
+
+def test_cluster_quality_endpoint_no_wq():
+    """GET /cluster-quality sans serveur initialisé (_wq=None) → 503."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
+    import server as srv_module
+
+    original_wq = srv_module._wq
+    srv_module._wq = None
+    try:
+        client = srv_module.app.test_client()
+        resp = client.get("/cluster-quality?signal=embeddings&param=75")
+        assert resp.status_code == 503
+    finally:
+        srv_module._wq = original_wq
+
+
+def test_cluster_endpoint_accepts_algo_transfers():
+    """POST /cluster avec algo='transfers' et param manquant → 400."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
+    import server as srv_module
+
+    client = srv_module.app.test_client()
+    resp = client.post("/cluster", json={"algo": "transfers"})
+    assert resp.status_code == 400
+    assert "param" in resp.get_json().get("error", "")
