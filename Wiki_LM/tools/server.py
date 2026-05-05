@@ -117,6 +117,11 @@ def start_cluster():
 
     signal = str(data.get("signal", "embeddings"))
     param = int(data["param"])
+    algo = str(data.get("algo", "hdbscan"))
+    theta = float(data["theta"]) if "theta" in data else None
+    max_k = int(data["max_k"]) if "max_k" in data else None
+    force_assign = bool(data.get("force_assign", False))
+    incremental = bool(data.get("incremental", False))
 
     if _cluster_status["running"]:
         return jsonify({"status": "already_running"})
@@ -128,7 +133,11 @@ def start_cluster():
             wiki_dir = Path(_wq._search.wiki_dir)
             embed_dir = Path(__file__).resolve().parent.parent / "embeddings"
             llm = LLM()
-            stats = run_clustering(wiki_dir, embed_dir, signal, param, llm=llm)
+            stats = run_clustering(
+                wiki_dir, embed_dir, signal, param, llm=llm,
+                algo=algo, theta=theta, max_k=max_k,
+                force_assign=force_assign, incremental=incremental,
+            )
             _wq._search.reload()
             import datetime
             _cluster_status["last"] = {**stats, "timestamp": datetime.datetime.now().isoformat()}
@@ -144,6 +153,29 @@ def start_cluster():
 @app.get("/cluster-status")
 def cluster_status():
     return jsonify(_cluster_status)
+
+
+@app.get("/cluster-quality")
+def cluster_quality():
+    """Évalue la qualité du clustering existant via un dry-run de l'Algo 2."""
+    signal = request.args.get("signal", "embeddings")
+    param_str = request.args.get("param", "75")
+    try:
+        param = int(param_str)
+    except ValueError:
+        return jsonify({"error": f"param doit être un entier, reçu : {param_str!r}"}), 400
+    if _wq is None:
+        return jsonify({"error": "Serveur non initialisé"}), 503
+
+    wiki_dir = Path(_wq._search.wiki_dir)
+    embed_dir = Path(__file__).resolve().parent.parent / "embeddings"
+    stats = run_clustering(
+        wiki_dir, embed_dir, signal, param,
+        algo="transfers", dry_run=True,
+    )
+    if "error" in stats:
+        return jsonify(stats), 404
+    return jsonify(stats)
 
 
 def main() -> None:
