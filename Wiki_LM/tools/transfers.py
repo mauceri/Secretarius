@@ -112,7 +112,7 @@ def run_transfers(
         best_cid, best_gain = _best_other(x)
         if best_gain > theta:
             _add(x, best_cid)
-        elif (max_k is None and best_gain < theta / 2) or (max_k is not None and len(clusters) < max_k):
+        elif max_k is None or len(clusters) < max_k:
             _new_cluster(x)
         # else : stays -1 (poubelle)
 
