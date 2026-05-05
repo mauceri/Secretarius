@@ -183,3 +183,33 @@ def test_quality_threshold_bad_partition():
                            initial_partition=initial)
     assert result["ratio"] > QUALITY_THRESHOLD
     assert result["adequate"] is False
+
+
+def test_run_transfers_incremental_assigns_new_docs():
+    """Avec initial_partition sur 8 docs, les 2 nouveaux docs (8,9) sont assignés."""
+    from transfers import run_transfers
+    sim = _make_sim(n=10)
+    slugs = [f"s{i}" for i in range(10)]
+    # Partition initiale sur docs 0-7 seulement
+    # groupe A = 0-4, groupe B = 5-9 → initial : cluster 0 = [0..3], cluster 1 = [4..7]
+    initial = {0: list(range(4)), 1: list(range(4, 8))}
+    result = run_transfers(slugs, sim, theta=0.5, initial_partition=initial,
+                           rng=np.random.default_rng(0))
+    all_idx = {i for m in result.values() for i in m}
+    # Les docs 8 et 9 (groupe B, non dans la partition) doivent être assignés
+    assert 8 in all_idx
+    assert 9 in all_idx
+
+
+def test_run_transfers_incremental_preserves_existing():
+    """Les docs déjà clustérisés restent assignés (éventuellement après optimisation)."""
+    from transfers import run_transfers
+    sim = _make_sim(n=10)
+    slugs = [f"s{i}" for i in range(10)]
+    initial = {0: list(range(4)), 1: list(range(4, 8))}
+    result = run_transfers(slugs, sim, theta=0.5, initial_partition=initial,
+                           rng=np.random.default_rng(0))
+    all_idx = {i for m in result.values() for i in m}
+    # Tous les docs initiaux (0-7) toujours présents
+    for i in range(8):
+        assert i in all_idx
