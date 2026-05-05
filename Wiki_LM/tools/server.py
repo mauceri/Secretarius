@@ -118,8 +118,14 @@ def start_cluster():
     signal = str(data.get("signal", "embeddings"))
     param = int(data["param"])
     algo = str(data.get("algo", "hdbscan"))
-    theta = float(data["theta"]) if "theta" in data else None
-    max_k = int(data["max_k"]) if "max_k" in data else None
+    try:
+        theta = float(data["theta"]) if "theta" in data else None
+    except (ValueError, TypeError):
+        return jsonify({"error": "'theta' doit être un nombre flottant"}), 400
+    try:
+        max_k = int(data["max_k"]) if "max_k" in data else None
+    except (ValueError, TypeError):
+        return jsonify({"error": "'max_k' doit être un entier"}), 400
     force_assign = bool(data.get("force_assign", False))
     incremental = bool(data.get("incremental", False))
 
