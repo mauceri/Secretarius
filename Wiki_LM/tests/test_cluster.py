@@ -248,3 +248,66 @@ def test_cluster_endpoint_missing_param(tmp_path):
 
     assert resp.status_code == 400
     assert "param" in resp.get_json().get("error", "")
+
+
+# ---------------------------------------------------------------------------
+# run_clustering — intégration algo="transfers"
+# ---------------------------------------------------------------------------
+
+def test_run_clustering_transfers_creates_output(tmp_path):
+    """algo='transfers' génère index.md + unclustered.md dans le bon répertoire."""
+    from cluster import run_clustering
+    wiki_dir, embed_dir = _setup_wiki_with_embeds(tmp_path, n=60)
+    stats = run_clustering(wiki_dir, embed_dir, "embeddings", param=75, llm=None,
+                           algo="transfers", theta=0.5)
+    assert "error" not in stats
+    out_dir = wiki_dir / "clusterings" / "clustering-embeddings-transfers-75"
+    assert out_dir.exists()
+    assert (out_dir / "index.md").exists()
+    assert (out_dir / "unclustered.md").exists()
+
+
+def test_run_clustering_transfers_two_groups(tmp_path):
+    """Données à 2 groupes bien séparés → 2 clusters, 0 docs en poubelle."""
+    from cluster import run_clustering
+    wiki_dir, embed_dir = _setup_wiki_with_embeds(tmp_path, n=60)
+    stats = run_clustering(wiki_dir, embed_dir, "embeddings", param=75, llm=None,
+                           algo="transfers", theta=0.5)
+    assert stats["clusters"] == 2
+    assert stats["noise"] == 0
+
+
+def test_run_clustering_transfers_too_small(tmp_path):
+    """Corpus trop petit (< MIN_PAGES_FOR_CLUSTERING) → retourne 'error' dans stats."""
+    from cluster import run_clustering
+    # _setup_wiki_with_embeds(n=6) crée 6 pages < MIN_PAGES_FOR_CLUSTERING=50
+    wiki_dir, embed_dir = _setup_wiki_with_embeds(tmp_path, n=6)
+    stats = run_clustering(wiki_dir, embed_dir, "embeddings", param=75, llm=None,
+                           algo="transfers")
+    assert "error" in stats
+
+
+def test_run_clustering_transfers_dry_run(tmp_path):
+    """dry_run=True sans clustering existant → retourne 'error'."""
+    from cluster import run_clustering
+    wiki_dir, embed_dir = _setup_wiki_with_embeds(tmp_path, n=60)
+    stats = run_clustering(wiki_dir, embed_dir, "embeddings", param=75, llm=None,
+                           algo="transfers", dry_run=True)
+    assert "error" in stats
+
+
+def test_run_clustering_transfers_dry_run_on_existing(tmp_path):
+    """dry_run=True sur un clustering existant → retourne les stats de qualité."""
+    from cluster import run_clustering
+    wiki_dir, embed_dir = _setup_wiki_with_embeds(tmp_path, n=60)
+    # Créer d'abord le clustering
+    run_clustering(wiki_dir, embed_dir, "embeddings", param=75, llm=None,
+                   algo="transfers", theta=0.5)
+    # Dry-run sur le clustering existant
+    stats = run_clustering(wiki_dir, embed_dir, "embeddings", param=75, llm=None,
+                           algo="transfers", dry_run=True)
+    assert "error" not in stats
+    for key in ("proposed_transfers", "total", "ratio", "adequate"):
+        assert key in stats
+    assert 0.0 <= stats["ratio"] <= 1.0
+    assert isinstance(stats["adequate"], bool)
