@@ -80,11 +80,13 @@ def test_run_transfers_group_coherence():
         assert len(groups) == 1, f"Cluster mélangé : {members}"
 
 
-def test_run_transfers_high_theta_creates_noise():
-    """theta=0.99 → la plupart des docs restent en poubelle."""
+def test_run_transfers_high_theta_creates_singletons():
+    """Sans max_k, theta=0.99 → chaque doc isolé crée son propre singleton."""
     from transfers import run_transfers
     sim = _make_sim(n=10)
     slugs = [f"s{i}" for i in range(10)]
     result = run_transfers(slugs, sim, theta=0.99, rng=np.random.default_rng(0))
-    in_cluster = sum(len(m) for m in result.values())
-    assert in_cluster < 10
+    # Pas de gain > 0.99 entre docs inter-groupes → tous singletons
+    assert len(result) == 10
+    for members in result.values():
+        assert len(members) == 1
