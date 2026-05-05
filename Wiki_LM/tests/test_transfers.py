@@ -118,3 +118,27 @@ def test_run_transfers_min_gain_delta_stops_marginal():
     all_idx = {i for m in result.values() for i in m}
     assert isinstance(result, dict)
     assert len(all_idx) == 10
+
+
+def test_run_transfers_max_k():
+    """max_k=1 : une seule classe autorisée, le reste reste en poubelle."""
+    from transfers import run_transfers
+    sim = _make_sim(n=10)
+    slugs = [f"s{i}" for i in range(10)]
+    result = run_transfers(slugs, sim, theta=0.5, max_k=1,
+                           rng=np.random.default_rng(0))
+    assert len(result) == 1
+    in_cluster = sum(len(m) for m in result.values())
+    assert in_cluster < 10  # des docs en poubelle
+
+
+def test_run_transfers_force_assign_no_poubelle():
+    """force_assign=True : tous les docs dans un cluster, aucun en poubelle."""
+    from transfers import run_transfers
+    sim = _make_sim(n=10)
+    slugs = [f"s{i}" for i in range(10)]
+    # theta très élevé : sans force_assign, beaucoup seraient en poubelle
+    result = run_transfers(slugs, sim, theta=0.99, force_assign=True,
+                           rng=np.random.default_rng(0))
+    all_idx = {i for m in result.values() for i in m}
+    assert all_idx == set(range(10))

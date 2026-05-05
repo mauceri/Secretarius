@@ -137,4 +137,11 @@ def run_transfers(
         if not changed:
             break
 
+    # --- Assignation forcée (optionnelle) ---
+    if force_assign:
+        for x in range(n):
+            if labels[x] == -1 and clusters:
+                best_cid, _ = _best_other(x)
+                _add(x, best_cid)
+
     return {cid: list(m) for cid, m in clusters.items()}
