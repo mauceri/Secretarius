@@ -161,11 +161,11 @@ def update_kb(
     wiki_root : répertoire racine du wiki archivé (contient wiki/).
     Retourne {"created": int, "updated": int, "excluded": int}.
     """
-    clustering_dir = wiki_root / "wiki" / "clusterings" / clustering_name
+    clustering_dir = wiki_root / "clusterings" / clustering_name
     if not clustering_dir.exists():
         raise FileNotFoundError(f"Clustering introuvable : {clustering_dir}")
 
-    sources_dir = wiki_root / "wiki" / "sources"
+    sources_dir = wiki_root / "sources"
 
     m_theta = re.search(r"-(\d+\.\d+)$", clustering_name)
     auto_theta = float(m_theta.group(1)) if m_theta else 0.0
