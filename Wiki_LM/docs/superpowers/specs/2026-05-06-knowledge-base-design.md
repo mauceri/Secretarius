@@ -60,7 +60,7 @@ Lors de l'extraction depuis un clustering archivé, un cluster est retenu comme 
 | Critère | Seuil par défaut | Option CLI |
 |---------|-----------------|------------|
 | Taille minimum | >= 3 pages | `--min-size` |
-| Cohésion minimum | >= theta/2 | `--min-cohesion` |
+| Cohésion minimum | >= theta/2 (theta parsé depuis le nom du répertoire de clustering) | `--min-cohesion` |
 | Statut | != garbage | automatique |
 
 Les clusters exclus sont enregistrés dans `excluded.json` :
@@ -74,7 +74,7 @@ Les clusters exclus sont enregistrés dans `excluded.json` :
 
 La détection des clusters poubelle s'appuie sur le cluster analysis skill (à venir). En attendant, marquage manuel via `status: garbage` dans le frontmatter du cluster source.
 
-**Tags d'un axe** : agrégés depuis les tags des pages membres (top-N les plus fréquents), puis normalisés via `tags_dict.json`.
+**Tags d'un axe** : agrégés depuis les tags des pages membres (top-10 les plus fréquents), puis normalisés via `tags_dict.json`.
 
 ---
 
@@ -206,3 +206,15 @@ ingest.py → embed(page) → kb_query(vecteur, top_k=3)
 | `tools/ingest.py` | Modifier | Appel de kb_query lors de l'ingestion |
 
 `knowledge_base/` n'est pas versionné dans git (données dérivées volumineuses) — à ajouter dans `.gitignore`.
+
+---
+
+## Maintenance — détection de dérive
+
+Un axe mis à jour de nombreuses fois par moyenne pondérée peut dériver de tout cluster concret. `kb_lint.py` (hors périmètre de ce plan — à spécifier séparément) détecte :
+
+- **Dérive** : cohésion d'un axe inférieure à un seuil (cosine similarity centroïde vs pages représentatives)
+- **Doublons** : deux axes dont la similarité mutuelle dépasse `fusion_threshold`
+- **Axes orphelins** : axes non mis à jour depuis N archivages
+
+Sortie : rapport Markdown + suggestion de recalcul complet (`kb_update.py --rebuild`).
