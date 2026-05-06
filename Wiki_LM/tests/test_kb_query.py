@@ -67,3 +67,40 @@ def test_kb_query_empty_kb(tmp_path):
     kb_dir.mkdir()
     result = kb_query(np.ones(8, dtype=np.float32), kb_dir, top_k=3)
     assert result == []
+
+
+def test_kb_query_top_k_greater_than_axes(tmp_path):
+    """top_k > nombre d'axes → retourne tous les axes disponibles."""
+    from kb_query import kb_query
+    kb_dir, mat, ids = _make_kb(tmp_path, n_axes=2)
+    results = kb_query(mat[0].copy(), kb_dir, top_k=10)
+    assert len(results) == 2
+
+
+def test_kb_query_axis_without_md_file(tmp_path):
+    """Axe sans fichier .md → title=axis_id, tags=[]."""
+    from kb_query import kb_query
+    kb_dir = tmp_path / "kb"
+    (kb_dir / "axes").mkdir(parents=True)
+    (kb_dir / "embeddings").mkdir(parents=True)
+    rng = np.random.default_rng(0)
+    vec = rng.standard_normal(8).astype(np.float32)
+    vec /= np.linalg.norm(vec)
+    mat = vec.reshape(1, -1)
+    np.save(kb_dir / "embeddings" / "axes.npy", mat)
+    (kb_dir / "embeddings" / "axes_index.json").write_text(
+        json.dumps({"ids": ["axis-0001"]}), encoding="utf-8"
+    )
+    # Pas de fichier axis-0001.md créé
+    results = kb_query(vec, kb_dir, top_k=1)
+    assert results[0]["title"] == "axis-0001"
+    assert results[0]["tags"] == []
+
+
+def test_kb_query_dim_mismatch_raises(tmp_path):
+    """Dimension du vecteur incompatible → ValueError."""
+    from kb_query import kb_query
+    kb_dir, mat, _ = _make_kb(tmp_path, n_axes=2, dim=8)
+    bad_vec = np.ones(16, dtype=np.float32)
+    with pytest.raises(ValueError, match="dim"):
+        kb_query(bad_vec, kb_dir, top_k=1)
