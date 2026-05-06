@@ -92,6 +92,8 @@ def _load_embed_matrix(embed_dir: Path) -> tuple[np.ndarray, list[str]] | tuple[
         matrix = np.load(matrix_path)
         data = json.loads(index_path.read_text(encoding="utf-8"))
         slugs = data.get("slugs", [])
+        if matrix.shape[0] != len(slugs):
+            return None, None
         return matrix.astype(np.float32), slugs
     except Exception:
         return None, None
@@ -118,15 +120,6 @@ def _compute_centroid_and_cohesion(
     cohesion = float(np.mean(vecs @ centroid))
     return centroid, cohesion
 
-
-def _next_axis_id(axes_dir: Path) -> str:
-    """Retourne le prochain ID d'axe disponible (axis-0001, etc.)."""
-    nums = []
-    for p in axes_dir.glob("axis-*.md"):
-        m = re.match(r"axis-(\d+)\.md$", p.name)
-        if m:
-            nums.append(int(m.group(1)))
-    return f"axis-{(max(nums) + 1 if nums else 1):04d}"
 
 
 def _regenerate_index(kb_dir: Path) -> None:
@@ -206,6 +199,14 @@ def update_kb(
         axis_matrix = []
         axis_ids = []
 
+    # Compteur local pour éviter N² scans disque dans _next_axis_id
+    _existing_nums = []
+    for _p in (kb_dir / "axes").glob("axis-*.md"):
+        _m = re.match(r"axis-(\d+)\.md$", _p.name)
+        if _m:
+            _existing_nums.append(int(_m.group(1)))
+    _next_axis_num = [max(_existing_nums) + 1 if _existing_nums else 1]
+
     wiki_name = wiki_root.name
     today = date.today().isoformat()
     excluded: list[dict] = []
@@ -257,6 +258,7 @@ def update_kb(
             old_count = int(post.get("members_count", 1))
             new_count = old_count + len(cluster["members"])
             old_vec = axis_matrix[best_idx]
+            # Approximation : old_vec est normalisé, pas la somme brute — dérive faible si fusion_threshold élevé
             fused = (old_vec * old_count + centroid * len(cluster["members"])) / new_count
             n = float(np.linalg.norm(fused))
             axis_matrix[best_idx] = (fused / n if n > 0 else fused).astype(np.float32)
@@ -275,7 +277,8 @@ def update_kb(
             axis_path.write_text(frontmatter.dumps(post), encoding="utf-8")
             stats["updated"] += 1
         else:
-            axis_id = _next_axis_id(kb_dir / "axes")
+            axis_id = f"axis-{_next_axis_num[0]:04d}"
+            _next_axis_num[0] += 1
             axis_path = kb_dir / "axes" / f"{axis_id}.md"
             rep_lines = "\n".join(f"- [[{s}]]" for s in cluster["members"][:3])
             new_post = frontmatter.Post(
@@ -295,10 +298,12 @@ def update_kb(
             stats["created"] += 1
 
     if axis_matrix:
-        np.save(axes_npy_path, np.array(axis_matrix, dtype=np.float32))
-        axes_index_path.write_text(
-            json.dumps({"ids": axis_ids}), encoding="utf-8"
-        )
+        tmp_npy = axes_npy_path.parent / (axes_npy_path.stem + ".tmp.npy")
+        np.save(tmp_npy, np.array(axis_matrix, dtype=np.float32))
+        tmp_npy.rename(axes_npy_path)
+        tmp_idx = axes_index_path.with_suffix(".json.tmp")
+        tmp_idx.write_text(json.dumps({"ids": axis_ids}), encoding="utf-8")
+        tmp_idx.rename(axes_index_path)
 
     excluded_path = kb_dir / "excluded.json"
     existing_excl: list[dict] = (
@@ -306,10 +311,12 @@ def update_kb(
         if excluded_path.exists()
         else []
     )
-    excluded_path.write_text(
+    tmp_excl = excluded_path.with_suffix(".json.tmp")
+    tmp_excl.write_text(
         json.dumps(existing_excl + excluded, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
+    tmp_excl.rename(excluded_path)
 
     _regenerate_index(kb_dir)
     return stats

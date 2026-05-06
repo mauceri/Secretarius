@@ -147,6 +147,9 @@ def test_update_kb_fusion_on_second_call(tmp_path):
     assert stats2["updated"] == 2
     axes = list((kb_dir / "axes").glob("axis-*.md"))
     assert len(axes) == 2
+    # Vérifier que members_count a doublé
+    post = frontmatter.load(kb_dir / "axes" / "axis-0001.md")
+    assert post.get("members_count") == 10   # 5 + 5
 
 
 def test_update_kb_source_wikis_accumulated(tmp_path):
@@ -162,7 +165,10 @@ def test_update_kb_source_wikis_accumulated(tmp_path):
     update_kb(wiki_root2, clustering_name, embed_dir, kb_dir)
 
     post = frontmatter.load(kb_dir / "axes" / "axis-0001.md")
-    assert len(post.get("source_wikis", [])) == 2
+    src_wikis = post.get("source_wikis", [])
+    assert len(src_wikis) == 2
+    assert "wiki_arch" in src_wikis
+    assert "wiki_arch2" in src_wikis
 
 
 def test_update_kb_index_md_created(tmp_path):
