@@ -30,7 +30,20 @@ def kb_query(
         return []
 
     matrix = np.load(axes_npy)                                          # (K, dim)
-    ids: list[str] = json.loads(axes_index.read_text(encoding="utf-8"))["ids"]
+    data = json.loads(axes_index.read_text(encoding="utf-8"))
+    ids: list[str] = data.get("ids", [])
+    if not ids:
+        return []
+
+    if matrix.shape[0] != len(ids):
+        raise ValueError(
+            f"axes.npy ({matrix.shape[0]} lignes) et axes_index.json ({len(ids)} ids) désynchronisés"
+        )
+
+    if matrix.shape[1] != vec.shape[0]:
+        raise ValueError(
+            f"dim vecteur ({vec.shape[0]}) != dim axes ({matrix.shape[1]})"
+        )
 
     scores = matrix @ vec                                                # (K,) cosine sim
     k = min(top_k, len(ids))
