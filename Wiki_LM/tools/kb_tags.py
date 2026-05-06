@@ -95,12 +95,21 @@ def save_tag_dict(
     canonicals = sorted(groups.keys())
     mat_rows = [vecs[c].astype(np.float32) for c in canonicals if c in vecs]
 
-    if mat_rows:
-        np.save(kb_dir / "tags" / "tags_embeddings.npy", np.array(mat_rows))
-
-    (kb_dir / "tags" / "tags_dict.json").write_text(
+    # Écriture atomique pour tags_dict.json
+    tmp_json = kb_dir / "tags" / "tags_dict.json.tmp"
+    tmp_json.write_text(
         json.dumps(groups, ensure_ascii=False, indent=2), encoding="utf-8"
     )
+    tmp_json.replace(kb_dir / "tags" / "tags_dict.json")
+
+    # Écriture atomique + cohérence pour tags_embeddings.npy
+    npy_path = kb_dir / "tags" / "tags_embeddings.npy"
+    if mat_rows:
+        tmp_npy = npy_path.parent / ".tags_embeddings.tmp.npy"
+        np.save(str(tmp_npy)[:-4], np.array(mat_rows))  # np.save ajoute .npy
+        (npy_path.parent / ".tags_embeddings.tmp.npy").replace(npy_path)
+    elif npy_path.exists():
+        npy_path.unlink()
 
 
 def main() -> None:

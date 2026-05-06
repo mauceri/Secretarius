@@ -87,3 +87,6 @@ def test_save_tag_dict(tmp_path):
     d = json.loads((kb_dir / "tags" / "tags_dict.json").read_text(encoding="utf-8"))
     assert "python" in d
     assert "Python" in d["python"]
+    mat = np.load(kb_dir / "tags" / "tags_embeddings.npy")
+    assert mat.shape[0] == 2    # 2 canoniques : "python" et "cuisine"
+    assert mat.shape[1] == 2    # dim des vecteurs fournis
