@@ -27,3 +27,4 @@ openclaw-config/gateway.systemd.env
 # Divers
 *.log
 .DS_Store
+Wiki_LM/knowledge_base/
