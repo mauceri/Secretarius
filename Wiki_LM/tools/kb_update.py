@@ -7,7 +7,7 @@ Usage:
         --wiki ~/Documents/Arbath/Wiki_LM/wiki_signets_05_2026 \\
         --clustering clustering-embeddings-transfers-0.403 \\
         [--embed-dir ~/Secretarius/Wiki_LM/embeddings] \\
-        [--kb-dir ~/Secretarius/Wiki_LM/knowledge_base] \\
+        [--kb-dir ~/Documents/Arbath/Wiki_LM/knowledge_base] \\
         [--fusion-threshold 0.85] \\
         [--min-size 3]
 """
@@ -23,7 +23,7 @@ import frontmatter
 import numpy as np
 
 _DEFAULT_EMBED_DIR = Path(__file__).resolve().parent.parent / "embeddings"
-_DEFAULT_KB_DIR = Path(__file__).resolve().parent.parent / "knowledge_base"
+_DEFAULT_KB_DIR = Path.home() / "Documents" / "Arbath" / "Wiki_LM" / "knowledge_base"
 FUSION_THRESHOLD = 0.85
 MIN_SIZE = 3
 
