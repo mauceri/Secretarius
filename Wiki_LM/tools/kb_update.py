@@ -45,7 +45,7 @@ def _load_cluster_files(clustering_dir: Path) -> list[dict]:
         m_title = re.search(r"^# (.+)$", content, re.MULTILINE)
         title = m_title.group(1).strip() if m_title else path.stem
 
-        m_desc = re.search(r"^# .+\n\n(.+?)(?=\n\n|\Z)", content, re.DOTALL | re.MULTILINE)
+        m_desc = re.search(r"^# [^\n]+\n\n([^\n]+)", content, re.MULTILINE)
         description = m_desc.group(1).strip() if m_desc else ""
 
         m_members = re.search(
