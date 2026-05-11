@@ -10,16 +10,18 @@ Voir `PATTERN.md` pour la description complète du patron et de ses cas d'usage.
 
 ```
 Wiki_LM/
-├── tools/          ← pipeline d'ingestion et outils CLI
-├── tests/          ← suite pytest (74 tests)
-├── wiki/           ← pages Markdown (données, hors dépôt)
-├── raw/            ← sources brutes (données, hors dépôt)
-├── zim/            ← fichiers Kiwix ZIM optionnels (hors dépôt)
-├── PATTERN.md      ← description du patron
+├── tools/              ← pipeline d'ingestion et outils CLI
+├── tests/              ← suite pytest (170 tests)
+├── wiki/               ← pages Markdown (données, hors dépôt)
+├── raw/                ← sources brutes (données, hors dépôt)
+├── embeddings/         ← vecteurs BGE-M3 (données, hors dépôt)
+├── knowledge_base/     ← base de connaissance compactée (données, hors dépôt)
+├── zim/                ← fichiers Kiwix ZIM optionnels (hors dépôt)
+├── PATTERN.md          ← description du patron
 └── requirements.txt
 ```
 
-Les données (`wiki/`, `raw/`, `zim/`) sont hors dépôt (`.gitignore`).  
+Les données (`wiki/`, `raw/`, `embeddings/`, `knowledge_base/`, `zim/`) sont hors dépôt (`.gitignore`).  
 Le répertoire wiki par défaut est `~/Secretarius/Wiki_LM/wiki/` ;  
 le répertoire raw par défaut est `~/Secretarius/Wiki_LM/raw/`.
 
@@ -27,19 +29,58 @@ le répertoire raw par défaut est `~/Secretarius/Wiki_LM/raw/`.
 
 ## Outils (`tools/`)
 
+### Ingestion
+
 | Outil | Description |
 |-------|-------------|
 | `ingest.py` | Ingestion d'une source (URL, PDF, texte) dans le wiki |
 | `capture.py` | Capture rapide depuis OpenClaw / CLI |
-| `query.py` | Interrogation du wiki en langage naturel |
-| `search.py` | Recherche BM25 sur les pages |
-| `lint.py` | Health-check : liens brisés, pages orphelines |
-| `wiki_lookup.py` | Lookup Wikipedia (ZIM → cache SQLite → API REST) |
 | `bookmarks_to_raw.py` | Export des signets Brave vers `raw/` |
 | `build_wiki_cache.py` | Préchauffage du cache Wikipedia sur les pages existantes |
 | `summarize.py` | Résumé d'un document via LLM |
 | `build_summary_corpus.py` | Construction d'un corpus de résumés |
+
+### Recherche et consultation
+
+| Outil | Description |
+|-------|-------------|
+| `query.py` | Interrogation du wiki en langage naturel |
+| `search.py` | Recherche BM25 sur les pages |
+| `server.py` | Serveur Flask pour interroger le wiki depuis Obsidian |
+| `lint.py` | Health-check : liens brisés, pages orphelines |
+| `wiki_lookup.py` | Lookup Wikipedia (ZIM → cache SQLite → API REST) |
+
+### Embeddings et similarité
+
+| Outil | Description |
+|-------|-------------|
+| `embed.py` | Calcule et persiste les embeddings BGE-M3 pour toutes les pages |
+| `similarity.py` | Calcul de matrices de similarité entre pages (`src-`) |
+| `dedup.py` | Détection et nettoyage de doublons sémantiques |
+
+### Clustering
+
+| Outil | Description |
+|-------|-------------|
+| `cluster.py` | Clustering des pages `src-` (algo des transferts ou k-means) |
+| `transfers.py` | Algorithme des transferts (O(k × N × C)) |
+
+### Base de connaissance
+
+| Outil | Description |
+|-------|-------------|
+| `kb_update.py` | Met à jour la base de connaissance depuis un wiki archivé |
+| `kb_query.py` | Retourne les axes thématiques les plus proches d'un vecteur |
+| `kb_tags.py` | Construit le dictionnaire de tags normalisés |
+
+### Utilitaires
+
+| Outil | Description |
+|-------|-------------|
+| `wiki_paths.py` | Navigation dans la structure du wiki |
 | `llm.py` | Abstraction LLM (DeepSeek / Anthropic / Ollama) |
+
+> Les scripts `migrate_wiki_structure.py`, `patch_lien_source.py`, `patch_src_slugs.py` et `patch_wiki_abstracts.py` sont des migrations ponctuelles, sans vocation à être relancés.
 
 ---
 
@@ -155,5 +196,5 @@ source .venv/bin/activate
 python -m pytest tests/ -v
 ```
 
-74 tests couvrant : ingestion, déduplication, index, normalisation, slugification, Wikipedia lookup.  
+170 tests couvrant : ingestion, déduplication, index, normalisation, slugification, Wikipedia lookup, embeddings, clustering (algorithme des transferts), base de connaissance (kb_update, kb_query, kb_tags).  
 Tous les tests sont isolés (pas de réseau, pas de LLM réel — `MockLLM` + `tmp_path`).
