@@ -35,8 +35,11 @@ import hashlib
 import frontmatter
 
 from llm import LLM
+from kb_query import kb_query
 from wiki_lookup import WikiLookup
 from wiki_paths import CONTENT_SUBDIRS, CLUSTERING_SUBDIR, iter_pages, slug_to_path
+
+_DEFAULT_KB_DIR = Path.home() / "Documents" / "Arbath" / "Wiki_LM" / "knowledge_base"
 
 
 # ---------------------------------------------------------------------------
@@ -461,8 +464,7 @@ Voici le contenu d'une source à intégrer dans le wiki.
 
 Source : {source_name}
 Date d'ingestion : {today}
-{required_tags_line}
----
+{required_tags_line}{kb_context_line}---
 {content}
 ---
 
@@ -700,6 +702,8 @@ class Ingestor:
         self.llm = llm or LLM()
         self.today = _today()
         self._wiki_lookup = WikiLookup(wiki_path)
+        self._kb_dir = _DEFAULT_KB_DIR
+        self._embed_model = None  # chargé à la première utilisation
 
     # ------------------------------------------------------------------
     # Public API
@@ -1142,6 +1146,27 @@ class Ingestor:
             f"À réingérer manuellement si le document devient accessible.\n"
         )
 
+    def _kb_context(self, content: str) -> str:
+        """Retourne une ligne de contexte thématique depuis la base de connaissance, ou ''."""
+        if not self._kb_dir.exists():
+            return ""
+        try:
+            from sentence_transformers import SentenceTransformer
+            import numpy as np
+            if self._embed_model is None:
+                print("[ingest] Chargement du modèle BGE-M3 pour kb_query…")
+                self._embed_model = SentenceTransformer("BAAI/bge-m3")
+            vec = self._embed_model.encode(
+                content[:2000], normalize_embeddings=True
+            ).astype(np.float32)
+            axes = kb_query(vec, self._kb_dir, top_k=3)
+            if not axes:
+                return ""
+            lines = ", ".join(f"{a['title']} ({a['score']:.2f})" for a in axes)
+            return f"Axes thématiques proches : {lines}\n"
+        except Exception:
+            return ""
+
     def _generate_source_page(
         self, content: str, source_name: str, extra_tags: list[str] | None = None
     ) -> str:
@@ -1149,11 +1174,15 @@ class Ingestor:
         if extra_tags:
             tags_str = ", ".join(extra_tags)
             required_tags_line = f"Tags requis (à inclure dans le frontmatter) : {tags_str}\n"
+        kb_context_line = self._kb_context(content)
+        if kb_context_line:
+            kb_context_line += "\n"
         prompt = _PROMPT_SOURCE_PAGE.format(
             source_name=source_name,
             today=self.today,
             content=_truncate(content),
             required_tags_line=required_tags_line,
+            kb_context_line=kb_context_line,
         )
         return self.llm.complete(prompt, system=_SYSTEM_INGEST, max_tokens=3000)
 
