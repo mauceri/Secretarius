@@ -12,6 +12,7 @@ Wiki_LM/zim/
 Wiki_LM/wiki_cache.db
 Wiki_LM/bookmarks.json
 Wiki_LM/corpus-pkm.txt
+Wiki_LM/knowledge_base/
 
 # Secrets / config locale
 .env
