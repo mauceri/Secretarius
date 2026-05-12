@@ -112,11 +112,74 @@ def save_tag_dict(
         npy_path.unlink()
 
 
+def build_tag_groups_transfers(
+    tags: dict[str, int],
+    vecs: dict[str, np.ndarray],
+    min_count: int = 2,
+    max_k: int | None = None,
+    theta: float | None = None,
+) -> dict[str, list[str]]:
+    """
+    Regroupe les tags par l'algorithme des transferts.
+
+    tags     : {tag: count}
+    vecs     : {tag: vecteur L2-normalisé}
+    theta    : seuil de similarité (estimé automatiquement si None)
+    max_k    : nombre maximum de clusters (None = pas de limite)
+
+    Retourne {canonical: [variant, ...]}.
+    Le canonique est le tag avec le count le plus élevé du groupe.
+    Les tags non assignés (poubelle) restent singletons.
+    """
+    from transfers import estimate_theta, run_transfers
+
+    filtered = [t for t, c in tags.items() if c >= min_count and t in vecs]
+    if not filtered:
+        return {}
+
+    mat = np.array([vecs[t] for t in filtered], dtype=np.float32)
+    sim = mat @ mat.T  # matrice de similarité cosinus (vecteurs normalisés)
+
+    if theta is None:
+        theta = estimate_theta(sim)
+        print(f"[kb_tags] theta estimé : {theta:.4f}")
+
+    partition = run_transfers(
+        slugs=filtered,
+        sim=sim,
+        theta=theta,
+        max_k=max_k,
+        force_assign=False,
+    )
+
+    groups: dict[str, list[str]] = {}
+    for cid, indices in partition.items():
+        members = [filtered[i] for i in indices]
+        # Canonique = tag le plus fréquent du groupe
+        canonical = max(members, key=lambda t: tags.get(t, 0))
+        groups[canonical] = members
+
+    # Tags non regroupés (poubelle label=-1) → singletons
+    assigned = {t for members in groups.values() for t in members}
+    for tag in filtered:
+        if tag not in assigned:
+            groups[tag] = [tag]
+
+    return groups
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Construit le dictionnaire de tags normalisés")
     parser.add_argument("--wiki", required=True)
     parser.add_argument("--kb-dir", default=str(_DEFAULT_KB_DIR))
-    parser.add_argument("--threshold", type=float, default=0.90)
+    parser.add_argument("--algo", choices=["greedy", "transfers"], default="greedy",
+                        help="Algorithme de clustering (défaut : greedy)")
+    parser.add_argument("--threshold", type=float, default=0.90,
+                        help="Seuil de similarité pour algo=greedy (défaut : 0.90)")
+    parser.add_argument("--theta", type=float, default=None,
+                        help="Seuil theta pour algo=transfers (estimé si absent)")
+    parser.add_argument("--max-k", type=int, default=None,
+                        help="Nombre max de clusters pour algo=transfers")
     parser.add_argument("--min-count", type=int, default=2)
     args = parser.parse_args()
 
@@ -134,7 +197,16 @@ def main() -> None:
     raw_vecs = model.encode(tag_list, normalize_embeddings=True, show_progress_bar=True)
     vecs = {t: raw_vecs[i].astype(np.float32) for i, t in enumerate(tag_list)}
 
-    groups = build_tag_groups(tags, vecs, threshold=args.threshold, min_count=args.min_count)
+    if args.algo == "transfers":
+        groups = build_tag_groups_transfers(
+            tags, vecs,
+            min_count=args.min_count,
+            max_k=args.max_k,
+            theta=args.theta,
+        )
+    else:
+        groups = build_tag_groups(tags, vecs, threshold=args.threshold, min_count=args.min_count)
+
     save_tag_dict(kb_dir, groups, vecs)
     print(f"[kb_tags] {len(groups)} groupes → {kb_dir / 'tags'}")
 
