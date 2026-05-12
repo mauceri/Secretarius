@@ -25,7 +25,7 @@ def _make_archived_wiki(
     """
     wiki_root = tmp_path / "wiki_arch"
     wiki_root.mkdir()
-    wiki_dir = wiki_root / "wiki"
+    wiki_dir = wiki_root
     sources_dir = wiki_dir / "sources"
     sources_dir.mkdir(parents=True)
 
