@@ -1204,17 +1204,20 @@ class Ingestor:
             return {}, set()
 
     def _rebuild_tags_index(self) -> None:
-        """Reconstruit tags.md en n'indexant que sous les tags canoniques.
+        """Reconstruit tags.md en n'indexant que les pages src- sous leurs tags canoniques.
 
+        - Seules les pages src- sont indexées (concepts/entités accessibles à un rebond).
         - Les variantes sont fusionnées sous leur canonique.
         - Les hapax (tags absents du dictionnaire) sont ignorés.
-        - Si le dictionnaire est absent, tous les tags sont conservés (comportement legacy).
+        - Si le dictionnaire est absent, tous les tags src- sont conservés (comportement legacy).
         """
         variants_to_canon, known_canonicals = self._load_tag_variants()
         filter_hapax = bool(known_canonicals)
 
         tag_map: dict[str, list[tuple[str, str, str]]] = {}
         for page in sorted(iter_pages(self.wiki_dir)):
+            if not page.stem.startswith("src-"):
+                continue
             try:
                 post = frontmatter.loads(page.read_text(encoding="utf-8"))
                 tags = post.get("tags", [])
