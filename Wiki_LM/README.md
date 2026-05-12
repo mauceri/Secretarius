@@ -25,6 +25,11 @@ Les données (`wiki/`, `raw/`, `embeddings/`, `knowledge_base/`, `zim/`) sont ho
 Le répertoire wiki par défaut est `~/Secretarius/Wiki_LM/wiki/` ;  
 le répertoire raw par défaut est `~/Secretarius/Wiki_LM/raw/`.
 
+Chaque wiki contient deux fichiers d'index des tags générés par `ingest.py` :
+
+- `tags.md` — index complet avec renvois `[[src-*]]`, trié alphabétiquement par tag
+- `liste_mots_clés.md` — liste des tags seuls, triés par fréquence décroissante
+
 ---
 
 ## Outils (`tools/`)
@@ -34,7 +39,7 @@ le répertoire raw par défaut est `~/Secretarius/Wiki_LM/raw/`.
 | Outil | Description |
 |-------|-------------|
 | `ingest.py` | Ingestion d'une source (URL, PDF, texte) dans le wiki |
-| `capture.py` | Capture rapide depuis OpenClaw / CLI |
+| `capture.py` | Capture rapide depuis OpenClaw / CLI (URLs, texte, `#tags`, fichiers joints) |
 | `bookmarks_to_raw.py` | Export des signets Brave vers `raw/` |
 | `build_wiki_cache.py` | Préchauffage du cache Wikipedia sur les pages existantes |
 | `summarize.py` | Résumé d'un document via LLM |
@@ -71,7 +76,8 @@ le répertoire raw par défaut est `~/Secretarius/Wiki_LM/raw/`.
 |-------|-------------|
 | `kb_update.py` | Met à jour la base de connaissance depuis un wiki archivé |
 | `kb_query.py` | Retourne les axes thématiques les plus proches d'un vecteur |
-| `kb_tags.py` | Construit le dictionnaire de tags normalisés |
+| `kb_tags.py` | Construit le dictionnaire de tags canoniques (`--algo greedy\|transfers`) |
+| `name_clusters.py` | Renomme les clusters via LLM (titre thématique + description) |
 
 ### Utilitaires
 
