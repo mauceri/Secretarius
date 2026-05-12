@@ -158,7 +158,7 @@ def update_kb(
 ) -> dict:
     """
     Met à jour la base de connaissance depuis un clustering archivé.
-    wiki_root : répertoire racine du wiki archivé (contient wiki/).
+    wiki_root : répertoire racine du wiki archivé (contient clusterings/ et sources/).
     Retourne {"created": int, "updated": int, "excluded": int}.
     """
     clustering_dir = wiki_root / "clusterings" / clustering_name
