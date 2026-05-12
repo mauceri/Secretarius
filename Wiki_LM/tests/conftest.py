@@ -151,4 +151,5 @@ def ingestor(wiki_root: Path, raw_dir: Path, mock_llm: MockLLM):
     wl = WikiLookup(wiki_root, zim_dir=wiki_root / "zim")  # ZIM dir vide → pas de ZIM réel
     ing = Ingestor(wiki_root, llm=mock_llm, raw_path=raw_dir)
     ing._wiki_lookup = wl
+    ing._kb_dir = wiki_root / "knowledge_base"  # KB vide → filter_hapax=False en tests
     return ing
