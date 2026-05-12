@@ -1,19 +1,27 @@
+# tools/capture.py
 """
 Capture rapide vers raw/ : URLs, commentaire libre, ou fichier joint.
 
+Les tokens #motclé sont extraits comme tags et normalisés contre le
+dictionnaire de tags canoniques (best-effort, silencieux si absent).
+
 Usage :
-    python tools/capture.py https://example.com https://autre.com
-    python tools/capture.py "Réflexion sur l'article de Salton"
+    python tools/capture.py https://example.com
+    python tools/capture.py "#memo Réflexion sur BM25"
+    python tools/capture.py "#attention #transformer https://arxiv.org/abs/1706.03762"
+    python tools/capture.py "#attention note: commentaire https://arxiv.org/abs/1706.03762"
     python tools/capture.py --file /tmp/document.pdf
     python tools/capture.py --file /tmp/document.pdf "commentaire optionnel"
 
-URLs   → un fichier .url par URL, slug horodaté + domaine
-Texte  → un fichier .md, slug horodaté + incipit
-Fichier → copie dans raw/ avec nom horodaté, extension conservée
+URLs seules            → un fichier .url par URL, avec ligne tags: si tags présents
+Texte seul             → un fichier .md avec frontmatter tags si tags présents
+Texte + URL(s)         → un seul fichier .md contenant texte et URL(s)
+Fichier joint          → copie dans raw/ + .md optionnel si commentaire
 """
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import sys
@@ -22,7 +30,13 @@ from datetime import datetime
 from pathlib import Path
 
 RAW_DEFAULT = Path.home() / "Secretarius/Wiki_LM/raw"
+_DEFAULT_KB_DIR = Path.home() / "Documents" / "Arbath" / "Wiki_LM" / "knowledge_base"
+_TAG_NORMALIZE_THRESHOLD = 0.85
 
+
+# ---------------------------------------------------------------------------
+# Utilitaires
+# ---------------------------------------------------------------------------
 
 def _file_hash(path: Path) -> str:
     import hashlib
@@ -34,7 +48,6 @@ def _file_hash(path: Path) -> str:
 
 
 def _normalize_url(url: str) -> str:
-    """Supprime les paramètres de tracking courants pour la comparaison."""
     import urllib.parse
     _TRACKING = {"utm_source", "utm_medium", "utm_campaign", "utm_content",
                  "utm_term", "triedRedirect", "inbox"}
@@ -46,7 +59,6 @@ def _normalize_url(url: str) -> str:
 
 
 def _existing_urls(raw: Path) -> set[str]:
-    """Retourne l'ensemble des URLs normalisées déjà présentes dans raw/."""
     seen = set()
     for f in raw.glob("*.url"):
         for line in f.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -60,7 +72,6 @@ def _existing_urls(raw: Path) -> set[str]:
 
 
 def _existing_hashes(raw: Path) -> set[str]:
-    """Retourne les SHA256 de tous les fichiers non-.url de raw/."""
     seen = set()
     for f in raw.iterdir():
         if f.is_file() and f.suffix.lower() not in (".url",):
@@ -82,7 +93,57 @@ def timestamp() -> str:
     return datetime.now().strftime("%Y%m%d-%H%M%S")
 
 
-def capture_urls(urls: list[str], raw: Path) -> list[Path]:
+# ---------------------------------------------------------------------------
+# Hashtags
+# ---------------------------------------------------------------------------
+
+def _parse_hashtags(text: str) -> tuple[list[str], str]:
+    """Extrait les tokens #motclé. Retourne (tags_bruts, texte_restant).
+
+    Le préfixe "note:" éventuel est aussi retiré du texte restant.
+    """
+    tags = [m.group(1) for m in re.finditer(r"#(\w+)", text)]
+    remaining = re.sub(r"#\w+\s*", "", text).strip()
+    remaining = re.sub(r"^note:\s*", "", remaining, flags=re.IGNORECASE).strip()
+    return tags, remaining
+
+
+def _normalize_tags(raw_tags: list[str], kb_dir: Path = _DEFAULT_KB_DIR) -> list[str]:
+    """Normalise les tags bruts contre les tags canoniques. Best-effort silencieux."""
+    if not raw_tags:
+        return []
+    tags_dir = kb_dir / "tags"
+    dict_path = tags_dir / "tags_dict.json"
+    emb_path = tags_dir / "tags_embeddings.npy"
+    if not dict_path.exists() or not emb_path.exists():
+        return raw_tags
+    try:
+        import numpy as np
+        from sentence_transformers import SentenceTransformer
+        data = json.loads(dict_path.read_text(encoding="utf-8"))
+        # Les canoniques sont dans l'ordre alphabétique (cf. save_tag_dict)
+        canonicals = sorted(data.keys())
+        matrix = np.load(emb_path).astype(np.float32)
+        model = SentenceTransformer("BAAI/bge-m3")
+        normalized = []
+        for tag in raw_tags:
+            vec = model.encode(tag, normalize_embeddings=True).astype(np.float32)
+            sims = matrix @ vec
+            best_idx = int(np.argmax(sims))
+            if float(sims[best_idx]) >= _TAG_NORMALIZE_THRESHOLD:
+                normalized.append(canonicals[best_idx])
+            else:
+                normalized.append(tag)
+        return normalized
+    except Exception:
+        return raw_tags
+
+
+# ---------------------------------------------------------------------------
+# Fonctions de capture
+# ---------------------------------------------------------------------------
+
+def capture_urls(urls: list[str], raw: Path, tags: list[str] | None = None) -> list[Path]:
     ts = timestamp()
     existing = _existing_urls(raw)
     created = []
@@ -97,21 +158,46 @@ def capture_urls(urls: list[str], raw: Path) -> list[Path]:
         suffix = f"-{i}" if len(urls) > 1 else ""
         fname = f"{ts}{suffix}-{domain_slug}.url"
         path = raw / fname
-        path.write_text(url + "\n", encoding="utf-8")
+        content = url + "\n"
+        if tags:
+            content += f"tags: {', '.join(tags)}\n"
+        path.write_text(content, encoding="utf-8")
         created.append(path)
     return created
 
 
-def capture_comment(text: str, raw: Path) -> Path:
+def capture_comment(text: str, raw: Path, tags: list[str] | None = None) -> Path:
     ts = timestamp()
     slug = slugify(text)
     fname = f"{ts}-{slug}.md"
     path = raw / fname
-    path.write_text(text.strip() + "\n", encoding="utf-8")
+    if tags:
+        content = f"---\ntags: [{', '.join(tags)}]\n---\n{text.strip()}\n"
+    else:
+        content = text.strip() + "\n"
+    path.write_text(content, encoding="utf-8")
     return path
 
 
-def capture_file(src: Path, raw: Path, comment: str = "") -> Path:
+def capture_mixed(text: str, urls: list[str], raw: Path,
+                  tags: list[str] | None = None) -> Path:
+    """Texte + URL(s) → un seul fichier .md."""
+    ts = timestamp()
+    slug = slugify(text or urls[0])
+    fname = f"{ts}-{slug}.md"
+    path = raw / fname
+    url_block = "\n".join(urls)
+    body = f"{text}\n\n{url_block}" if text else url_block
+    if tags:
+        content = f"---\ntags: [{', '.join(tags)}]\n---\n{body.strip()}\n"
+    else:
+        content = body.strip() + "\n"
+    path.write_text(content, encoding="utf-8")
+    return path
+
+
+def capture_file(src: Path, raw: Path, comment: str = "",
+                 tags: list[str] | None = None) -> tuple[Path | None, Path | None]:
     ts = timestamp()
     h = _file_hash(src)
     if h in _existing_hashes(raw):
@@ -122,13 +208,20 @@ def capture_file(src: Path, raw: Path, comment: str = "") -> Path:
     fname = f"{ts}-{stem}{ext}"
     dest = raw / fname
     shutil.copy2(src, dest)
-    # Si un commentaire accompagne le fichier, on le dépose en .md juxtaposé
-    if comment:
+    if comment or tags:
         note = dest.with_suffix(".md")
-        note.write_text(comment.strip() + "\n", encoding="utf-8")
+        if tags:
+            note_content = f"---\ntags: [{', '.join(tags)}]\n---\n{comment.strip()}\n"
+        else:
+            note_content = comment.strip() + "\n"
+        note.write_text(note_content, encoding="utf-8")
         return dest, note
     return dest, None
 
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
 
 def main() -> None:
     import os
@@ -146,28 +239,39 @@ def main() -> None:
         if not src.exists():
             print(f"Fichier introuvable : {src}", file=sys.stderr)
             sys.exit(1)
-        comment = " ".join(argv[2:]).strip()
-        dest, note = capture_file(src, raw, comment)
-        print(f"Fichier → {dest.name}")
+        raw_comment = " ".join(argv[2:]).strip()
+        tags_raw, comment = _parse_hashtags(raw_comment)
+        tags = _normalize_tags(tags_raw)
+        dest, note = capture_file(src, raw, comment, tags)
+        if dest:
+            print(f"Fichier → {dest.name}")
         if note:
             print(f"Note    → {note.name}")
         return
 
     args = " ".join(argv).strip()
     if not args:
-        print("Usage: capture.py <url [url ...]> | <commentaire> | --file <chemin>",
+        print("Usage: capture.py <url|commentaire|#tags ...> | --file <chemin>",
               file=sys.stderr)
         sys.exit(1)
 
-    tokens = args.split()
-    urls = [t for t in tokens if re.match(r"https?://", t)]
+    tags_raw, args_clean = _parse_hashtags(args)
+    tags = _normalize_tags(tags_raw)
 
-    if urls:
-        created = capture_urls(urls, raw)
+    tokens = args_clean.split() if args_clean else []
+    urls = [t for t in tokens if re.match(r"https?://", t)]
+    text_tokens = [t for t in tokens if not re.match(r"https?://", t)]
+    text = " ".join(text_tokens).strip()
+
+    if urls and text:
+        path = capture_mixed(text, urls, raw, tags)
+        print(f"Note → {path.name}")
+    elif urls:
+        created = capture_urls(urls, raw, tags)
         for p in created:
             print(f"URL  → {p.name}")
     else:
-        path = capture_comment(args, raw)
+        path = capture_comment(text or " ".join(f"#{t}" for t in tags_raw), raw, tags)
         print(f"Note → {path.name}")
 
 
