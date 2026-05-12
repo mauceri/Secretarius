@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import json
 import os
 import re
 import unicodedata
@@ -1186,8 +1187,32 @@ class Ingestor:
         )
         return self.llm.complete(prompt, system=_SYSTEM_INGEST, max_tokens=3000)
 
+    def _load_tag_variants(self) -> tuple[dict[str, str], set[str]]:
+        """Retourne ({variante: canonique}, {canoniques}) depuis tags_dict.json.
+
+        Retourne deux dicts vides si le fichier est absent.
+        """
+        dict_path = self._kb_dir / "tags" / "tags_dict.json"
+        if not dict_path.exists():
+            return {}, set()
+        try:
+            data = json.loads(dict_path.read_text(encoding="utf-8"))
+            variants = {v: canon for canon, vs in data.items() for v in vs}
+            canonicals = set(data.keys())
+            return variants, canonicals
+        except Exception:
+            return {}, set()
+
     def _rebuild_tags_index(self) -> None:
-        """Reconstruit tags.md : index tag → pages du wiki."""
+        """Reconstruit tags.md en n'indexant que sous les tags canoniques.
+
+        - Les variantes sont fusionnées sous leur canonique.
+        - Les hapax (tags absents du dictionnaire) sont ignorés.
+        - Si le dictionnaire est absent, tous les tags sont conservés (comportement legacy).
+        """
+        variants_to_canon, known_canonicals = self._load_tag_variants()
+        filter_hapax = bool(known_canonicals)
+
         tag_map: dict[str, list[tuple[str, str, str]]] = {}
         for page in sorted(iter_pages(self.wiki_dir)):
             try:
@@ -1196,7 +1221,10 @@ class Ingestor:
                 title = str(post.get("title", page.stem))
                 category = str(post.get("category", ""))
                 for tag in tags:
-                    tag_map.setdefault(str(tag), []).append((page.stem, category, title))
+                    canon = variants_to_canon.get(str(tag), str(tag))
+                    if filter_hapax and canon not in known_canonicals:
+                        continue
+                    tag_map.setdefault(canon, []).append((page.stem, category, title))
             except Exception:
                 continue
 
