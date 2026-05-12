@@ -1,17 +1,370 @@
 {
-  "assistant_name": "${ASSISTANT_NAME}",
-  "obsidian_path": "${OBSIDIAN_PATH}",
-  "llm": {
-    "provider": "${LLM_BACKEND}",
-    "model": "",
-    "api_key": ""
+  "meta": {
+    "lastTouchedVersion": "2026.4.24",
+    "lastTouchedAt": "2026-04-25T21:02:52.410Z"
   },
-  "agents": {
-    "main": {
-      "name": "${ASSISTANT_NAME}",
-      "llm": "${LLM_BACKEND}"
+  "wizard": {
+    "lastRunAt": "2026-04-25T21:02:52.371Z",
+    "lastRunVersion": "2026.4.24",
+    "lastRunCommand": "doctor",
+    "lastRunMode": "local"
+  },
+  "auth": {
+    "profiles": {
+      "openai-codex:default": {
+        "provider": "openai-codex",
+        "mode": "oauth"
+      },
+      "deepseek:default": {
+        "provider": "deepseek",
+        "mode": "api_key"
+      },
+      "ollm:default": {
+        "provider": "ollm",
+        "mode": "api_key"
+      }
     }
   },
-  "skills": [],
-  "commands": {}
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "ollama": {
+        "baseUrl": "http://${HOSTNAME}:11434/v1",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "gemma4:latest",
+            "name": "Gemma 4 8B (local)",
+            "api": "openai-completions",
+            "reasoning": false,
+            "input": [
+              "text"
+            ],
+            "contextWindow": 8192,
+            "maxTokens": 2048
+          },
+          {
+            "id": "glm4:latest",
+            "name": "GLM 4 9B (local)",
+            "api": "openai-completions",
+            "reasoning": false,
+            "input": [
+              "text"
+            ],
+            "contextWindow": 8192,
+            "maxTokens": 2048
+          },
+          {
+            "id": "granite4:3b",
+            "name": "Granite 4 3B (local)",
+            "api": "openai-completions",
+            "reasoning": false,
+            "input": [
+              "text"
+            ],
+            "contextWindow": 8192,
+            "maxTokens": 2048
+          },
+          {
+            "id": "granite4:3b-131k",
+            "name": "Granite 4 3B 131k (local)",
+            "api": "openai-completions",
+            "reasoning": false,
+            "input": [
+              "text"
+            ],
+            "contextWindow": 8192,
+            "maxTokens": 2048
+          }
+        ]
+      },
+      "ollm": {
+        "baseUrl": "https://api.ollm.com/v1",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "near/DeepSeek-V3.1",
+            "name": "DeepSeek V3.1 (OLLM)",
+            "api": "openai-completions",
+            "reasoning": false,
+            "input": [
+              "text"
+            ],
+            "contextWindow": 131072,
+            "maxTokens": 8192
+          }
+        ]
+      },
+      "deepseek": {
+        "baseUrl": "https://api.deepseek.com",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "deepseek-chat",
+            "name": "DeepSeek Chat",
+            "api": "openai-completions",
+            "reasoning": false,
+            "input": [
+              "text"
+            ],
+            "cost": {
+              "input": 0.28,
+              "output": 0.42,
+              "cacheRead": 0.028,
+              "cacheWrite": 0
+            },
+            "contextWindow": 131072,
+            "maxTokens": 8192
+          },
+          {
+            "id": "deepseek-reasoner",
+            "name": "DeepSeek Reasoner",
+            "api": "openai-completions",
+            "reasoning": true,
+            "input": [
+              "text"
+            ],
+            "cost": {
+              "input": 0.28,
+              "output": 0.42,
+              "cacheRead": 0.028,
+              "cacheWrite": 0
+            },
+            "contextWindow": 131072,
+            "maxTokens": 65536
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "deepseek/deepseek-chat"
+      },
+      "models": {
+        "deepseek/deepseek-chat": {
+          "alias": "DeepSeek"
+        },
+        "ollm/near/DeepSeek-V3.1": {
+          "alias": "DeepSeekOLLM"
+        },
+        "ollama/gemma4:latest": {
+          "alias": "Gemma4"
+        },
+        "ollama/glm4:latest": {
+          "alias": "GLM4local"
+        },
+        "ollama/granite4:3b": {
+          "alias": "Granite3B"
+        },
+        "ollama/granite4:3b-131k": {
+          "alias": "Granite3B131k"
+        }
+      },
+      "workspace": "${HOME}/.openclaw/workspace",
+      "compaction": {
+        "mode": "safeguard"
+      },
+      "maxConcurrent": 4,
+      "subagents": {
+        "maxConcurrent": 8
+      },
+      "sandbox": {
+        "mode": "all",
+        "workspaceAccess": "rw",
+        "scope": "session"
+      }
+    },
+    "list": [
+      {
+        "id": "main"
+      },
+      {
+        "id": "scout",
+        "name": "scout",
+        "workspace": "${HOME}/.openclaw/agents/scout/workspace",
+        "agentDir": "${HOME}/.openclaw/agents/scout/agent",
+        "model": "deepseek/deepseek-chat"
+      }
+    ]
+  },
+  "tools": {
+    "exec": {
+      "host": "gateway",
+      "security": "allowlist",
+      "ask": "on-miss",
+      "safeBins": [
+        "gog",
+        "cat",
+        "ls",
+        "find",
+        "switch-model"
+      ],
+      "applyPatch": {
+        "enabled": false
+      },
+      "safeBinProfiles": {
+        "cat": {},
+        "find": {},
+        "gog": {},
+        "ls": {},
+        "switch-model": {}
+      }
+    },
+    "sandbox": {
+      "tools": {
+        "allow": [
+          "gog",
+          "read",
+          "write",
+          "edit",
+          "apply_path",
+          "sessions_list",
+          "sessions_send",
+          "sessions_spawn",
+          "session_status",
+          "group:runtime",
+          "group:fs",
+          "mcp-adapter"
+        ],
+        "deny": [
+          "browser",
+          "canvas",
+          "nodes",
+          "cron",
+          "discord",
+          "gateway",
+          "web_search",
+          "web_fetch"
+        ]
+      }
+    }
+  },
+  "messages": {
+    "ackReactionScope": "group-mentions"
+  },
+  "commands": {
+    "native": "auto",
+    "nativeSkills": "auto",
+    "restart": true
+  },
+  "session": {
+    "dmScope": "per-channel-peer"
+  },
+  "channels": {
+    "telegram": {
+      "execApprovals": {
+        "enabled": true,
+        "approvers": [
+          "220537738"
+        ]
+      },
+      "enabled": true,
+      "dmPolicy": "pairing",
+      "groupPolicy": "allowlist",
+      "streaming": {
+        "mode": "partial"
+      }
+    }
+  },
+  "gateway": {
+    "port": 18789,
+    "mode": "local",
+    "bind": "loopback",
+    "controlUi": {
+      "allowedOrigins": [
+        "https://santiago.tailc69141.ts.net",
+        "http://localhost:18789"
+      ]
+    },
+    "auth": {
+      "mode": "token",
+      "token": "${OPENCLAW_GATEWAY_TOKEN}"
+    },
+    "trustedProxies": [
+      "127.0.0.1",
+      "::1"
+    ],
+    "tailscale": {
+      "mode": "serve",
+      "resetOnExit": false
+    },
+    "nodes": {
+      "denyCommands": [
+        "camera.snap",
+        "camera.clip",
+        "screen.record",
+        "contacts.add",
+        "calendar.add",
+        "reminders.add",
+        "sms.send",
+        "config.patch",
+        "config.apply"
+      ]
+    }
+  },
+  "plugins": {
+    "entries": {
+      "telegram": {
+        "enabled": true
+      },
+      "openai": {
+        "enabled": true
+      },
+      "deepseek": {
+        "enabled": true
+      },
+      "ollama": {
+        "enabled": true
+      },
+      "openclaw-mcp-adapter": {
+        "enabled": true,
+        "config": {
+          "servers": [
+            {
+              "name": "multi-host",
+              "transport": "stdio",
+              "command": "${HOME}/.openclaw/mcp-venv/bin/python3",
+              "args": [
+                "${HOME}/.claude/mcp-servers/multi_host_mcp.py"
+              ]
+            }
+          ],
+          "toolPrefix": true
+        }
+      }
+    },
+    "installs": {
+      "openclaw-mcp-adapter": {
+        "source": "npm",
+        "spec": "openclaw-mcp-adapter",
+        "installPath": "${HOME}/.openclaw/extensions/openclaw-mcp-adapter",
+        "version": "0.1.1",
+        "resolvedName": "openclaw-mcp-adapter",
+        "resolvedVersion": "0.1.1",
+        "resolvedSpec": "openclaw-mcp-adapter@0.1.1",
+        "integrity": "sha512-HqNPiC14f3KoYWIAz/6jB0a7M3kM3+BwtfAxwAoaWbZCBNcM6P5GB0IqzIHaeaBlJYeezHinQj431GN8c2IRbg==",
+        "shasum": "f196c78d966b149b121407cbc14b29da0a8428d9",
+        "resolvedAt": "2026-04-10T16:13:28.904Z",
+        "installedAt": "2026-04-10T16:13:31.362Z"
+      }
+    }
+  },
+  "skills": {
+    "install": {
+      "nodeManager": "npm"
+    }
+  },
+  "mcp": {
+    "servers": {
+      "multi-host": {
+        "command": "${HOME}/.openclaw/mcp-venv/bin/python3",
+        "args": [
+          "${HOME}/.claude/mcp-servers/multi_host_mcp.py"
+        ],
+        "transport": "stdio"
+      }
+    }
+  }
 }
