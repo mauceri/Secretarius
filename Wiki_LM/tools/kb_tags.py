@@ -18,13 +18,13 @@ from pathlib import Path
 import frontmatter
 import numpy as np
 
-_DEFAULT_KB_DIR = Path(__file__).resolve().parent.parent / "knowledge_base"
+_DEFAULT_KB_DIR = Path.home() / "Documents" / "Arbath" / "Wiki_LM" / "knowledge_base"
 
 
 def collect_tags(wiki_root: Path) -> dict[str, int]:
     """Retourne {tag: count} depuis toutes les pages sources du wiki."""
     counts: dict[str, int] = {}
-    sources_dir = wiki_root / "wiki" / "sources"
+    sources_dir = wiki_root / "sources"
     if not sources_dir.exists():
         return counts
     for path in sorted(sources_dir.glob("src-*.md")):
