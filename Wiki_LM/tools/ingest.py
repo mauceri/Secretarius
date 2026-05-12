@@ -1240,6 +1240,11 @@ class Ingestor:
 
         (self.wiki_dir / "tags.md").write_text("".join(lines), encoding="utf-8")
 
+        kw_lines = ["# Mots-clés\n\n"]
+        for tag, pages in sorted(tag_map.items(), key=lambda x: -len(x[1])):
+            kw_lines.append(f"- {tag} ({len(pages)})\n")
+        (self.wiki_dir / "liste_mots_clés.md").write_text("".join(kw_lines), encoding="utf-8")
+
     def _update_concept_page(
         self, concept: str, source_title: str, src_slug: str, full_content: str
     ) -> None:
