@@ -317,13 +317,6 @@
       },
       "ollama": {
         "enabled": true
-      },
-      "openclaw-mcp-adapter": {
-        "enabled": true,
-        "config": {
-          "servers": [],
-          "toolPrefix": true
-        }
       }
     },
     "installs": {
