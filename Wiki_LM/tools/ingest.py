@@ -676,7 +676,7 @@ def _extract_title_from_page(content: str) -> str:
 # Moteur d'ingestion
 # ---------------------------------------------------------------------------
 
-_DEFAULT_RAW = Path.home() / "Secretarius" / "Wiki_LM" / "raw"
+_DEFAULT_RAW = Path(os.environ.get("WIKI_PATH", str(Path.home() / "Secretarius" / "Wiki_LM"))).expanduser() / "raw"
 
 
 class Ingestor:
