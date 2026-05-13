@@ -12,7 +12,7 @@ info()  { echo -e "${GREEN}[INFO]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
 error() { echo -e "${RED}[ERREUR]${NC} $*" >&2; }
 
-INTERACTIVE=false
+INTERACTIVE=true
 FORCE=false
 ENV_FILE=""
 
