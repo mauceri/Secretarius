@@ -22,6 +22,7 @@ Fichier joint          → copie dans raw/ + .md optionnel si commentaire
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import sys
@@ -29,7 +30,7 @@ import unicodedata
 from datetime import datetime
 from pathlib import Path
 
-RAW_DEFAULT = Path.home() / "Secretarius/Wiki_LM/raw"
+RAW_DEFAULT = Path(os.environ.get("WIKI_PATH", str(Path.home() / "Secretarius" / "Wiki_LM"))).expanduser() / "raw"
 _DEFAULT_KB_DIR = Path.home() / "Documents" / "Arbath" / "Wiki_LM" / "knowledge_base"
 _TAG_NORMALIZE_THRESHOLD = 0.85
 
