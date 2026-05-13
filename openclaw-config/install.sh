@@ -58,3 +58,21 @@ else
   cp "${SCRIPT_DIR}/openclaw-gateway.service" "$SERVICE_TARGET"
   info "Service systemd installé dans ${SYSTEMD_USER_DIR}"
 fi
+
+# Workspace .md et skills
+WORKSPACE_SRC="${SCRIPT_DIR}/workspace"
+WORKSPACE_DST="${OPENCLAW_PATH}/workspace"
+export HOME HOSTNAME OBSIDIAN_PATH ASSISTANT_NAME
+SUBST_VARS='${HOME} ${HOSTNAME} ${OBSIDIAN_PATH} ${ASSISTANT_NAME}'
+
+while IFS= read -r -d '' src; do
+  rel="${src#${WORKSPACE_SRC}/}"
+  dst="${WORKSPACE_DST}/${rel}"
+  mkdir -p "$(dirname "$dst")"
+  if [[ -f "$dst" && "$FORCE" != "true" ]]; then
+    info "${rel} existe déjà — ignoré"
+  else
+    envsubst "$SUBST_VARS" < "$src" > "$dst"
+    info "${rel} installé"
+  fi
+done < <(find "$WORKSPACE_SRC" -name "*.md" -print0)
