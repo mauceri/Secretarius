@@ -174,9 +174,6 @@
         "mode": "all",
         "workspaceAccess": "rw",
         "scope": "session"
-      },
-      "mcp": {
-        "servers": []
       }
     },
     "list": [
@@ -324,16 +321,7 @@
       "openclaw-mcp-adapter": {
         "enabled": true,
         "config": {
-          "servers": [
-            {
-              "name": "multi-host",
-              "transport": "stdio",
-              "command": "${HOME}/.openclaw/mcp-venv/bin/python3",
-              "args": [
-                "${HOME}/.claude/mcp-servers/multi_host_mcp.py"
-              ]
-            }
-          ],
+          "servers": [],
           "toolPrefix": true
         }
       }
@@ -357,17 +345,6 @@
   "skills": {
     "install": {
       "nodeManager": "npm"
-    }
-  },
-  "mcp": {
-    "servers": {
-      "multi-host": {
-        "command": "${HOME}/.openclaw/mcp-venv/bin/python3",
-        "args": [
-          "${HOME}/.claude/mcp-servers/multi_host_mcp.py"
-        ],
-        "transport": "stdio"
-      }
     }
   }
 }
