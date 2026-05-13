@@ -1,78 +1,86 @@
 # Secretarius
 
-Secrétaire documentaire personnel, local et frugal.
+Knowledge base personnelle locale basée sur le patron *LLM Wiki* (Andrej Karpathy) : un LLM ingère des sources (URLs, PDFs, textes) et maintient de façon incrémentale un wiki Markdown interconnecté — résumés, pages de concepts, pages d'entités, clustering thématique, base de connaissance compactée.
+
+→ Voir [`PATTERN.md`](PATTERN.md) pour la description complète du patron.
+
+## Prérequis
+
+- Python 3.11+
+- [OpenClaw](https://openclaw.dev) installé (`npm install -g openclaw`)
+- `envsubst` (`apt install gettext` / `brew install gettext`)
+- Git
+
+## Installation
+
+```bash
+git clone https://github.com/mauceri/Secretarius
+cd Secretarius
+./install.sh --interactive
+```
+
+Options disponibles :
+
+```
+--obsidian-path PATH    Chemin du coffre Obsidian (défaut: ~/Documents/Obsidian)
+--assistant-name NAME   Nom de l'assistant OpenClaw (défaut: Tiron)
+--llm BACKEND           deepseek | ollama | claude (défaut: deepseek)
+--env-file FILE         Fichier de secrets (clés API, tokens)
+--force                 Écrase les fichiers existants
+```
+
+Le script installe les dépendances Python, génère `~/.openclaw/openclaw.json` depuis le template, et configure `Wiki_LM/.env`.
 
 ## Composants
 
 ### Wiki_LM
 
-Pipeline de knowledge base personnelle basé sur le patron *LLM Wiki* (Andrej Karpathy).  
-Un LLM ingère des sources (URLs, PDFs, textes) et maintient de façon incrémentale un wiki Markdown interconnecté — résumés, pages de concepts, pages d'entités, liens croisés.
+Pipeline complet de knowledge base personnelle.
 
-→ Voir [`Wiki_LM/README.md`](Wiki_LM/README.md) et [`Wiki_LM/PATTERN.md`](Wiki_LM/PATTERN.md)
+→ Voir [`Wiki_LM/README.md`](Wiki_LM/README.md)
 
-**Fonctionnalités principales :**
+**Fonctionnalités :**
 - Ingestion batch depuis `raw/` avec déduplication (SHA-256 / URL normalisée)
 - Enrichissement Wikipedia anti-hallucination (ZIM Kiwix → cache SQLite → API REST)
 - Export des signets Brave vers `raw/`
-- Recherche BM25 + requêtes en langage naturel
-- Suite de tests pytest isolée (74 tests, zéro réseau)
+- Recherche BM25 + requêtes en langage naturel (hybride BM25 + BGE-M3)
+- Clustering thématique (algorithme des transferts)
+- Base de connaissance compactée (axes thématiques, centroïdes BGE-M3)
+- Suite de tests pytest isolée (170 tests, zéro réseau)
 
-### Infrastructure LLM locale
+### OpenClaw
 
-| Service | Port | Modèle | Rôle |
-|---------|------|--------|------|
-| llama.cpp | 8989 | Phi-4-mini LoRA (Wikipedia FR) | Extraction d'expressions |
-| Ollama | 11434 | Qwen | LLM généraliste |
-
-Les artefacts LoRA sont dans `~/lora_local/` (hors dépôt).
-
-## Démarrage rapide
-
-```bash
-cd ~/Secretarius/Wiki_LM
-python -m venv .venv && source .venv/bin/activate
-pip install -r Wiki_LM/requirements.txt
-
-# Ingérer une URL
-python Wiki_LM/tools/ingest.py https://example.com/article
-
-# Lancer les tests
-python -m pytest Wiki_LM/tests/
-```
+Agent conversationnel configuré pour opérer sur le wiki via les outils Wiki_LM.  
+La configuration est générée depuis `openclaw-config/openclaw.json.template` à l'installation.
 
 ## Structure du dépôt
 
 ```
 Secretarius/
 ├── install.sh                 # Script d'installation principal
-├── install.conf               # Configuration par défaut (sourceable)
+├── install.conf               # Valeurs par défaut (sourceable)
+├── PATTERN.md                 # Le patron LLM Wiki
 ├── CLAUDE.md                  # Instructions pour Claude Code / agents
-├── README.md                  # Ce fichier
+├── README.md
 │
-├── Wiki_LM/                   # Coeur du projet LLM Wiki
-│   ├── tools/                 # Pipeline CLI (ingest, query, search…)
-│   ├── tests/                 # Suite pytest (74 tests)
+├── Wiki_LM/                   # Outils pipeline LLM Wiki
+│   ├── tools/                 # 24 outils CLI (ingest, query, cluster, kb_*)
+│   ├── tests/                 # Suite pytest (170 tests)
 │   ├── .env.template          # Template de configuration LLM
-│   ├── PATTERN.md             # Description du pattern LLM Wiki
 │   └── requirements.txt
 │
-├── openclaw-config/           # Templates pour OpenClaw
-│   ├── openclaw.json.template # Config OpenClaw (placeholders)
-│   ├── gateway.systemd.env.template # Secrets (généré à l'install)
+├── openclaw-config/           # Templates de configuration OpenClaw
+│   ├── openclaw.json.template # Config complète (variables ${HOME}, ${HOSTNAME}…)
+│   ├── gateway.systemd.env.template # Secrets (tokens — non versionné)
 │   ├── openclaw-gateway.service     # Unité systemd user
-│   └── install.sh             # Sous-script de génération
+│   └── install.sh             # Génère ~/.openclaw/ via envsubst
 │
-├── docs/                      # Documentation
-│   ├── architecture/          # Décisions d'architecture, patterns
-│   ├── history/               # Historique du projet
-│   └── superpowers/           # Specs et plans d'implémentation
-│       ├── specs/
-│       └── plans/
-│
-├── data/                      # Données runtime (hors git)
-│   ├── raw/                   # Sources brutes ingérées
-│   └── wiki/                  # Wiki généré
-│
-└── worktrees/                 # Git worktrees (hors git)
+└── docs/
+    ├── architecture/          # Décisions d'architecture
+    ├── history/               # Historique du projet
+    └── superpowers/           # Specs et plans d'implémentation
+        ├── specs/
+        └── plans/
 ```
+
+Les données wiki (`raw/`, `wiki/`, `embeddings/`, `knowledge_base/`) vivent sous le coffre Obsidian (`OBSIDIAN_PATH/Wiki_LM/`) et ne sont pas versionnées.
