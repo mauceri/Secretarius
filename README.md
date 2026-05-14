@@ -13,11 +13,15 @@ Knowledge base personnelle locale basée sur le patron *LLM Wiki* (Andrej Karpat
 
 ## Installation
 
+### 1. Cloner et configurer
+
 ```bash
 git clone https://github.com/mauceri/Secretarius
 cd Secretarius
-./install.sh --interactive
+./install.sh
 ```
+
+Le script pose les questions interactivement (coffre Obsidian, nom de l'assistant, backend LLM).
 
 Options disponibles :
 
@@ -29,7 +33,34 @@ Options disponibles :
 --force                 Écrase les fichiers existants
 ```
 
-Le script installe les dépendances Python, génère `~/.openclaw/openclaw.json` depuis le template, et configure `Wiki_LM/.env`.
+### 2. Renseigner les secrets
+
+**Avant de lancer OpenClaw**, éditer `~/.openclaw/gateway.systemd.env` :
+
+```
+TELEGRAM_BOT_TOKEN=<token BotFather>
+GATEWAY_TOKEN=<identifiant Telegram numérique>
+OPENCLAW_GATEWAY_TOKEN=<même valeur que GATEWAY_TOKEN>
+GATEWAY_PASSWORD=<mot de passe gateway>
+DEEPSEEK_API_KEY=<clé API DeepSeek>
+```
+
+### 3. Démarrer le service
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now openclaw-gateway.service
+```
+
+### 4. Appairer Telegram
+
+Envoyer `/start` au bot Telegram, puis :
+
+```bash
+openclaw pairing approve telegram <CODE>
+```
+
+> **Important** : ne jamais lancer `openclaw` avant l'étape 2 — OpenClaw initialiserait le workspace avec ses fichiers par défaut (en anglais) et écraserait la configuration. En cas d'accident : `./install.sh --force`.
 
 ## Composants
 
