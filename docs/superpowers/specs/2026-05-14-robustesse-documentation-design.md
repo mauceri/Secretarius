@@ -122,136 +122,76 @@ Cette pratique est documentée dans `PATTERN.md` (paragraphe "Documentation comm
 
 ### 3.1 `prompt-injection-guard`
 
-**Rôle :** Couche de sanitisation partagée entre tous les canaux d'entrée (scout, email,
-Telegram). Analyse un texte non fiable et retourne un verdict structuré.
+**Statut :** skill déjà installé sur sanroque (`~/.openclaw/workspace/skills/prompt-injection-guard/`),
+absent du repo.
 
-**Fichiers :**
+**Rôle :** Instructions comportementales pour l'agent OpenClaw — détection et blocage
+des injections de prompt (direct, indirect, changement de rôle, fuite du prompt système).
+Trois niveaux de réponse : avertissement / confirmation obligatoire / blocage.
+Pas de script Python — c'est un skill purement déclaratif.
+
+**Fichiers à ajouter au repo :**
 
 ```
 openclaw-config/workspace/skills/prompt-injection-guard/
-├── SKILL.md       — interface pour l'agent OpenClaw
-└── guard.py       — détection heuristique (stdlib Python, zéro dépendance externe)
-```
-
-**Interface `guard.py` :**
-
-```bash
-echo "<texte>" | python guard.py
-# ou
-python guard.py --text "<texte>"
-```
-
-Sortie JSON :
-```json
-{
-  "verdict": "safe|suspect|blocked",
-  "score": 0.0,
-  "reasons": ["..."]
-}
-```
-
-**Heuristiques (sans ML) :**
-- Patterns d'injection connus : "ignore previous", "you are now", "disregard",
-  "forget your instructions", "jailbreak", "do anything now"
-- Instructions imbriquées : balises `<`, `[INST]`, markdown structurel dans du
-  contenu censément non formaté
-- Densité anormale de verbes impératifs en début de phrase
-- Unicode suspect : homoglyphes, caractères RTL override (U+202E, etc.)
-
-**Seuils :**
-- `score < 0.3` → `safe`
-- `0.3 ≤ score < 0.7` → `suspect` (passer à l'agent avec avertissement)
-- `score ≥ 0.7` → `blocked` (ne pas transmettre à l'agent principal)
-
-**Intégration :** scout, email-prompt-injection-defense et c appellent `guard.py`
-avant de transmettre tout contenu externe à l'agent principal.
-
-```
-scout ──────────┐
-email-defense ──┼──► prompt-injection-guard ──► agent principal
-c (Telegram) ───┘
+└── SKILL.md       — copie depuis ~/.openclaw/workspace/skills/prompt-injection-guard/
 ```
 
 ### 3.2 `email-prompt-injection-defense`
 
-**Rôle :** Lire les emails entrants via IMAP générique ou Gmail OAuth2, filtrer
-les tentatives d'injection avant de passer le contenu à l'agent principal.
+**Statut :** skill déjà installé sur sanroque (`~/.openclaw/workspace/skills/email-prompt-injection-defense/`),
+absent du repo.
 
-**Fichiers :**
+**Rôle :** Instructions comportementales pour scanner les emails avant traitement.
+Détecte : blocs `<thinking>`, fausses sorties système, texte caché (RTL override,
+caractères de largeur nulle), blocs Base64, demandes d'action urgentes.
+Protocole de confirmation avant toute action déclenchée par un email.
+
+**Fichiers à ajouter au repo :**
 
 ```
 openclaw-config/workspace/skills/email-prompt-injection-defense/
 ├── SKILL.md
-└── email_fetch.py   — IMAP + Gmail API, filtre via guard.py
+└── references/patterns.md   — bibliothèque de patterns d'injection
 ```
 
-**Backends supportés :**
-
-- **IMAP générique** : tout serveur IMAP (Outlook, Protonmail, serveur auto-hébergé)
-- **Gmail OAuth2** : via `google-auth` + `google-api-python-client`
-
-Sélection automatique selon les variables d'environnement disponibles :
-- `GMAIL_CLIENT_ID` présent → backend Gmail
-- Sinon → backend IMAP (`IMAP_HOST`, `IMAP_USER`, `IMAP_PASSWORD`)
-
-**Variables d'environnement** (dans `gateway.systemd.env`) :
+**Variables d'environnement** (dans `gateway.systemd.env`) — inchangées :
 
 ```bash
-# IMAP générique
-IMAP_HOST=
-IMAP_USER=
-IMAP_PASSWORD=
-
-# Gmail OAuth2 (optionnel)
-GMAIL_CLIENT_ID=
-GMAIL_CLIENT_SECRET=
-GMAIL_REFRESH_TOKEN=
+# IMAP_HOST=
+# IMAP_USER=
+# IMAP_PASSWORD=
+# GMAIL_CLIENT_ID=
+# GMAIL_CLIENT_SECRET=
+# GMAIL_REFRESH_TOKEN=
 ```
-
-**`install.sh`** : vérifie `google-auth` si `GMAIL_CLIENT_ID` est défini (avertissement
-non-bloquant si absent).
 
 ### 3.3 `superpowers`
 
-**Deux composantes :**
+**Statut :** skill OpenClaw déjà installé sur sanroque
+(`~/.openclaw/workspace/skills/superpowers/`), absent du repo.
+Source : adapté de [obra/superpowers](https://github.com/obra/superpowers).
 
-**a) Plugin Claude Code** — déjà présent sur la machine de développement
-(`~/.codex/.tmp/plugins/plugins/superpowers/`).
+**Rôle :** Workflow de développement spec-first + TDD + sous-agents pour OpenClaw.
+Pipeline : Brainstorm → Plan → Subagent-Driven Build → Code Review → Finish Branch.
 
-Source : `https://github.com/anthropics/claude-code-config` (répertoire `plugins/superpowers/`).
-À confirmer lors de l'implémentation si l'URL a changé.
-
-`install.sh` ajoute une étape non-bloquante :
-```bash
-# Vérifier/installer le plugin superpowers pour Claude Code
-SUPERPOWERS_PLUGIN_DIR="${HOME}/.claude/plugins/superpowers"
-if command -v claude &>/dev/null; then
-  if [[ ! -d "$SUPERPOWERS_PLUGIN_DIR" ]]; then
-    git clone --depth=1 --filter=blob:none --sparse \
-      https://github.com/anthropics/claude-code-config \
-      /tmp/claude-code-config 2>/dev/null \
-      && git -C /tmp/claude-code-config sparse-checkout set plugins/superpowers \
-      && cp -r /tmp/claude-code-config/plugins/superpowers "$SUPERPOWERS_PLUGIN_DIR" \
-      && rm -rf /tmp/claude-code-config \
-      && info "Plugin superpowers installé" \
-      || warn "impossible d'installer le plugin superpowers — à faire manuellement"
-  else
-    info "Plugin superpowers déjà installé ✓"
-  fi
-else
-  warn "claude non trouvé — plugin superpowers non installé"
-fi
-```
-
-**b) Skill OpenClaw** :
+**Fichiers à ajouter au repo :**
 
 ```
 openclaw-config/workspace/skills/superpowers/
-└── SKILL.md   — workflow brainstorming→writing-plans→executing-plans pour OpenClaw
+├── SKILL.md
+├── _meta.json
+└── references/
+    ├── brainstorming.md
+    ├── finishing-branch.md
+    ├── subagent-development.md
+    ├── systematic-debugging.md
+    ├── tdd.md
+    └── writing-plans.md
 ```
 
-Le SKILL.md explique à l'agent OpenClaw comment utiliser la méthodologie superpowers
-pour les tâches de développement : exploration → spec → plan → implémentation.
+**Note :** pas d'étape d'installation dans `install.sh` — le skill s'installe
+comme les autres (copie dans `~/.openclaw/workspace/skills/` par `openclaw-config/install.sh`).
 
 ---
 
@@ -298,9 +238,9 @@ après l'étape secrets.
 
 1. `install.sh` robustesse + `gateway.systemd.env.template` — fondation
 2. `docs/components/` pour les skills existants + ingestion wiki progressive
-3. `prompt-injection-guard` — implémentation + doc + ingestion wiki
-4. `email-prompt-injection-defense` — implémentation + doc + ingestion wiki
-5. `superpowers` — implémentation + doc + ingestion wiki
+3. `prompt-injection-guard` — copie depuis `~/.openclaw/` vers repo + doc + ingestion wiki
+4. `email-prompt-injection-defense` — copie depuis `~/.openclaw/` vers repo + doc + ingestion wiki
+5. `superpowers` — copie depuis `~/.openclaw/` vers repo + doc + ingestion wiki
 6. Intégration des 3 nouveaux skills dans `install.sh`
 7. Enrichissement `PATTERN.md` (paragraphe "Documentation comme source wiki")
 
@@ -313,11 +253,12 @@ après l'étape secrets.
 | `install.sh` | Modifier — robustesse prérequis, accumulation warnings |
 | `openclaw-config/gateway.systemd.env.template` | Modifier — variables enrichies |
 | `docs/components/*.md` (×10) | Créer |
-| `openclaw-config/workspace/skills/prompt-injection-guard/SKILL.md` | Créer |
-| `openclaw-config/workspace/skills/prompt-injection-guard/guard.py` | Créer |
-| `openclaw-config/workspace/skills/email-prompt-injection-defense/SKILL.md` | Créer |
-| `openclaw-config/workspace/skills/email-prompt-injection-defense/email_fetch.py` | Créer |
-| `openclaw-config/workspace/skills/superpowers/SKILL.md` | Créer |
+| `openclaw-config/workspace/skills/prompt-injection-guard/SKILL.md` | Copier depuis `~/.openclaw/` |
+| `openclaw-config/workspace/skills/email-prompt-injection-defense/SKILL.md` | Copier depuis `~/.openclaw/` |
+| `openclaw-config/workspace/skills/email-prompt-injection-defense/references/patterns.md` | Copier depuis `~/.openclaw/` |
+| `openclaw-config/workspace/skills/superpowers/SKILL.md` | Copier depuis `~/.openclaw/` |
+| `openclaw-config/workspace/skills/superpowers/_meta.json` | Copier depuis `~/.openclaw/` |
+| `openclaw-config/workspace/skills/superpowers/references/` | Copier depuis `~/.openclaw/` |
 | `PATTERN.md` | Modifier — paragraphe "Documentation comme source wiki" |
 
 ## Hors périmètre
