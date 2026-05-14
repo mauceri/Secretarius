@@ -12,7 +12,7 @@ info()  { echo -e "${GREEN}[INFO]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[WARN]${NC} $*"; }
 error() { echo -e "${RED}[ERREUR]${NC} $*" >&2; }
 
-INTERACTIVE=true
+[[ -t 0 ]] && INTERACTIVE=true || INTERACTIVE=false
 FORCE=false
 ENV_FILE=""
 
@@ -100,11 +100,10 @@ bash "${SECRETARIUS_ROOT}/openclaw-config/install.sh"
 info "Configuration de Wiki_LM/.env..."
 WIKI_ENV="${SECRETARIUS_ROOT}/Wiki_LM/.env"
 WIKI_ENV_TEMPLATE="${SECRETARIUS_ROOT}/Wiki_LM/.env.template"
-if [[ -f "$WIKI_ENV" && "$FORCE" != "true" ]]; then
-  info "Wiki_LM/.env existe déjà — ignoré"
-else
+WIKI_PATH="${OBSIDIAN_PATH}/Wiki_LM"
+
+if [[ ! -f "$WIKI_ENV" || "$FORCE" == "true" ]]; then
   cp "$WIKI_ENV_TEMPLATE" "$WIKI_ENV"
-  WIKI_PATH="${OBSIDIAN_PATH}/Wiki_LM"
   sed -i "s|^WIKI_PATH=.*|WIKI_PATH=${WIKI_PATH}|" "$WIKI_ENV"
   case "$LLM_BACKEND" in
     deepseek) sed -i "s|^WIKI_LLM_BACKEND=.*|WIKI_LLM_BACKEND=openai|" "$WIKI_ENV" ;;
@@ -115,6 +114,9 @@ else
     claude) sed -i "s|^WIKI_LLM_BACKEND=.*|WIKI_LLM_BACKEND=claude|" "$WIKI_ENV" ;;
   esac
   info "Wiki_LM/.env créé"
+else
+  sed -i "s|^WIKI_PATH=.*|WIKI_PATH=${WIKI_PATH}|" "$WIKI_ENV"
+  info "Wiki_LM/.env : WIKI_PATH mis à jour (${WIKI_PATH})"
 fi
 
 # Étape 5 — Dépendances Python
