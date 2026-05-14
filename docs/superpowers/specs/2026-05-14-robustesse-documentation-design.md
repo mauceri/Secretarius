@@ -104,6 +104,22 @@ Un fichier par composant, template uniforme :
 | `docs/components/switch-model.md` | Modèles disponibles, bascule, redémarrage gateway |
 | `docs/components/gog.md` | Google Workspace CLI, OAuth, commandes Gmail/Calendar/Drive |
 
+### Tags frontmatter
+
+Chaque fichier `docs/components/` porte un frontmatter YAML avec tags :
+
+```markdown
+---
+tags: [documentation, secretarius]
+date: YYYY-MM-DD
+---
+```
+
+| Tags | Composants |
+|------|-----------|
+| `documentation`, `LLM_Wiki`, `secretarius` | wiki-lm, scout, obsidian, prompt-injection-guard, superpowers |
+| `documentation`, `secretarius` | c-telegram, gog, email-prompt-injection-defense, switch-model, secretarius-document-normalizer |
+
 ### Intégration wiki (patron Karpathy)
 
 Après chaque `docs/components/<composant>.md` écrit et commité, ingestion immédiate :
