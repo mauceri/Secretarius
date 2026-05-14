@@ -12,7 +12,28 @@ Structure attendue :
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+
+
+def _load_dotenv() -> None:
+    """Charge Wiki_LM/.env dans os.environ (stdlib, pas de python-dotenv requis)."""
+    env_file = Path(__file__).resolve().parent.parent / ".env"
+    if not env_file.exists():
+        return
+    with env_file.open(encoding="utf-8") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+
+
+_load_dotenv()
 
 CONTENT_SUBDIRS: list[str] = ["sources", "concepts", "entités"]
 CLUSTERING_SUBDIR: str = "clusterings"
