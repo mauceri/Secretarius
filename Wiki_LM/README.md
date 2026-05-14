@@ -21,9 +21,9 @@ Wiki_LM/
 └── requirements.txt
 ```
 
-Les données (`wiki/`, `raw/`, `embeddings/`, `knowledge_base/`, `zim/`) sont hors dépôt (`.gitignore`).  
-Le répertoire wiki par défaut est `~/Secretarius/Wiki_LM/wiki/` ;  
-le répertoire raw par défaut est `~/Secretarius/Wiki_LM/raw/`.
+Les données (`wiki/`, `raw/`, `embeddings/`, `knowledge_base/`, `zim/`) sont hors dépôt.  
+Elles vivent sous le coffre Obsidian : `$WIKI_PATH/wiki/`, `$WIKI_PATH/../raw/`, etc.  
+`WIKI_PATH` est lu depuis `Wiki_LM/.env` (chargé automatiquement à l'import de `wiki_paths`).
 
 Chaque wiki contient deux fichiers d'index des tags générés par `ingest.py` :
 
@@ -92,10 +92,11 @@ Chaque wiki contient deux fichiers d'index des tags générés par `ingest.py` :
 
 ## Démarrage rapide
 
+`install.sh` crée `.venv` et installe les dépendances. Activer l'environnement :
+
 ```bash
 cd ~/Secretarius/Wiki_LM
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+source .venv/bin/activate
 
 # Ingérer une URL
 python tools/ingest.py https://example.com/article
@@ -188,9 +189,9 @@ Le LLM utilisé est sélectionné par variable d'environnement (dans `.env` ou l
 
 | Variable | Valeur | Backend |
 |----------|--------|---------|
-| `LLM_BACKEND` | `deepseek` | DeepSeek API (`DEEPSEEK_API_KEY`) |
-| `LLM_BACKEND` | `anthropic` | Anthropic API (`ANTHROPIC_API_KEY`) |
-| `LLM_BACKEND` | `ollama` | Ollama local (`OLLAMA_MODEL`) |
+| `WIKI_LLM_BACKEND` | `openai` | DeepSeek API (`DEEPSEEK_API_KEY`, `OPENAI_MODEL=deepseek-v4-flash`) |
+| `WIKI_LLM_BACKEND` | `claude` | Anthropic API (`ANTHROPIC_API_KEY`) |
+| `WIKI_LLM_BACKEND` | `ollama` | Ollama local (`OLLAMA_MODEL`) |
 
 ---
 
