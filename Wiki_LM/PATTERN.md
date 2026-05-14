@@ -89,3 +89,23 @@ L'idée est apparentée en esprit au Memex de Vannevar Bush (1945) — un réser
 ## Note
 
 Ce document est intentionnellement abstrait. Il décrit l'idée, pas une implémentation spécifique. La structure exacte des répertoires, les conventions du schéma, les formats de pages, l'outillage — tout cela dépendra de votre domaine, de vos préférences et de votre LLM. Tout ce qui est mentionné ci-dessus est optionnel et modulaire — prenez ce qui est utile, ignorez le reste. Par exemple : vos sources peuvent être uniquement textuelles, donc vous n'avez pas besoin de gestion des images. Votre wiki peut être suffisamment petit pour que le fichier index soit tout ce dont vous avez besoin, sans moteur de recherche. Vous ne vous intéressez peut-être pas aux diaporamas et voulez simplement des pages Markdown. Vous voudrez peut-être un ensemble de formats de sortie complètement différent. La bonne façon d'utiliser ce document est de le partager avec votre agent LLM et de travailler ensemble pour instancier une version adaptée à vos besoins. Ce document a pour seul rôle de communiquer le patron. Votre LLM peut déduire le reste.
+
+
+## Documentation comme source wiki
+
+Une application naturelle du patron LLM Wiki est d'ingérer la documentation
+technique du projet lui-même. Chaque fichier `docs/components/<composant>.md`
+devient une source brute ingérée dans le wiki :
+
+```bash
+cd ~/Secretarius/Wiki_LM && source .venv/bin/activate
+python tools/ingest.py ../docs/components/<composant>.md
+```
+
+Les avantages :
+- La doc est **trouvable** via `query.py` en langage naturel
+- Les liens entre composants sont **matérialisés** dans les pages wiki
+- C'est une démonstration concrète du patron : la documentation *est* le wiki
+
+Cette pratique transforme le dépôt en exemple vivant du patron Karpathy :
+le wiki se nourrit de lui-même.
