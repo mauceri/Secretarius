@@ -12,11 +12,19 @@ OPENCLAW_PATH="${OPENCLAW_PATH:-$HOME/.openclaw}"
 FORCE="${FORCE:-false}"
 
 TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
-GATEWAY_TOKEN="${GATEWAY_TOKEN:-}"
 GATEWAY_PASSWORD="${GATEWAY_PASSWORD:-}"
+OPENCLAW_GATEWAY_TOKEN="${OPENCLAW_GATEWAY_TOKEN:-}"
 
 info()  { echo "[INFO] $*"; }
 warn()  { echo "[WARN] $*"; }
+
+# Migration GATEWAY_TOKEN → OPENCLAW_GATEWAY_TOKEN
+if [[ -z "${OPENCLAW_GATEWAY_TOKEN:-}" && -n "${GATEWAY_TOKEN:-}" ]]; then
+  warn "GATEWAY_TOKEN est déprécié — utiliser OPENCLAW_GATEWAY_TOKEN dans gateway.systemd.env"
+  OPENCLAW_GATEWAY_TOKEN="$GATEWAY_TOKEN"
+else
+  OPENCLAW_GATEWAY_TOKEN="${OPENCLAW_GATEWAY_TOKEN:-}"
+fi
 
 mkdir -p "$OPENCLAW_PATH"
 
@@ -38,10 +46,13 @@ if [[ -f "$ENV_TARGET" && "$FORCE" != "true" ]]; then
   info "gateway.systemd.env existe déjà — ignoré"
 else
   if [[ -z "$TELEGRAM_BOT_TOKEN" ]]; then
-    warn "TELEGRAM_BOT_TOKEN non défini — gateway.systemd.env généré avec des valeurs vides"
+    warn "TELEGRAM_BOT_TOKEN non défini — à renseigner dans ${ENV_TARGET} avant de démarrer OpenClaw"
   fi
-  export TELEGRAM_BOT_TOKEN GATEWAY_TOKEN GATEWAY_PASSWORD
-  envsubst '${TELEGRAM_BOT_TOKEN} ${GATEWAY_TOKEN} ${GATEWAY_PASSWORD}' \
+  if [[ -z "$OPENCLAW_GATEWAY_TOKEN" ]]; then
+    warn "OPENCLAW_GATEWAY_TOKEN non défini — à renseigner dans ${ENV_TARGET} avant de démarrer OpenClaw"
+  fi
+  export TELEGRAM_BOT_TOKEN OPENCLAW_GATEWAY_TOKEN GATEWAY_PASSWORD
+  envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD}' \
     < "${SCRIPT_DIR}/gateway.systemd.env.template" \
     > "$ENV_TARGET"
   chmod 600 "$ENV_TARGET"
