@@ -66,17 +66,46 @@ export OBSIDIAN_PATH ASSISTANT_NAME LLM_BACKEND OPENCLAW_PATH FORCE
 
 # Étape 1 — Prérequis
 info "Vérification des prérequis..."
+WARNINGS=()
 
-python3 -c "import sys; assert sys.version_info >= (3,11), f'Python 3.11+ requis (trouvé {sys.version})'" \
-  && info "Python $(python3 --version | cut -d' ' -f2) ✓" \
-  || { error "Python 3.11+ requis"; exit 1; }
+# --- Bloquants ---
+if python3 -c "import sys; exit(0 if sys.version_info >= (3,11) else 1)" 2>/dev/null; then
+  info "Python $(python3 --version | cut -d' ' -f2) ✓"
+else
+  error "Python 3.11+ requis"
+  error "  Ubuntu/Debian : sudo apt install python3.11 python3.11-venv"
+  error "  macOS         : brew install python@3.11"
+  exit 1
+fi
 
-command -v git &>/dev/null && info "git ✓" || { error "git requis"; exit 1; }
-command -v envsubst &>/dev/null && info "envsubst ✓" \
-  || { error "envsubst requis (apt install gettext / brew install gettext)"; exit 1; }
-command -v openclaw &>/dev/null \
-  && info "openclaw $(openclaw --version 2>/dev/null || echo '?') ✓" \
-  || warn "openclaw non trouvé — config générée mais service inactif"
+if command -v git &>/dev/null; then
+  info "git ✓"
+else
+  error "git requis"
+  error "  Ubuntu/Debian : sudo apt install git"
+  error "  macOS         : brew install git"
+  exit 1
+fi
+
+if command -v envsubst &>/dev/null; then
+  info "envsubst ✓"
+else
+  error "envsubst requis (paquet gettext)"
+  error "  Ubuntu/Debian : sudo apt install gettext"
+  error "  macOS         : brew install gettext && brew link gettext --force"
+  exit 1
+fi
+
+# --- Non-bloquants ---
+if command -v openclaw &>/dev/null; then
+  info "openclaw $(openclaw --version 2>/dev/null | head -1 || echo '?') ✓"
+else
+  WARNINGS+=("openclaw non trouvé — le service restera inactif\n    Installer : npm install -g openclaw")
+fi
+
+if ! systemctl --user status &>/dev/null 2>&1; then
+  WARNINGS+=("systemd user non disponible (WSL ou macOS ?) — démarrer openclaw manuellement\n    openclaw start")
+fi
 
 # Étape 2 — Coffre Obsidian
 info "Validation du coffre Obsidian: ${OBSIDIAN_PATH}"
