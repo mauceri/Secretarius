@@ -157,15 +157,29 @@ if command -v pip3 &>/dev/null; then
   elif pip3 install -r "${WIKI_LM_PATH}/requirements.txt" --quiet --break-system-packages 2>/dev/null; then
     info "Dépendances Python ✓ (--break-system-packages)"
   else
-    warn "pip3 a échoué — installez dans un venv : python -m venv .venv && .venv/bin/pip install -r Wiki_LM/requirements.txt"
+    WARNINGS+=("dépendances Python non installées\n    Installer dans un venv :\n    python3 -m venv ${WIKI_LM_PATH}/.venv && ${WIKI_LM_PATH}/.venv/bin/pip install -r ${WIKI_LM_PATH}/requirements.txt")
   fi
 else
-  warn "pip3 non trouvé — installez manuellement: pip install -r Wiki_LM/requirements.txt"
+  WARNINGS+=("pip3 non trouvé — dépendances Python non installées\n    Ubuntu/Debian : sudo apt install python3-pip\n    Puis : pip3 install -r ${WIKI_LM_PATH}/requirements.txt")
+fi
+
+# Vérification google-auth si Gmail configuré
+if [[ -n "${GMAIL_CLIENT_ID:-}" ]]; then
+  if ! python3 -c "import google.auth" 2>/dev/null; then
+    WARNINGS+=("google-auth non installé (requis pour Gmail OAuth2)\n    pip3 install google-auth google-api-python-client")
+  fi
 fi
 
 # Résumé
 echo ""
 info "=== Installation terminée ==="
+if [[ ${#WARNINGS[@]} -gt 0 ]]; then
+  echo ""
+  warn "Points d'attention :"
+  for w in "${WARNINGS[@]}"; do
+    echo -e "  - ${w}"
+  done
+fi
 echo ""
 echo "Prochaines étapes :"
 echo ""
