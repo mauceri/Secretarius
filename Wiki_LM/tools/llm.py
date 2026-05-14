@@ -128,7 +128,7 @@ class _OpenAIBackend:
             api_key=api_key,
             base_url=_env("OPENAI_BASE_URL", "http://localhost:11434/v1"),
         )
-        self.model = model or _env("OPENAI_MODEL", "qwen2.5:7b")
+        self.model = model or _env("OPENAI_MODEL", "deepseek-v4-flash")
 
     def complete(self, messages: list[dict], system: str = "", max_tokens: int = 2048) -> str:
         if system:
