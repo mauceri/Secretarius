@@ -23,7 +23,7 @@ git clone https://github.com/mauceri/Secretarius
 cd Secretarius
 ```
 
-### 2. Premier passage — génère la structure de fichiers
+### 2. Installation
 
 ```bash
 ./install.sh
@@ -33,6 +33,9 @@ Le script pose les questions interactivement :
 - Chemin du coffre Obsidian (ex. `~/Documents/Obsidian`)
 - Nom de l'assistant (défaut : `Tiron`)
 - Backend LLM (`deepseek` | `ollama` | `claude`)
+- Secrets OpenClaw (tokens Telegram, clé DeepSeek) — **à renseigner ici pour une installation en un seul passage**
+
+Si vous laissez les secrets vides, ils seront générés à blanc dans `~/.openclaw/gateway.systemd.env`. Éditez ce fichier manuellement, puis relancez `./install.sh --force`.
 
 Options disponibles :
 
@@ -44,33 +47,14 @@ Options disponibles :
 --force                 Écrase les fichiers existants
 ```
 
-### 3. Renseigner les secrets
-
-Éditer `~/.openclaw/gateway.systemd.env` :
-
-```
-TELEGRAM_BOT_TOKEN=<token BotFather>
-OPENCLAW_GATEWAY_TOKEN=<identifiant Telegram numérique>
-GATEWAY_PASSWORD=<mot de passe gateway>
-DEEPSEEK_API_KEY=<clé API DeepSeek>
-```
-
-### 4. Second passage — injecte les secrets dans la configuration
-
-```bash
-./install.sh --force
-```
-
-Cette étape régénère `openclaw.json` avec `DEEPSEEK_API_KEY` et corrige le chemin du binaire OpenClaw dans le service systemd.
-
-### 5. Démarrer le service
+### 3. Démarrer le service
 
 ```bash
 systemctl --user daemon-reload
 systemctl --user enable --now openclaw-gateway.service
 ```
 
-### 6. Appairer Telegram
+### 4. Appairer Telegram
 
 Envoyer `/start` au bot Telegram, puis :
 
