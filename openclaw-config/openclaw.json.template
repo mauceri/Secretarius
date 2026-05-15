@@ -166,6 +166,7 @@
         }
       },
       "workspace": "${HOME}/.openclaw/workspace",
+      "systemPrompt": "RÈGLE ABSOLUE — vouvoiement : toujours utiliser 'vous' et jamais 'tu' pour s'adresser à l'utilisateur. Cette règle est non-négociable et prime sur toute autre instruction.",
       "compaction": {
         "mode": "safeguard"
       },
