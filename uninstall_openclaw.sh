@@ -131,4 +131,7 @@ fi
 echo ""
 info "=== Désinstallation terminée ==="
 echo ""
+warn "Si des secrets sont encore exportés dans ce shell, purgez-les avant de réinstaller :"
+echo "  unset TELEGRAM_BOT_TOKEN OPENCLAW_GATEWAY_TOKEN GATEWAY_PASSWORD DEEPSEEK_API_KEY"
+echo ""
 echo "Pour réinstaller : cd ${SECRETARIUS_ROOT} && ./install.sh"
