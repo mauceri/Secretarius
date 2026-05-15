@@ -20,8 +20,10 @@ DEEPSEEK_API_KEY="${DEEPSEEK_API_KEY:-}"
 EXISTING_ENV="${OPENCLAW_PATH}/gateway.systemd.env"
 if [[ -f "$EXISTING_ENV" ]]; then
   while IFS='=' read -r key val; do
-    [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
-    # N'écraser que si la variable est vide dans l'environnement courant
+    key="${key#"${key%%[! ]*}"}"   # strip leading spaces
+    key="${key%"${key##*[! ]}"}"   # strip trailing spaces
+    key="${key%$'\r'}"             # strip CR (CRLF)
+    [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
     [[ -z "${!key:-}" ]] && declare "$key=$val"
   done < <(grep -v '^#' "$EXISTING_ENV")
 fi
