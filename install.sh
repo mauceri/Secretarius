@@ -183,6 +183,17 @@ fi
 echo ""
 echo "Prochaines étapes :"
 echo ""
+
+# Si openclaw absent, indiquer d'abord de l'installer
+if ! command -v openclaw &>/dev/null; then
+  echo "  0. Installer Node.js 22+ et OpenClaw :"
+  echo "       curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash"
+  echo "       source ~/.bashrc"
+  echo "       nvm install 22 && nvm use 22"
+  echo "       npm install -g openclaw"
+  echo ""
+fi
+
 echo "  1. Renseigner les secrets dans ${OPENCLAW_PATH}/gateway.systemd.env :"
 echo ""
 echo "       TELEGRAM_BOT_TOKEN=<token BotFather de ce serveur>"
@@ -192,15 +203,20 @@ echo "       DEEPSEEK_API_KEY=<clé API DeepSeek>"
 echo ""
 echo "       nano ${OPENCLAW_PATH}/gateway.systemd.env"
 echo ""
-echo "  2. Activer le service OpenClaw :"
+echo "  2. Relancer l'installation pour injecter les secrets dans la config :"
+echo "       cd ${SECRETARIUS_ROOT} && ./install.sh --force"
+echo ""
+echo "  3. Activer le service OpenClaw :"
 echo "       systemctl --user daemon-reload"
 echo "       systemctl --user enable --now openclaw-gateway.service"
 echo ""
-echo "  3. Appairer Telegram (envoyer /start au bot, puis) :"
+echo "  4. Appairer Telegram (envoyer /start au bot, puis) :"
 echo "       openclaw pairing approve telegram <CODE>"
 echo ""
-echo "  4. Tester Wiki_LM :"
+echo "  5. Tester Wiki_LM :"
 echo "       cd ${WIKI_LM_PATH} && python -m pytest tests/"
 echo ""
-echo "  IMPORTANT : ne lancer aucune commande openclaw avant l'étape 1,"
-echo "  sinon les fichiers de configuration seront écrasés par les défauts."
+if command -v openclaw &>/dev/null; then
+  echo "  IMPORTANT : ne lancer aucune commande openclaw avant l'étape 2 (--force),"
+  echo "  sinon les fichiers de configuration seront écrasés par les défauts."
+fi
