@@ -33,9 +33,8 @@ Le script pose les questions interactivement :
 - Chemin du coffre Obsidian (ex. `~/Documents/Obsidian`)
 - Nom de l'assistant (défaut : `Tiron`)
 - Backend LLM (`deepseek` | `ollama` | `claude`)
-- Secrets OpenClaw (tokens Telegram, clé DeepSeek) — **à renseigner ici pour une installation en un seul passage**
 
-Si vous laissez les secrets vides, ils seront générés à blanc dans `~/.openclaw/gateway.systemd.env`. Éditez ce fichier manuellement, puis relancez `./install.sh --force`.
+Puis éditer `~/.openclaw/gateway.systemd.env` pour renseigner `TELEGRAM_BOT_TOKEN` et `DEEPSEEK_API_KEY` (`OPENCLAW_GATEWAY_TOKEN` est généré automatiquement). Les secrets sont lus par OpenClaw au démarrage du service — pas besoin de relancer l'installation.
 
 Options disponibles :
 
