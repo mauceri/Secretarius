@@ -59,8 +59,8 @@ TARGET="${OPENCLAW_PATH}/openclaw.json"
 if [[ -f "$TARGET" && "$FORCE" != "true" ]]; then
   info "openclaw.json existe déjà — ignoré (utilisez --force pour écraser)"
 else
-  export HOME HOSTNAME OBSIDIAN_PATH ASSISTANT_NAME LLM_BACKEND DEEPSEEK_API_KEY
-  envsubst '${HOME} ${HOSTNAME} ${OBSIDIAN_PATH} ${ASSISTANT_NAME} ${LLM_BACKEND} ${DEEPSEEK_API_KEY}' \
+  export HOME HOSTNAME OBSIDIAN_PATH ASSISTANT_NAME LLM_BACKEND DEEPSEEK_API_KEY OPENCLAW_GATEWAY_TOKEN
+  envsubst '${HOME} ${HOSTNAME} ${OBSIDIAN_PATH} ${ASSISTANT_NAME} ${LLM_BACKEND} ${DEEPSEEK_API_KEY} ${OPENCLAW_GATEWAY_TOKEN}' \
     < "${SCRIPT_DIR}/openclaw.json.template" \
     > "$TARGET"
   info "openclaw.json généré dans ${OPENCLAW_PATH}"
@@ -71,20 +71,17 @@ ENV_TARGET="${OPENCLAW_PATH}/gateway.systemd.env"
 if [[ -f "$ENV_TARGET" && "$FORCE" != "true" ]]; then
   info "gateway.systemd.env existe déjà — ignoré"
 elif [[ "$FORCE" != "true" ]]; then
-  # Premier passage : valeurs vides — l'environnement shell est ignoré pour les secrets
-  TELEGRAM_BOT_TOKEN="" OPENCLAW_GATEWAY_TOKEN="" GATEWAY_PASSWORD="" \
+  # Premier passage : TELEGRAM_BOT_TOKEN vide (à renseigner), OPENCLAW_GATEWAY_TOKEN auto-généré
+  TELEGRAM_BOT_TOKEN="" GATEWAY_PASSWORD="" \
     envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD}' \
     < "${SCRIPT_DIR}/gateway.systemd.env.template" \
     > "$ENV_TARGET"
   chmod 600 "$ENV_TARGET"
-  info "gateway.systemd.env généré (600) — renseigner les secrets, puis relancer avec --force"
+  info "gateway.systemd.env généré (600) — renseigner TELEGRAM_BOT_TOKEN et DEEPSEEK_API_KEY, puis relancer avec --force"
 else
   # Passage --force : injecter les secrets (depuis le fichier existant ou --env-file)
   if [[ -z "$TELEGRAM_BOT_TOKEN" ]]; then
     warn "TELEGRAM_BOT_TOKEN non défini — à renseigner dans ${ENV_TARGET}"
-  fi
-  if [[ -z "$OPENCLAW_GATEWAY_TOKEN" ]]; then
-    warn "OPENCLAW_GATEWAY_TOKEN non défini — à renseigner dans ${ENV_TARGET}"
   fi
   export TELEGRAM_BOT_TOKEN OPENCLAW_GATEWAY_TOKEN GATEWAY_PASSWORD
   envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD}' \
