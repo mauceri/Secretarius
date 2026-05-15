@@ -66,19 +66,28 @@ fi
 ENV_TARGET="${OPENCLAW_PATH}/gateway.systemd.env"
 if [[ -f "$ENV_TARGET" && "$FORCE" != "true" ]]; then
   info "gateway.systemd.env existe déjà — ignoré"
+elif [[ "$FORCE" != "true" ]]; then
+  # Premier passage : valeurs vides — l'environnement shell est ignoré pour les secrets
+  TELEGRAM_BOT_TOKEN="" OPENCLAW_GATEWAY_TOKEN="" GATEWAY_PASSWORD="" \
+    envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD}' \
+    < "${SCRIPT_DIR}/gateway.systemd.env.template" \
+    > "$ENV_TARGET"
+  chmod 600 "$ENV_TARGET"
+  info "gateway.systemd.env généré (600) — renseigner les secrets, puis relancer avec --force"
 else
+  # Passage --force : injecter les secrets (depuis le fichier existant ou --env-file)
   if [[ -z "$TELEGRAM_BOT_TOKEN" ]]; then
-    warn "TELEGRAM_BOT_TOKEN non défini — à renseigner dans ${ENV_TARGET} avant de démarrer OpenClaw"
+    warn "TELEGRAM_BOT_TOKEN non défini — à renseigner dans ${ENV_TARGET}"
   fi
   if [[ -z "$OPENCLAW_GATEWAY_TOKEN" ]]; then
-    warn "OPENCLAW_GATEWAY_TOKEN non défini — à renseigner dans ${ENV_TARGET} avant de démarrer OpenClaw"
+    warn "OPENCLAW_GATEWAY_TOKEN non défini — à renseigner dans ${ENV_TARGET}"
   fi
   export TELEGRAM_BOT_TOKEN OPENCLAW_GATEWAY_TOKEN GATEWAY_PASSWORD
   envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD}' \
     < "${SCRIPT_DIR}/gateway.systemd.env.template" \
     > "$ENV_TARGET"
   chmod 600 "$ENV_TARGET"
-  info "gateway.systemd.env généré (600)"
+  info "gateway.systemd.env mis à jour (600)"
 fi
 
 # Service systemd user
