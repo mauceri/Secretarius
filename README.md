@@ -7,35 +7,46 @@ Knowledge base personnelle locale basée sur le patron *LLM Wiki* (Andrej Karpat
 ## Prérequis
 
 - Python 3.11+
-- [OpenClaw](https://openclaw.dev) installé (`npm install -g openclaw`)
+- Node.js 22+ et npm (`nvm install 22` recommandé)
+- [OpenClaw](https://openclaw.dev) : `npm install -g openclaw`
 - `envsubst` (`apt install gettext` / `brew install gettext`)
 - Git
 
 ## Installation
 
-### 1. Cloner et configurer
+> **Important** : ne jamais lancer `openclaw` manuellement avant la fin de l'installation — OpenClaw initialiserait le workspace avec ses fichiers par défaut (en anglais) et écraserait la configuration française.
+
+### 1. Cloner
 
 ```bash
 git clone https://github.com/mauceri/Secretarius
 cd Secretarius
+```
+
+### 2. Premier passage — génère la structure de fichiers
+
+```bash
 ./install.sh
 ```
 
-Le script pose les questions interactivement (coffre Obsidian, nom de l'assistant, backend LLM).
+Le script pose les questions interactivement :
+- Chemin du coffre Obsidian (ex. `~/Documents/Obsidian`)
+- Nom de l'assistant (défaut : `Tiron`)
+- Backend LLM (`deepseek` | `ollama` | `claude`)
 
 Options disponibles :
 
 ```
---obsidian-path PATH    Chemin du coffre Obsidian (défaut: ~/Documents/Obsidian)
---assistant-name NAME   Nom de l'assistant OpenClaw (défaut: Tiron)
+--obsidian-path PATH    Chemin du coffre Obsidian
+--assistant-name NAME   Nom de l'assistant
 --llm BACKEND           deepseek | ollama | claude (défaut: deepseek)
 --env-file FILE         Fichier de secrets (clés API, tokens)
 --force                 Écrase les fichiers existants
 ```
 
-### 2. Renseigner les secrets
+### 3. Renseigner les secrets
 
-**Avant de lancer OpenClaw**, éditer `~/.openclaw/gateway.systemd.env` :
+Éditer `~/.openclaw/gateway.systemd.env` :
 
 ```
 TELEGRAM_BOT_TOKEN=<token BotFather>
@@ -44,28 +55,28 @@ GATEWAY_PASSWORD=<mot de passe gateway>
 DEEPSEEK_API_KEY=<clé API DeepSeek>
 ```
 
-Puis régénérer `openclaw.json` avec la clé DeepSeek :
+### 4. Second passage — injecte les secrets dans la configuration
 
 ```bash
-cd ~/Secretarius && ./install.sh --force
+./install.sh --force
 ```
 
-### 3. Démarrer le service
+Cette étape régénère `openclaw.json` avec `DEEPSEEK_API_KEY` et corrige le chemin du binaire OpenClaw dans le service systemd.
+
+### 5. Démarrer le service
 
 ```bash
 systemctl --user daemon-reload
 systemctl --user enable --now openclaw-gateway.service
 ```
 
-### 4. Appairer Telegram
+### 6. Appairer Telegram
 
 Envoyer `/start` au bot Telegram, puis :
 
 ```bash
 openclaw pairing approve telegram <CODE>
 ```
-
-> **Important** : ne jamais lancer `openclaw` avant l'étape 2 — OpenClaw initialiserait le workspace avec ses fichiers par défaut (en anglais) et écraserait la configuration. En cas d'accident : `./install.sh --force`.
 
 ## Composants
 
