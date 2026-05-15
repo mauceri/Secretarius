@@ -62,6 +62,7 @@ echo "Éléments qui seront supprimés :"
 echo "  - Service systemd  : ~/.config/systemd/user/openclaw-gateway.service"
 echo "  - Config OpenClaw  : ${OPENCLAW_PATH}"
 echo "  - Wiki_LM/.env     : ${SECRETARIUS_ROOT}/Wiki_LM/.env"
+echo "  - Paquet npm       : openclaw (npm uninstall -g)"
 if [[ "$REMOVE_NVM" == true ]]; then
   echo "  - NVM + Node.js    : ~/.nvm"
 fi
@@ -97,7 +98,17 @@ else
   info "Répertoire absent : ${OPENCLAW_PATH} — ignoré"
 fi
 
-# 3 — Supprimer Wiki_LM/.env
+# 3 — Désinstaller le paquet openclaw
+if command -v openclaw &>/dev/null; then
+  info "Désinstallation du paquet openclaw..."
+  npm uninstall -g openclaw 2>/dev/null \
+    || npm uninstall -g openclaw --prefix "$(npm prefix -g 2>/dev/null)" 2>/dev/null \
+    || warn "Impossible de désinstaller openclaw via npm — supprimez-le manuellement"
+else
+  info "Paquet openclaw absent — ignoré"
+fi
+
+# 4 — Supprimer Wiki_LM/.env
 WIKI_ENV="${SECRETARIUS_ROOT}/Wiki_LM/.env"
 if [[ -f "$WIKI_ENV" ]]; then
   rm -f "$WIKI_ENV"
@@ -106,7 +117,7 @@ else
   info "Absent : ${WIKI_ENV} — ignoré"
 fi
 
-# 4 — NVM (optionnel)
+# 5 — NVM (optionnel)
 if [[ "$REMOVE_NVM" == true ]]; then
   if [[ -d "$HOME/.nvm" ]]; then
     rm -rf "$HOME/.nvm"
