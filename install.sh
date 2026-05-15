@@ -100,7 +100,7 @@ fi
 if command -v openclaw &>/dev/null; then
   info "openclaw $(openclaw --version 2>/dev/null | head -1 || echo '?') ✓"
 else
-  WARNINGS+=("openclaw non trouvé — le service restera inactif\n    Installer : npm install -g openclaw")
+  WARNINGS+=("openclaw non trouvé — le service restera inactif\n    Utiliser NVM (npm système requiert root) :\n      curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash\n      source ~/.bashrc && nvm install 22 && npm install -g openclaw")
 fi
 
 if ! systemctl --user status &>/dev/null 2>&1; then
