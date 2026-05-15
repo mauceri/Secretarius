@@ -53,14 +53,6 @@ if [[ "$INTERACTIVE" == true ]]; then
   read -rp "Nom de l'assistant [${ASSISTANT_NAME}]: " v; ASSISTANT_NAME="${v:-$ASSISTANT_NAME}"
   read -rp "LLM (deepseek|ollama|claude) [${LLM_BACKEND}]: " v; LLM_BACKEND="${v:-$LLM_BACKEND}"
   read -rp "Config OpenClaw [${OPENCLAW_PATH}]: " v; OPENCLAW_PATH="${v:-$OPENCLAW_PATH}"
-  echo ""
-  echo "Secrets OpenClaw (laisser vide pour renseigner manuellement après) :"
-  read -rsp "  TELEGRAM_BOT_TOKEN : " v; echo; TELEGRAM_BOT_TOKEN="${v:-}"
-  read -rsp "  OPENCLAW_GATEWAY_TOKEN : " v; echo; OPENCLAW_GATEWAY_TOKEN="${v:-}"
-  read -rsp "  GATEWAY_PASSWORD : " v; echo; GATEWAY_PASSWORD="${v:-}"
-  read -rsp "  DEEPSEEK_API_KEY : " v; echo; DEEPSEEK_API_KEY="${v:-}"
-  export TELEGRAM_BOT_TOKEN OPENCLAW_GATEWAY_TOKEN GATEWAY_PASSWORD DEEPSEEK_API_KEY
-  [[ -n "$TELEGRAM_BOT_TOKEN$OPENCLAW_GATEWAY_TOKEN$DEEPSEEK_API_KEY$GATEWAY_PASSWORD" ]] && FORCE=true
 fi
 
 # Charger les secrets
