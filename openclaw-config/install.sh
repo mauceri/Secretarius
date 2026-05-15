@@ -44,8 +44,12 @@ export OPENCLAW_BIN
 if [[ -z "${OPENCLAW_GATEWAY_TOKEN:-}" && -n "${GATEWAY_TOKEN:-}" ]]; then
   warn "GATEWAY_TOKEN est déprécié — utiliser OPENCLAW_GATEWAY_TOKEN dans gateway.systemd.env"
   OPENCLAW_GATEWAY_TOKEN="$GATEWAY_TOKEN"
-else
-  OPENCLAW_GATEWAY_TOKEN="${OPENCLAW_GATEWAY_TOKEN:-}"
+fi
+
+# Générer OPENCLAW_GATEWAY_TOKEN si absent (token HTTP du gateway, pas lié à Telegram)
+if [[ -z "${OPENCLAW_GATEWAY_TOKEN:-}" ]]; then
+  OPENCLAW_GATEWAY_TOKEN="$(openssl rand -hex 32)"
+  info "OPENCLAW_GATEWAY_TOKEN généré automatiquement"
 fi
 
 mkdir -p "$OPENCLAW_PATH"
