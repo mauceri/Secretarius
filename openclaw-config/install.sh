@@ -14,9 +14,29 @@ FORCE="${FORCE:-false}"
 TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 GATEWAY_PASSWORD="${GATEWAY_PASSWORD:-}"
 OPENCLAW_GATEWAY_TOKEN="${OPENCLAW_GATEWAY_TOKEN:-}"
+DEEPSEEK_API_KEY="${DEEPSEEK_API_KEY:-}"
+
+# Si gateway.systemd.env existe déjà (réinstallation), lire les secrets
+EXISTING_ENV="${OPENCLAW_PATH}/gateway.systemd.env"
+if [[ -f "$EXISTING_ENV" ]]; then
+  while IFS='=' read -r key val; do
+    [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
+    # N'écraser que si la variable est vide dans l'environnement courant
+    [[ -z "${!key:-}" ]] && declare "$key=$val"
+  done < <(grep -v '^#' "$EXISTING_ENV")
+fi
 
 info()  { echo "[INFO] $*"; }
 warn()  { echo "[WARN] $*"; }
+
+# Détecter le binaire openclaw (NVM, npm global, ou chemin par défaut)
+OPENCLAW_BIN=$(command -v openclaw 2>/dev/null || true)
+if [[ -z "$OPENCLAW_BIN" ]]; then
+  NPM_PREFIX=$(npm prefix -g 2>/dev/null || true)
+  [[ -n "$NPM_PREFIX" ]] && OPENCLAW_BIN="${NPM_PREFIX}/bin/openclaw"
+fi
+OPENCLAW_BIN="${OPENCLAW_BIN:-/usr/bin/openclaw}"
+export OPENCLAW_BIN
 
 # Migration GATEWAY_TOKEN → OPENCLAW_GATEWAY_TOKEN
 if [[ -z "${OPENCLAW_GATEWAY_TOKEN:-}" && -n "${GATEWAY_TOKEN:-}" ]]; then
@@ -33,8 +53,8 @@ TARGET="${OPENCLAW_PATH}/openclaw.json"
 if [[ -f "$TARGET" && "$FORCE" != "true" ]]; then
   info "openclaw.json existe déjà — ignoré (utilisez --force pour écraser)"
 else
-  export HOME HOSTNAME OBSIDIAN_PATH ASSISTANT_NAME LLM_BACKEND
-  envsubst '${HOME} ${HOSTNAME} ${OBSIDIAN_PATH} ${ASSISTANT_NAME} ${LLM_BACKEND}' \
+  export HOME HOSTNAME OBSIDIAN_PATH ASSISTANT_NAME LLM_BACKEND DEEPSEEK_API_KEY
+  envsubst '${HOME} ${HOSTNAME} ${OBSIDIAN_PATH} ${ASSISTANT_NAME} ${LLM_BACKEND} ${DEEPSEEK_API_KEY}' \
     < "${SCRIPT_DIR}/openclaw.json.template" \
     > "$TARGET"
   info "openclaw.json généré dans ${OPENCLAW_PATH}"
@@ -66,8 +86,10 @@ SERVICE_TARGET="${SYSTEMD_USER_DIR}/openclaw-gateway.service"
 if [[ -f "$SERVICE_TARGET" && "$FORCE" != "true" ]]; then
   info "openclaw-gateway.service existe déjà — ignoré"
 else
-  cp "${SCRIPT_DIR}/openclaw-gateway.service" "$SERVICE_TARGET"
-  info "Service systemd installé dans ${SYSTEMD_USER_DIR}"
+  envsubst '${OPENCLAW_BIN}' \
+    < "${SCRIPT_DIR}/openclaw-gateway.service" \
+    > "$SERVICE_TARGET"
+  info "Service systemd installé dans ${SYSTEMD_USER_DIR} (${OPENCLAW_BIN})"
 fi
 
 # Workspace .md et skills

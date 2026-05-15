@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 EnvironmentFile=%h/.openclaw/gateway.systemd.env
-ExecStart=/usr/bin/openclaw gateway
+ExecStart=${OPENCLAW_BIN} gateway run
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
