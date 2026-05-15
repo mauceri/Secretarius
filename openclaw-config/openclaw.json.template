@@ -1,4 +1,7 @@
 {
+  "env": {
+    "DEEPSEEK_API_KEY": "${DEEPSEEK_API_KEY}"
+  },
   "meta": {
     "lastTouchedVersion": "2026.4.24",
     "lastTouchedAt": "2026-04-25T21:02:52.410Z"

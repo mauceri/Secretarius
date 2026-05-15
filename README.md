@@ -39,10 +39,15 @@ Options disponibles :
 
 ```
 TELEGRAM_BOT_TOKEN=<token BotFather>
-GATEWAY_TOKEN=<identifiant Telegram numérique>
-OPENCLAW_GATEWAY_TOKEN=<même valeur que GATEWAY_TOKEN>
+OPENCLAW_GATEWAY_TOKEN=<identifiant Telegram numérique>
 GATEWAY_PASSWORD=<mot de passe gateway>
 DEEPSEEK_API_KEY=<clé API DeepSeek>
+```
+
+Puis régénérer `openclaw.json` avec la clé DeepSeek :
+
+```bash
+cd ~/Secretarius && ./install.sh --force
 ```
 
 ### 3. Démarrer le service
