@@ -211,10 +211,5 @@ echo ""
 echo "  3. Appairer Telegram (envoyer /start au bot, puis) :"
 echo "       openclaw pairing approve telegram <CODE>"
 echo ""
-echo "  5. Tester Wiki_LM :"
+echo "  4. Tester Wiki_LM :"
 echo "       cd ${WIKI_LM_PATH} && python -m pytest tests/"
-echo ""
-if command -v openclaw &>/dev/null; then
-  echo "  IMPORTANT : ne lancer aucune commande openclaw avant l'étape 2 (--force),"
-  echo "  sinon les fichiers de configuration seront écrasés par les défauts."
-fi

@@ -77,7 +77,7 @@ elif [[ "$FORCE" != "true" ]]; then
     < "${SCRIPT_DIR}/gateway.systemd.env.template" \
     > "$ENV_TARGET"
   chmod 600 "$ENV_TARGET"
-  info "gateway.systemd.env généré (600) — renseigner TELEGRAM_BOT_TOKEN et DEEPSEEK_API_KEY, puis relancer avec --force"
+  info "gateway.systemd.env généré (600) — renseigner TELEGRAM_BOT_TOKEN et DEEPSEEK_API_KEY avant de démarrer le service"
 else
   # Passage --force : injecter les secrets (depuis le fichier existant ou --env-file)
   if [[ -z "$TELEGRAM_BOT_TOKEN" ]]; then
