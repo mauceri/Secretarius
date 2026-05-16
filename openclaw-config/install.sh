@@ -156,3 +156,22 @@ while IFS= read -r -d '' src; do
     info "scout/${rel} installé"
   fi
 done < <(find "$SCOUT_WORKSPACE_SRC" -name "*.md" -print0)
+
+# Image Docker sandbox
+SANDBOX_IMAGE="openclaw-sandbox:bookworm-slim"
+SANDBOX_DOCKERFILE="${SCRIPT_DIR}/sandbox/Dockerfile"
+if docker ps &>/dev/null 2>&1; then
+  if docker image inspect "$SANDBOX_IMAGE" &>/dev/null 2>&1; then
+    info "Image Docker ${SANDBOX_IMAGE} déjà présente — ignorée"
+  else
+    info "Construction de l'image Docker ${SANDBOX_IMAGE}..."
+    if docker build -t "$SANDBOX_IMAGE" "$(dirname "$SANDBOX_DOCKERFILE")" 2>&1 | tail -1; then
+      info "Image ${SANDBOX_IMAGE} construite ✓"
+    else
+      warn "Échec de la construction de l'image Docker — relancer manuellement :"
+      warn "  docker build -t ${SANDBOX_IMAGE} ${SANDBOX_DOCKERFILE}"
+    fi
+  fi
+else
+  info "Docker inaccessible — image sandbox non construite (relancer install.sh après reconnexion)"
+fi
