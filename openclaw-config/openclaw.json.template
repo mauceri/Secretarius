@@ -174,7 +174,9 @@
         "maxConcurrent": 8
       },
       "sandbox": {
-        "mode": "off"
+        "mode": "all",
+        "workspaceAccess": "rw",
+        "scope": "session"
       }
     },
     "list": [
