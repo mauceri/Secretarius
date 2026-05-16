@@ -20,21 +20,28 @@ while true; do
     echo "[scout-watcher] Tâche détectée : ${task_id}"
 
     # Soumettre la tâche à l'agent scout via openclaw (mode embarqué)
-    if openclaw agent --agent scout --message "task_id: ${task_id}" --local \
-        --json 2>/dev/null \
-        | python3 -c "
+    RAW_OUTPUT="$(openclaw agent --agent scout --message "task_id: ${task_id}" --local --json 2>&1)" || {
+      echo "[scout-watcher] ERREUR openclaw agent pour ${task_id} :" >&2
+      echo "$RAW_OUTPUT" >&2
+      mv "$task_file" "${DONE}/${task_id}.json"
+      continue
+    }
+
+    echo "$RAW_OUTPUT" | python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
     reply = data.get('reply') or data.get('message') or ''
     sys.stdout.write(reply)
-except Exception:
-    pass
-" > "${RESULTS}/${task_id}.json"; then
-      echo "[scout-watcher] Résultat écrit : ${RESULTS}/${task_id}.json"
-    else
-      echo "[scout-watcher] ERREUR lors du traitement de ${task_id}" >&2
-    fi
+except Exception as e:
+    sys.stderr.write('parse error: ' + str(e) + '\n')
+    sys.exit(1)
+" > "${RESULTS}/${task_id}.json" || {
+      echo "[scout-watcher] ERREUR parsing JSON pour ${task_id}" >&2
+      echo "[scout-watcher] Sortie brute : ${RAW_OUTPUT}" >&2
+    }
+
+    echo "[scout-watcher] Résultat écrit : ${RESULTS}/${task_id}.json"
 
     # Déplacer la tâche vers done/ dans tous les cas
     mv "$task_file" "${DONE}/${task_id}.json"
