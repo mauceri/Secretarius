@@ -30,8 +30,11 @@ print(d.get('url_or_path', ''))
     if [[ -n "$URL" && "$URL" =~ ^https?:// ]]; then
       echo "[scout-watcher] Fetch : ${URL}"
       FETCHED_FILE="$(mktemp)"
-      if curl -sL --max-time 30 --user-agent 'Scout/1.0' "$URL" 2>/dev/null \
-          | head -c 20000 > "$FETCHED_FILE"; then
+      CURL_HTTP_CODE="$(curl -sL --max-time 30 --user-agent 'Scout/1.0' \
+          -w '%{http_code}' -o "$FETCHED_FILE" "$URL" 2>/dev/null || echo '000')"
+      FETCHED_SIZE="$(wc -c < "$FETCHED_FILE")"
+
+      if [[ "$CURL_HTTP_CODE" =~ ^[23] && "$FETCHED_SIZE" -gt 0 ]]; then
         python3 - "$task_file" "$FETCHED_FILE" <<'PYEOF'
 import sys, json
 task_file, content_file = sys.argv[1], sys.argv[2]
@@ -42,9 +45,25 @@ with open(content_file) as f:
 with open(task_file, 'w') as f:
     json.dump(data, f, ensure_ascii=False, indent=2)
 PYEOF
-        echo "[scout-watcher] Contenu injecté : $(wc -c < "$FETCHED_FILE") octets"
+        echo "[scout-watcher] Contenu injecté : ${FETCHED_SIZE} octets (HTTP ${CURL_HTTP_CODE})"
       else
-        echo "[scout-watcher] AVERTISSEMENT : curl échoué pour ${URL}" >&2
+        echo "[scout-watcher] ERREUR fetch : HTTP ${CURL_HTTP_CODE}, ${FETCHED_SIZE} octets — tâche abandonnée" >&2
+        python3 -c "
+import json, datetime, sys
+result = {
+    'source': sys.argv[1],
+    'retrieved_at': datetime.datetime.utcnow().isoformat() + 'Z',
+    'error': 'fetch_failed',
+    'http_code': sys.argv[2],
+    'summary': 'Impossible de récupérer le contenu (HTTP ' + sys.argv[2] + ').',
+    'raw_excerpt': '',
+    'warnings': []
+}
+print(json.dumps(result, ensure_ascii=False, indent=2))
+" "$URL" "$CURL_HTTP_CODE" > "${RESULTS}/${task_id}.json"
+        rm -f "$FETCHED_FILE"
+        mv "$task_file" "${DONE}/${task_id}.json"
+        continue
       fi
       rm -f "$FETCHED_FILE"
     fi
