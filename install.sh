@@ -221,12 +221,13 @@ echo "  2. Activer les services OpenClaw :"
 echo "       systemctl --user daemon-reload"
 echo "       systemctl --user enable --now openclaw-gateway.service"
 echo "       systemctl --user enable --now openclaw-scout.service"
+echo "       (openclaw gateway start ne démarre que le gateway, pas scout)"
 echo ""
 echo "  3. Appairer Telegram (envoyer /start au bot, puis) :"
 echo "       openclaw pairing approve telegram <CODE>"
 echo ""
 echo "  4. Tester Wiki_LM :"
-echo "       cd ${WIKI_LM_PATH} && python -m pytest tests/"
+echo "       cd ${WIKI_LM_PATH} && python3 -m pytest tests/"
 
 # Si docker inaccessible, rappeler la correction avant Milvus
 if [[ "$DOCKER_OK" != true ]]; then
@@ -235,5 +236,7 @@ if [[ "$DOCKER_OK" != true ]]; then
   if ! command -v docker &>/dev/null; then
     echo "       sudo apt install docker.io docker-compose-plugin"
   fi
-  echo "       sudo usermod -aG docker \$USER && newgrp docker"
+  echo "       sudo usermod -aG docker \$USER"
+  echo "       Puis fermer la session SSH et se reconnecter"
+  echo "       (le groupe docker n'est pris en compte qu'à la prochaine connexion)"
 fi
