@@ -106,6 +106,12 @@ if ! systemctl --user status &>/dev/null 2>&1; then
   WARNINGS+=("systemd user non disponible (WSL ou macOS ?) — démarrer openclaw manuellement\n    openclaw start")
 fi
 
+if command -v docker &>/dev/null; then
+  info "docker $(docker --version | cut -d' ' -f3 | tr -d ',') ✓"
+else
+  WARNINGS+=("docker non trouvé — requis pour Milvus\n    Ubuntu/Debian : sudo apt install docker.io docker-compose-plugin\n    Puis : sudo usermod -aG docker \$USER && newgrp docker")
+fi
+
 # Étape 2 — Coffre Obsidian
 info "Validation du coffre Obsidian: ${OBSIDIAN_PATH}"
 OBSIDIAN_PATH="${OBSIDIAN_PATH/#\~/$HOME}"
@@ -214,3 +220,11 @@ echo "       openclaw pairing approve telegram <CODE>"
 echo ""
 echo "  4. Tester Wiki_LM :"
 echo "       cd ${WIKI_LM_PATH} && python -m pytest tests/"
+
+# Si docker absent, rappeler l'installation avant Milvus
+if ! command -v docker &>/dev/null; then
+  echo ""
+  echo "  Nota : Docker est absent — requis avant de démarrer Milvus :"
+  echo "       sudo apt install docker.io docker-compose-plugin"
+  echo "       sudo usermod -aG docker \$USER && newgrp docker"
+fi
