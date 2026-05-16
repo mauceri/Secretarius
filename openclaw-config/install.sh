@@ -139,3 +139,20 @@ while IFS= read -r -d '' src; do
     info "${rel} installé"
   fi
 done < <(find "$WORKSPACE_SRC" -name "*.md" -print0)
+
+# Workspace scout (isolé dans agents/scout/workspace/)
+SCOUT_WORKSPACE_SRC="${SCRIPT_DIR}/agents/scout/workspace"
+SCOUT_WORKSPACE_DST="${OPENCLAW_PATH}/agents/scout/workspace"
+mkdir -p "${SCOUT_WORKSPACE_DST}/tasks/pending" "${SCOUT_WORKSPACE_DST}/results"
+
+while IFS= read -r -d '' src; do
+  rel="${src#${SCOUT_WORKSPACE_SRC}/}"
+  dst="${SCOUT_WORKSPACE_DST}/${rel}"
+  mkdir -p "$(dirname "$dst")"
+  if [[ -f "$dst" && "$FORCE" != "true" ]]; then
+    info "scout/${rel} existe déjà — ignoré"
+  else
+    envsubst "$SUBST_VARS" < "$src" > "$dst"
+    info "scout/${rel} installé"
+  fi
+done < <(find "$SCOUT_WORKSPACE_SRC" -name "*.md" -print0)
