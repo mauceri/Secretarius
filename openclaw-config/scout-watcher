@@ -20,7 +20,7 @@ while true; do
     echo "[scout-watcher] Tâche détectée : ${task_id}"
 
     # Soumettre la tâche à l'agent scout via openclaw (mode embarqué)
-    RAW_OUTPUT="$(openclaw agent --agent scout --message "task_id: ${task_id}" --local --json 2>&1)" || {
+    RAW_OUTPUT="$("${OPENCLAW_BIN:-openclaw}" agent --agent scout --message "task_id: ${task_id}" --local --json 2>&1)" || {
       echo "[scout-watcher] ERREUR openclaw agent pour ${task_id} :" >&2
       echo "$RAW_OUTPUT" >&2
       mv "$task_file" "${DONE}/${task_id}.json"
