@@ -59,7 +59,8 @@ echo ""
 echo "=== Désinstallation OpenClaw / Secretarius ==="
 echo ""
 echo "Éléments qui seront supprimés :"
-echo "  - Service systemd  : ~/.config/systemd/user/openclaw-gateway.service"
+echo "  - Services systemd : openclaw-gateway.service, openclaw-scout.service"
+echo "  - scout-watcher    : ~/.local/bin/scout-watcher"
 echo "  - Config OpenClaw  : ${OPENCLAW_PATH}"
 echo "  - Wiki_LM/.env     : ${SECRETARIUS_ROOT}/Wiki_LM/.env"
 echo "  - Paquet npm       : openclaw (npm uninstall -g)"
@@ -73,21 +74,34 @@ if [[ "$FORCE" != true ]]; then
   [[ "$c" =~ ^[Yy] ]] || { echo "Annulé."; exit 0; }
 fi
 
-# 1 — Arrêter et désactiver le service
-SERVICE_FILE="$HOME/.config/systemd/user/openclaw-gateway.service"
-if systemctl --user is-active openclaw-gateway.service &>/dev/null 2>&1; then
-  info "Arrêt du service openclaw-gateway..."
-  systemctl --user stop openclaw-gateway.service || warn "Impossible d'arrêter le service"
-fi
-if systemctl --user is-enabled openclaw-gateway.service &>/dev/null 2>&1; then
-  systemctl --user disable openclaw-gateway.service 2>/dev/null || true
-fi
-if [[ -f "$SERVICE_FILE" ]]; then
-  rm -f "$SERVICE_FILE"
-  systemctl --user daemon-reload 2>/dev/null || true
-  info "Service systemd supprimé"
+# 1 — Arrêter et désactiver les services
+SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
+
+for svc in openclaw-gateway openclaw-scout; do
+  if systemctl --user is-active "${svc}.service" &>/dev/null 2>&1; then
+    info "Arrêt de ${svc}..."
+    systemctl --user stop "${svc}.service" || warn "Impossible d'arrêter ${svc}"
+  fi
+  if systemctl --user is-enabled "${svc}.service" &>/dev/null 2>&1; then
+    systemctl --user disable "${svc}.service" 2>/dev/null || true
+  fi
+  SERVICE_FILE="${SYSTEMD_USER_DIR}/${svc}.service"
+  if [[ -f "$SERVICE_FILE" ]]; then
+    rm -f "$SERVICE_FILE"
+    info "Service ${svc}.service supprimé"
+  else
+    info "Service ${svc}.service absent — ignoré"
+  fi
+done
+systemctl --user daemon-reload 2>/dev/null || true
+
+# scout-watcher
+SCOUT_WATCHER="$HOME/.local/bin/scout-watcher"
+if [[ -f "$SCOUT_WATCHER" ]]; then
+  rm -f "$SCOUT_WATCHER"
+  info "scout-watcher supprimé"
 else
-  info "Service systemd absent — ignoré"
+  info "scout-watcher absent — ignoré"
 fi
 
 # 2 — Supprimer la configuration OpenClaw
