@@ -164,12 +164,13 @@ if docker ps &>/dev/null 2>&1; then
   if docker image inspect "$SANDBOX_IMAGE" &>/dev/null 2>&1; then
     info "Image Docker ${SANDBOX_IMAGE} déjà présente — ignorée"
   else
-    info "Construction de l'image Docker ${SANDBOX_IMAGE}..."
-    if docker build -t "$SANDBOX_IMAGE" "$(dirname "$SANDBOX_DOCKERFILE")" 2>&1 | tail -1; then
+    info "Construction de l'image Docker ${SANDBOX_IMAGE} (peut prendre 1-2 minutes)..."
+    SANDBOX_DIR="$(dirname "$SANDBOX_DOCKERFILE")"
+    if docker build -t "$SANDBOX_IMAGE" "$SANDBOX_DIR"; then
       info "Image ${SANDBOX_IMAGE} construite ✓"
     else
       warn "Échec de la construction de l'image Docker — relancer manuellement :"
-      warn "  docker build -t ${SANDBOX_IMAGE} ${SANDBOX_DOCKERFILE}"
+      warn "  docker build -t ${SANDBOX_IMAGE} ${SANDBOX_DIR}"
     fi
   fi
 else
