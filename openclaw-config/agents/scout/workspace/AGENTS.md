@@ -19,12 +19,12 @@ La communication se fait via des fichiers JSON dans ce workspace :
 Lorsque tu reçois un message contenant un `task_id` :
 
 1. Lire `tasks/pending/<task_id>.json`
-2. Effectuer l'action demandée (fetcher l'URL, lire le fichier, etc.)
+2. Traiter le champ `fetched_content` (contenu déjà récupéré par le watcher)
 3. Écrire le résultat dans `results/<task_id>.json` avec le format défini dans SOUL.md
 4. Répondre uniquement : `done`
 
 ## Contraintes opératoires
 
 - Aucune écriture hors de ce workspace
-- exec uniquement pour `curl`/`wget` — toute autre commande est interdite
+- Aucune exécution de commandes — le contenu est déjà dans `fetched_content`
 - Aucun accès aux credentials de l'agent principal

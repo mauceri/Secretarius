@@ -19,8 +19,38 @@ while true; do
     task_id="$(basename "$task_file" .json)"
     echo "[scout-watcher] Tâche détectée : ${task_id}"
 
+    # Pré-fetch de l'URL si la tâche en contient une
+    URL="$(python3 -c "
+import sys, json
+with open(sys.argv[1]) as f:
+    d = json.load(f)
+print(d.get('url_or_path', ''))
+" "$task_file" 2>/dev/null || echo '')"
+
+    if [[ -n "$URL" && "$URL" =~ ^https?:// ]]; then
+      echo "[scout-watcher] Fetch : ${URL}"
+      FETCHED_FILE="$(mktemp)"
+      if curl -sL --max-time 30 --user-agent 'Scout/1.0' "$URL" 2>/dev/null \
+          | head -c 20000 > "$FETCHED_FILE"; then
+        python3 - "$task_file" "$FETCHED_FILE" <<'PYEOF'
+import sys, json
+task_file, content_file = sys.argv[1], sys.argv[2]
+with open(task_file) as f:
+    data = json.load(f)
+with open(content_file) as f:
+    data['fetched_content'] = f.read()
+with open(task_file, 'w') as f:
+    json.dump(data, f, ensure_ascii=False, indent=2)
+PYEOF
+        echo "[scout-watcher] Contenu injecté : $(wc -c < "$FETCHED_FILE") octets"
+      else
+        echo "[scout-watcher] AVERTISSEMENT : curl échoué pour ${URL}" >&2
+      fi
+      rm -f "$FETCHED_FILE"
+    fi
+
     # Soumettre la tâche à l'agent scout via openclaw (mode embarqué)
-    # Scout écrit lui-même le résultat dans results/<task_id>.json via son tool write
+    # Scout lit tasks/pending/<task_id>.json et écrit results/<task_id>.json via write
     RAW_OUTPUT="$("${OPENCLAW_BIN:-openclaw}" agent --agent scout --message "task_id: ${task_id}" --local --json --timeout 120 2>&1)" || {
       echo "[scout-watcher] ERREUR openclaw agent pour ${task_id} :" >&2
       echo "$RAW_OUTPUT" >&2
