@@ -187,7 +187,6 @@
         "id": "scout",
         "name": "scout",
         "workspace": "${HOME}/.openclaw/agents/scout/workspace",
-        "agentDir": "${HOME}/.openclaw/agents/scout/agent",
         "model": "deepseek/deepseek-chat"
       }
     ]
