@@ -36,16 +36,28 @@ print(d.get('url_or_path', ''))
 
       if [[ "$CURL_HTTP_CODE" =~ ^[23] && "$FETCHED_SIZE" -gt 0 ]]; then
         python3 - "$task_file" "$FETCHED_FILE" <<'PYEOF'
-import sys, json
+import sys, json, re, html as html_mod
 task_file, content_file = sys.argv[1], sys.argv[2]
 with open(task_file) as f:
     data = json.load(f)
-with open(content_file) as f:
-    data['fetched_content'] = f.read()
+with open(content_file, errors='replace') as f:
+    raw = f.read()
+# Nettoyage HTML si la page en contient
+if '<' in raw and '>' in raw:
+    raw = re.sub(r'<script[^>]*>.*?</script>', ' ', raw, flags=re.DOTALL|re.IGNORECASE)
+    raw = re.sub(r'<style[^>]*>.*?</style>', ' ', raw, flags=re.DOTALL|re.IGNORECASE)
+    raw = re.sub(r'<[^>]+>', ' ', raw)
+    raw = html_mod.unescape(raw)
+    raw = re.sub(r'\s+', ' ', raw).strip()
+# Limite à 15000 caractères
+content = raw[:15000]
+data['fetched_content'] = content
 with open(task_file, 'w') as f:
     json.dump(data, f, ensure_ascii=False, indent=2)
+print(len(content))
 PYEOF
-        echo "[scout-watcher] Contenu injecté : ${FETCHED_SIZE} octets (HTTP ${CURL_HTTP_CODE})"
+        INJECTED="$?"
+        echo "[scout-watcher] Contenu injecté : HTTP ${CURL_HTTP_CODE}, brut ${FETCHED_SIZE} octets"
       else
         echo "[scout-watcher] ERREUR fetch : HTTP ${CURL_HTTP_CODE}, ${FETCHED_SIZE} octets — tâche abandonnée" >&2
         python3 -c "
