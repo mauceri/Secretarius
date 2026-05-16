@@ -21,7 +21,7 @@ while true; do
 
     # Soumettre la tâche à l'agent scout via openclaw (mode embarqué)
     # Scout écrit lui-même le résultat dans results/<task_id>.json via son tool write
-    RAW_OUTPUT="$("${OPENCLAW_BIN:-openclaw}" agent --agent scout --message "task_id: ${task_id}" --local --json 2>&1)" || {
+    RAW_OUTPUT="$("${OPENCLAW_BIN:-openclaw}" agent --agent scout --message "task_id: ${task_id}" --local --json --timeout 120 2>&1)" || {
       echo "[scout-watcher] ERREUR openclaw agent pour ${task_id} :" >&2
       echo "$RAW_OUTPUT" >&2
       mv "$task_file" "${DONE}/${task_id}.json"
