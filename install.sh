@@ -161,19 +161,18 @@ else
   info "Wiki_LM/.env : WIKI_PATH mis à jour (${WIKI_PATH})"
 fi
 
-# Étape 5 — Dépendances Python
+# Étape 5 — Dépendances Python (venv)
 info "Installation des dépendances Python..."
 WIKI_LM_PATH="${SECRETARIUS_ROOT}/Wiki_LM"
-if command -v pip3 &>/dev/null; then
-  if pip3 install -r "${WIKI_LM_PATH}/requirements.txt" --quiet 2>/dev/null; then
-    info "Dépendances Python ✓"
-  elif pip3 install -r "${WIKI_LM_PATH}/requirements.txt" --quiet --break-system-packages 2>/dev/null; then
-    info "Dépendances Python ✓ (--break-system-packages)"
+VENV_PATH="${WIKI_LM_PATH}/.venv"
+if python3 -m venv "$VENV_PATH" 2>/dev/null; then
+  if "${VENV_PATH}/bin/pip" install -r "${WIKI_LM_PATH}/requirements.txt" --quiet 2>/dev/null; then
+    info "Dépendances Python ✓ (venv: ${VENV_PATH})"
   else
-    WARNINGS+=("dépendances Python non installées\n    Installer dans un venv :\n    python3 -m venv ${WIKI_LM_PATH}/.venv && ${WIKI_LM_PATH}/.venv/bin/pip install -r ${WIKI_LM_PATH}/requirements.txt")
+    WARNINGS+=("dépendances Python non installées dans le venv\n    ${VENV_PATH}/bin/pip install -r ${WIKI_LM_PATH}/requirements.txt")
   fi
 else
-  WARNINGS+=("pip3 non trouvé — dépendances Python non installées\n    Ubuntu/Debian : sudo apt install python3-pip\n    Puis : pip3 install -r ${WIKI_LM_PATH}/requirements.txt")
+  WARNINGS+=("impossible de créer le venv Python\n    sudo apt install python3-venv\n    Puis relancer install.sh")
 fi
 
 # Vérification google-auth si Gmail configuré
@@ -227,7 +226,7 @@ echo "  3. Appairer Telegram (envoyer /start au bot, puis) :"
 echo "       openclaw pairing approve telegram <CODE>"
 echo ""
 echo "  4. Tester Wiki_LM :"
-echo "       cd ${WIKI_LM_PATH} && python3 -m pytest tests/"
+echo "       cd ${WIKI_LM_PATH} && .venv/bin/python -m pytest tests/"
 
 # Si docker inaccessible, rappeler la correction avant Milvus
 if [[ "$DOCKER_OK" != true ]]; then
