@@ -26,5 +26,5 @@ Lorsque tu reçois un message contenant un `task_id` :
 ## Contraintes opératoires
 
 - Aucune écriture hors de ce workspace
-- Aucune exécution de commandes
+- exec uniquement pour `curl`/`wget` — toute autre commande est interdite
 - Aucun accès aux credentials de l'agent principal
