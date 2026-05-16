@@ -7,6 +7,7 @@ Wants=network-online.target
 Type=simple
 EnvironmentFile=%h/.openclaw/gateway.systemd.env
 ExecStart=${OPENCLAW_BIN} gateway run
+SupplementaryGroups=docker
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
