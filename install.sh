@@ -106,8 +106,15 @@ if ! systemctl --user status &>/dev/null 2>&1; then
   WARNINGS+=("systemd user non disponible (WSL ou macOS ?) — démarrer openclaw manuellement\n    openclaw start")
 fi
 
+DOCKER_OK=false
 if command -v docker &>/dev/null; then
-  info "docker $(docker --version | cut -d' ' -f3 | tr -d ',') ✓"
+  if docker ps &>/dev/null 2>&1; then
+    info "docker $(docker --version | cut -d' ' -f3 | tr -d ',') ✓"
+    DOCKER_OK=true
+  else
+    info "docker $(docker --version | cut -d' ' -f3 | tr -d ',') — accès refusé au socket"
+    WARNINGS+=("utilisateur non dans le groupe docker — requis pour Milvus\n    sudo usermod -aG docker \$USER && newgrp docker")
+  fi
 else
   WARNINGS+=("docker non trouvé — requis pour Milvus\n    Ubuntu/Debian : sudo apt install docker.io docker-compose-plugin\n    Puis : sudo usermod -aG docker \$USER && newgrp docker")
 fi
@@ -221,10 +228,12 @@ echo ""
 echo "  4. Tester Wiki_LM :"
 echo "       cd ${WIKI_LM_PATH} && python -m pytest tests/"
 
-# Si docker absent, rappeler l'installation avant Milvus
-if ! command -v docker &>/dev/null; then
+# Si docker inaccessible, rappeler la correction avant Milvus
+if [[ "$DOCKER_OK" != true ]]; then
   echo ""
-  echo "  Nota : Docker est absent — requis avant de démarrer Milvus :"
-  echo "       sudo apt install docker.io docker-compose-plugin"
+  echo "  Nota : Docker inaccessible — requis avant de démarrer Milvus :"
+  if ! command -v docker &>/dev/null; then
+    echo "       sudo apt install docker.io docker-compose-plugin"
+  fi
   echo "       sudo usermod -aG docker \$USER && newgrp docker"
 fi
