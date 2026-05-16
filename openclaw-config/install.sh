@@ -104,6 +104,24 @@ else
   info "Service systemd installé dans ${SYSTEMD_USER_DIR} (${OPENCLAW_BIN})"
 fi
 
+# Service scout (watcher)
+SCOUT_SERVICE_TARGET="${SYSTEMD_USER_DIR}/openclaw-scout.service"
+SCOUT_WATCHER_TARGET="${HOME}/.local/bin/scout-watcher"
+mkdir -p "${HOME}/.local/bin"
+if [[ -f "$SCOUT_SERVICE_TARGET" && "$FORCE" != "true" ]]; then
+  info "openclaw-scout.service existe déjà — ignoré"
+else
+  cp "${SCRIPT_DIR}/openclaw-scout.service" "$SCOUT_SERVICE_TARGET"
+  info "openclaw-scout.service installé dans ${SYSTEMD_USER_DIR}"
+fi
+if [[ -f "$SCOUT_WATCHER_TARGET" && "$FORCE" != "true" ]]; then
+  info "scout-watcher existe déjà — ignoré"
+else
+  cp "${SCRIPT_DIR}/scout-watcher" "$SCOUT_WATCHER_TARGET"
+  chmod +x "$SCOUT_WATCHER_TARGET"
+  info "scout-watcher installé dans ${HOME}/.local/bin"
+fi
+
 # Workspace .md et skills
 WORKSPACE_SRC="${SCRIPT_DIR}/workspace"
 WORKSPACE_DST="${OPENCLAW_PATH}/workspace"
