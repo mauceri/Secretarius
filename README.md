@@ -46,20 +46,21 @@ Options disponibles :
 --force                 Écrase les fichiers existants
 ```
 
-### 3. Démarrer le service
+### 3. Appairer Telegram
+
+Si `TELEGRAM_BOT_TOKEN` est déjà renseigné dans `gateway.systemd.env`, les services démarrent automatiquement à l'étape 2. Sinon, éditer le fichier puis démarrer :
 
 ```bash
-systemctl --user daemon-reload
-systemctl --user enable --now openclaw-gateway.service
+systemctl --user start openclaw-gateway.service openclaw-scout.service
 ```
-
-### 4. Appairer Telegram
 
 Envoyer `/start` au bot Telegram, puis :
 
 ```bash
 openclaw pairing approve telegram <CODE>
 ```
+
+(La connexion Telegram est brièvement interrompue lors du pairing, c'est normal.)
 
 ## Composants
 
