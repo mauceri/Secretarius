@@ -98,14 +98,16 @@ for svc in openclaw-gateway openclaw-scout; do
 done
 systemctl --user daemon-reload 2>/dev/null || true
 
-# scout-watcher
-SCOUT_WATCHER="$HOME/.local/bin/scout-watcher"
-if [[ -f "$SCOUT_WATCHER" ]]; then
-  rm -f "$SCOUT_WATCHER"
-  info "scout-watcher supprimé"
-else
-  info "scout-watcher absent — ignoré"
-fi
+# scout-watcher + scout-query
+for bin in scout-watcher scout-query; do
+  TARGET="$HOME/.local/bin/$bin"
+  if [[ -f "$TARGET" ]]; then
+    rm -f "$TARGET"
+    info "$bin supprimé"
+  else
+    info "$bin absent — ignoré"
+  fi
+done
 
 # 2 — Supprimer la configuration OpenClaw
 if [[ -d "$OPENCLAW_PATH" ]]; then
