@@ -259,7 +259,7 @@
   "channels": {
     "telegram": {
       "execApprovals": {
-        "enabled": true,
+        "enabled": false,
         "approvers": [
           "220537738"
         ]
