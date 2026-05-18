@@ -84,6 +84,11 @@ Pipeline complet de knowledge base personnelle.
 Agent conversationnel configuré pour opérer sur le wiki via les outils Wiki_LM.  
 La configuration est générée depuis `openclaw-config/openclaw.json.template` à l'installation.
 
+Deux agents sont configurés :
+
+- **main** (`Tiron`) — agent principal, accessible via Telegram.
+- **scout** — agent isolé, sans accès réseau direct. Utilisé par Tiron pour lire des sources externes (URL, pages web) à travers `sessions_spawn`. Le contenu est pré-fetché par `scout-watcher` (curl côté hôte) et transmis via des fichiers JSON dans `~/.openclaw/agents/scout/workspace/`. Scout n'exécute jamais de commandes réseau.
+
 ## Structure du dépôt
 
 ```
@@ -103,8 +108,12 @@ Secretarius/
 ├── openclaw-config/           # Templates de configuration OpenClaw
 │   ├── openclaw.json.template # Config complète (variables ${HOME}, ${HOSTNAME}…)
 │   ├── gateway.systemd.env.template # Secrets (tokens — non versionné)
-│   ├── openclaw-gateway.service     # Unité systemd user
-│   └── install.sh             # Génère ~/.openclaw/ via envsubst
+│   ├── openclaw-gateway.service     # Unité systemd user (agent principal)
+│   ├── openclaw-scout.service       # Unité systemd user (watcher scout)
+│   ├── scout-watcher          # Script bash : poll tasks/pending/, pré-fetch URL, signal scout
+│   ├── install.sh             # Génère ~/.openclaw/ via envsubst
+│   ├── workspace/             # Workspace de l'agent principal (SOUL.md, AGENTS.md, skills/)
+│   └── agents/scout/workspace/ # Workspace isolé de l'agent scout
 │
 └── docs/
     ├── architecture/          # Décisions d'architecture
