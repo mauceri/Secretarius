@@ -204,6 +204,9 @@
         "switch-model",
         "scout-query"
       ],
+      "safeBinTrustedDirs": [
+        "${HOME}/.local/bin"
+      ],
       "applyPatch": {
         "enabled": false
       },
