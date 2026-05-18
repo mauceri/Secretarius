@@ -82,11 +82,13 @@ if command -v openclaw &>/dev/null; then
   info "openclaw $(openclaw --version 2>/dev/null | head -1 || echo '?') ✓"
 else
   error "openclaw requis — installer Node.js 22+ via NVM puis openclaw :"
-  error "  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash"
-  error "  source ~/.bashrc"
-  error "  nvm install 22 && nvm use 22"
-  error "  npm install -g openclaw"
-  error "Puis relancer : ./install.sh"
+  echo ""
+  echo "    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash"
+  echo "    source ~/.bashrc"
+  echo "    nvm install 22 && nvm use 22"
+  echo "    npm install -g openclaw"
+  echo ""
+  echo "Puis relancer : ./install.sh"
   exit 1
 fi
 
