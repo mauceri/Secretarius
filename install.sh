@@ -182,6 +182,21 @@ if [[ -n "${GMAIL_CLIENT_ID:-}" ]]; then
   fi
 fi
 
+# Activer et démarrer les services OpenClaw si systemd est disponible
+SYSTEMD_OK=false
+if systemctl --user status &>/dev/null 2>&1 && command -v openclaw &>/dev/null; then
+  systemctl --user daemon-reload
+  systemctl --user enable openclaw-gateway.service openclaw-scout.service 2>/dev/null || true
+  SYSTEMD_OK=true
+  # Démarrer seulement si les secrets sont renseignés
+  if grep -q "^TELEGRAM_BOT_TOKEN=.\+" "${OPENCLAW_PATH}/gateway.systemd.env" 2>/dev/null; then
+    systemctl --user restart openclaw-gateway.service openclaw-scout.service
+    info "Services OpenClaw démarrés ✓"
+  else
+    info "Services OpenClaw activés (démarreront après renseignement des secrets)"
+  fi
+fi
+
 # Résumé
 echo ""
 info "=== Installation terminée ==="
@@ -206,26 +221,29 @@ if ! command -v openclaw &>/dev/null; then
   echo ""
 fi
 
-echo "  1. Renseigner les secrets dans ${OPENCLAW_PATH}/gateway.systemd.env :"
-echo ""
-echo "       TELEGRAM_BOT_TOKEN=<token BotFather>"
-echo "       DEEPSEEK_API_KEY=<clé API DeepSeek>"
-echo "       GATEWAY_PASSWORD=<mot de passe optionnel pour l'interface web>"
-echo ""
-echo "       (OPENCLAW_GATEWAY_TOKEN est généré automatiquement)"
-echo ""
-echo "       nano ${OPENCLAW_PATH}/gateway.systemd.env"
-echo ""
-echo "  2. Activer les services OpenClaw :"
-echo "       systemctl --user daemon-reload"
-echo "       systemctl --user enable --now openclaw-gateway.service"
-echo "       systemctl --user enable --now openclaw-scout.service"
-echo "       (openclaw gateway start ne démarre que le gateway, pas scout)"
-echo ""
-echo "  3. Appairer Telegram (envoyer /start au bot, puis) :"
+if ! grep -q "^TELEGRAM_BOT_TOKEN=.\+" "${OPENCLAW_PATH}/gateway.systemd.env" 2>/dev/null; then
+  echo "  1. Renseigner les secrets dans ${OPENCLAW_PATH}/gateway.systemd.env :"
+  echo ""
+  echo "       TELEGRAM_BOT_TOKEN=<token BotFather>"
+  echo "       DEEPSEEK_API_KEY=<clé API DeepSeek>"
+  echo "       GATEWAY_PASSWORD=<mot de passe optionnel pour l'interface web>"
+  echo ""
+  echo "       (OPENCLAW_GATEWAY_TOKEN est généré automatiquement)"
+  echo ""
+  echo "       nano ${OPENCLAW_PATH}/gateway.systemd.env"
+  echo ""
+  if [[ "$SYSTEMD_OK" == true ]]; then
+    echo "       Puis démarrer les services :"
+    echo "       systemctl --user start openclaw-gateway.service openclaw-scout.service"
+    echo ""
+  fi
+fi
+
+echo "  2. Appairer Telegram : envoyer /start au bot, puis :"
 echo "       openclaw pairing approve telegram <CODE>"
+echo "       (la connexion Telegram est brièvement interrompue, c'est normal)"
 echo ""
-echo "  4. Tester Wiki_LM :"
+echo "  3. Tester Wiki_LM :"
 echo "       cd ${WIKI_LM_PATH} && .venv/bin/python -m pytest tests/"
 
 # Si docker inaccessible, rappeler la correction avant Milvus
