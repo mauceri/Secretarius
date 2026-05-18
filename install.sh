@@ -99,7 +99,13 @@ fi
 if command -v openclaw &>/dev/null; then
   info "openclaw $(openclaw --version 2>/dev/null | head -1 || echo '?') ✓"
 else
-  WARNINGS+=("openclaw non trouvé — le service restera inactif\n    Utiliser NVM (npm système requiert root) :\n      curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash\n      source ~/.bashrc && nvm install 22 && npm install -g openclaw")
+  error "openclaw requis — installer Node.js 22+ via NVM puis openclaw :"
+  error "  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash"
+  error "  source ~/.bashrc"
+  error "  nvm install 22 && nvm use 22"
+  error "  npm install -g openclaw"
+  error "Puis relancer : ./install.sh"
+  exit 1
 fi
 
 if ! systemctl --user status &>/dev/null 2>&1; then
@@ -211,18 +217,6 @@ echo ""
 echo "Prochaines étapes :"
 echo ""
 
-# Si openclaw absent, indiquer d'abord de l'installer
-if ! command -v openclaw &>/dev/null; then
-  echo "  0. Installer Node.js 22+ et OpenClaw :"
-  echo "       curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash"
-  echo "       source ~/.bashrc"
-  echo "       nvm install 22 && nvm use 22"
-  echo "       npm install -g openclaw"
-  echo ""
-  echo "       Puis relancer install.sh pour activer les services :"
-  echo "       ./install.sh"
-  echo ""
-fi
 
 if ! grep -q "^TELEGRAM_BOT_TOKEN=.\+" "${OPENCLAW_PATH}/gateway.systemd.env" 2>/dev/null; then
   echo "  1. Renseigner les secrets dans ${OPENCLAW_PATH}/gateway.systemd.env :"
