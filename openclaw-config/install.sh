@@ -73,7 +73,7 @@ if [[ -f "$ENV_TARGET" && "$FORCE" != "true" ]]; then
 elif [[ "$FORCE" != "true" ]]; then
   # Premier passage : TELEGRAM_BOT_TOKEN vide (à renseigner), OPENCLAW_GATEWAY_TOKEN auto-généré
   TELEGRAM_BOT_TOKEN="" GATEWAY_PASSWORD="" \
-    envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD} ${OPENCLAW_BIN}' \
+    envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD} ${OPENCLAW_BIN} ${HOME}' \
     < "${SCRIPT_DIR}/gateway.systemd.env.template" \
     > "$ENV_TARGET"
   chmod 600 "$ENV_TARGET"
@@ -84,7 +84,7 @@ else
     warn "TELEGRAM_BOT_TOKEN non défini — à renseigner dans ${ENV_TARGET}"
   fi
   export TELEGRAM_BOT_TOKEN OPENCLAW_GATEWAY_TOKEN GATEWAY_PASSWORD OPENCLAW_BIN
-  envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD} ${OPENCLAW_BIN}' \
+  envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD} ${OPENCLAW_BIN} ${HOME}' \
     < "${SCRIPT_DIR}/gateway.systemd.env.template" \
     > "$ENV_TARGET"
   chmod 600 "$ENV_TARGET"
