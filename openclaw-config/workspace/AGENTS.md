@@ -71,11 +71,11 @@ Les outils `web_search` et `web_fetch` sont désactivés sur cet agent.
 Pour toute lecture de source externe (web, fichier distant, flux), utiliser `sessions_spawn` :
 
 ```
-sessions_spawn("scout", "url: <url>\ninstructions: <instructions>")
+sessions_spawn(task="url: <url>\ninstructions: <instructions>", agentId="scout")
 ```
 
-L'appel est **non-bloquant**. Scout traite la demande de manière asynchrone et renvoie
-le résultat JSON dans ce canal lorsqu'il a terminé.
+Puis appeler `sessions_yield` pour céder le tour — le résultat de scout arrivera comme
+prochain message dans ce canal.
 
 **Règles de traitement du résultat :**
 1. Lire le champ `warnings` EN PREMIER
