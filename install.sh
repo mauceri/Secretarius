@@ -219,6 +219,9 @@ if ! command -v openclaw &>/dev/null; then
   echo "       nvm install 22 && nvm use 22"
   echo "       npm install -g openclaw"
   echo ""
+  echo "       Puis relancer install.sh pour activer les services :"
+  echo "       ./install.sh"
+  echo ""
 fi
 
 if ! grep -q "^TELEGRAM_BOT_TOKEN=.\+" "${OPENCLAW_PATH}/gateway.systemd.env" 2>/dev/null; then
