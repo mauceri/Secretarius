@@ -201,7 +201,8 @@
         "cat",
         "ls",
         "find",
-        "switch-model"
+        "switch-model",
+        "scout-query"
       ],
       "applyPatch": {
         "enabled": false
@@ -211,7 +212,8 @@
         "find": {},
         "gog": {},
         "ls": {},
-        "switch-model": {}
+        "switch-model": {},
+        "scout-query": {}
       }
     },
     "sandbox": {
