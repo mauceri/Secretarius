@@ -23,6 +23,7 @@ error() { echo -e "${RED}[ERREUR]${NC} $*" >&2; }
 
 FORCE=false
 REMOVE_NVM=false
+REMOVE_OPENCLAW=false
 
 usage() {
   cat << 'EOF'
@@ -63,7 +64,6 @@ echo "  - Services systemd : openclaw-gateway.service, openclaw-scout.service"
 echo "  - scout-watcher    : ~/.local/bin/scout-watcher"
 echo "  - Config OpenClaw  : ${OPENCLAW_PATH}"
 echo "  - Wiki_LM/.env     : ${SECRETARIUS_ROOT}/Wiki_LM/.env"
-echo "  - Paquet npm       : openclaw (npm uninstall -g)"
 if [[ "$REMOVE_NVM" == true ]]; then
   echo "  - NVM + Node.js    : ~/.nvm"
 fi
@@ -72,6 +72,9 @@ echo ""
 if [[ "$FORCE" != true ]]; then
   read -rp "Continuer ? [y/N] " c
   [[ "$c" =~ ^[Yy] ]] || { echo "Annulé."; exit 0; }
+  echo ""
+  read -rp "Désinstaller aussi le paquet npm openclaw ? [y/N] " c
+  [[ "$c" =~ ^[Yy] ]] && REMOVE_OPENCLAW=true
 fi
 
 # 1 — Arrêter et désactiver les services
@@ -112,14 +115,18 @@ else
   info "Répertoire absent : ${OPENCLAW_PATH} — ignoré"
 fi
 
-# 3 — Désinstaller le paquet openclaw
-if command -v openclaw &>/dev/null; then
-  info "Désinstallation du paquet openclaw..."
-  npm uninstall -g openclaw 2>/dev/null \
-    || npm uninstall -g openclaw --prefix "$(npm prefix -g 2>/dev/null)" 2>/dev/null \
-    || warn "Impossible de désinstaller openclaw via npm — supprimez-le manuellement"
+# 3 — Désinstaller le paquet openclaw (optionnel)
+if [[ "$REMOVE_OPENCLAW" == true ]]; then
+  if command -v openclaw &>/dev/null; then
+    info "Désinstallation du paquet openclaw..."
+    npm uninstall -g openclaw 2>/dev/null \
+      || npm uninstall -g openclaw --prefix "$(npm prefix -g 2>/dev/null)" 2>/dev/null \
+      || warn "Impossible de désinstaller openclaw via npm — supprimez-le manuellement"
+  else
+    info "Paquet openclaw absent — ignoré"
+  fi
 else
-  info "Paquet openclaw absent — ignoré"
+  info "Paquet openclaw conservé"
 fi
 
 # 4 — Supprimer Wiki_LM/.env
