@@ -181,7 +181,10 @@
     },
     "list": [
       {
-        "id": "main"
+        "id": "main",
+        "subagents": {
+          "allowAgents": ["scout"]
+        }
       },
       {
         "id": "scout",
@@ -213,10 +216,6 @@
         "ls": {},
         "switch-model": {}
       }
-    },
-    "agentToAgent": {
-      "enabled": true,
-      "allow": ["main", "scout"]
     },
     "sandbox": {
       "tools": {
