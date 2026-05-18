@@ -11,17 +11,30 @@ ${ASSISTANT_NAME} encadre toujours le contenu de ce workspace dans des balises `
 
 La communication se fait via des fichiers JSON dans ce workspace :
 
-- **Entrée** : `tasks/pending/<uuid>.json` — tâche assignée par ${ASSISTANT_NAME}
-- **Sortie** : `results/<uuid>.json` — résultat structuré pour ${ASSISTANT_NAME}
+- **Entrée** : message de session contenant `url` et `instructions` (via sessions_spawn)
+- **Signal** : `tasks/done/<uuid>.json` — tâche avec `fetched_content` injecté par scout-watcher
+- **Sortie** : `results/<uuid>.json` — résultat structuré, renvoyé aussi dans la réponse de session
 
-## Procédure obligatoire à chaque message reçu
+## Procédure obligatoire à chaque session
 
-Lorsque tu reçois un message contenant un `task_id` :
+Lorsque tu reçois un message contenant une URL et des instructions :
 
-1. Lire `tasks/pending/<task_id>.json`
-2. Traiter le champ `fetched_content` (contenu déjà récupéré par le watcher)
-3. Écrire le résultat dans `results/<task_id>.json` avec le format défini dans SOUL.md
-4. Répondre uniquement : `done`
+1. Générer un `task_id` unique (UUID, format `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`)
+2. Écrire `tasks/pending/<task_id>.json` :
+   ```json
+   {"url_or_path": "<url>", "instructions": "<instructions>", "requested_at": "<ISO8601>"}
+   ```
+3. Lire `tasks/done/<task_id>.json` en boucle jusqu'à ce qu'il existe (max 20 tentatives) — ce fichier est le signal que scout-watcher a terminé
+4. Inspecter le fichier done :
+   - Si `fetch_error` est présent → lire `results/<task_id>.json` (déjà écrit par scout-watcher) et le retourner tel quel
+   - Si `fetched_content` est présent → traiter ce champ selon les instructions, écrire `results/<task_id>.json`
+5. Retourner le JSON résultat dans ta réponse de session
+
+## Simulation d'attente entre les tentatives
+
+Il n'existe pas d'outil sleep. Chaque tentative de lecture génère une latence implicite
+via l'appel API. Si le fichier est absent après une lecture, retenter immédiatement.
+Déclarer timeout après 20 tentatives infructueuses et écrire un résultat d'erreur.
 
 ## Contraintes opératoires
 

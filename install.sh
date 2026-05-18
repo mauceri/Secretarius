@@ -191,7 +191,7 @@ fi
 
 # Activer et démarrer les services OpenClaw si systemd est disponible
 SYSTEMD_OK=false
-if systemctl --user status &>/dev/null 2>&1 && command -v openclaw &>/dev/null; then
+if systemctl --user daemon-reload &>/dev/null 2>&1 && command -v openclaw &>/dev/null; then
   systemctl --user daemon-reload
   systemctl --user enable openclaw-gateway.service openclaw-scout.service 2>/dev/null || true
   SYSTEMD_OK=true
