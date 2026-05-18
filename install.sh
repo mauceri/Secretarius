@@ -46,24 +46,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Mode interactif
-if [[ "$INTERACTIVE" == true ]]; then
-  echo "=== Installation Secretarius ==="
-  read -rp "Coffre Obsidian [${OBSIDIAN_PATH}]: " v; OBSIDIAN_PATH="${v:-$OBSIDIAN_PATH}"
-  read -rp "Nom de l'assistant [${ASSISTANT_NAME}]: " v; ASSISTANT_NAME="${v:-$ASSISTANT_NAME}"
-  read -rp "LLM (deepseek|ollama|claude) [${LLM_BACKEND}]: " v; LLM_BACKEND="${v:-$LLM_BACKEND}"
-  read -rp "Config OpenClaw [${OPENCLAW_PATH}]: " v; OPENCLAW_PATH="${v:-$OPENCLAW_PATH}"
-fi
-
-# Charger les secrets
-if [[ -n "$ENV_FILE" ]]; then
-  [[ -f "$ENV_FILE" ]] || { error "Fichier introuvable: $ENV_FILE"; exit 1; }
-  source "$ENV_FILE"
-fi
-
-export OBSIDIAN_PATH ASSISTANT_NAME LLM_BACKEND OPENCLAW_PATH FORCE
-
-# Étape 1 — Prérequis
+# Étape 1 — Prérequis (avant toute question interactive)
 info "Vérification des prérequis..."
 WARNINGS=()
 
@@ -95,7 +78,6 @@ else
   exit 1
 fi
 
-# --- Non-bloquants ---
 if command -v openclaw &>/dev/null; then
   info "openclaw $(openclaw --version 2>/dev/null | head -1 || echo '?') ✓"
 else
@@ -107,6 +89,23 @@ else
   error "Puis relancer : ./install.sh"
   exit 1
 fi
+
+# Mode interactif
+if [[ "$INTERACTIVE" == true ]]; then
+  echo "=== Installation Secretarius ==="
+  read -rp "Coffre Obsidian [${OBSIDIAN_PATH}]: " v; OBSIDIAN_PATH="${v:-$OBSIDIAN_PATH}"
+  read -rp "Nom de l'assistant [${ASSISTANT_NAME}]: " v; ASSISTANT_NAME="${v:-$ASSISTANT_NAME}"
+  read -rp "LLM (deepseek|ollama|claude) [${LLM_BACKEND}]: " v; LLM_BACKEND="${v:-$LLM_BACKEND}"
+  read -rp "Config OpenClaw [${OPENCLAW_PATH}]: " v; OPENCLAW_PATH="${v:-$OPENCLAW_PATH}"
+fi
+
+# Charger les secrets
+if [[ -n "$ENV_FILE" ]]; then
+  [[ -f "$ENV_FILE" ]] || { error "Fichier introuvable: $ENV_FILE"; exit 1; }
+  source "$ENV_FILE"
+fi
+
+export OBSIDIAN_PATH ASSISTANT_NAME LLM_BACKEND OPENCLAW_PATH FORCE
 
 if ! systemctl --user status &>/dev/null 2>&1; then
   WARNINGS+=("systemd user non disponible (WSL ou macOS ?) — démarrer openclaw manuellement\n    openclaw start")
