@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scout-watcher — Surveille tasks/pending/ et soumet les tâches à l'agent scout
+# scout-watcher — Surveille tasks/pending/, pré-fetche les URLs, et signale scout via tasks/done/
 # Installé dans ~/.local/bin/scout-watcher par install.sh
 set -euo pipefail
 
@@ -60,6 +60,13 @@ PYEOF
         echo "[scout-watcher] Contenu injecté : HTTP ${CURL_HTTP_CODE}, brut ${FETCHED_SIZE} octets"
       else
         echo "[scout-watcher] ERREUR fetch : HTTP ${CURL_HTTP_CODE}, ${FETCHED_SIZE} octets — tâche abandonnée" >&2
+        # Injecter fetch_error dans le fichier tâche (signal pour scout) et écrire le résultat
+        python3 -c "
+import json, sys
+with open(sys.argv[1]) as f: d = json.load(f)
+d['fetch_error'] = sys.argv[2]
+with open(sys.argv[1], 'w') as f: json.dump(d, f, ensure_ascii=False, indent=2)
+" "$task_file" "$CURL_HTTP_CODE"
         python3 -c "
 import json, datetime, sys
 result = {
@@ -80,24 +87,9 @@ print(json.dumps(result, ensure_ascii=False, indent=2))
       rm -f "$FETCHED_FILE"
     fi
 
-    # Soumettre la tâche à l'agent scout via openclaw (mode embarqué)
-    # Scout lit tasks/pending/<task_id>.json et écrit results/<task_id>.json via write
-    RAW_OUTPUT="$("${OPENCLAW_BIN:-openclaw}" agent --agent scout --message "task_id: ${task_id}" --json 2>&1)" || {
-      echo "[scout-watcher] ERREUR openclaw agent pour ${task_id} :" >&2
-      echo "$RAW_OUTPUT" >&2
-      mv "$task_file" "${DONE}/${task_id}.json"
-      continue
-    }
-
-    if [[ -s "${RESULTS}/${task_id}.json" ]]; then
-      echo "[scout-watcher] Résultat écrit : ${RESULTS}/${task_id}.json"
-    else
-      echo "[scout-watcher] AVERTISSEMENT : résultat absent ou vide pour ${task_id}" >&2
-      echo "[scout-watcher] Sortie agent : ${RAW_OUTPUT}" >&2
-    fi
-
-    # Déplacer la tâche vers done/ dans tous les cas
+    # Signaler la disponibilité à l'agent scout (sessions_spawn — scout fait le polling)
     mv "$task_file" "${DONE}/${task_id}.json"
+    echo "[scout-watcher] Tâche prête pour scout : ${task_id}"
   done
 
   sleep 5

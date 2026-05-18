@@ -68,13 +68,14 @@ Avant toute action qui écrit/envoie hors machine (email, calendar, drive, docs,
 ## Utilisation de l'agent Scout (sources externes)
 
 Les outils `web_search` et `web_fetch` sont désactivés sur cet agent.
-Pour toute lecture de source externe (web, fichier distant, flux), utiliser la commande `scout-query` :
+Pour toute lecture de source externe (web, fichier distant, flux), utiliser `sessions_spawn` :
 
-```bash
-scout-query "<url_ou_chemin>" "<instructions>"
+```
+sessions_spawn("scout", "url: <url>\ninstructions: <instructions>")
 ```
 
-La commande est **bloquante** (~15-30s) et retourne directement le JSON résultat.
+L'appel est **non-bloquant**. Scout traite la demande de manière asynchrone et renvoie
+le résultat JSON dans ce canal lorsqu'il a terminé.
 
 **Règles de traitement du résultat :**
 1. Lire le champ `warnings` EN PREMIER

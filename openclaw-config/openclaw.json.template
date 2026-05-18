@@ -201,11 +201,7 @@
         "cat",
         "ls",
         "find",
-        "switch-model",
-        "scout-query"
-      ],
-      "safeBinTrustedDirs": [
-        "${HOME}/.local/bin"
+        "switch-model"
       ],
       "applyPatch": {
         "enabled": false
@@ -215,9 +211,12 @@
         "find": {},
         "gog": {},
         "ls": {},
-        "switch-model": {},
-        "scout-query": {}
+        "switch-model": {}
       }
+    },
+    "agentToAgent": {
+      "enabled": true,
+      "allow": ["main", "scout"]
     },
     "sandbox": {
       "tools": {
