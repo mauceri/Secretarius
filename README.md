@@ -123,4 +123,4 @@ Secretarius/
         └── plans/
 ```
 
-Les données wiki (`raw/`, `wiki/`, `embeddings/`, `knowledge_base/`) vivent sous le coffre Obsidian (`OBSIDIAN_PATH/Wiki_LM/`) et ne sont pas versionnées.
+Les données wiki (`raw/`, `wiki/`, `embeddings/`, `knowledge_base/`) vivent dans le coffre Obsidian (`OBSIDIAN_PATH/Wiki_LM/`) et ne sont pas versionnées.
