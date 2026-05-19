@@ -239,7 +239,7 @@ fi
 
 echo "  2. Appairer Telegram : envoyer /start au bot, puis :"
 echo "       openclaw pairing approve telegram <CODE>"
-echo "       (la connexion Telegram est brièvement interrompue, c'est normal)"
+echo "       (la connexion Telegram est interrompue — le gateway restart ci-dessous la rétablit)"
 echo ""
 echo "       Puis redémarrer le gateway pour prendre en compte le pairing :"
 echo "       openclaw gateway restart"
