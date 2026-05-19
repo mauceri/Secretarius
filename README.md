@@ -87,7 +87,7 @@ La configuration est générée depuis `openclaw-config/openclaw.json.template` 
 Deux agents sont configurés :
 
 - **main** (`Tiron`) — agent principal, accessible via Telegram.
-- **scout** — agent isolé, sans accès réseau direct. Utilisé par Tiron pour lire des sources externes (URL, pages web) à travers `sessions_spawn`. Le contenu est pré-fetché par `scout-watcher` (curl côté hôte) et transmis via des fichiers JSON dans `~/.openclaw/agents/scout/workspace/`. Scout n'exécute jamais de commandes réseau.
+- **scout** — agent isolé, sans accès réseau direct. Utilisé par Tiron pour lire des sources externes (URL, pages web) à travers `sessions_spawn`. Le contenu est pré-fetché par `scout-watcher` (curl côté hôte) et transmis via des fichiers JSON dans `~/.openclaw/agents/scout/workspace/`. Scout n'exécute jamais de commandes réseau. `scout-watcher` est lancé par `openclaw-scout.service` (service systemd user, démarre après `openclaw-gateway.service`).
 
 ## Structure du dépôt
 
