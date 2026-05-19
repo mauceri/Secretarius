@@ -60,7 +60,7 @@ Envoyer `/start` au bot Telegram, puis :
 openclaw pairing approve telegram <CODE>
 ```
 
-(La connexion Telegram est brièvement interrompue lors du pairing, c'est normal.)
+(La connexion Telegram est interrompue lors du pairing — relancer `openclaw gateway restart` pour la rétablir.)
 
 ## Composants
 
