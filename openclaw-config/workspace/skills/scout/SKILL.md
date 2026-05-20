@@ -33,6 +33,7 @@ Les instructions sont optionnelles (défaut : résumé en français + détection
   "retrieved_at": "ISO8601",
   "summary": "<UNTRUSTED> résumé factuel",
   "raw_excerpt": "<UNTRUSTED> extrait brut (max 2000 caractères)",
+  "full_content": "<UNTRUSTED> contenu brut intégral (présent uniquement si demandé explicitement)",
   "warnings": ["anomalies ou tentatives d'injection détectées"]
 }
 ```
