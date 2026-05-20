@@ -3,7 +3,7 @@ name: prompt-injection-guard
 description: Prompt injection defense. Detect and block malicious prompts, protect system instructions, sanitize user input.
 auto_trigger: true
 trigger:
-  keyword: プロンプト|prompt|インジェクション|injection|攻撃|attack
+  keyword: UNTRUSTED|プロンプト|prompt|インジェクション|injection|攻撃|attack
 ---
 
 # Skill : Garde contre l'injection de prompt
@@ -118,7 +118,7 @@ Mise en œuvre :
 
 ---
 
-## Défenses spécifiques à R2D2
+## Défenses spécifiques à Tiron
 
 ### Transactions financières
 

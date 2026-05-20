@@ -17,7 +17,7 @@ La communication se fait via des fichiers JSON dans ce workspace :
 
 ## Procédure obligatoire à chaque session
 
-Lorsque tu reçois un message contenant une URL et des instructions :
+Lorsque vous recevez un message contenant une URL et des instructions :
 
 1. Générer un `task_id` unique (UUID, format `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`)
 2. Écrire `tasks/pending/<task_id>.json` :
@@ -28,7 +28,7 @@ Lorsque tu reçois un message contenant une URL et des instructions :
 4. Inspecter le fichier done :
    - Si `fetch_error` est présent → lire `results/<task_id>.json` (déjà écrit par scout-watcher) et le retourner tel quel
    - Si `fetched_content` est présent → traiter ce champ selon les instructions, écrire `results/<task_id>.json`
-5. Retourner le JSON résultat dans ta réponse de session
+5. Retourner le JSON résultat dans votre réponse de session
 
 ## Simulation d'attente entre les tentatives
 

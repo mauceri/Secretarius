@@ -124,3 +124,11 @@ Secretarius/
 ```
 
 Les données wiki (`raw/`, `wiki/`, `embeddings/`, `knowledge_base/`) vivent dans le coffre Obsidian (`OBSIDIAN_PATH/Wiki_LM/`) et ne sont pas versionnées.
+
+## Roadmap
+
+### Synchronisation du workspace Tiron vers le dépôt
+
+Tension structurelle actuelle : le dépôt versionne les *templates* de workspace (`openclaw-config/workspace/`), mais le workspace réel sur santiago (`~/.openclaw/workspace/`) peut diverger au fil des sessions — Tiron est censé modifier ses propres fichiers (`SOUL.md`, `AGENTS.md`) comme mécanisme de mémoire. Un `./install.sh --force` écrase ces évolutions.
+
+Solution envisagée : donner à Tiron accès à `git` (safeBins), configurer des credentials en écriture sur santiago, et lui instruire de committer ses modifications de workspace sur une branche dédiée (`tiron/workspace`). La branche est mergée manuellement par l'utilisateur. Estimation : demi-session.
