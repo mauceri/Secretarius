@@ -132,3 +132,9 @@ Les données wiki (`raw/`, `wiki/`, `embeddings/`, `knowledge_base/`) vivent dan
 Tension structurelle actuelle : le dépôt versionne les *templates* de workspace (`openclaw-config/workspace/`), mais le workspace réel sur santiago (`~/.openclaw/workspace/`) peut diverger au fil des sessions — Tiron est censé modifier ses propres fichiers (`SOUL.md`, `AGENTS.md`) comme mécanisme de mémoire. Un `./install.sh --force` écrase ces évolutions.
 
 Solution envisagée : donner à Tiron accès à `git` (safeBins), configurer des credentials en écriture sur santiago, et lui instruire de committer ses modifications de workspace sur une branche dédiée (`tiron/workspace`). La branche est mergée manuellement par l'utilisateur. Estimation : demi-session.
+
+### Défense structurelle contre l'injection de prompt indirecte
+
+Le skill `prompt-injection-guard` est déclaratif (instructions comportementales au LLM) et ne peut pas être déclenché de façon fiable sur les résultats de `sessions_spawn`. Une injection placée dans le contenu web fetché par Scout se retrouve dans le JSON retourné à Tiron — les balises `<UNTRUSTED>` et les instructions SOUL.md atténuent le risque mais ne l'éliminent pas.
+
+Piste à approfondir : existe-t-il dans l'écosystème OpenClaw ou LLM un mécanisme structurel (non comportemental) permettant de filtrer le contenu non fiable avant qu'il n'atteigne le contexte de l'agent principal ? Les approches déterministes (regex dans scout-watcher) couvrent les cas évidents mais fragilisent la chaîne et ne résistent pas aux injections sophistiquées.
