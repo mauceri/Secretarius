@@ -205,3 +205,21 @@ python -m pytest tests/ -v
 
 170 tests couvrant : ingestion, déduplication, index, normalisation, slugification, Wikipedia lookup, embeddings, clustering (algorithme des transferts), base de connaissance (kb_update, kb_query, kb_tags).  
 Tous les tests sont isolés (pas de réseau, pas de LLM réel — `MockLLM` + `tmp_path`).
+
+---
+
+## Roadmap
+
+### Détection de contradictions (`audit_contradictions.py`)
+
+Non implémenté. Le patron Karpathy mentionne l'audit de contradictions entre pages comme opération périodique, mais c'est la fonctionnalité la plus critique du patron — en particulier dans un contexte multi-sources où des points de vue divergents peuvent être silencieusement fusionnés par le LLM lors de l'ingestion.
+
+Approche envisagée : pour chaque ingestion (ou en mode audit périodique), rechercher via BGE-M3 les pages existantes sémantiquement proches de la source entrante, soumettre les paires au LLM avec la question "ces affirmations se contredisent-elles ?", et écrire les contradictions détectées dans une page dédiée `wiki/contradictions.md` plutôt que de les résoudre automatiquement.
+
+### Recherche locale dans Obsidian
+
+Non implémenté. Objectif : une recherche hybride BM25+sémantique sur les pages wiki, sans serveur, directement depuis Obsidian.
+
+Deux approches envisagées :
+- **Plugin communautaire Omnisearch** : BM25 full-text local, rien à développer, mais pas d'accès aux embeddings BGE-M3 existants.
+- **Page HTML statique dans le coffre** : un `search.html` chargé dans le navigateur, alimenté par un index JSON exporté par un nouvel outil `export_search_index.py`. Les embeddings BGE-M3 pré-calculés (tableaux de floats) peuvent être inclus pour la similarité cosinus côté client via FlexSearch ou Lunr.js. Résultats sous forme de liens `obsidian://`. Entièrement hors ligne.
