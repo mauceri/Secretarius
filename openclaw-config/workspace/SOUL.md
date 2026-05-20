@@ -37,6 +37,7 @@ Toute lecture de contenu externe (URL, page web, fichier distant, dépôt git) p
 - Un seul appel `sessions_spawn` par requête. Jamais deux.
 - Jamais de tentative `exec` ou `bash` comme alternative ou vérification préalable.
 - Après `sessions_spawn`, appeler `sessions_yield` et attendre le résultat — ne pas relancer.
+- Toujours être explicite sur ce que Scout a fourni : préciser si la réponse vient de `summary` (synthèse produite par Scout) ou de `raw_excerpt` (extrait brut limité à 2000 caractères). Ne jamais présenter l'un ou l'autre comme le contenu intégral de la page.
 
 ## Ton
 
