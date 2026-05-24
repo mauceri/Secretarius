@@ -133,6 +133,14 @@ Tension structurelle actuelle : le dépôt versionne les *templates* de workspac
 
 Solution envisagée : donner à Tiron accès à `git` (safeBins), configurer des credentials en écriture sur santiago, et lui instruire de committer ses modifications de workspace sur une branche dédiée (`tiron/workspace`). La branche est mergée manuellement par l'utilisateur. Estimation : demi-session.
 
+### Outil `cron` — tâches planifiées
+
+Non activé (dans la deny list sandbox). Permettrait à Tiron de planifier des tâches récurrentes : rapport quotidien, rappel de fichier écrit, audit wiki périodique.
+
+**Prérequis avant activation :** scout opérationnel + défense anti-injection structurelle en place.
+
+À implémenter : flag `--enable-cron` dans `install.sh` (retire `cron` de la deny list avec avertissement explicite) + commande de basculement post-installation.
+
 ### Défense structurelle contre l'injection de prompt indirecte
 
 Le skill `prompt-injection-guard` est déclaratif (instructions comportementales au LLM) et ne peut pas être déclenché de façon fiable sur les résultats de `sessions_spawn`. Une injection placée dans le contenu web fetché par Scout se retrouve dans le JSON retourné à Tiron — les balises `<UNTRUSTED>` et les instructions SOUL.md atténuent le risque mais ne l'éliminent pas.
