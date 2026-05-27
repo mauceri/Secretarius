@@ -151,12 +151,16 @@ else
 fi
 
 # Dépendances Python pour injection-guard
-info "Installation des dépendances Python (flask, beautifulsoup4, requests)..."
-pip install --user --quiet flask beautifulsoup4 requests || \
-  warn "pip install échoué — relancer manuellement : pip install flask beautifulsoup4 requests"
+if python3 -c "import flask, bs4, requests" &>/dev/null; then
+  info "flask, beautifulsoup4, requests déjà installés"
+else
+  info "Installation des dépendances Python (flask, beautifulsoup4, requests)..."
+  pip install --user --quiet flask beautifulsoup4 requests || \
+    warn "pip install échoué — relancer manuellement : pip install flask beautifulsoup4 requests"
+fi
 
 # transformers et torch (optionnel — slow download, ~1GB)
-if python3 -c "import transformers" &>/dev/null 2>&1; then
+if python3 -c "import transformers" &>/dev/null; then
   info "transformers déjà installé"
 else
   info "Installation de transformers et torch (peut prendre plusieurs minutes)..."
