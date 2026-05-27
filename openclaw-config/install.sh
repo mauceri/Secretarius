@@ -168,6 +168,15 @@ else
     warn "pip install transformers échoué — DeBERTa désactivé, mode regex-only"
 fi
 
+# fastmcp (dépendance du serveur MCP Wiki_LM)
+if "${HOME}/Secretarius/Wiki_LM/.venv/bin/python3" -c "import fastmcp" &>/dev/null; then
+  info "fastmcp déjà installé dans le venv Wiki_LM"
+else
+  info "Installation de fastmcp dans le venv Wiki_LM..."
+  "${HOME}/Secretarius/Wiki_LM/.venv/bin/pip" install --quiet fastmcp || \
+    warn "pip install fastmcp échoué — relancer manuellement dans le venv Wiki_LM"
+fi
+
 # Recharger et démarrer injection-guard si TELEGRAM_BOT_TOKEN est renseigné
 if [[ -n "${TELEGRAM_BOT_TOKEN:-}" ]]; then
   systemctl --user daemon-reload 2>/dev/null || true
