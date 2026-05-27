@@ -145,5 +145,77 @@ def wiki_ingest() -> dict:
     }
 
 
+@mcp.tool()
+def wiki_query(question: str, top_k: int = 5) -> dict:
+    """Interroge le wiki et retourne une synthèse avec les sources."""
+    try:
+        q = WikiQuery(_wiki_root())
+        result = q.query(question, top_k=top_k)
+        if not result.text:
+            return {"error": "KB vide — lancer wiki_ingest d'abord"}
+        return {"synthesis": result.text, "references": result.references}
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def wiki_tags() -> dict:
+    """Retourne la liste des tags du wiki."""
+    try:
+        tags = collect_tags(_wiki_root() / "wiki")
+        return {"tags": sorted(tags.keys())}
+    except Exception as exc:
+        return {"error": str(exc)}
+
+
+@mcp.tool()
+def wiki_ingest_status() -> dict:
+    """Retourne le nombre de .url en attente et la liste des fichiers bloqués."""
+    raw = _raw_dir()
+    if not raw.exists():
+        return {"pending": 0, "blocked_files": []}
+    ingestor = Ingestor(_wiki_root(), raw_path=raw)
+    manifest = ingestor._load_manifest()
+    pending_files = [
+        f.name for f in sorted(raw.iterdir())
+        if f.suffix == ".url" and f.name not in manifest
+    ]
+    blocked_files = sorted(
+        f.name for f in raw.iterdir() if f.name.endswith(".url.blocked")
+    )
+    return {"pending": len(pending_files), "blocked_files": blocked_files}
+
+
+@mcp.tool()
+def wiki_kb_update() -> dict:
+    """Lance la mise à jour du KB depuis le dernier clustering disponible."""
+    if not _kb_update_lock.acquire(blocking=False):
+        return {"status": "already_running"}
+    try:
+        wiki_dir = _wiki_root() / "wiki"
+        clusterings_dir = wiki_dir / "clusterings"
+        if not clusterings_dir.exists():
+            return {"status": "error", "reason": "répertoire clusterings/ introuvable"}
+        candidates = sorted(
+            (c for c in clusterings_dir.iterdir() if c.is_dir()),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        if not candidates:
+            return {"status": "error", "reason": "aucun clustering disponible"}
+        clustering_name = candidates[0].name
+        stats = update_kb(
+            wiki_root=wiki_dir,
+            clustering_name=clustering_name,
+            embed_dir=_DEFAULT_EMBED_DIR,
+            kb_dir=_DEFAULT_KB_DIR,
+        )
+        return {"status": "ok", "clustering": clustering_name, **stats}
+    except Exception as exc:
+        return {"status": "error", "reason": str(exc)}
+    finally:
+        _kb_update_lock.release()
+
+
 if __name__ == "__main__":
     mcp.run()
