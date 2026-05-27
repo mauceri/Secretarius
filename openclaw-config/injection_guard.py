@@ -9,6 +9,7 @@ import logging
 from typing import List, Tuple
 
 from bs4 import BeautifulSoup
+from flask import Flask, request, jsonify
 
 # ─── Constantes ──────────────────────────────────────────────────────────────
 
@@ -82,3 +83,95 @@ def check_regex(text: str) -> Tuple[str, List[str]]:
     if matched_medium:
         return "medium", matched_medium
     return "low", []
+
+
+# ─── DeBERTa ─────────────────────────────────────────────────────────────────
+
+_classifier = None
+_deberta_available = False
+
+
+def _load_deberta() -> None:
+    global _classifier, _deberta_available
+    try:
+        from transformers import pipeline as hf_pipeline
+        _classifier = hf_pipeline(
+            "text-classification",
+            model="protectai/deberta-v3-base-prompt-injection-v2",
+            device=-1,
+        )
+        _deberta_available = True
+        logging.info("DeBERTa chargé.")
+    except Exception as exc:
+        logging.error("Chargement DeBERTa échoué (%s) — mode regex-only.", exc)
+
+
+def _deberta_risk(text: str) -> str:
+    """Retourne 'blocked', 'medium' ou 'low' selon le score DeBERTa."""
+    if not _deberta_available or _classifier is None:
+        return "medium"
+    result = _classifier(text[:DEBERTA_MAX_TOKENS])
+    label = result[0]['label'].upper()
+    score = result[0]['score']
+    if label == 'INJECTION':
+        if score >= DEBERTA_BLOCK_THRESHOLD:
+            return "blocked"
+        if score >= DEBERTA_MEDIUM_THRESHOLD:
+            return "medium"
+        return "low"
+    # label == LEGIT
+    return "low" if score >= DEBERTA_BLOCK_THRESHOLD else "medium"
+
+
+# ─── Flask app ────────────────────────────────────────────────────────────────
+
+app = Flask(__name__)
+
+
+@app.route('/check', methods=['POST'])
+def check():
+    data = request.get_json(force=True)
+    content = data.get('content', '')
+    content_type = data.get('type', 'text')
+
+    truncated = len(content) > MAX_CONTENT_LEN
+    if truncated:
+        content = content[:MAX_CONTENT_LEN]
+
+    if content_type == 'html':
+        clean_text = clean_html(content)
+        full_content = content
+    else:
+        clean_text = content
+        full_content = content
+
+    risk, patterns = check_regex(clean_text)
+    if risk == "blocked":
+        return jsonify({"blocked": True, "reason": ", ".join(patterns)})
+
+    if risk == "medium":
+        deberta_risk = _deberta_risk(clean_text)
+        if deberta_risk == "blocked":
+            return jsonify({"blocked": True, "reason": "DeBERTa: score d'injection élevé"})
+        risk = deberta_risk
+
+    return jsonify({
+        "blocked": False,
+        "risk": risk,
+        "clean_text": clean_text,
+        "full_content": full_content,
+        "truncated": truncated,
+    })
+
+
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({"status": "ok", "deberta": _deberta_available})
+
+
+# ─── Entry point ──────────────────────────────────────────────────────────────
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+    _load_deberta()
+    app.run(host='127.0.0.1', port=8990, debug=False)
