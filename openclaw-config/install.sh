@@ -172,20 +172,32 @@ else
 fi
 
 # openclaw-mcp-adapter (expose les outils MCP à l'agent)
-# Installé depuis le chemin local pour compatibilité TypeScript source (npm 0.1.1 est cassé)
+# Pré-installer les dépendances dans le répertoire source AVANT openclaw plugins install.
+# Sans cela, openclaw copie les .js sans node_modules, le plugin échoue au chargement,
+# et openclaw n'écrit pas les métadonnées plugins.installs → plugin absent au démarrage.
+ADAPTER_SRC="${SCRIPT_DIR}/openclaw-mcp-adapter"
+if ! [[ -d "${ADAPTER_SRC}/node_modules/@modelcontextprotocol" ]]; then
+  info "Pré-installation des dépendances npm de openclaw-mcp-adapter..."
+  (cd "${ADAPTER_SRC}" && npm install --omit=dev --silent) || \
+    warn "npm install pré-install échoué dans ${ADAPTER_SRC}"
+fi
 if [[ "$FORCE" != "true" ]] && openclaw plugins list 2>/dev/null | grep -q "openclaw-mcp-adapter"; then
   info "openclaw-mcp-adapter déjà installé"
 else
   info "Installation/mise à jour de openclaw-mcp-adapter depuis source locale..."
-  openclaw plugins install --force "${SCRIPT_DIR}/openclaw-mcp-adapter" || \
+  openclaw plugins install --force "${ADAPTER_SRC}" || \
     warn "openclaw plugins install openclaw-mcp-adapter échoué — les outils MCP ne seront pas exposés à l'agent"
 fi
-# openclaw ne lance pas toujours npm install selon la version — garantir les dépendances
+# Garde de sécurité : si les dépendances sont absentes dans l'extension (openclaw ne les a pas copiées),
+# les installer et relancer openclaw plugins install pour écrire les métadonnées plugins.installs.
 ADAPTER_EXT="${OPENCLAW_PATH}/extensions/openclaw-mcp-adapter"
 if [[ -f "${ADAPTER_EXT}/package.json" ]] && ! [[ -d "${ADAPTER_EXT}/node_modules/@modelcontextprotocol" ]]; then
-  info "Installation des dépendances npm de openclaw-mcp-adapter..."
+  info "Installation des dépendances npm de openclaw-mcp-adapter (extension)..."
   (cd "${ADAPTER_EXT}" && npm install --omit=dev --silent) || \
     warn "npm install échoué dans ${ADAPTER_EXT} — @modelcontextprotocol/sdk manquant"
+  info "Réinstallation de openclaw-mcp-adapter (écriture des métadonnées plugins.installs)..."
+  openclaw plugins install --force "${ADAPTER_SRC}" || \
+    warn "Réinstallation openclaw-mcp-adapter échouée"
 fi
 
 # fastmcp (dépendance du serveur MCP Wiki_LM)
