@@ -130,8 +130,12 @@ app = Flask(__name__)
 
 @app.route('/check', methods=['POST'])
 def check():
-    data = request.get_json(force=True)
-    content = data.get('content', '')
+    try:
+        data = request.get_json(force=True) or {}
+    except Exception:
+        return jsonify({"error": "invalid JSON"}), 400
+
+    content = str(data.get('content', '') or '')
     content_type = data.get('type', 'text')
 
     truncated = len(content) > MAX_CONTENT_LEN
@@ -150,10 +154,13 @@ def check():
         return jsonify({"blocked": True, "reason": ", ".join(patterns)})
 
     if risk == "medium":
-        deberta_risk = _deberta_risk(clean_text)
-        if deberta_risk == "blocked":
-            return jsonify({"blocked": True, "reason": "DeBERTa: score d'injection élevé"})
-        risk = deberta_risk
+        try:
+            deberta_risk = _deberta_risk(clean_text)
+            if deberta_risk == "blocked":
+                return jsonify({"blocked": True, "reason": "DeBERTa: score d'injection élevé"})
+            risk = deberta_risk
+        except Exception as exc:
+            logging.error("DeBERTa inference error: %s", exc)
 
     return jsonify({
         "blocked": False,
