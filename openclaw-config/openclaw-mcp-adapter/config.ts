@@ -25,7 +25,20 @@ export function parseConfig(raw: unknown): McpAdapterConfig {
   const cfg = (raw ?? {}) as Record<string, unknown>;
   const servers: ServerConfig[] = [];
 
-  for (const s of (cfg.servers as unknown[]) ?? []) {
+  // Accepte deux formats :
+  // - tableau : [{name, command, args}, ...]  (format original)
+  // - objet   : {"nom": {command, args}, ...} (format produit par openclaw mcp set)
+  const serversRaw = cfg.servers;
+  const serverEntries: Array<Record<string, unknown>> = [];
+  if (Array.isArray(serversRaw)) {
+    serverEntries.push(...(serversRaw as Record<string, unknown>[]));
+  } else if (serversRaw && typeof serversRaw === "object") {
+    for (const [name, srv] of Object.entries(serversRaw as Record<string, unknown>)) {
+      serverEntries.push({ name, ...(srv as Record<string, unknown>) });
+    }
+  }
+
+  for (const s of serverEntries) {
     const srv = s as Record<string, unknown>;
     if (!srv.name) throw new Error("Server missing 'name'");
 

@@ -8,7 +8,20 @@ function interpolateEnv(obj) {
 export function parseConfig(raw) {
     const cfg = (raw ?? {});
     const servers = [];
-    for (const s of cfg.servers ?? []) {
+    // Accepte deux formats :
+    // - tableau : [{name, command, args}, ...]  (format original)
+    // - objet   : {"nom": {command, args}, ...} (format produit par openclaw mcp set)
+    const serversRaw = cfg.servers;
+    const serverEntries = [];
+    if (Array.isArray(serversRaw)) {
+        serverEntries.push(...serversRaw);
+    }
+    else if (serversRaw && typeof serversRaw === "object") {
+        for (const [name, srv] of Object.entries(serversRaw)) {
+            serverEntries.push({ name, ...srv });
+        }
+    }
+    for (const s of serverEntries) {
         const srv = s;
         if (!srv.name)
             throw new Error("Server missing 'name'");
