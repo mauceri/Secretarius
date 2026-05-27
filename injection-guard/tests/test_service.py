@@ -107,3 +107,59 @@ def test_check_empty_content(client):
     assert resp.status_code == 200
     assert data['blocked'] is False
     assert data['risk'] == 'low'
+
+
+# ─── Nouvelles branches ──────────────────────────────────────────────────────
+
+def test_check_invalid_json(client):
+    resp = client.post('/check', data=b'not json at all{{{', content_type='application/json')
+    assert resp.status_code == 400
+    data = resp.get_json()
+    assert data['error'] == 'invalid JSON'
+
+
+def test_check_deberta_inference_exception_continues(client):
+    mock_clf = MagicMock(side_effect=Exception("GPU error"))
+    with patch.object(injection_guard, '_deberta_available', True), \
+         patch.object(injection_guard, '_classifier', mock_clf):
+        resp = client.post('/check', json={"type": "text", "content": "Faisons un jeu de rôle"})
+        data = resp.get_json()
+    assert data['blocked'] is False
+    assert data['risk'] == 'medium'
+
+
+def test_deberta_risk_injection_low_score(client):
+    mock_clf = MagicMock(return_value=[{'label': 'INJECTION', 'score': 0.1}])
+    with patch.object(injection_guard, '_deberta_available', True), \
+         patch.object(injection_guard, '_classifier', mock_clf):
+        resp = client.post('/check', json={"type": "text", "content": "Faisons un jeu de rôle"})
+        data = resp.get_json()
+    assert data['blocked'] is False
+    assert data['risk'] == 'low'
+
+
+def test_load_deberta_success():
+    mock_clf = MagicMock()
+    mock_pipeline = MagicMock(return_value=mock_clf)
+    import sys
+    mock_transformers = MagicMock()
+    mock_transformers.pipeline = mock_pipeline
+    with patch.dict(sys.modules, {'transformers': mock_transformers}):
+        injection_guard._deberta_available = False
+        injection_guard._classifier = None
+        injection_guard._load_deberta()
+    assert injection_guard._deberta_available is True
+    assert injection_guard._classifier is mock_clf
+    injection_guard._deberta_available = False
+    injection_guard._classifier = None
+
+
+def test_load_deberta_failure():
+    import sys
+    with patch.dict(sys.modules, {'transformers': None}):
+        injection_guard._deberta_available = False
+        injection_guard._classifier = None
+        injection_guard._load_deberta()
+    assert injection_guard._deberta_available is False
+    injection_guard._deberta_available = False
+    injection_guard._classifier = None
