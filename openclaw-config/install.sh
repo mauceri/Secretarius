@@ -171,6 +171,15 @@ else
     warn "pip install transformers échoué — DeBERTa désactivé, mode regex-only"
 fi
 
+# openclaw-mcp-adapter (expose les outils MCP à l'agent)
+if openclaw plugins list 2>/dev/null | grep -q "openclaw-mcp-adapter"; then
+  info "openclaw-mcp-adapter déjà installé"
+else
+  info "Installation de openclaw-mcp-adapter..."
+  openclaw plugins install openclaw-mcp-adapter || \
+    warn "openclaw plugins install openclaw-mcp-adapter échoué — les outils MCP ne seront pas exposés à l'agent"
+fi
+
 # fastmcp (dépendance du serveur MCP Wiki_LM)
 if "${HOME}/Secretarius/Wiki_LM/.venv/bin/python3" -c "import fastmcp" &>/dev/null; then
   info "fastmcp déjà installé dans le venv Wiki_LM"
