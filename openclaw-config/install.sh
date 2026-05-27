@@ -177,7 +177,7 @@ if openclaw plugins list 2>/dev/null | grep -q "openclaw-mcp-adapter"; then
   info "openclaw-mcp-adapter déjà installé"
 else
   info "Installation de openclaw-mcp-adapter depuis source locale..."
-  openclaw plugins install "${SCRIPT_DIR}/openclaw-mcp-adapter" || \
+  openclaw plugins install --force "${SCRIPT_DIR}/openclaw-mcp-adapter" || \
     warn "openclaw plugins install openclaw-mcp-adapter échoué — les outils MCP ne seront pas exposés à l'agent"
 fi
 

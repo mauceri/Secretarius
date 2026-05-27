@@ -32,7 +32,7 @@ export default function (api: any) {
               parameters: tool.inputSchema ?? { type: "object", properties: {} },
               async execute(_id: string, params: unknown) {
                 const result = await pool.callTool(server.name, tool.name, params);
-                const text = result.content
+                const text = (result.content as any[])
                   ?.map((c: any) => c.text ?? c.data ?? "")
                   .join("\n") ?? "";
                 return {
