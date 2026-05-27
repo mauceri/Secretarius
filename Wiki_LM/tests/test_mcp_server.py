@@ -191,3 +191,91 @@ class TestWikiIngest:
         result = mcp_server.wiki_ingest()
         assert result["ingested"] == 0
         assert not fetch_called
+
+
+class TestWikiQuery:
+    def test_returns_synthesis_and_references(self, wiki_env, monkeypatch):
+        mock_result = MagicMock()
+        mock_result.text = "Synthèse du wiki."
+        mock_result.references = ["src-article1", "src-article2"]
+        monkeypatch.setattr(mcp_server, "WikiQuery",
+                            MagicMock(return_value=MagicMock(query=MagicMock(return_value=mock_result))))
+        result = mcp_server.wiki_query("Que dit le wiki sur les langues ?")
+        assert result["synthesis"] == "Synthèse du wiki."
+        assert result["references"] == ["src-article1", "src-article2"]
+
+    def test_returns_error_when_kb_empty(self, wiki_env, monkeypatch):
+        mock_result = MagicMock()
+        mock_result.text = ""
+        mock_result.references = []
+        monkeypatch.setattr(mcp_server, "WikiQuery",
+                            MagicMock(return_value=MagicMock(query=MagicMock(return_value=mock_result))))
+        result = mcp_server.wiki_query("question")
+        assert "error" in result
+
+    def test_returns_error_on_exception(self, wiki_env, monkeypatch):
+        def raise_err(*a, **kw):
+            raise RuntimeError("embeddings introuvables")
+        monkeypatch.setattr(mcp_server, "WikiQuery",
+                            MagicMock(return_value=MagicMock(query=raise_err)))
+        result = mcp_server.wiki_query("question")
+        assert "error" in result
+
+
+class TestWikiTags:
+    def test_returns_sorted_tags(self, wiki_env, monkeypatch):
+        monkeypatch.setattr(mcp_server, "collect_tags",
+                            lambda wiki_dir: {"python": 3, "rust": 1, "ai": 5})
+        result = mcp_server.wiki_tags()
+        assert result["tags"] == ["ai", "python", "rust"]
+
+
+class TestWikiIngestStatus:
+    def test_counts_pending_url_files(self, wiki_env):
+        raw = wiki_env["raw"]
+        (raw / "20260527-a.url").write_text("https://example.com\n")
+        (raw / "20260527-b.url").write_text("https://other.com\n")
+        (raw / "20260527-c.url.blocked").write_text("https://evil.com\n")
+        result = mcp_server.wiki_ingest_status()
+        assert result["pending"] == 2
+        assert result["blocked_files"] == ["20260527-c.url.blocked"]
+
+    def test_excludes_already_ingested(self, wiki_env):
+        raw = wiki_env["raw"]
+        (raw / "20260527-a.url").write_text("https://example.com\n")
+        (raw / ".ingested").write_text("20260527-a.url\tsrc-example\t\n")
+        result = mcp_server.wiki_ingest_status()
+        assert result["pending"] == 0
+
+    def test_returns_zero_when_raw_absent(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("WIKI_PATH", str(tmp_path))
+        monkeypatch.setenv("WIKI_RAW_PATH", str(tmp_path / "raw_nonexistent"))
+        result = mcp_server.wiki_ingest_status()
+        assert result == {"pending": 0, "blocked_files": []}
+
+
+class TestWikiKbUpdate:
+    def test_already_running(self, wiki_env):
+        mcp_server._kb_update_lock.acquire()
+        try:
+            result = mcp_server.wiki_kb_update()
+        finally:
+            mcp_server._kb_update_lock.release()
+        assert result == {"status": "already_running"}
+
+    def test_error_when_no_clusterings(self, wiki_env):
+        result = mcp_server.wiki_kb_update()
+        assert result["status"] == "error"
+
+    def test_calls_update_kb_with_latest_clustering(self, wiki_env, monkeypatch):
+        wiki_dir = wiki_env["root"] / "wiki"
+        wiki_dir.mkdir(parents=True, exist_ok=True)
+        (wiki_dir / "clusterings" / "clustering-0.85").mkdir(parents=True)
+
+        monkeypatch.setattr(mcp_server, "update_kb",
+                            lambda **kw: {"created": 3, "updated": 1, "excluded": 0})
+
+        result = mcp_server.wiki_kb_update()
+        assert result["status"] == "ok"
+        assert result["clustering"] == "clustering-0.85"
+        assert result["created"] == 3
