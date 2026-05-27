@@ -23,7 +23,12 @@ export class McpClientPool {
       // unref() évite que le sous-processus MCP bloque la sortie du processus parent
       // (notamment lors de `openclaw plugins install` qui charge le plugin en in-process)
       const proc = (transport as any)._process ?? (transport as any).process;
-      if (proc?.unref) proc.unref();
+      if (proc?.unref) {
+        proc.unref();
+        proc.stdin?.unref();
+        proc.stdout?.unref();
+        proc.stderr?.unref();
+      }
       transport.onerror = () => this.markDisconnected(config.name);
       transport.onclose = () => this.markDisconnected(config.name);
     }
