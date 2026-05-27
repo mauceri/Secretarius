@@ -173,10 +173,10 @@ fi
 
 # openclaw-mcp-adapter (expose les outils MCP à l'agent)
 # Installé depuis le chemin local pour compatibilité TypeScript source (npm 0.1.1 est cassé)
-if openclaw plugins list 2>/dev/null | grep -q "openclaw-mcp-adapter"; then
+if [[ "$FORCE" != "true" ]] && openclaw plugins list 2>/dev/null | grep -q "openclaw-mcp-adapter"; then
   info "openclaw-mcp-adapter déjà installé"
 else
-  info "Installation de openclaw-mcp-adapter depuis source locale..."
+  info "Installation/mise à jour de openclaw-mcp-adapter depuis source locale..."
   openclaw plugins install --force "${SCRIPT_DIR}/openclaw-mcp-adapter" || \
     warn "openclaw plugins install openclaw-mcp-adapter échoué — les outils MCP ne seront pas exposés à l'agent"
 fi
