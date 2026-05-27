@@ -66,6 +66,9 @@ else
   envsubst '${HOME} ${HOSTNAME} ${OBSIDIAN_PATH} ${ASSISTANT_NAME} ${LLM_BACKEND} ${DEEPSEEK_API_KEY} ${OPENCLAW_GATEWAY_TOKEN}' \
     < "${SCRIPT_DIR}/openclaw.json.template" \
     > "$TARGET"
+  # Sync .bak pour éviter que le gateway détecte notre écriture comme un "clobber"
+  # et restaure silencieusement l'ancienne config au démarrage suivant.
+  cp "$TARGET" "${OPENCLAW_PATH}/openclaw.json.bak" 2>/dev/null || true
   info "openclaw.json généré dans ${OPENCLAW_PATH}"
 fi
 
