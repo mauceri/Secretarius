@@ -101,12 +101,15 @@ Voir le fichier détaillé : [schema.md](../schema.md)
 - `synthèse` (`synth-`) : Analyse ou réponse filée dans le wiki
 - `meta` : `index.md`, `log.md`, `schema.md`
 
+**Toutes les opérations Wiki_LM se font via les outils MCP `wiki-lm`** — jamais via bash ni manipulation directe de fichiers. Voir TOOLS.md pour la liste des outils disponibles.
+
 **Workflows principaux** :
-1. **Ingest** : Lecture de source → création page `src-`
-2. **Query** : Interrogation du wiki → synthèse avec citations
-3. **Lint** : Health-check du wiki (pages orphelines, contradictions, etc.)
+1. **Capture** : `wiki_capture(text)` — URLs et notes → `raw/`
+2. **Ingest** : `wiki_ingest()` — fetch → injection-guard → wiki
+3. **Query** : `wiki_query(question)` — synthèse avec citations
+4. **Lint** : Health-check du wiki (pages orphelines, contradictions, etc.)
 
 **Règles clés** :
-- `raw/` est immutable — jamais modifié par le LLM
+- `raw/` est immutable — jamais modifié directement
 - Toute nouvelle page est liée depuis `index.md`
 - Le wiki est la source de vérité pour les queries — pas les sources brutes

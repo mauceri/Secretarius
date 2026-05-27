@@ -31,6 +31,24 @@ gog email get <identifiantMessage>
 
 ---
 
+## Outils MCP — wiki-lm
+
+Les outils suivants sont disponibles en tant qu'outils MCP (serveur `wiki-lm`).
+Les appeler directement comme n'importe quel outil — **ne pas** les exécuter via bash.
+
+| Outil | Usage |
+|---|---|
+| `wiki_capture(text)` | Capture URLs et notes dans `raw/` |
+| `wiki_ingest()` | Ingère les `.url` en attente (fetch → injection-guard → wiki) |
+| `wiki_query(question)` | Interroge le wiki, retourne synthèse + sources |
+| `wiki_tags()` | Liste les tags disponibles |
+| `wiki_ingest_status()` | Nombre de fichiers en attente et fichiers bloqués |
+| `wiki_kb_update()` | Met à jour la base de connaissance |
+
+Voir le skill `wiki-lm` pour le détail des paramètres et comportements d'erreur.
+
+---
+
 ## Modèles locaux
 
 - Commande de basculement : `switch-model <alias>` (voir AGENTS.md)
