@@ -72,7 +72,10 @@ def _screen(html: str) -> tuple[str, str | None]:
 
     if result.get("blocked"):
         return "", result.get("reason", "blocked")
-    return result.get("clean_text", html), None
+    clean = result.get("clean_text")
+    if not clean:
+        return "", "clean_text absent — réponse injection-guard incomplète"
+    return clean, None
 
 
 @mcp.tool()
