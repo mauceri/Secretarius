@@ -199,6 +199,14 @@ if systemctl --user daemon-reload &>/dev/null 2>&1 && command -v openclaw &>/dev
   if grep -q "^TELEGRAM_BOT_TOKEN=.\+" "${OPENCLAW_PATH}/gateway.systemd.env" 2>/dev/null; then
     systemctl --user restart openclaw-gateway.service openclaw-scout.service
     info "Services OpenClaw démarrés ✓"
+    # Installer openclaw-mcp-adapter APRÈS le redémarrage du gateway.
+    # plugins.installs n'est écrit que quand le gateway est actif (pas en offline).
+    # Un appel anticipé (pendant le hot-reload de openclaw.json) crée une race condition.
+    sleep 5
+    ADAPTER_SRC="${SECRETARIUS_ROOT}/openclaw-config/openclaw-mcp-adapter"
+    info "Installation de openclaw-mcp-adapter..."
+    openclaw plugins install --force "${ADAPTER_SRC}" 2>&1 | grep -E "(Installed|failed|WARN|warn)" || true
+    info "openclaw-mcp-adapter installé ✓"
   else
     info "Services OpenClaw activés (démarreront après renseignement des secrets)"
   fi
