@@ -61,6 +61,18 @@ class TestIngestSingle:
         post = frontmatter.loads((wiki_dir / "sources" / f"{slug}.md").read_text())
         assert post.get("status") == "nouveau"
 
+    def test_ingest_with_content_skips_read_source(self, ingestor, monkeypatch):
+        called = []
+
+        def fake_read_source(source):
+            called.append(source)
+            return "contenu fetché", "titre fetché"
+
+        monkeypatch.setattr("ingest._read_source", fake_read_source)
+        slug = ingestor.ingest("https://example.com", content="contenu pré-screené")
+        assert not called, "_read_source ne doit pas être appelé quand content est fourni"
+        assert slug.startswith("src-")
+
 
 class TestImmuable:
     def test_immuable_page_not_overwritten(self, ingestor, wiki_dir, tmp_path):

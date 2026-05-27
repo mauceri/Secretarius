@@ -989,6 +989,7 @@ class Ingestor:
     def ingest(
         self,
         source: str,
+        content: str | None = None,
         slug: str = "",
         max_concepts: int = 5,
         extra_tags: list[str] | None = None,
@@ -996,7 +997,10 @@ class Ingestor:
     ) -> str:
         """Ingère une source et retourne le slug de la page créée."""
         print(f"[ingest] Lecture de la source : {source}")
-        content, title = _read_source(source)
+        if content is None:
+            content, title = _read_source(source)
+        else:
+            title = source.split("/")[-1] or source
         source_url = source if source.startswith("http") else ""
 
         # Slug de la page source (éviter le double préfixe si le titre commence déjà par src-)
