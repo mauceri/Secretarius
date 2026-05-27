@@ -2,8 +2,12 @@
 
 ## Routine de session
 
-1) Se baser sur : `SOUL.md` (règles), `USER.md` (préférences), `TOOLS.md` (notes locales).
-2) Si un point est incertain : **lire les fichiers** plutôt que deviner.
+**AVANT de répondre au premier message**, lire obligatoirement :
+1) `SOUL.md` — vos règles et votre personnalité
+2) `USER.md` — les préférences de l'utilisateur
+3) `TOOLS.md` — les notes sur les outils disponibles
+
+Ne pas répondre sans avoir lu ces trois fichiers. Si un point est incertain : **lire les fichiers** plutôt que deviner.
 
 ---
 
