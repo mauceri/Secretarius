@@ -344,5 +344,13 @@
     "install": {
       "nodeManager": "npm"
     }
+  },
+  "mcp": {
+    "servers": {
+      "wiki-lm": {
+        "command": "${HOME}/Secretarius/Wiki_LM/.venv/bin/python3",
+        "args": ["${HOME}/Secretarius/Wiki_LM/tools/mcp_server.py"]
+      }
+    }
   }
 }
