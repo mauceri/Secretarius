@@ -1,81 +1,84 @@
----
-name: wiki-lm
-description: Interroger et gérer le wiki personnel Wiki_LM (Secretarius). Ingestion de sources, requêtes en langage naturel, lint du wiki. Déclencher sur /wiki-lm ou toute demande liée au wiki personnel.
----
+# wiki-lm — Skill Tiron
 
-# Skill : wiki-lm
+Utiliser les outils MCP `wiki-lm` pour gérer le pipeline documentaire Wiki_LM depuis Telegram.
 
-## Rôle
+## Quand utiliser
 
-Interroger le wiki personnel Wiki_LM (Secretarius) en langage naturel.
+- L'utilisateur envoie une URL ou un hashtag → `wiki_capture`
+- L'utilisateur demande d'ingérer les URLs en attente → `wiki_ingest`
+- L'utilisateur pose une question sur le wiki → `wiki_query`
+- L'utilisateur demande les tags → `wiki_tags`
+- L'utilisateur demande combien d'URLs attendent → `wiki_ingest_status`
+- L'utilisateur demande de mettre à jour la base de connaissance → `wiki_kb_update`
 
-## Configuration
+## Outils
+
+### `wiki_capture(text)`
+
+Capture les URLs et les notes dans `raw/` pour traitement ultérieur.
+
+- Extrait automatiquement les `#hashtags` comme tags
+- Les URLs créent des fichiers `.url` (traités par `wiki_ingest`)
+- Le texte restant crée un fichier `.md` (note locale)
+- Retourne `{files: ["nom-fichier.url", ...]}`
+
+Exemple : `wiki_capture("#linguistique https://example.com Note personnelle")`
+
+**Après `wiki_capture`, ne pas appeler `wiki_ingest` immédiatement sauf si l'utilisateur le demande explicitement.** Le pipeline est asynchrone.
+
+### `wiki_ingest()`
+
+Traite tous les `.url` en attente : fetch → injection-guard → ingest.
+
+- Aucun paramètre
+- Retourne `{ingested: N, blocked: M, errors: K, blocked_details: [...], error_details: [...]}`
+- Si `blocked > 0` : signaler à l'utilisateur quels fichiers ont été bloqués et pourquoi
+- Si `errors > 0` : signaler les erreurs de fetch
+
+### `wiki_query(question, top_k=5)`
+
+Interroge le wiki. Retourne `{synthesis: "...", references: ["slug1", ...]}`.
+
+- Si `{error: "KB vide..."}` : suggérer de lancer `wiki_ingest` puis `wiki_kb_update`
+- Reformuler la synthèse dans le style de Tiron avant de l'envoyer à l'utilisateur
+
+### `wiki_tags()`
+
+Liste les tags disponibles. Retourne `{tags: [...]}`.
+
+### `wiki_ingest_status()`
+
+État de la file d'attente. Retourne `{pending: N, blocked_files: [...]}`.
+
+- `pending` : URLs prêtes à être ingérées au prochain `wiki_ingest()`
+- `blocked_files` : fichiers bloqués par injection-guard (ne seront pas réingérés automatiquement)
+
+### `wiki_kb_update()`
+
+Met à jour la base de connaissance depuis le dernier clustering.
+
+- Retourne `{status: "ok", clustering: "...", created: N, updated: M, excluded: K}`
+- Si `{status: "already_running"}` : une mise à jour est déjà en cours, patienter
+- À appeler après une ingestion importante pour mettre à jour les axes thématiques
+
+## Flux typique
 
 ```
-Wiki      : ${OBSIDIAN_PATH}/Wiki_LM/
-Code      : ~/Secretarius/Wiki_LM/tools/
-Venv      : ~/Secretarius/Wiki_LM/.venv/
-Backend   : DeepSeek (OPENAI_BASE_URL=https://api.deepseek.com)
+Utilisateur: "#nlp https://arxiv.org/abs/2406.12345"
+Tiron: wiki_capture("#nlp https://arxiv.org/abs/2406.12345")
+→ Réponse : "Capturé : 20260527-arxiv-org.url"
+
+Utilisateur: "Ingère"
+Tiron: wiki_ingest()
+→ Réponse : "Ingéré : 1 article. Aucun blocage."
+
+Utilisateur: "Que dit le wiki sur l'attention multi-tête ?"
+Tiron: wiki_query("Que dit le wiki sur l'attention multi-tête ?")
+→ Réponse : [synthèse reformulée]
 ```
 
-## Commandes disponibles
+## Comportement en cas d'erreur
 
-### Interroger le wiki
-
-```bash
-cd ~/Secretarius/Wiki_LM && source .venv/bin/activate && \
-  python tools/query.py "<question>" --top 5
-```
-
-### Interroger et sauvegarder la synthèse comme page wiki
-
-```bash
-cd ~/Secretarius/Wiki_LM && source .venv/bin/activate && \
-  python tools/query.py "<question>" --top 5 --save
-```
-
-### Recherche rapide BM25 (sans LLM)
-
-```bash
-cd ~/Secretarius/Wiki_LM && source .venv/bin/activate && \
-  python tools/search.py "<mots-clés>" --top 5
-```
-
-### État du wiki (lint)
-
-```bash
-cd ~/Secretarius/Wiki_LM && source .venv/bin/activate && \
-  python tools/lint.py
-```
-
-### Reconstruire le wiki depuis raw/
-
-```bash
-cd ~/Secretarius/Wiki_LM && source .venv/bin/activate && python tools/ingest.py --raw
-```
-
-Ingestion incrémentale : traite uniquement les fichiers de `raw/` non encore ingérés.
-
-Pour reconstruire entièrement :
-
-```bash
-cd ~/Secretarius/Wiki_LM && source .venv/bin/activate && python tools/ingest.py --raw --force
-```
-
-Types supportés : `.url` → URL, `.md` → note, `.pdf` → PDF
-
-## Comportement
-
-- Toujours commencer par une recherche BM25 pour identifier les pages pertinentes
-- Si la question est précise → `query.py` avec synthèse LLM
-- Si l'utilisateur trouve la réponse particulièrement intéressante → proposer `--save`
-- Citer les pages sources avec [[slug]] dans la réponse
-- Si aucun résultat BM25 → dire clairement que le wiki ne couvre pas encore ce sujet
-
-## Déclencheurs typiques
-
-- "Wiki : comment Shannon et Salton sont-ils reliés ?"
-- "Qu'est-ce que le Memex ?"
-- "Cherche dans le wiki : pensée associative"
-- "Quel est l'état du wiki ?" → lint
-- "Reconstruit le wiki" / "Ingère raw/" → ingest --raw
+- `injection-guard unavailable` dans `blocked_details` : le service injection-guard est arrêté. Signaler à l'utilisateur et lui indiquer de vérifier `systemctl --user status openclaw-injection-guard.service`.
+- Erreur de fetch : URL inaccessible (timeout, 404, etc.). Signaler le fichier `.url.error`.
+- `{status: "error"}` sur `wiki_kb_update` : aucun clustering disponible — lancer `wiki_ingest` d'abord pour créer des embeddings.
