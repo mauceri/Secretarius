@@ -180,6 +180,13 @@ else
   openclaw plugins install --force "${SCRIPT_DIR}/openclaw-mcp-adapter" || \
     warn "openclaw plugins install openclaw-mcp-adapter échoué — les outils MCP ne seront pas exposés à l'agent"
 fi
+# openclaw ne lance pas toujours npm install selon la version — garantir les dépendances
+ADAPTER_EXT="${OPENCLAW_PATH}/extensions/openclaw-mcp-adapter"
+if [[ -f "${ADAPTER_EXT}/package.json" ]] && ! [[ -d "${ADAPTER_EXT}/node_modules/@modelcontextprotocol" ]]; then
+  info "Installation des dépendances npm de openclaw-mcp-adapter..."
+  (cd "${ADAPTER_EXT}" && npm install --omit=dev --silent) || \
+    warn "npm install échoué dans ${ADAPTER_EXT} — @modelcontextprotocol/sdk manquant"
+fi
 
 # fastmcp (dépendance du serveur MCP Wiki_LM)
 if "${HOME}/Secretarius/Wiki_LM/.venv/bin/python3" -c "import fastmcp" &>/dev/null; then
