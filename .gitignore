@@ -29,3 +29,4 @@ openclaw-config/gateway.systemd.env
 *.log
 .DS_Store
 .worktrees/
+node_modules/
