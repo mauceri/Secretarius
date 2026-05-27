@@ -7,8 +7,12 @@ export class McpClientPool {
         const client = new Client({ name: "openclaw-mcp-adapter", version: "0.1.0" });
         const transport = this.createTransport(config);
         await client.connect(transport);
-        // Watch for stdio process exit
         if (transport instanceof StdioClientTransport) {
+            // unref() évite que le sous-processus MCP bloque la sortie du processus parent
+            // (notamment lors de `openclaw plugins install` qui charge le plugin en in-process)
+            const proc = transport._process ?? transport.process;
+            if (proc?.unref)
+                proc.unref();
             transport.onerror = () => this.markDisconnected(config.name);
             transport.onclose = () => this.markDisconnected(config.name);
         }
