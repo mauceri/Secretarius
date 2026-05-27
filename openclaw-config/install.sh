@@ -122,6 +122,59 @@ else
   info "scout-watcher installé dans ${HOME}/.local/bin"
 fi
 
+# Injection guard
+GUARD_TARGET="${HOME}/.local/bin/injection_guard.py"
+GUARD_PROCESS_TARGET="${HOME}/.local/bin/scout_process.py"
+GUARD_SERVICE_TARGET="${SYSTEMD_USER_DIR}/openclaw-injection-guard.service"
+
+if [[ -f "$GUARD_TARGET" && "$FORCE" != "true" ]]; then
+  info "injection_guard.py existe déjà — ignoré"
+else
+  cp "${SCRIPT_DIR}/injection_guard.py" "$GUARD_TARGET"
+  chmod +x "$GUARD_TARGET"
+  info "injection_guard.py installé dans ${HOME}/.local/bin"
+fi
+
+if [[ -f "$GUARD_PROCESS_TARGET" && "$FORCE" != "true" ]]; then
+  info "scout_process.py existe déjà — ignoré"
+else
+  cp "${SCRIPT_DIR}/scout_process.py" "$GUARD_PROCESS_TARGET"
+  chmod +x "$GUARD_PROCESS_TARGET"
+  info "scout_process.py installé dans ${HOME}/.local/bin"
+fi
+
+if [[ -f "$GUARD_SERVICE_TARGET" && "$FORCE" != "true" ]]; then
+  info "openclaw-injection-guard.service existe déjà — ignoré"
+else
+  cp "${SCRIPT_DIR}/openclaw-injection-guard.service" "$GUARD_SERVICE_TARGET"
+  info "openclaw-injection-guard.service installé dans ${SYSTEMD_USER_DIR}"
+fi
+
+# Dépendances Python pour injection-guard
+info "Installation des dépendances Python (flask, beautifulsoup4, requests)..."
+pip install --user --quiet flask beautifulsoup4 requests || \
+  warn "pip install échoué — relancer manuellement : pip install flask beautifulsoup4 requests"
+
+# transformers et torch (optionnel — slow download, ~1GB)
+if python3 -c "import transformers" &>/dev/null 2>&1; then
+  info "transformers déjà installé"
+else
+  info "Installation de transformers et torch (peut prendre plusieurs minutes)..."
+  pip install --user --quiet transformers torch || \
+    warn "pip install transformers échoué — DeBERTa désactivé, mode regex-only"
+fi
+
+# Recharger et démarrer injection-guard si TELEGRAM_BOT_TOKEN est renseigné
+if [[ -n "${TELEGRAM_BOT_TOKEN:-}" ]]; then
+  systemctl --user daemon-reload 2>/dev/null || true
+  systemctl --user enable --now openclaw-injection-guard.service 2>/dev/null && \
+    info "openclaw-injection-guard.service démarré" || \
+    warn "Démarrage automatique échoué — lancer manuellement : systemctl --user start openclaw-injection-guard.service"
+else
+  info "TELEGRAM_BOT_TOKEN absent — openclaw-injection-guard.service non démarré automatiquement"
+  info "Démarrer avec : systemctl --user start openclaw-injection-guard.service"
+fi
+
 # Workspace .md et skills
 WORKSPACE_SRC="${SCRIPT_DIR}/workspace"
 WORKSPACE_DST="${OPENCLAW_PATH}/workspace"
