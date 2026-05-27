@@ -231,7 +231,18 @@
           "session_status",
           "group:runtime",
           "group:fs",
-          "mcp-adapter"
+          "wiki_capture",
+          "wiki_ingest",
+          "wiki_query",
+          "wiki_tags",
+          "wiki_ingest_status",
+          "wiki_kb_update",
+          "wiki-lm__wiki_capture",
+          "wiki-lm__wiki_ingest",
+          "wiki-lm__wiki_query",
+          "wiki-lm__wiki_tags",
+          "wiki-lm__wiki_ingest_status",
+          "wiki-lm__wiki_kb_update"
         ],
         "deny": [
           "browser",
@@ -310,6 +321,9 @@
     }
   },
   "plugins": {
+    "allow": [
+      "openclaw-mcp-adapter"
+    ],
     "entries": {
       "telegram": {
         "enabled": true
@@ -322,23 +336,12 @@
       },
       "ollama": {
         "enabled": true
+      },
+      "openclaw-mcp-adapter": {
+        "enabled": true
       }
     },
-    "installs": {
-      "openclaw-mcp-adapter": {
-        "source": "npm",
-        "spec": "openclaw-mcp-adapter",
-        "installPath": "${HOME}/.openclaw/extensions/openclaw-mcp-adapter",
-        "version": "0.1.1",
-        "resolvedName": "openclaw-mcp-adapter",
-        "resolvedVersion": "0.1.1",
-        "resolvedSpec": "openclaw-mcp-adapter@0.1.1",
-        "integrity": "sha512-HqNPiC14f3KoYWIAz/6jB0a7M3kM3+BwtfAxwAoaWbZCBNcM6P5GB0IqzIHaeaBlJYeezHinQj431GN8c2IRbg==",
-        "shasum": "f196c78d966b149b121407cbc14b29da0a8428d9",
-        "resolvedAt": "2026-04-10T16:13:28.904Z",
-        "installedAt": "2026-04-10T16:13:31.362Z"
-      }
-    }
+    "installs": {}
   },
   "skills": {
     "install": {
@@ -346,6 +349,7 @@
     }
   },
   "mcp": {
+    "toolPrefix": false,
     "servers": {
       "wiki-lm": {
         "command": "${HOME}/Secretarius/Wiki_LM/.venv/bin/python3",
