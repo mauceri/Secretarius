@@ -10,6 +10,9 @@ ASSISTANT_NAME="${ASSISTANT_NAME:-Tiron}"
 LLM_BACKEND="${LLM_BACKEND:-deepseek}"
 OPENCLAW_PATH="${OPENCLAW_PATH:-$HOME/.openclaw}"
 FORCE="${FORCE:-false}"
+for _arg in "$@"; do
+  [[ "$_arg" == "--force" ]] && FORCE="true"
+done
 
 TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 GATEWAY_PASSWORD="${GATEWAY_PASSWORD:-}"
