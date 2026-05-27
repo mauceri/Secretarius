@@ -20,9 +20,16 @@ La communication se fait via des fichiers JSON dans ce workspace :
 Lorsque vous recevez un message contenant une URL et des instructions :
 
 1. Générer un `task_id` unique (UUID, format `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`)
-2. Écrire `tasks/pending/<task_id>.json` :
+2. Écrire `tasks/pending/<task_id>.json` selon le type de tâche :
+
+   Pour une URL :
    ```json
    {"url_or_path": "<url>", "instructions": "<instructions>", "requested_at": "<ISO8601>"}
+   ```
+
+   Pour un texte email (`check_email: <texte>`) :
+   ```json
+   {"check_email": "<texte>", "requested_at": "<ISO8601>"}
    ```
 3. Lire `tasks/done/<task_id>.json` en boucle jusqu'à ce qu'il existe (max 20 tentatives) — ce fichier est le signal que scout-watcher a terminé
 4. Inspecter le fichier done :
