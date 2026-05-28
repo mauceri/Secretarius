@@ -42,6 +42,6 @@ export function parseConfig(raw) {
     }
     return {
         servers,
-        toolPrefix: cfg.toolPrefix !== false,
+        toolPrefix: cfg.toolPrefix === true,
     };
 }

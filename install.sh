@@ -199,14 +199,22 @@ if systemctl --user daemon-reload &>/dev/null 2>&1 && command -v openclaw &>/dev
   if grep -q "^TELEGRAM_BOT_TOKEN=.\+" "${OPENCLAW_PATH}/gateway.systemd.env" 2>/dev/null; then
     systemctl --user restart openclaw-gateway.service openclaw-scout.service
     info "Services OpenClaw démarrés ✓"
-    # Installer openclaw-mcp-adapter APRÈS le redémarrage du gateway.
-    # plugins.installs n'est écrit que quand le gateway est actif (pas en offline).
-    # Un appel anticipé (pendant le hot-reload de openclaw.json) crée une race condition.
+    # Étape 1 : openclaw plugins install déploie les fichiers JS dans extensions/
+    # et écrit plugins.installs dans openclaw.json. Cela déclenche un
+    # "supervisor restart" (exit 0) — le gateway s'arrête, Restart=on-failure
+    # ne le relance pas. C'est attendu.
     sleep 5
     ADAPTER_SRC="${SECRETARIUS_ROOT}/openclaw-config/openclaw-mcp-adapter"
     info "Installation de openclaw-mcp-adapter..."
     openclaw plugins install --force "${ADAPTER_SRC}" 2>&1 | grep -E "(Installed|failed|WARN|warn)" || true
     info "openclaw-mcp-adapter installé ✓"
+    # Étape 2 : re-synchroniser .bak (plugins.installs vient d'être mis à jour
+    # par openclaw plugins install ; sans sync, le prochain démarrage détecte
+    # une divergence et restaure silencieusement l'ancienne config).
+    cp "${OPENCLAW_PATH}/openclaw.json" "${OPENCLAW_PATH}/openclaw.json.bak" 2>/dev/null || true
+    # Étape 3 : redémarrer le gateway avec les nouveaux fichiers JS déployés.
+    systemctl --user restart openclaw-gateway.service openclaw-scout.service
+    info "Gateway redémarré avec l'adaptateur MCP à jour ✓"
   else
     info "Services OpenClaw activés (démarreront après renseignement des secrets)"
   fi

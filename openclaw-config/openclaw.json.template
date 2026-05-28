@@ -349,7 +349,6 @@
     }
   },
   "mcp": {
-    "toolPrefix": false,
     "servers": {
       "wiki-lm": {
         "command": "${HOME}/Secretarius/Wiki_LM/.venv/bin/python3",

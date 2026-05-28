@@ -59,6 +59,6 @@ export function parseConfig(raw: unknown): McpAdapterConfig {
 
   return {
     servers,
-    toolPrefix: cfg.toolPrefix !== false,
+    toolPrefix: cfg.toolPrefix === true,
   };
 }
