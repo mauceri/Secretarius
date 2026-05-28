@@ -12,7 +12,7 @@ error() { echo -e "${RED}[ERREUR]${NC} $*" >&2; }
 
 # Source NVM (sessions SSH non-interactives ne chargent pas .bashrc)
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-[[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh" --no-use 2>/dev/null || true
+[[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh" 2>/dev/null || true
 
 OPENCLAW_PATH="${OPENCLAW_PATH/#\~/$HOME}"
 
