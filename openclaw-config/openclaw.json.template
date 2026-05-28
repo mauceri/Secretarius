@@ -237,12 +237,14 @@
           "wiki_query",
           "wiki_tags",
           "wiki_ingest_status",
+          "wiki_list_pending",
           "wiki_kb_update",
           "wiki-lm__wiki_capture",
           "wiki-lm__wiki_ingest",
           "wiki-lm__wiki_query",
           "wiki-lm__wiki_tags",
           "wiki-lm__wiki_ingest_status",
+          "wiki-lm__wiki_list_pending",
           "wiki-lm__wiki_kb_update"
         ],
         "deny": [
