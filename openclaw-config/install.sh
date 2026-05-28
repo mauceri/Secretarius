@@ -162,13 +162,18 @@ else
   info "openclaw-injection-guard.service installé dans ${SYSTEMD_USER_DIR}"
 fi
 
-# Dépendances Python pour injection-guard
-if python3 -c "import flask, bs4, requests" &>/dev/null; then
-  info "flask, beautifulsoup4, requests déjà installés"
+# Dépendances Python pour injection-guard (vérifiées dans le venv Wiki_LM)
+VENV_PY="${SCRIPT_DIR}/../Wiki_LM/.venv/bin/python3"
+if [[ -x "$VENV_PY" ]]; then
+  if "$VENV_PY" -c "import flask, bs4, requests" &>/dev/null 2>&1; then
+    info "flask, beautifulsoup4, requests déjà installés dans le venv"
+  else
+    info "Installation de flask, beautifulsoup4, requests dans le venv..."
+    "${SCRIPT_DIR}/../Wiki_LM/.venv/bin/pip" install --quiet flask beautifulsoup4 requests || \
+      warn "pip install échoué dans le venv"
+  fi
 else
-  info "Installation des dépendances Python (flask, beautifulsoup4, requests)..."
-  pip install --user --quiet flask beautifulsoup4 requests || \
-    warn "pip install échoué — relancer manuellement : pip install flask beautifulsoup4 requests"
+  warn "Venv Wiki_LM non encore créé — flask/bs4/requests installés à l'étape suivante"
 fi
 
 # transformers et torch (optionnel — slow download, ~1GB)
