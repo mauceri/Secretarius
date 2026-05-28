@@ -27,6 +27,11 @@ _GUARD_URL = "http://localhost:8990/check"
 _FETCH_TIMEOUT = 30
 _kb_update_lock = threading.Lock()
 
+# État de l'ingestion asynchrone
+_ingest_lock = threading.Lock()
+_ingest_running = False
+_ingest_result: dict | None = None  # résultat du dernier run terminé
+
 
 def _wiki_root() -> Path:
     """Racine du projet Wiki_LM (contient wiki/ et raw/)."""
@@ -81,9 +86,9 @@ def _screen(html: str) -> tuple[str, str | None]:
 _INGESTABLE_SUFFIXES = {".url", ".md", ".pdf", ".txt"}
 
 
-@mcp.tool()
-def wiki_ingest() -> dict:
-    """Traite les fichiers en attente dans raw/ : .url via injection-guard, .md/.pdf/.txt directement."""
+def _run_ingest() -> None:
+    """Exécuté dans un thread de fond par wiki_ingest."""
+    global _ingest_running, _ingest_result
     raw = _raw_dir()
     wiki_root = _wiki_root()
     ingestor = Ingestor(wiki_root, raw_path=raw)
@@ -95,12 +100,6 @@ def wiki_ingest() -> dict:
         and f.name not in manifest
         and f.name != ingestor._MANIFEST
     ]
-
-    if not all_pending:
-        return {
-            "ingested": 0, "blocked": 0, "errors": 0,
-            "blocked_details": [], "error_details": [],
-        }
 
     ingested = blocked = errors = 0
     blocked_details: list[dict] = []
@@ -142,7 +141,6 @@ def wiki_ingest() -> dict:
                 error_details.append({"file": f.name, "reason": str(exc)})
                 errors += 1
         else:
-            # .md / .pdf / .txt — contenu local, pas d'injection-guard nécessaire
             user_tags = Ingestor._parse_raw_tags(f)
             try:
                 slug = ingestor.ingest(
@@ -154,13 +152,39 @@ def wiki_ingest() -> dict:
                 error_details.append({"file": f.name, "reason": str(exc)})
                 errors += 1
 
-    return {
-        "ingested": ingested,
-        "blocked": blocked,
-        "errors": errors,
-        "blocked_details": blocked_details,
-        "error_details": error_details,
-    }
+    with _ingest_lock:
+        _ingest_result = {
+            "status": "done",
+            "ingested": ingested, "blocked": blocked, "errors": errors,
+            "blocked_details": blocked_details, "error_details": error_details,
+        }
+        _ingest_running = False
+
+
+@mcp.tool()
+def wiki_ingest() -> dict:
+    """Lance l'ingestion en tâche de fond et retourne immédiatement. Interroger wiki_ingest_status pour le résultat."""
+    global _ingest_running
+    with _ingest_lock:
+        if _ingest_running:
+            return {"status": "already_running"}
+        raw = _raw_dir()
+        if not raw.exists():
+            return {"status": "started", "queued": 0}
+        ingestor = Ingestor(_wiki_root(), raw_path=raw)
+        manifest = ingestor._load_manifest()
+        queued = sum(
+            1 for f in raw.iterdir()
+            if f.suffix in _INGESTABLE_SUFFIXES
+            and f.name not in manifest
+            and f.name != ingestor._MANIFEST
+        )
+        if queued == 0:
+            return {"status": "nothing_to_do", "queued": 0}
+        _ingest_running = True
+        t = threading.Thread(target=_run_ingest, daemon=True)
+        t.start()
+    return {"status": "started", "queued": queued}
 
 
 @mcp.tool()
@@ -188,10 +212,14 @@ def wiki_tags() -> dict:
 
 @mcp.tool()
 def wiki_ingest_status() -> dict:
-    """Retourne le nombre de .url en attente et la liste des fichiers bloqués."""
+    """Retourne l'état de l'ingestion en cours (ou du dernier run) et les fichiers en attente/bloqués."""
+    with _ingest_lock:
+        running = _ingest_running
+        last = _ingest_result.copy() if _ingest_result else None
+
     raw = _raw_dir()
     if not raw.exists():
-        return {"pending": 0, "blocked_files": []}
+        return {"running": running, "last_run": last, "pending": 0, "blocked_files": []}
     ingestor = Ingestor(_wiki_root(), raw_path=raw)
     manifest = ingestor._load_manifest()
     pending_files = [
@@ -203,7 +231,12 @@ def wiki_ingest_status() -> dict:
     blocked_files = sorted(
         f.name for f in raw.iterdir() if f.name.endswith(".url.blocked")
     )
-    return {"pending": len(pending_files), "blocked_files": blocked_files}
+    return {
+        "running": running,
+        "last_run": last,
+        "pending": len(pending_files),
+        "blocked_files": blocked_files,
+    }
 
 
 @mcp.tool()
