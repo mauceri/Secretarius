@@ -34,6 +34,12 @@ fi
 info()  { echo "[INFO] $*"; }
 warn()  { echo "[WARN] $*"; }
 
+# Sourcer NVM si nécessaire (sessions SSH non-interactives ne chargent pas .bashrc)
+if ! command -v openclaw &>/dev/null; then
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  [[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh" 2>/dev/null || true
+fi
+
 # Détecter le binaire openclaw (NVM, npm global, ou chemin par défaut)
 OPENCLAW_BIN=$(command -v openclaw 2>/dev/null || true)
 if [[ -z "$OPENCLAW_BIN" ]]; then
