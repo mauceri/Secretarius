@@ -190,6 +190,23 @@ def wiki_ingest_status() -> dict:
 
 
 @mcp.tool()
+def wiki_list_pending() -> dict:
+    """Liste les fichiers en attente d'ingestion dans raw/ avec leurs tags."""
+    raw = _raw_dir()
+    if not raw.exists():
+        return {"pending": [], "blocked": [], "raw_dir": str(raw)}
+    ingestor = Ingestor(_wiki_root(), raw_path=raw)
+    manifest = ingestor._load_manifest()
+    pending = []
+    for f in sorted(raw.iterdir()):
+        if f.suffix == ".url" and f.name not in manifest:
+            tags = Ingestor._parse_raw_tags(f)
+            pending.append({"file": f.name, "tags": tags or []})
+    blocked = sorted(f.name for f in raw.iterdir() if f.name.endswith(".url.blocked"))
+    return {"pending": pending, "blocked": blocked, "raw_dir": str(raw)}
+
+
+@mcp.tool()
 def wiki_kb_update() -> dict:
     """Lance la mise à jour du KB depuis le dernier clustering disponible."""
     if not _kb_update_lock.acquire(blocking=False):
