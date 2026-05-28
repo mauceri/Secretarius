@@ -78,20 +78,25 @@ def _screen(html: str) -> tuple[str, str | None]:
     return clean, None
 
 
+_INGESTABLE_SUFFIXES = {".url", ".md", ".pdf", ".txt"}
+
+
 @mcp.tool()
 def wiki_ingest() -> dict:
-    """Traite les .url en attente dans raw/ via injection-guard, puis ingère."""
+    """Traite les fichiers en attente dans raw/ : .url via injection-guard, .md/.pdf/.txt directement."""
     raw = _raw_dir()
     wiki_root = _wiki_root()
     ingestor = Ingestor(wiki_root, raw_path=raw)
     manifest = ingestor._load_manifest()
 
-    pending = [
+    all_pending = [
         f for f in sorted(raw.iterdir())
-        if f.suffix == ".url" and f.name not in manifest
+        if f.suffix in _INGESTABLE_SUFFIXES
+        and f.name not in manifest
+        and f.name != ingestor._MANIFEST
     ]
 
-    if not pending:
+    if not all_pending:
         return {
             "ingested": 0, "blocked": 0, "errors": 0,
             "blocked_details": [], "error_details": [],
@@ -101,43 +106,53 @@ def wiki_ingest() -> dict:
     blocked_details: list[dict] = []
     error_details: list[dict] = []
 
-    for url_file in pending:
-        url = Ingestor._parse_url_file(url_file)
-        if not url:
-            url_file.rename(url_file.parent / (url_file.name + ".error"))
-            error_details.append({"file": url_file.name, "reason": "fichier .url vide"})
-            errors += 1
-            continue
-
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": "Wiki_LM/1.0"})
-            with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT) as resp:
-                charset = resp.headers.get_content_charset("utf-8")
-                html = resp.read().decode(charset, errors="replace")
-        except Exception as exc:
-            url_file.rename(url_file.parent / (url_file.name + ".error"))
-            error_details.append({"file": url_file.name, "reason": str(exc)})
-            errors += 1
-            continue
-
-        clean_text, block_reason = _screen(html)
-        if block_reason is not None:
-            url_file.rename(url_file.parent / (url_file.name + ".blocked"))
-            blocked_details.append({"file": url_file.name, "reason": block_reason})
-            blocked += 1
-            continue
-
-        user_tags = Ingestor._parse_raw_tags(url_file)
-        try:
-            slug = ingestor.ingest(
-                url, content=clean_text,
-                extra_tags=user_tags or None, rename_raw=False,
-            )
-            ingestor._mark_ingested(url_file.name, slug=slug)
-            ingested += 1
-        except Exception as exc:
-            error_details.append({"file": url_file.name, "reason": str(exc)})
-            errors += 1
+    for f in all_pending:
+        if f.suffix == ".url":
+            url = Ingestor._parse_url_file(f)
+            if not url:
+                f.rename(f.parent / (f.name + ".error"))
+                error_details.append({"file": f.name, "reason": "fichier .url vide"})
+                errors += 1
+                continue
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "Wiki_LM/1.0"})
+                with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT) as resp:
+                    charset = resp.headers.get_content_charset("utf-8")
+                    html = resp.read().decode(charset, errors="replace")
+            except Exception as exc:
+                f.rename(f.parent / (f.name + ".error"))
+                error_details.append({"file": f.name, "reason": str(exc)})
+                errors += 1
+                continue
+            clean_text, block_reason = _screen(html)
+            if block_reason is not None:
+                f.rename(f.parent / (f.name + ".blocked"))
+                blocked_details.append({"file": f.name, "reason": block_reason})
+                blocked += 1
+                continue
+            user_tags = Ingestor._parse_raw_tags(f)
+            try:
+                slug = ingestor.ingest(
+                    url, content=clean_text,
+                    extra_tags=user_tags or None, rename_raw=False,
+                )
+                ingestor._mark_ingested(f.name, slug=slug)
+                ingested += 1
+            except Exception as exc:
+                error_details.append({"file": f.name, "reason": str(exc)})
+                errors += 1
+        else:
+            # .md / .pdf / .txt — contenu local, pas d'injection-guard nécessaire
+            user_tags = Ingestor._parse_raw_tags(f)
+            try:
+                slug = ingestor.ingest(
+                    str(f), extra_tags=user_tags or None, rename_raw=False,
+                )
+                ingestor._mark_ingested(f.name, slug=slug)
+                ingested += 1
+            except Exception as exc:
+                error_details.append({"file": f.name, "reason": str(exc)})
+                errors += 1
 
     return {
         "ingested": ingested,
@@ -181,7 +196,9 @@ def wiki_ingest_status() -> dict:
     manifest = ingestor._load_manifest()
     pending_files = [
         f.name for f in sorted(raw.iterdir())
-        if f.suffix == ".url" and f.name not in manifest
+        if f.suffix in _INGESTABLE_SUFFIXES
+        and f.name not in manifest
+        and f.name != ingestor._MANIFEST
     ]
     blocked_files = sorted(
         f.name for f in raw.iterdir() if f.name.endswith(".url.blocked")
@@ -199,7 +216,7 @@ def wiki_list_pending() -> dict:
     manifest = ingestor._load_manifest()
     pending = []
     for f in sorted(raw.iterdir()):
-        if f.suffix == ".url" and f.name not in manifest:
+        if f.suffix in _INGESTABLE_SUFFIXES and f.name not in manifest and f.name != ingestor._MANIFEST:
             tags = Ingestor._parse_raw_tags(f)
             pending.append({"file": f.name, "tags": tags or []})
     blocked = sorted(f.name for f in raw.iterdir() if f.name.endswith(".url.blocked"))
