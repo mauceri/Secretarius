@@ -9,7 +9,7 @@ Trois principes fondateurs :
 - **Frugalité** : consommation comparable à un ordinateur de jeu.
 - **Confidentialité** : vos données restent sous votre contrôle.
 
-→ [Présentation complète (PDF)](docs/Secretarius.pdf)
+→ `docs/Secretarius.md` — présentation complète du projet (à venir)
 
 ---
 
@@ -126,7 +126,7 @@ Secretarius/
 │   └── install.sh                  # Génère ~/.openclaw/ via envsubst
 │
 └── docs/
-    ├── Secretarius.pdf             # Présentation complète du projet
+    ├── Secretarius.md              # Présentation complète du projet
     └── history/                    # Historique des sessions de développement
 ```
 
@@ -143,4 +143,4 @@ OpenClaw présente des risques de sécurité importants dans sa configuration st
 - **Injection guard** : filtre heuristique sur le contenu fetché.
 - **Allowlist réseau** : les communications externes sont limitées aux destinations pré-approuvées.
 
-Ces mesures réduisent fortement la surface d'attaque sans l'éliminer complètement. Voir la [présentation](docs/Secretarius.pdf) pour une analyse détaillée.
+Ces mesures réduisent fortement la surface d'attaque sans l'éliminer complètement. Voir `docs/Secretarius.md` pour une analyse détaillée.
