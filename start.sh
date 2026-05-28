@@ -50,6 +50,17 @@ if ! grep -q "^TELEGRAM_BOT_TOKEN=.\+" "${OPENCLAW_PATH}/gateway.systemd.env" 2>
   exit 1
 fi
 
+# Propager DEEPSEEK_API_KEY vers Wiki_LM/.env si absent
+WIKI_ENV="${SECRETARIUS_ROOT}/Wiki_LM/.env"
+if [[ -f "$WIKI_ENV" ]] && grep -q "^DEEPSEEK_API_KEY=$" "$WIKI_ENV" 2>/dev/null; then
+  GW_KEY=$(grep "^DEEPSEEK_API_KEY=" "${OPENCLAW_PATH}/gateway.systemd.env" 2>/dev/null \
+    | cut -d'=' -f2- | tr -d '"' || true)
+  if [[ -n "$GW_KEY" ]]; then
+    sed -i "s|^DEEPSEEK_API_KEY=.*|DEEPSEEK_API_KEY=${GW_KEY}|" "$WIKI_ENV"
+    info "DEEPSEEK_API_KEY propagé vers Wiki_LM/.env ✓"
+  fi
+fi
+
 # Étape 1 : démarrer le gateway
 systemctl --user restart openclaw-gateway.service openclaw-scout.service
 info "openclaw-gateway + openclaw-scout démarrés ✓"
