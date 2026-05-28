@@ -50,16 +50,37 @@ if ! grep -q "^TELEGRAM_BOT_TOKEN=.\+" "${OPENCLAW_PATH}/gateway.systemd.env" 2>
   exit 1
 fi
 
+# Étape 1 : démarrer le gateway
 systemctl --user restart openclaw-gateway.service openclaw-scout.service
 info "openclaw-gateway + openclaw-scout démarrés ✓"
 
+# Étape 2 : charger le plugin MCP adapter (OpenClaw ne le charge pas au démarrage
+# depuis extensions/ ; il faut déclencher plugins install sur gateway vivant).
+# plugins install écrit plugins.installs et cause un "supervisor restart" (exit 0).
+sleep 5
+ADAPTER_SRC="${SECRETARIUS_ROOT}/openclaw-config/openclaw-mcp-adapter"
+if [[ -d "$ADAPTER_SRC" ]] && command -v openclaw &>/dev/null; then
+  info "Chargement de openclaw-mcp-adapter..."
+  openclaw plugins install --force "${ADAPTER_SRC}" 2>&1 | grep -E "(Installed|failed|WARN|warn)" || true
+  # Re-synchroniser .bak pour éviter l'anti-clobber au prochain démarrage
+  cp "${OPENCLAW_PATH}/openclaw.json" "${OPENCLAW_PATH}/openclaw.json.bak" 2>/dev/null || true
+  # Étape 3 : relancer après le supervisor restart déclenché par plugins install
+  systemctl --user restart openclaw-gateway.service openclaw-scout.service
+  info "Gateway redémarré avec l'adaptateur MCP ✓"
+else
+  warn "openclaw-mcp-adapter introuvable ou openclaw absent — outils wiki_* non chargés"
+fi
+
+# Attendre l'enregistrement des outils dans le log fichier d'OpenClaw
 echo ""
 info "Attente de l'enregistrement des outils MCP (~60s)..."
+OPENCLAW_LOG="/tmp/openclaw/openclaw-$(date +%Y-%m-%d).log"
+LOG_BASELINE=$(wc -l < "$OPENCLAW_LOG" 2>/dev/null || echo 0)
 DEADLINE=$((SECONDS + 90))
 while [[ $SECONDS -lt $DEADLINE ]]; do
-  COUNT=$(journalctl --user -u openclaw-gateway.service --since "1 minute ago" 2>/dev/null \
-    | grep -c "Registered: wiki_" || true)
-  if [[ "$COUNT" -ge 6 ]]; then
+  COUNT=$(tail -n +"$((LOG_BASELINE + 1))" "$OPENCLAW_LOG" 2>/dev/null \
+    | grep -c "Registered: wiki_" || echo 0)
+  if [[ "${COUNT:-0}" -ge 6 ]]; then
     info "6 outils wiki_* enregistrés ✓"
     break
   fi
@@ -68,7 +89,7 @@ done
 
 if [[ $SECONDS -ge $DEADLINE ]]; then
   warn "Outils MCP non encore enregistrés après 90s — vérifier :"
-  warn "  journalctl --user -u openclaw-gateway.service -n 50"
+  warn "  grep 'Registered: wiki_' $OPENCLAW_LOG"
 fi
 
 echo ""
