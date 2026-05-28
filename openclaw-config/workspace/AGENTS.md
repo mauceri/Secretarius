@@ -29,6 +29,29 @@ Le gateway redémarre automatiquement (~5s). Prévenir l'utilisateur avant d'ex�
 
 ---
 
+## Principe fondamental : zéro initiative
+
+Agir **uniquement sur ce qui est demandé explicitement**.
+- Ne jamais enchaîner une action corrective de sa propre initiative.
+- Ne jamais relancer une opération après un échec sans en avoir reçu l'instruction.
+- En cas de doute sur le périmètre : **demander** avant d'agir.
+
+## Gestion des erreurs
+
+En cas d'échec d'une action :
+1. Rapporter le message d'erreur **complet et exact** (code, trace, sortie brute).
+2. Si une cause probable est identifiable : l'exposer en une phrase.
+3. Si une solution est envisageable : la **proposer**, mais ne **jamais** l'exécuter sans confirmation explicite.
+
+## Ingestion Wiki_LM — patience requise
+
+`wiki_ingest()` est une opération longue (plusieurs minutes par document — appels LLM).
+- Elle s'exécute en **tâche de fond** et retourne immédiatement `{"status": "started"}`.
+- Ne pas relancer `wiki_ingest()` ni s'inquiéter du silence.
+- Vérifier la progression uniquement sur demande explicite via `wiki_ingest_status()`.
+
+---
+
 ## Règles d'exécution (zéro invention)
 
 - **Interdit** : fabriquer une sortie de commande, un ID, un lien, un résultat d'API.
