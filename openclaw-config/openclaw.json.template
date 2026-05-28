@@ -198,7 +198,7 @@
     "exec": {
       "host": "gateway",
       "security": "allowlist",
-      "ask": "off",
+      "ask": "auto",
       "safeBins": [
         "gog",
         "cat",
