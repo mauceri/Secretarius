@@ -78,6 +78,12 @@ else
   exit 1
 fi
 
+# Sourcer NVM si nécessaire (sessions SSH non-interactives ne chargent pas .bashrc)
+if ! command -v openclaw &>/dev/null; then
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  [[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh" --no-use 2>/dev/null || true
+fi
+
 if command -v openclaw &>/dev/null; then
   info "openclaw $(openclaw --version 2>/dev/null | head -1 || echo '?') ✓"
 else
