@@ -79,7 +79,7 @@ LOG_BASELINE=$(wc -l < "$OPENCLAW_LOG" 2>/dev/null || echo 0)
 DEADLINE=$((SECONDS + 90))
 while [[ $SECONDS -lt $DEADLINE ]]; do
   COUNT=$(tail -n +"$((LOG_BASELINE + 1))" "$OPENCLAW_LOG" 2>/dev/null \
-    | grep -c "Registered: wiki_" || echo 0)
+    | grep -c "Registered: wiki_" || true)
   if [[ "${COUNT:-0}" -ge 6 ]]; then
     info "6 outils wiki_* enregistrés ✓"
     break
