@@ -261,7 +261,7 @@
     }
   },
   "messages": {
-    "ackReactionScope": "on-miss"
+    "ackReactionScope": "group-mentions"
   },
   "commands": {
     "native": "auto",
