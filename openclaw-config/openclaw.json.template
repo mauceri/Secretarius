@@ -221,6 +221,7 @@
       "tools": {
         "allow": [
           "gog",
+          "exec",
           "read",
           "write",
           "edit",
