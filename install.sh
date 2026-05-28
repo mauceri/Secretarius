@@ -168,6 +168,14 @@ if [[ ! -f "$WIKI_ENV" || "$FORCE" == "true" ]]; then
       ;;
     claude) sed -i "s|^WIKI_LLM_BACKEND=.*|WIKI_LLM_BACKEND=claude|" "$WIKI_ENV" ;;
   esac
+  # Propager DEEPSEEK_API_KEY depuis gateway.systemd.env si disponible
+  if [[ -z "${DEEPSEEK_API_KEY:-}" ]]; then
+    DEEPSEEK_API_KEY=$(grep "^DEEPSEEK_API_KEY=" "${OPENCLAW_PATH}/gateway.systemd.env" 2>/dev/null \
+      | cut -d'=' -f2- | tr -d '"' || true)
+  fi
+  if [[ -n "${DEEPSEEK_API_KEY:-}" ]]; then
+    sed -i "s|^DEEPSEEK_API_KEY=.*|DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}|" "$WIKI_ENV"
+  fi
   info "Wiki_LM/.env créé"
 else
   sed -i "s|^WIKI_PATH=.*|WIKI_PATH=${WIKI_PATH}|" "$WIKI_ENV"
