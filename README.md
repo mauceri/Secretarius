@@ -1,15 +1,15 @@
 # Secretarius
 
-**Secretarius est un assistant IA personnel, local, open source et frugal.**
+**Secretarius est une configuration sécurisée d'[OpenClaw](https://openclaw.dev) pour individus et petites structures**, enrichie d'une base de connaissances personnelle.
 
-Il ne cherche pas à remplacer l'humain, mais à constituer un collaborateur numérique qui évolue avec lui : plus il est utilisé, plus il accumule connaissances et compétences à partir de l'environnement documentaire et des méthodes de travail de son utilisateur.
+OpenClaw est un agent IA puissant, mais dangereux dans sa configuration standard : il donne à l'IA un accès large à la machine hôte et reste vulnérable aux injections de prompt. Secretarius corrige cela par une architecture de sécurité en plusieurs couches, tout en ajoutant une mémoire documentaire durable.
 
 Trois principes fondateurs :
 - **Indépendance** : hébergé sur votre propre machine ou serveur, sans dépendance aux fournisseurs cloud d'IA.
 - **Frugalité** : consommation comparable à un ordinateur de jeu.
 - **Confidentialité** : vos données restent sous votre contrôle.
 
-→ `docs/Secretarius.md` — présentation complète du projet (à venir)
+→ `docs/Secretarius.md` — présentation complète du projet
 
 ---
 
