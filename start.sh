@@ -58,6 +58,8 @@ info "openclaw-gateway + openclaw-scout démarrés ✓"
 # depuis extensions/ ; il faut déclencher plugins install sur gateway vivant).
 # plugins install écrit plugins.installs et cause un "supervisor restart" (exit 0).
 sleep 5
+OPENCLAW_LOG="/tmp/openclaw/openclaw-$(date +%Y-%m-%d).log"
+LOG_BASELINE=$(wc -l < "$OPENCLAW_LOG" 2>/dev/null || echo 0)
 ADAPTER_SRC="${SECRETARIUS_ROOT}/openclaw-config/openclaw-mcp-adapter"
 if [[ -d "$ADAPTER_SRC" ]] && command -v openclaw &>/dev/null; then
   info "Chargement de openclaw-mcp-adapter..."
@@ -71,12 +73,10 @@ else
   warn "openclaw-mcp-adapter introuvable ou openclaw absent — outils wiki_* non chargés"
 fi
 
-# Attendre l'enregistrement des outils dans le log fichier d'OpenClaw
+# Vérifier l'enregistrement des outils (enregistrés pendant le hot-reload de plugins install)
 echo ""
-info "Attente de l'enregistrement des outils MCP (~60s)..."
-OPENCLAW_LOG="/tmp/openclaw/openclaw-$(date +%Y-%m-%d).log"
-LOG_BASELINE=$(wc -l < "$OPENCLAW_LOG" 2>/dev/null || echo 0)
-DEADLINE=$((SECONDS + 90))
+info "Vérification de l'enregistrement des outils MCP..."
+DEADLINE=$((SECONDS + 30))
 while [[ $SECONDS -lt $DEADLINE ]]; do
   COUNT=$(tail -n +"$((LOG_BASELINE + 1))" "$OPENCLAW_LOG" 2>/dev/null \
     | grep -c "Registered: wiki_" || true)
@@ -88,7 +88,7 @@ while [[ $SECONDS -lt $DEADLINE ]]; do
 done
 
 if [[ $SECONDS -ge $DEADLINE ]]; then
-  warn "Outils MCP non encore enregistrés après 90s — vérifier :"
+  warn "Outils MCP non enregistrés — vérifier :"
   warn "  grep 'Registered: wiki_' $OPENCLAW_LOG"
 fi
 
