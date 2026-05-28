@@ -23,6 +23,18 @@ fi
 
 systemctl --user daemon-reload
 
+# Vérifier que le binaire openclaw dans le service systemd est accessible
+SERVICE_FILE="${HOME}/.config/systemd/user/openclaw-gateway.service"
+if [[ -f "$SERVICE_FILE" ]]; then
+  EXEC_BIN=$(grep '^ExecStart=' "$SERVICE_FILE" | sed 's/ExecStart=\([^ ]*\).*/\1/')
+  if [[ -n "$EXEC_BIN" && ! -x "$EXEC_BIN" ]]; then
+    error "Le binaire dans ExecStart est introuvable : $EXEC_BIN"
+    error "Le fichier service a été généré sans NVM dans le PATH."
+    error "Relancer : ./install.sh --force"
+    exit 1
+  fi
+fi
+
 # injection-guard
 if systemctl --user is-enabled openclaw-injection-guard.service &>/dev/null 2>&1; then
   systemctl --user restart openclaw-injection-guard.service
