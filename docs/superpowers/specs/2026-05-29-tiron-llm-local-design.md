@@ -33,7 +33,7 @@ Exposition : IP Tailscale de sanroque uniquement, pas sur l'internet public.
 
 ## Composants
 
-### 1. Service systemd `llama-tiron.service` (sanroque)
+### 1. Service systemd `tiron-llm.service` (sanroque)
 
 Nouvelle unité systemd user, parallèle à l'extracteur existant.
 
@@ -72,9 +72,9 @@ Le plugin `openai` est déjà présent dans la config — aucun ajout requis.
 SANROQUE_TAILSCALE_IP="${SANROQUE_TAILSCALE_IP:-}"
 ```
 
-### 3. Script `start-llama-tiron.sh` (sanroque)
+### 3. Script `start-tiron-llm.sh` (sanroque)
 
-Script de démarrage du serveur, sourcé par le service systemd. Lit `LLAMA_TIRON_API_KEY` et `SANROQUE_TAILSCALE_IP` depuis `~/.config/llama-tiron.env` (non versionné, même pattern que `gateway.systemd.env`).
+Script de démarrage du serveur, sourcé par le service systemd. Lit `LLAMA_TIRON_API_KEY` et `SANROQUE_TAILSCALE_IP` depuis `~/.config/tiron-llm.env` (non versionné, même pattern que `gateway.systemd.env`).
 
 ---
 
