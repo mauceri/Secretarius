@@ -1,6 +1,8 @@
 {
   "env": {
-    "DEEPSEEK_API_KEY": "${DEEPSEEK_API_KEY}"
+    "DEEPSEEK_API_KEY": "${DEEPSEEK_API_KEY}",
+    "EURIA_API_KEY": "${EURIA_API_KEY}",
+    "EURIA_PRODUCT_ID": "${EURIA_PRODUCT_ID}"
   },
   "meta": {
     "lastTouchedVersion": "2026.4.24",
@@ -98,6 +100,25 @@
           }
         ]
       },
+      "euria": {
+        "baseUrl": "https://api.infomaniak.com/2/ai/${EURIA_PRODUCT_ID}/openai/v1",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8",
+            "name": "Nemotron 3 Nano 30B (Euria)",
+            "api": "openai-completions",
+            "reasoning": false,
+            "input": ["text"],
+            "cost": {
+              "input": 0.05,
+              "output": 0.20
+            },
+            "contextWindow": 262144,
+            "maxTokens": 8192
+          }
+        ]
+      },
       "deepseek": {
         "baseUrl": "https://api.deepseek.com",
         "api": "openai-completions",
@@ -143,9 +164,12 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "deepseek/deepseek-chat"
+        "primary": "euria/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8"
       },
       "models": {
+        "euria/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8": {
+          "alias": "Euria"
+        },
         "deepseek/deepseek-chat": {
           "alias": "DeepSeek"
         },
