@@ -57,5 +57,45 @@ def _screen(content: str) -> tuple[str, str | None]:
     return clean, None
 
 
+@mcp.tool()
+def gmail_unread(max: int = 10) -> dict:
+    """Liste les messages Gmail non lus (métadonnées uniquement)."""
+    return _run_gog("gmail", "search", "is:unread", "--max", str(max))
+
+
+@mcp.tool()
+def gmail_search(query: str, max: int = 10) -> dict:
+    """Recherche des messages Gmail. Retourne métadonnées (id, sujet, expéditeur, date)."""
+    return _run_gog("gmail", "search", query, "--max", str(max))
+
+
+@mcp.tool()
+def gmail_get(message_id: str) -> dict:
+    """Récupère le contenu complet d'un message Gmail. ⚠ Contenu filtré par injection-guard."""
+    result = _run_gog("gmail", "get", message_id)
+    if not result["ok"]:
+        return result
+    content = json.dumps(result["data"])
+    clean, reason = _screen(content)
+    if reason:
+        return {"ok": False, "blocked": True, "reason": reason}
+    return {"ok": True, "data": result["data"], "clean_text": clean}
+
+
+@mcp.tool()
+def gmail_send(to: str, subject: str, body: str, cc: str = "") -> dict:
+    """⚠ Demander confirmation avant d'exécuter. Envoie un email Gmail."""
+    args = ["gmail", "send", "--to", to, "--subject", subject, "--body", body]
+    if cc:
+        args += ["--cc", cc]
+    return _run_gog(*args)
+
+
+@mcp.tool()
+def gmail_reply(message_id: str, body: str) -> dict:
+    """⚠ Demander confirmation avant d'exécuter. Répond à un message Gmail."""
+    return _run_gog("gmail", "reply", message_id, "--body", body)
+
+
 if __name__ == "__main__":
     mcp.run()
