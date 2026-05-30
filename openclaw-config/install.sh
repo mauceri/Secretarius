@@ -141,6 +141,13 @@ else
   info "Service systemd installé dans ${SYSTEMD_USER_DIR} (${OPENCLAW_BIN})"
 fi
 
+# switch-model
+SWITCH_MODEL_TARGET="${HOME}/.local/bin/switch-model"
+mkdir -p "${HOME}/.local/bin"
+cp "${SCRIPT_DIR}/switch-model" "$SWITCH_MODEL_TARGET"
+chmod +x "$SWITCH_MODEL_TARGET"
+info "switch-model installé dans ${HOME}/.local/bin"
+
 # Service scout (watcher)
 SCOUT_SERVICE_TARGET="${SYSTEMD_USER_DIR}/openclaw-scout.service"
 SCOUT_WATCHER_TARGET="${HOME}/.local/bin/scout-watcher"
