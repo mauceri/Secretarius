@@ -63,6 +63,31 @@ fi
 
 mkdir -p "$OPENCLAW_PATH"
 
+# auth-profiles.json de l'agent principal — injecter les clés API des providers configurés
+AUTH_PROFILES="${OPENCLAW_PATH}/agents/main/agent/auth-profiles.json"
+if [[ -f "$AUTH_PROFILES" ]] && [[ -n "${EURIA_API_KEY:-}" ]]; then
+  python3 - <<PYEOF
+import json, os
+path = os.environ.get('AUTH_PROFILES', '$AUTH_PROFILES')
+try:
+    with open(path) as f:
+        d = json.load(f)
+    d.setdefault('profiles', {})
+    if isinstance(d['profiles'], list):
+        d['profiles'] = {p: {} for p in d['profiles']}
+    d['profiles']['euria:default'] = {
+        'type': 'api_key',
+        'provider': 'euria',
+        'key': '${EURIA_API_KEY}'
+    }
+    with open(path, 'w') as f:
+        json.dump(d, f, indent=2)
+    print('[INFO] Profil euria:default écrit dans auth-profiles.json')
+except Exception as e:
+    print(f'[WARN] auth-profiles.json non mis à jour : {e}')
+PYEOF
+fi
+
 # openclaw.json
 TARGET="${OPENCLAW_PATH}/openclaw.json"
 if [[ -f "$TARGET" && "$FORCE" != "true" ]]; then

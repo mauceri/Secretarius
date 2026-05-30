@@ -20,6 +20,10 @@
         "provider": "openai-codex",
         "mode": "oauth"
       },
+      "euria:default": {
+        "provider": "euria",
+        "mode": "api_key"
+      },
       "deepseek:default": {
         "provider": "deepseek",
         "mode": "api_key"
