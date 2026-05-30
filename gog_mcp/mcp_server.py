@@ -124,5 +124,44 @@ def calendar_delete(event_id: str, calendar_id: str = "primary") -> dict:
     return _run_gog("calendar", "delete", calendar_id, event_id)
 
 
+@mcp.tool()
+def drive_search(query: str, max: int = 10) -> dict:
+    """Recherche des fichiers Drive. Retourne métadonnées (id, nom, type, date)."""
+    return _run_gog("drive", "search", query, "--max", str(max))
+
+
+@mcp.tool()
+def drive_download(file_id: str, filename: str) -> dict:
+    """⚠ Contenu filtré par injection-guard. Télécharge un fichier Drive dans ~/Downloads/gog/<filename>."""
+    _DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    output = _DOWNLOAD_DIR / filename
+    cmd = [_GOG, "drive", "download", file_id, "--out", str(output), "--no-input"]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=_TIMEOUT)
+        if r.returncode != 0:
+            return {"ok": False, "error": r.stderr.strip()}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "timeout"}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+    try:
+        content = output.read_text(errors="replace")
+    except Exception as exc:
+        return {"ok": False, "error": f"lecture fichier : {exc}"}
+    clean, reason = _screen(content)
+    if reason:
+        return {"ok": False, "blocked": True, "reason": reason, "path": str(output)}
+    return {"ok": True, "path": str(output), "clean_text": clean[:4000]}
+
+
+@mcp.tool()
+def drive_upload(file_path: str, folder_id: str = "") -> dict:
+    """⚠ Demander confirmation avant d'exécuter. Dépose un fichier local sur Drive."""
+    args = ["drive", "upload", file_path]
+    if folder_id:
+        args += ["--folder", folder_id]
+    return _run_gog(*args)
+
+
 if __name__ == "__main__":
     mcp.run()
