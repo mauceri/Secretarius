@@ -273,7 +273,18 @@
           "wiki-lm__wiki_tags",
           "wiki-lm__wiki_ingest_status",
           "wiki-lm__wiki_list_pending",
-          "wiki-lm__wiki_kb_update"
+          "wiki-lm__wiki_kb_update",
+          "gog__gmail_unread",
+          "gog__gmail_search",
+          "gog__gmail_get",
+          "gog__gmail_send",
+          "gog__gmail_reply",
+          "gog__calendar_events",
+          "gog__calendar_create",
+          "gog__calendar_delete",
+          "gog__drive_search",
+          "gog__drive_download",
+          "gog__drive_upload"
         ],
         "deny": [
           "browser",
@@ -384,6 +395,12 @@
       "wiki-lm": {
         "command": "${HOME}/Secretarius/Wiki_LM/.venv/bin/python3",
         "args": ["${HOME}/Secretarius/Wiki_LM/tools/mcp_server.py"]
+      },
+      "gog": {
+        "command": "${HOME}/Secretarius/Wiki_LM/.venv/bin/python3",
+        "args": [
+          "${HOME}/Secretarius/gog_mcp/mcp_server.py"
+        ]
       }
     }
   }
