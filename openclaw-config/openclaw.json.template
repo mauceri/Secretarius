@@ -197,9 +197,9 @@
       "compaction": {
         "mode": "safeguard"
       },
-      "maxConcurrent": 4,
+      "maxConcurrent": 1,
       "subagents": {
-        "maxConcurrent": 8
+        "maxConcurrent": 2
       },
       "sandbox": {
         "mode": "all",
@@ -249,17 +249,12 @@
       "tools": {
         "allow": [
           "gog",
-          "exec",
           "read",
-          "write",
-          "edit",
-          "apply_path",
           "sessions_list",
           "sessions_send",
           "sessions_spawn",
           "session_status",
           "group:runtime",
-          "group:fs",
           "wiki_capture",
           "wiki_ingest",
           "wiki_query",
@@ -277,14 +272,9 @@
           "gog__gmail_unread",
           "gog__gmail_search",
           "gog__gmail_get",
-          "gog__gmail_send",
-          "gog__gmail_reply",
           "gog__calendar_events",
-          "gog__calendar_create",
-          "gog__calendar_delete",
           "gog__drive_search",
-          "gog__drive_download",
-          "gog__drive_upload"
+          "gog__drive_download"
         ],
         "deny": [
           "browser",
@@ -294,7 +284,17 @@
           "discord",
           "gateway",
           "web_search",
-          "web_fetch"
+          "web_fetch",
+          "exec",
+          "write",
+          "edit",
+          "apply_path",
+          "group:fs",
+          "gog__gmail_send",
+          "gog__gmail_reply",
+          "gog__calendar_create",
+          "gog__calendar_delete",
+          "gog__drive_upload"
         ]
       }
     }
