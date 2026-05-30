@@ -97,5 +97,32 @@ def gmail_reply(message_id: str, body: str) -> dict:
     return _run_gog("gmail", "reply", message_id, "--body", body)
 
 
+@mcp.tool()
+def calendar_events(from_date: str, to_date: str, calendar_id: str = "primary") -> dict:
+    """Liste les événements Calendar entre from_date et to_date (format ISO 8601).
+    Exemple: from_date='2026-05-30T00:00:00Z', to_date='2026-05-31T00:00:00Z'"""
+    return _run_gog("calendar", "events", calendar_id, "--from", from_date, "--to", to_date)
+
+
+@mcp.tool()
+def calendar_create(
+    title: str, start: str, end: str,
+    calendar_id: str = "primary", description: str = ""
+) -> dict:
+    """⚠ Demander confirmation avant d'exécuter. Crée un événement Calendar.
+    start et end au format ISO 8601. Ex: '2026-05-30T14:00:00'"""
+    args = ["calendar", "create", calendar_id,
+            "--title", title, "--start", start, "--end", end]
+    if description:
+        args += ["--description", description]
+    return _run_gog(*args)
+
+
+@mcp.tool()
+def calendar_delete(event_id: str, calendar_id: str = "primary") -> dict:
+    """⚠ Demander confirmation avant d'exécuter. Supprime un événement Calendar."""
+    return _run_gog("calendar", "delete", calendar_id, event_id)
+
+
 if __name__ == "__main__":
     mcp.run()
