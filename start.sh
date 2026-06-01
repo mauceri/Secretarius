@@ -78,10 +78,11 @@ info "openclaw-gateway + openclaw-scout démarrés ✓"
 
 sleep 5
 
-# Vérifier que les services MCP SSE répondent
+# Vérifier que les services MCP répondent (transport streamable-http, endpoint /mcp)
 for _port in 8901 8902; do
-  _sse=$(curl -s --max-time 3 "http://127.0.0.1:${_port}/sse" 2>/dev/null | head -c 200)
-  if echo "${_sse}" | grep -q "endpoint"; then
+  _resp=$(curl -s -X POST --max-time 3 "http://127.0.0.1:${_port}/mcp" \
+    -H 'Content-Type: application/json' -d '{}' 2>/dev/null | head -c 200)
+  if [[ -n "$_resp" ]]; then
     info "MCP port ${_port} ✓"
   else
     warn "MCP port ${_port} ne répond pas — vérifier : journalctl --user -u wiki-lm-mcp -u gog-mcp -n 20"
