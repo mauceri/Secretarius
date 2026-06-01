@@ -25,9 +25,7 @@ export class McpClientPool {
     }
     createTransport(config) {
         if (config.transport === "http") {
-            return new StreamableHTTPClientTransport(new URL(config.url), {
-                requestInit: { headers: config.headers },
-            });
+            return new StreamableHTTPClientTransport(new URL(config.url));
         }
         return new StdioClientTransport({
             command: config.command,

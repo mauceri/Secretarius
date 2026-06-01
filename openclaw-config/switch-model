@@ -9,7 +9,7 @@ CONFIG = os.path.expanduser("~/.openclaw/openclaw.json")
 BAK = os.path.expanduser("~/.openclaw/openclaw.json.bak")
 
 ALIASES = {
-    "euria":      "euria/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8",
+    "euria":      "euria/mistralai/Mistral-Small-4-119B-2603",
     "deepseek":   "deepseek/deepseek-chat",
     "ollm":       "ollm/near/DeepSeek-V3.1",
     "gemma4":     "ollama/gemma4:latest",

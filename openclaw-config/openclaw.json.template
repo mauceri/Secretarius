@@ -109,16 +109,12 @@
         "api": "openai-completions",
         "models": [
           {
-            "id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8",
-            "name": "Nemotron 3 Nano 30B (Euria)",
+            "id": "mistralai/Mistral-Small-4-119B-2603",
+            "name": "Mistral Small 4 (Euria)",
             "api": "openai-completions",
             "reasoning": false,
             "input": ["text"],
-            "cost": {
-              "input": 0.05,
-              "output": 0.20
-            },
-            "contextWindow": 262144,
+            "contextWindow": 131072,
             "maxTokens": 8192
           }
         ]
@@ -168,10 +164,10 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "euria/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8"
+        "primary": "deepseek/deepseek-chat"
       },
       "models": {
-        "euria/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8": {
+        "euria/mistralai/Mistral-Small-4-119B-2603": {
           "alias": "Euria"
         },
         "deepseek/deepseek-chat": {
