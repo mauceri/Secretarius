@@ -393,10 +393,12 @@
   "mcp": {
     "servers": {
       "wiki-lm": {
-        "url": "http://127.0.0.1:8901/sse"
+        "url": "http://127.0.0.1:8901/mcp",
+        "transport": "http"
       },
       "gog": {
-        "url": "http://127.0.0.1:8902/sse"
+        "url": "http://127.0.0.1:8902/mcp",
+        "transport": "http"
       }
     }
   }

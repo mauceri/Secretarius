@@ -42,7 +42,7 @@ export function parseConfig(raw: unknown): McpAdapterConfig {
     const srv = s as Record<string, unknown>;
     if (!srv.name) throw new Error("Server missing 'name'");
 
-    const transport = (srv.transport as string) ?? "stdio";
+    const transport = (srv.transport as string) ?? (srv.url ? "http" : "stdio");
     if (transport === "stdio" && !srv.command) throw new Error(`Server "${srv.name}" missing 'command'`);
     if (transport === "http" && !srv.url) throw new Error(`Server "${srv.name}" missing 'url'`);
 
