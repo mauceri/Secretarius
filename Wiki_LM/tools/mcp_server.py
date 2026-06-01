@@ -288,4 +288,4 @@ def wiki_kb_update() -> dict:
 
 
 if __name__ == "__main__":
-    mcp.run()
+    mcp.run(transport="sse", host="127.0.0.1", port=8901)
