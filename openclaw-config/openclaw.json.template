@@ -393,14 +393,10 @@
   "mcp": {
     "servers": {
       "wiki-lm": {
-        "command": "${HOME}/Secretarius/Wiki_LM/.venv/bin/python3",
-        "args": ["${HOME}/Secretarius/Wiki_LM/tools/mcp_server.py"]
+        "url": "http://127.0.0.1:8901/sse"
       },
       "gog": {
-        "command": "${HOME}/Secretarius/Wiki_LM/.venv/bin/python3",
-        "args": [
-          "${HOME}/Secretarius/gog_mcp/mcp_server.py"
-        ]
+        "url": "http://127.0.0.1:8902/sse"
       }
     }
   }

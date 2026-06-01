@@ -148,6 +148,18 @@ cp "${SCRIPT_DIR}/switch-model" "$SWITCH_MODEL_TARGET"
 chmod +x "$SWITCH_MODEL_TARGET"
 info "switch-model installé dans ${HOME}/.local/bin"
 
+# Services MCP SSE
+for _svc in wiki-lm-mcp gog-mcp; do
+  _svc_src="${SCRIPT_DIR}/${_svc}.service"
+  _svc_dst="${SYSTEMD_USER_DIR}/${_svc}.service"
+  if [[ -f "$_svc_dst" && "$FORCE" != "true" ]]; then
+    info "${_svc}.service existe déjà — ignoré"
+  else
+    cp "$_svc_src" "$_svc_dst"
+    info "${_svc}.service installé dans ${SYSTEMD_USER_DIR}"
+  fi
+done
+
 # Service scout (watcher)
 SCOUT_SERVICE_TARGET="${SYSTEMD_USER_DIR}/openclaw-scout.service"
 SCOUT_WATCHER_TARGET="${HOME}/.local/bin/scout-watcher"
