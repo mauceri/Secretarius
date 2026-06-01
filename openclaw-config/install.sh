@@ -239,6 +239,13 @@ if ! [[ -d "${ADAPTER_SRC}/node_modules/@modelcontextprotocol" ]]; then
     warn "npm install pré-install échoué dans ${ADAPTER_SRC}"
 fi
 
+# Compiler les sources TypeScript de l'adaptateur
+if [[ -f "${ADAPTER_SRC}/tsconfig.json" ]]; then
+  info "Compilation TypeScript de openclaw-mcp-adapter..."
+  (cd "${ADAPTER_SRC}" && node_modules/.bin/tsc --noEmit false 2>&1) || \
+    warn "tsc échoué — l'adaptateur utilisera les .js existants"
+fi
+
 # fastmcp (dépendance du serveur MCP Wiki_LM)
 if "${HOME}/Secretarius/Wiki_LM/.venv/bin/python3" -c "import fastmcp" &>/dev/null; then
   info "fastmcp déjà installé dans le venv Wiki_LM"
