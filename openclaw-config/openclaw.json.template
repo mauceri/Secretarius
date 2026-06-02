@@ -119,6 +119,21 @@
           }
         ]
       },
+      "tiron-llm": {
+        "baseUrl": "http://127.0.0.1:8998/v1",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "phi-4-mini-instruct",
+            "name": "Phi-4-mini (SLM local)",
+            "api": "openai-completions",
+            "reasoning": false,
+            "input": ["text"],
+            "contextWindow": 32768,
+            "maxTokens": 2048
+          }
+        ]
+      },
       "deepseek": {
         "baseUrl": "https://api.deepseek.com",
         "api": "openai-completions",
@@ -169,6 +184,9 @@
       "models": {
         "euria/mistralai/Mistral-Small-4-119B-2603": {
           "alias": "Euria"
+        },
+        "tiron-llm/phi-4-mini-instruct": {
+          "alias": "TironSLM"
         },
         "deepseek/deepseek-chat": {
           "alias": "DeepSeek"

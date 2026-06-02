@@ -15,7 +15,8 @@ ALIASES = {
     "gemma4":     "ollama/gemma4:latest",
     "glm4":       "ollama/glm4:latest",
     "granite3b":  "ollama/granite4:3b",
-    "tiron-llm":  "openai/phi-4-mini-instruct",
+    "tiron-llm":  "tiron-llm/phi-4-mini-instruct",
+    "phi4":       "tiron-llm/phi-4-mini-instruct",
 }
 
 def main():

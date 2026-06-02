@@ -160,6 +160,26 @@ for _svc in wiki-lm-mcp gog-mcp; do
   fi
 done
 
+# Service SLM local (llama.cpp Phi-4-mini, cerveau de Tiron)
+# Installé partout, mais activé/démarré seulement si le binaire et le modèle existent
+SLM_SVC_DST="${SYSTEMD_USER_DIR}/slm-llama-cpp.service"
+if [[ -f "$SLM_SVC_DST" && "$FORCE" != "true" ]]; then
+  info "slm-llama-cpp.service existe déjà — ignoré"
+else
+  cp "${SCRIPT_DIR}/slm-llama-cpp.service" "$SLM_SVC_DST"
+  info "slm-llama-cpp.service installé dans ${SYSTEMD_USER_DIR}"
+fi
+SLM_BIN="${HOME}/llama.cpp/build/bin/llama-server"
+SLM_MODEL="${HOME}/Modèles/Phi-4-mini-instruct-Q6_K.gguf"
+if [[ -x "$SLM_BIN" && -f "$SLM_MODEL" ]]; then
+  systemctl --user daemon-reload 2>/dev/null || true
+  systemctl --user enable slm-llama-cpp.service 2>/dev/null && \
+    info "slm-llama-cpp.service activé au boot" || \
+    warn "Activation de slm-llama-cpp.service échouée"
+else
+  info "llama-server ou modèle Phi-4-mini absent — slm-llama-cpp.service installé mais non activé"
+fi
+
 # Service scout (watcher)
 SCOUT_SERVICE_TARGET="${SYSTEMD_USER_DIR}/openclaw-scout.service"
 SCOUT_WATCHER_TARGET="${HOME}/.local/bin/scout-watcher"
