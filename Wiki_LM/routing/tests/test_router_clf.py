@@ -26,22 +26,32 @@ def _train():
         {"message": "ajoute au wiki", "agent": "wikilm"},
         {"message": "url wiki à garder", "agent": "wikilm"},
         {"message": "bla bla flou", "agent": "clarify"},
+        {"message": "aide-moi", "agent": "clarify"},
+        {"message": "bonjour", "agent": "clarify"},
     ]
 
 
-def test_excludes_clarify_from_classes():
-    router = ClfRouter.from_corpus(_train(), threshold=0.55, encode_fn=_fake_encode)
-    assert set(router.clf.classes_) == {"gog", "wikilm"}
+def test_includes_clarify_by_default():
+    """clarify doit être une classe entraînée, pas un résidu de seuil."""
+    router = ClfRouter.from_corpus(_train(), encode_fn=_fake_encode)
+    assert "clarify" in router.clf.classes_
 
 
 def test_routes_clear_message():
-    router = ClfRouter.from_corpus(_train(), threshold=0.55, encode_fn=_fake_encode)
+    router = ClfRouter.from_corpus(_train(), encode_fn=_fake_encode)
     res = router.route("envoie un nouveau mail")
     assert res.agent == "gog"
-    assert res.confidence > 0.55
 
 
-def test_ambiguous_below_threshold_is_clarify():
-    router = ClfRouter.from_corpus(_train(), threshold=0.55, encode_fn=_fake_encode)
+def test_ambiguous_routes_to_clarify_class():
+    """Un message flou doit être prédit comme clarify par le classifieur."""
+    router = ClfRouter.from_corpus(_train(), encode_fn=_fake_encode)
     res = router.route("quelque chose de totalement flou")
     assert res.agent == "clarify"
+
+
+def test_exclude_clarify_legacy():
+    """exclude=('clarify',) préserve le comportement hérité."""
+    router = ClfRouter.from_corpus(_train(), threshold=0.55,
+                                   encode_fn=_fake_encode, exclude=("clarify",))
+    assert "clarify" not in router.clf.classes_

@@ -154,7 +154,13 @@ def main() -> None:
     )
 
     train_pool, test_real = stratified_split(pool, args.test_frac, args.seed)
-    test_set = test_real + clarify_pool
+    # Clarify : splitté entre train et test (compète comme classe normale)
+    if len(clarify_pool) > 1:
+        train_clarify, test_clarify = stratified_split(clarify_pool, args.test_frac, args.seed)
+    else:
+        train_clarify, test_clarify = [], clarify_pool
+    train_pool = train_pool + train_clarify
+    test_set = test_real + test_clarify
 
     sizes = [int(s) for s in args.sizes.split(",") if s.strip()]
     clamped, cap = clamp_sizes(sizes, train_pool)

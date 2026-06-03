@@ -1,4 +1,7 @@
-"""Routeur par embeddings BGE-M3 : un prototype par agent, cosinus + seuil → clarify."""
+"""Routeur par embeddings BGE-M3 : un prototype par agent, cosinus, argmax.
+
+Clarify est traité comme une classe normale (prototype dédié). Le seuil ne sert de
+repli que si clarify n'est pas présent dans les prototypes (mode héritage)."""
 from __future__ import annotations
 
 from collections import defaultdict
@@ -35,7 +38,7 @@ class EmbedRouter(Router):
 
     @classmethod
     def from_corpus(cls, train: list[dict], threshold: float = 0.55,
-                    encode_fn=_default_encode, exclude=("clarify",)):
+                    encode_fn=_default_encode, exclude=()):
         """Construit un prototype par agent (moyenne L2-normalisée), hors agents exclus."""
         msgs_by_agent: dict = defaultdict(list)
         for row in train:
@@ -57,6 +60,7 @@ class EmbedRouter(Router):
         sims = self._matrix @ vec  # produit scalaire = cosinus (vecteurs normalisés)
         best = int(np.argmax(sims))
         score = float(sims[best])
-        if score < self.threshold:
+        # Seuil de repli seulement si clarify n'est pas déjà un prototype entraîné
+        if score < self.threshold and "clarify" not in self._agents:
             return RouteResult("clarify", score)
         return RouteResult(self._agents[best], score)

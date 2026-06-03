@@ -20,7 +20,7 @@ class ClfRouter(Router):
 
     @classmethod
     def from_corpus(cls, train: list[dict], threshold: float = 0.55,
-                    encode_fn=_default_encode, exclude=("clarify",)):
+                    encode_fn=_default_encode, exclude=()):
         from sklearn.linear_model import LogisticRegression
         msgs: list[str] = []
         labels: list[str] = []
@@ -39,6 +39,7 @@ class ClfRouter(Router):
         proba = self.clf.predict_proba(vec)[0]
         best = int(np.argmax(proba))
         score = float(proba[best])
-        if score < self.threshold:
+        # Seuil de repli seulement si clarify n'est pas une classe entraînée
+        if score < self.threshold and "clarify" not in self.clf.classes_:
             return RouteResult("clarify", score)
         return RouteResult(str(self.clf.classes_[best]), score)
