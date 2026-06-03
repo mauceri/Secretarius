@@ -5,6 +5,9 @@ Seul module qui touche le réseau. usage = {prompt_tokens, completion_tokens}.
 from __future__ import annotations
 
 import os
+import time
+
+_last_mistral_call: float = 0.0
 
 
 def _extract(resp) -> tuple[str, dict]:
@@ -26,7 +29,15 @@ def deepseek_generate(prompt: str, temperature: float = 0.9) -> tuple[str, dict]
     return _extract(resp)
 
 
-def mistral_critique(prompt: str, temperature: float = 0.0) -> tuple[str, dict]:
+def mistral_critique(prompt: str, max_tokens: int = 8,
+                     temperature: float = 0.0) -> tuple[str, dict]:
+    """Appel Mistral/Euria avec throttle 1 req/s (limite Infomaniak : 60 req/min)."""
+    global _last_mistral_call
+    elapsed = time.time() - _last_mistral_call
+    if elapsed < 1.0:
+        time.sleep(1.0 - elapsed)
+    _last_mistral_call = time.time()
+
     from openai import OpenAI
     pid = os.environ["EURIA_PRODUCT_ID"]
     client = OpenAI(base_url=f"https://api.infomaniak.com/2/ai/{pid}/openai/v1",
@@ -35,6 +46,6 @@ def mistral_critique(prompt: str, temperature: float = 0.0) -> tuple[str, dict]:
         model="mistralai/Mistral-Small-4-119B-2603",
         messages=[{"role": "user", "content": prompt}],
         temperature=temperature,
-        max_tokens=8,
+        max_tokens=max_tokens,
     )
     return _extract(resp)

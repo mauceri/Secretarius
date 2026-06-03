@@ -94,14 +94,14 @@ def build_pool(agents, max_per_agent, clarify_k, generate_fn, critique_fn, cost)
     (destinés au test uniquement). cost est un CostTracker mis à jour au fil des appels.
     """
     from corpus_gen import build_generation_prompt, parse_candidates
-    from critique import critique_candidates
+    from critique import critique_batch
 
     def _gen_and_critique(agent, n):
         prompt = build_generation_prompt(agent, agents, examples=[], negatives=[], n=n)
         text, usage = generate_fn(prompt)
         cost.add(_DEEPSEEK_MODEL, usage)
         cands = parse_candidates(text, agent["name"])
-        kept, cusage = critique_candidates(cands, agents, critique_fn)
+        kept, cusage = critique_batch(cands, agents, critique_fn)
         cost.add(_MISTRAL_MODEL, cusage)
         return kept
 
