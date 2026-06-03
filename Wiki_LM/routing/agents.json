@@ -1,0 +1,8 @@
+{
+  "agents": [
+    {"name": "wikilm", "description": "Capture, recherche et ingestion de connaissances : URLs à mémoriser, notes, tags, questions sur la base documentaire."},
+    {"name": "gog", "description": "Google Workspace : email (lire, chercher, envoyer), agenda, fichiers Drive."},
+    {"name": "superpowers", "description": "Rédaction de textes longs, brainstorming, conception de plans et de spécifications."},
+    {"name": "clarify", "description": "Intention floue, ambiguë ou hors-sujet : demander une précision à l'utilisateur."}
+  ]
+}
