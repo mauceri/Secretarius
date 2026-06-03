@@ -1,0 +1,16 @@
+[Unit]
+Description=Router MCP Server (route_intent, port 8903)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Secretarius/Wiki_LM/routing
+ExecStart=%h/Secretarius/Wiki_LM/.venv/bin/python3 %h/Secretarius/Wiki_LM/routing/routing_mcp.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=router-mcp
+
+[Install]
+WantedBy=default.target
