@@ -337,6 +337,23 @@ while IFS= read -r -d '' src; do
   fi
 done < <(find "$SCOUT_WORKSPACE_SRC" -name "*.md" -print0)
 
+# Workspace wikilm (isolé dans agents/wikilm/workspace/)
+WIKILM_WORKSPACE_SRC="${SCRIPT_DIR}/agents/wikilm/workspace"
+WIKILM_WORKSPACE_DST="${OPENCLAW_PATH}/agents/wikilm/workspace"
+mkdir -p "${WIKILM_WORKSPACE_DST}"
+
+while IFS= read -r -d '' src; do
+  rel="${src#${WIKILM_WORKSPACE_SRC}/}"
+  dst="${WIKILM_WORKSPACE_DST}/${rel}"
+  mkdir -p "$(dirname "$dst")"
+  if [[ -f "$dst" && "$FORCE" != "true" ]]; then
+    info "wikilm/${rel} existe déjà — ignoré"
+  else
+    envsubst "$SUBST_VARS" < "$src" > "$dst"
+    info "wikilm/${rel} installé"
+  fi
+done < <(find "$WIKILM_WORKSPACE_SRC" -name "*.md" -print0)
+
 # Image Docker sandbox
 SANDBOX_IMAGE="openclaw-sandbox:bookworm-slim"
 SANDBOX_DOCKERFILE="${SCRIPT_DIR}/sandbox/Dockerfile"

@@ -230,7 +230,8 @@
       },
       {
         "id": "wikilm",
-        "model": "deepseek/deepseek-chat"
+        "model": "deepseek/deepseek-chat",
+        "workspace": "${HOME}/.openclaw/agents/wikilm/workspace"
       },
       {
         "id": "scout",
