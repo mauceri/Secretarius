@@ -160,6 +160,22 @@ for _svc in wiki-lm-mcp gog-mcp; do
   fi
 done
 
+# Service router-mcp (routeur d'intention EmbedRouter BGE-M3)
+ROUTER_SVC_DST="${SYSTEMD_USER_DIR}/router-mcp.service"
+if [[ -f "$ROUTER_SVC_DST" && "$FORCE" != "true" ]]; then
+  info "router-mcp.service existe déjà — ignoré"
+else
+  cp "${SCRIPT_DIR}/router-mcp.service" "$ROUTER_SVC_DST"
+  info "router-mcp.service installé dans ${SYSTEMD_USER_DIR}"
+fi
+ROUTER_BIN="${HOME}/Secretarius/Wiki_LM/routing/routing_mcp.py"
+if [[ -f "$ROUTER_BIN" ]]; then
+  systemctl --user daemon-reload 2>/dev/null || true
+  systemctl --user enable router-mcp.service 2>/dev/null && \
+    info "router-mcp.service activé au boot" || \
+    warn "Activation de router-mcp.service échouée"
+fi
+
 # Service SLM local (llama.cpp Phi-4-mini, cerveau de Tiron)
 # Installé partout, mais activé/démarré seulement si le binaire et le modèle existent
 SLM_SVC_DST="${SYSTEMD_USER_DIR}/slm-llama-cpp.service"

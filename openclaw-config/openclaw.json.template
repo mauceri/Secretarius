@@ -225,7 +225,48 @@
       {
         "id": "main",
         "subagents": {
-          "allowAgents": ["scout"]
+          "allowAgents": ["scout", "wikilm"]
+        },
+        "sandbox": {
+          "tools": {
+            "allow": [
+              "read",
+              "sessions_list",
+              "sessions_send",
+              "sessions_spawn",
+              "session_status",
+              "group:runtime",
+              "router-mcp__route_intent"
+            ]
+          }
+        }
+      },
+      {
+        "id": "wikilm",
+        "model": "deepseek/deepseek-chat",
+        "systemPrompt": "Tu es l'agent spécialisé Wiki_LM. Tu reçois une demande transmise par l'orchestrateur Tiron. Utilise les outils wiki_* pour y répondre. Sois concis et factuel. Si la demande demande de mémoriser une URL, utilise wiki_capture puis wiki_ingest.",
+        "mcp": {
+          "servers": {
+            "wiki-lm": {
+              "url": "http://127.0.0.1:8901/mcp",
+              "transport": "http"
+            }
+          }
+        },
+        "sandbox": {
+          "tools": {
+            "allow": [
+              "read",
+              "sessions_send",
+              "wiki-lm__wiki_capture",
+              "wiki-lm__wiki_ingest",
+              "wiki-lm__wiki_query",
+              "wiki-lm__wiki_tags",
+              "wiki-lm__wiki_ingest_status",
+              "wiki-lm__wiki_list_pending",
+              "wiki-lm__wiki_kb_update"
+            ]
+          }
         }
       },
       {
@@ -290,7 +331,8 @@
           "gog__gmail_reply",
           "gog__calendar_events",
           "gog__drive_search",
-          "gog__drive_download"
+          "gog__drive_download",
+          "router-mcp__route_intent"
         ],
         "deny": [
           "browser",
@@ -412,6 +454,10 @@
       },
       "gog": {
         "url": "http://127.0.0.1:8902/mcp",
+        "transport": "http"
+      },
+      "router-mcp": {
+        "url": "http://127.0.0.1:8903/mcp",
         "transport": "http"
       }
     }
