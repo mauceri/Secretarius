@@ -1,4 +1,4 @@
-# Secretarius `v0.1.0`
+# Secretarius `v0.2.0`
 
 **Secretarius est une configuration sécurisée d'[OpenClaw](https://openclaw.dev) pour individus et petites structures**, enrichie d'une base de connaissances personnelle.
 
@@ -31,11 +31,11 @@ Trois composants principaux :
 
 - Python 3.11+
 - Node.js 22+ via NVM (`nvm install 22` recommandé)
-- OpenClaw : `npm install -g openclaw`
+- OpenClaw 2026.6.1+ : `npm install -g openclaw`
 - `envsubst` : `apt install gettext` / `brew install gettext`
 - Git
 - Un bot Telegram (token obtenu via [@BotFather](https://t.me/botfather))
-- Une clé API DeepSeek (ou Ollama en local)
+- Une clé API pour le modèle principal : Euria/Infomaniak (Mistral Small 4, défaut) ou DeepSeek ; Ollama en local possible
 
 ---
 
@@ -70,9 +70,26 @@ nano ~/.openclaw/gateway.systemd.env
 Compléter :
 ```
 TELEGRAM_BOT_TOKEN=<token BotFather>
-DEEPSEEK_API_KEY=<clé API DeepSeek>
+EURIA_API_KEY=<clé API Infomaniak/Euria>
+EURIA_PRODUCT_ID=<identifiant produit Infomaniak>
+DEEPSEEK_API_KEY=<clé API DeepSeek, optionnel>
 ```
 (`OPENCLAW_GATEWAY_TOKEN` est généré automatiquement.)
+
+Si vous utilisez les outils Google (gog), ajouter aussi :
+```
+GOG_ACCOUNT=<votre adresse gmail>
+GOG_KEYRING_BACKEND=file
+GOG_KEYRING_PASSWORD=<mot de passe du keyring gog>
+```
+
+**OpenClaw 2026.6.1** ne lit plus les clés API depuis ce fichier pour
+l'authentification des modèles : il faut les enregistrer dans son magasin d'auth.
+Pour chaque fournisseur utilisé :
+```bash
+echo "$EURIA_API_KEY"    | openclaw models auth paste-api-key --provider euria
+echo "$DEEPSEEK_API_KEY" | openclaw models auth paste-api-key --provider deepseek
+```
 
 ### 4. Démarrer
 
@@ -80,7 +97,9 @@ DEEPSEEK_API_KEY=<clé API DeepSeek>
 ./start.sh
 ```
 
-Le script démarre les services, charge le plugin MCP et attend la confirmation que les 7 outils wiki sont enregistrés.
+Le script démarre les services. Les serveurs MCP (wiki-lm, gog) sont exposés en
+`streamable-http` et connectés nativement par OpenClaw (plus de plugin adapter
+depuis la 2026.6.1). Vérification : `openclaw mcp probe`.
 
 ### 5. Appairer Telegram
 
