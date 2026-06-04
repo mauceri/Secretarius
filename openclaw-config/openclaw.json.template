@@ -224,6 +224,7 @@
     "list": [
       {
         "id": "main",
+        "model": "tiron-llm/phi-4-mini-instruct",
         "subagents": {
           "allowAgents": ["scout", "wikilm"]
         }
