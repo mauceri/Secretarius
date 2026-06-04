@@ -1,0 +1,20 @@
+[Unit]
+Description=llama.cpp inference server (Phi-4-mini, cerveau SLM local de Tiron)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/llama.cpp/build-rocm/bin
+ExecStart=%h/llama.cpp/build-rocm/bin/llama-server \
+    -m %h/Modèles/Phi-4-mini-instruct-Q6_K.gguf \
+    -c 32768 \
+    -ngl 99 \
+    --host 0.0.0.0 \
+    --port 8998 \
+    --jinja
+Restart=on-failure
+RestartSec=5
+Environment=LD_LIBRARY_PATH=%h/llama.cpp/build-rocm/bin
+
+[Install]
+WantedBy=default.target

@@ -43,6 +43,17 @@ else
   warn "openclaw-injection-guard.service non activé — relancer install.sh pour l'installer"
 fi
 
+# Services MCP SSE (doivent être prêts avant le gateway)
+for _svc in wiki-lm-mcp gog-mcp; do
+  if systemctl --user is-enabled "${_svc}.service" &>/dev/null 2>&1; then
+    systemctl --user restart "${_svc}.service"
+    info "${_svc} démarré ✓"
+  else
+    warn "${_svc}.service non activé — relancer install.sh"
+  fi
+done
+sleep 2
+
 # gateway + scout
 if ! grep -q "^TELEGRAM_BOT_TOKEN=.\+" "${OPENCLAW_PATH}/gateway.systemd.env" 2>/dev/null; then
   error "TELEGRAM_BOT_TOKEN absent de ${OPENCLAW_PATH}/gateway.systemd.env"
@@ -65,45 +76,21 @@ fi
 systemctl --user restart openclaw-gateway.service openclaw-scout.service
 info "openclaw-gateway + openclaw-scout démarrés ✓"
 
-# Étape 2 : charger le plugin MCP adapter (OpenClaw ne le charge pas au démarrage
-# depuis extensions/ ; il faut déclencher plugins install sur gateway vivant).
-# plugins install écrit plugins.installs et cause un "supervisor restart" (exit 0).
 sleep 5
-OPENCLAW_LOG="/tmp/openclaw/openclaw-$(date +%Y-%m-%d).log"
-LOG_BASELINE=$(wc -l < "$OPENCLAW_LOG" 2>/dev/null || echo 0)
-ADAPTER_SRC="${SECRETARIUS_ROOT}/openclaw-config/openclaw-mcp-adapter"
-if [[ -d "$ADAPTER_SRC" ]] && command -v openclaw &>/dev/null; then
-  info "Chargement de openclaw-mcp-adapter..."
-  openclaw plugins install --force "${ADAPTER_SRC}" 2>&1 | grep -E "(Installed|failed|WARN|warn)" || true
-  # Re-synchroniser .bak pour éviter l'anti-clobber au prochain démarrage
-  cp "${OPENCLAW_PATH}/openclaw.json" "${OPENCLAW_PATH}/openclaw.json.bak" 2>/dev/null || true
-  # Étape 3 : relancer après le supervisor restart déclenché par plugins install
-  systemctl --user restart openclaw-gateway.service openclaw-scout.service
-  info "Gateway redémarré avec l'adaptateur MCP ✓"
-else
-  warn "openclaw-mcp-adapter introuvable ou openclaw absent — outils wiki_* non chargés"
-fi
 
-# Vérifier l'enregistrement des outils (enregistrés pendant le hot-reload de plugins install)
-echo ""
-info "Vérification de l'enregistrement des outils MCP..."
-DEADLINE=$((SECONDS + 30))
-while [[ $SECONDS -lt $DEADLINE ]]; do
-  COUNT=$(tail -n +"$((LOG_BASELINE + 1))" "$OPENCLAW_LOG" 2>/dev/null \
-    | grep -c "Registered: wiki_" || true)
-  if [[ "${COUNT:-0}" -ge 6 ]]; then
-    info "6 outils wiki_* enregistrés ✓"
-    break
+# Vérifier que les services MCP répondent (transport streamable-http, endpoint /mcp)
+for _port in 8901 8902; do
+  _resp=$(curl -s -X POST --max-time 3 "http://127.0.0.1:${_port}/mcp" \
+    -H 'Content-Type: application/json' -d '{}' 2>/dev/null | head -c 200)
+  if [[ -n "$_resp" ]]; then
+    info "MCP port ${_port} ✓"
+  else
+    warn "MCP port ${_port} ne répond pas — vérifier : journalctl --user -u wiki-lm-mcp -u gog-mcp -n 20"
   fi
-  sleep 5
 done
-
-if [[ $SECONDS -ge $DEADLINE ]]; then
-  warn "Outils MCP non enregistrés — vérifier :"
-  warn "  grep 'Registered: wiki_' $OPENCLAW_LOG"
-fi
 
 echo ""
 info "=== Services Secretarius opérationnels ==="
 systemctl --user status openclaw-gateway.service openclaw-scout.service \
-  openclaw-injection-guard.service --no-pager -l 2>&1 | grep -E "(Active|●)" || true
+  openclaw-injection-guard.service wiki-lm-mcp.service gog-mcp.service \
+  --no-pager -l 2>&1 | grep -E "(Active|●)" || true

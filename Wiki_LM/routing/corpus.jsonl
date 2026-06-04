@@ -1,0 +1,50 @@
+{"message": "Capture cette page https://fr.wikipedia.org/wiki/Henri_IV", "agent": "wikilm"}
+{"message": "Mémorise ce lien pour plus tard : https://exemple.fr/article", "agent": "wikilm"}
+{"message": "Qu'est-ce que la base de connaissances dit sur la sobriété énergétique ?", "agent": "wikilm"}
+{"message": "Ajoute une note avec le tag #histoire sur la Saint-Barthélemy", "agent": "wikilm"}
+{"message": "Recherche dans le wiki les pages sur le protestantisme", "agent": "wikilm"}
+{"message": "Quels sont mes rendez-vous demain ?", "agent": "gog"}
+{"message": "Envoie un mail à Paul pour annuler la réunion de jeudi", "agent": "gog"}
+{"message": "Cherche les mails non lus de cette semaine", "agent": "gog"}
+{"message": "Ajoute un événement agenda vendredi 14h dentiste", "agent": "gog"}
+{"message": "Télécharge le fichier budget.xlsx depuis mon Drive", "agent": "gog"}
+{"message": "Rédige-moi une note de synthèse sur la sobriété énergétique", "agent": "superpowers"}
+{"message": "Aide-moi à réfléchir à l'architecture d'un assistant personnel", "agent": "superpowers"}
+{"message": "Écris un plan détaillé pour un article sur la confidentialité", "agent": "superpowers"}
+{"message": "Brainstorm avec moi sur les noms possibles pour ce projet", "agent": "superpowers"}
+{"message": "Rédige une spécification pour un module de cache", "agent": "superpowers"}
+{"message": "Qu'est-ce que tu en penses ?", "agent": "clarify"}
+{"message": "Aide-moi", "agent": "clarify"}
+{"message": "Bonjour, ça va ?", "agent": "clarify"}
+{"message": "Fais le nécessaire", "agent": "clarify"}
+{"message": "C'est compliqué tout ça", "agent": "clarify"}
+{"message": "Peux-tu vérifier si j'ai reçu un mail de Sophie concernant le projet ?", "agent": "gog"}
+{"message": "Crée un événement dans mon agenda pour l'appel client, mercredi 10h.", "agent": "gog"}
+{"message": "Liste les fichiers PDF dans mon Drive récents.", "agent": "gog"}
+{"message": "Envoie un mail à toute l'équipe pour confirmer la réunion de lundi prochain.", "agent": "gog"}
+{"message": "Où est rangé le dossier 'Rapports 2024' sur Drive ?", "agent": "gog"}
+{"message": "Rappelle-moi de réserver le salon de coiffure samedi à 15h, ajoute-le à l'agenda.", "agent": "gog"}
+{"message": "Cherche dans mes mails le message contenant la facture de janvier.", "agent": "gog"}
+{"message": "Supprime le fichier 'brouillon_contrat.docx' de mon Drive, merci.", "agent": "gog"}
+{"message": "Y a-t-il des mails importants marqués d'une étoile aujourd'hui ?", "agent": "gog"}
+{"message": "Organise un rendez-vous dans mon agenda avec Marc pour discuter du budget, jeudi après-midi.", "agent": "gog"}
+{"message": "Peux-tu m'envoyer le lien du document 'Compte rendu réunion' par mail à moi-même ?", "agent": "gog"}
+{"message": "Quels sont les événements de mon agenda pour le mois de mars ?", "agent": "gog"}
+{"message": "Trouve un mail de la semaine dernière avec le mot-clé 'urgence' dans l'objet.", "agent": "gog"}
+{"message": "Ajoute un fichier 'planning_équipe.xlsx' depuis mon bureau à un dossier Drive appelé 'Partage'.", "agent": "gog"}
+{"message": "Je dois envoyer un message à Julien : 'Désolé, je serai en retard à la réunion de 14h.' Fais-le.", "agent": "gog"}
+{"message": "Est-ce que j'ai un créneau libre demain entre 11h et 13h dans mon agenda ?", "agent": "gog"}
+{"message": "Cherche un mail de confirmation de vol de la compagnie Air France dans ma boîte.", "agent": "gog"}
+{"message": "Déplace l'événement 'Point projet' de mercredi à jeudi 16h.", "agent": "gog"}
+{"message": "Donne-moi le nombre de fichiers dans le dossier 'Photos' de mon Drive.", "agent": "gog"}
+{"message": "Envoie un mail à [email protected] avec comme sujet 'Devis' et le corps du message : 'Veuillez trouver ci-joint le devis révisé.'", "agent": "gog"}
+{"message": "Quel modèle vous anime ?", "agent": "general"}
+{"message": "Bonjour, comment allez-vous ?", "agent": "general"}
+{"message": "Qui êtes-vous ?", "agent": "general"}
+{"message": "Que pouvez-vous faire ?", "agent": "general"}
+{"message": "Merci, c'est tout pour aujourd'hui.", "agent": "general"}
+{"message": "Comment vous appelez-vous ?", "agent": "general"}
+{"message": "Vous fonctionnez grâce à quel LLM ?", "agent": "general"}
+{"message": "Expliquez-moi votre architecture.", "agent": "general"}
+{"message": "Quelle est votre version actuelle ?", "agent": "general"}
+{"message": "Bonne nuit.", "agent": "general"}

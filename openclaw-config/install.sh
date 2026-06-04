@@ -63,13 +63,38 @@ fi
 
 mkdir -p "$OPENCLAW_PATH"
 
+# auth-profiles.json de l'agent principal — injecter les clés API des providers configurés
+AUTH_PROFILES="${OPENCLAW_PATH}/agents/main/agent/auth-profiles.json"
+if [[ -f "$AUTH_PROFILES" ]] && [[ -n "${EURIA_API_KEY:-}" ]]; then
+  python3 - <<PYEOF
+import json, os
+path = os.environ.get('AUTH_PROFILES', '$AUTH_PROFILES')
+try:
+    with open(path) as f:
+        d = json.load(f)
+    d.setdefault('profiles', {})
+    if isinstance(d['profiles'], list):
+        d['profiles'] = {p: {} for p in d['profiles']}
+    d['profiles']['euria:default'] = {
+        'type': 'api_key',
+        'provider': 'euria',
+        'key': '${EURIA_API_KEY}'
+    }
+    with open(path, 'w') as f:
+        json.dump(d, f, indent=2)
+    print('[INFO] Profil euria:default écrit dans auth-profiles.json')
+except Exception as e:
+    print(f'[WARN] auth-profiles.json non mis à jour : {e}')
+PYEOF
+fi
+
 # openclaw.json
 TARGET="${OPENCLAW_PATH}/openclaw.json"
 if [[ -f "$TARGET" && "$FORCE" != "true" ]]; then
   info "openclaw.json existe déjà — ignoré (utilisez --force pour écraser)"
 else
-  export HOME HOSTNAME OBSIDIAN_PATH ASSISTANT_NAME LLM_BACKEND DEEPSEEK_API_KEY OPENCLAW_GATEWAY_TOKEN
-  envsubst '${HOME} ${HOSTNAME} ${OBSIDIAN_PATH} ${ASSISTANT_NAME} ${LLM_BACKEND} ${DEEPSEEK_API_KEY} ${OPENCLAW_GATEWAY_TOKEN}' \
+  export HOME HOSTNAME OBSIDIAN_PATH ASSISTANT_NAME LLM_BACKEND DEEPSEEK_API_KEY OPENCLAW_GATEWAY_TOKEN EURIA_API_KEY EURIA_PRODUCT_ID
+  envsubst '${HOME} ${HOSTNAME} ${OBSIDIAN_PATH} ${ASSISTANT_NAME} ${LLM_BACKEND} ${DEEPSEEK_API_KEY} ${OPENCLAW_GATEWAY_TOKEN} ${EURIA_API_KEY} ${EURIA_PRODUCT_ID}' \
     < "${SCRIPT_DIR}/openclaw.json.template" \
     > "$TARGET"
   # Sync .bak pour éviter que le gateway détecte notre écriture comme un "clobber"
@@ -95,8 +120,8 @@ else
   if [[ -z "$TELEGRAM_BOT_TOKEN" ]]; then
     warn "TELEGRAM_BOT_TOKEN non défini — à renseigner dans ${ENV_TARGET}"
   fi
-  export TELEGRAM_BOT_TOKEN OPENCLAW_GATEWAY_TOKEN GATEWAY_PASSWORD OPENCLAW_BIN
-  envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD} ${OPENCLAW_BIN} ${HOME}' \
+  export TELEGRAM_BOT_TOKEN OPENCLAW_GATEWAY_TOKEN GATEWAY_PASSWORD OPENCLAW_BIN GOG_ACCOUNT
+  envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD} ${OPENCLAW_BIN} ${HOME} ${GOG_ACCOUNT}' \
     < "${SCRIPT_DIR}/gateway.systemd.env.template" \
     > "$ENV_TARGET"
   chmod 600 "$ENV_TARGET"
@@ -114,6 +139,61 @@ else
     < "${SCRIPT_DIR}/openclaw-gateway.service" \
     > "$SERVICE_TARGET"
   info "Service systemd installé dans ${SYSTEMD_USER_DIR} (${OPENCLAW_BIN})"
+fi
+
+# switch-model
+SWITCH_MODEL_TARGET="${HOME}/.local/bin/switch-model"
+mkdir -p "${HOME}/.local/bin"
+cp "${SCRIPT_DIR}/switch-model" "$SWITCH_MODEL_TARGET"
+chmod +x "$SWITCH_MODEL_TARGET"
+info "switch-model installé dans ${HOME}/.local/bin"
+
+# Services MCP SSE
+for _svc in wiki-lm-mcp gog-mcp; do
+  _svc_src="${SCRIPT_DIR}/${_svc}.service"
+  _svc_dst="${SYSTEMD_USER_DIR}/${_svc}.service"
+  if [[ -f "$_svc_dst" && "$FORCE" != "true" ]]; then
+    info "${_svc}.service existe déjà — ignoré"
+  else
+    cp "$_svc_src" "$_svc_dst"
+    info "${_svc}.service installé dans ${SYSTEMD_USER_DIR}"
+  fi
+done
+
+# Service router-mcp (routeur d'intention EmbedRouter BGE-M3)
+ROUTER_SVC_DST="${SYSTEMD_USER_DIR}/router-mcp.service"
+if [[ -f "$ROUTER_SVC_DST" && "$FORCE" != "true" ]]; then
+  info "router-mcp.service existe déjà — ignoré"
+else
+  cp "${SCRIPT_DIR}/router-mcp.service" "$ROUTER_SVC_DST"
+  info "router-mcp.service installé dans ${SYSTEMD_USER_DIR}"
+fi
+ROUTER_BIN="${HOME}/Secretarius/Wiki_LM/routing/routing_mcp.py"
+if [[ -f "$ROUTER_BIN" ]]; then
+  systemctl --user daemon-reload 2>/dev/null || true
+  systemctl --user enable router-mcp.service 2>/dev/null && \
+    info "router-mcp.service activé au boot" || \
+    warn "Activation de router-mcp.service échouée"
+fi
+
+# Service SLM local (llama.cpp Phi-4-mini, cerveau de Tiron)
+# Installé partout, mais activé/démarré seulement si le binaire et le modèle existent
+SLM_SVC_DST="${SYSTEMD_USER_DIR}/slm-llama-cpp.service"
+if [[ -f "$SLM_SVC_DST" && "$FORCE" != "true" ]]; then
+  info "slm-llama-cpp.service existe déjà — ignoré"
+else
+  cp "${SCRIPT_DIR}/slm-llama-cpp.service" "$SLM_SVC_DST"
+  info "slm-llama-cpp.service installé dans ${SYSTEMD_USER_DIR}"
+fi
+SLM_BIN="${HOME}/llama.cpp/build/bin/llama-server"
+SLM_MODEL="${HOME}/Modèles/Phi-4-mini-instruct-Q6_K.gguf"
+if [[ -x "$SLM_BIN" && -f "$SLM_MODEL" ]]; then
+  systemctl --user daemon-reload 2>/dev/null || true
+  systemctl --user enable slm-llama-cpp.service 2>/dev/null && \
+    info "slm-llama-cpp.service activé au boot" || \
+    warn "Activation de slm-llama-cpp.service échouée"
+else
+  info "llama-server ou modèle Phi-4-mini absent — slm-llama-cpp.service installé mais non activé"
 fi
 
 # Service scout (watcher)
@@ -195,6 +275,13 @@ if ! [[ -d "${ADAPTER_SRC}/node_modules/@modelcontextprotocol" ]]; then
     warn "npm install pré-install échoué dans ${ADAPTER_SRC}"
 fi
 
+# Compiler les sources TypeScript de l'adaptateur
+if [[ -f "${ADAPTER_SRC}/tsconfig.json" ]]; then
+  info "Compilation TypeScript de openclaw-mcp-adapter..."
+  (cd "${ADAPTER_SRC}" && node_modules/.bin/tsc --noEmit false 2>&1) || \
+    warn "tsc échoué — l'adaptateur utilisera les .js existants"
+fi
+
 # fastmcp (dépendance du serveur MCP Wiki_LM)
 if "${HOME}/Secretarius/Wiki_LM/.venv/bin/python3" -c "import fastmcp" &>/dev/null; then
   info "fastmcp déjà installé dans le venv Wiki_LM"
@@ -225,11 +312,12 @@ while IFS= read -r -d '' src; do
   rel="${src#${WORKSPACE_SRC}/}"
   dst="${WORKSPACE_DST}/${rel}"
   mkdir -p "$(dirname "$dst")"
-  if [[ -f "$dst" && "$FORCE" != "true" ]]; then
-    info "${rel} existe déjà — ignoré"
-  else
+  # AGENTS.md est de la configuration — toujours mis à jour
+  if [[ "$rel" == "AGENTS.md" || "$FORCE" == "true" || ! -f "$dst" ]]; then
     envsubst "$SUBST_VARS" < "$src" > "$dst"
     info "${rel} installé"
+  else
+    info "${rel} existe déjà — ignoré"
   fi
 done < <(find "$WORKSPACE_SRC" -name "*.md" -print0)
 
@@ -242,13 +330,30 @@ while IFS= read -r -d '' src; do
   rel="${src#${SCOUT_WORKSPACE_SRC}/}"
   dst="${SCOUT_WORKSPACE_DST}/${rel}"
   mkdir -p "$(dirname "$dst")"
-  if [[ -f "$dst" && "$FORCE" != "true" ]]; then
-    info "scout/${rel} existe déjà — ignoré"
-  else
+  if [[ "$rel" == "AGENTS.md" || "$FORCE" == "true" || ! -f "$dst" ]]; then
     envsubst "$SUBST_VARS" < "$src" > "$dst"
     info "scout/${rel} installé"
+  else
+    info "scout/${rel} existe déjà — ignoré"
   fi
 done < <(find "$SCOUT_WORKSPACE_SRC" -name "*.md" -print0)
+
+# Workspace wikilm (isolé dans agents/wikilm/workspace/)
+WIKILM_WORKSPACE_SRC="${SCRIPT_DIR}/agents/wikilm/workspace"
+WIKILM_WORKSPACE_DST="${OPENCLAW_PATH}/agents/wikilm/workspace"
+mkdir -p "${WIKILM_WORKSPACE_DST}"
+
+while IFS= read -r -d '' src; do
+  rel="${src#${WIKILM_WORKSPACE_SRC}/}"
+  dst="${WIKILM_WORKSPACE_DST}/${rel}"
+  mkdir -p "$(dirname "$dst")"
+  if [[ "$rel" == "AGENTS.md" || "$FORCE" == "true" || ! -f "$dst" ]]; then
+    envsubst "$SUBST_VARS" < "$src" > "$dst"
+    info "wikilm/${rel} installé"
+  else
+    info "wikilm/${rel} existe déjà — ignoré"
+  fi
+done < <(find "$WIKILM_WORKSPACE_SRC" -name "*.md" -print0)
 
 # Image Docker sandbox
 SANDBOX_IMAGE="openclaw-sandbox:bookworm-slim"
