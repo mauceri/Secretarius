@@ -312,11 +312,12 @@ while IFS= read -r -d '' src; do
   rel="${src#${WORKSPACE_SRC}/}"
   dst="${WORKSPACE_DST}/${rel}"
   mkdir -p "$(dirname "$dst")"
-  if [[ -f "$dst" && "$FORCE" != "true" ]]; then
-    info "${rel} existe déjà — ignoré"
-  else
+  # AGENTS.md est de la configuration — toujours mis à jour
+  if [[ "$rel" == "AGENTS.md" || "$FORCE" == "true" || ! -f "$dst" ]]; then
     envsubst "$SUBST_VARS" < "$src" > "$dst"
     info "${rel} installé"
+  else
+    info "${rel} existe déjà — ignoré"
   fi
 done < <(find "$WORKSPACE_SRC" -name "*.md" -print0)
 
@@ -329,11 +330,11 @@ while IFS= read -r -d '' src; do
   rel="${src#${SCOUT_WORKSPACE_SRC}/}"
   dst="${SCOUT_WORKSPACE_DST}/${rel}"
   mkdir -p "$(dirname "$dst")"
-  if [[ -f "$dst" && "$FORCE" != "true" ]]; then
-    info "scout/${rel} existe déjà — ignoré"
-  else
+  if [[ "$rel" == "AGENTS.md" || "$FORCE" == "true" || ! -f "$dst" ]]; then
     envsubst "$SUBST_VARS" < "$src" > "$dst"
     info "scout/${rel} installé"
+  else
+    info "scout/${rel} existe déjà — ignoré"
   fi
 done < <(find "$SCOUT_WORKSPACE_SRC" -name "*.md" -print0)
 
@@ -346,11 +347,11 @@ while IFS= read -r -d '' src; do
   rel="${src#${WIKILM_WORKSPACE_SRC}/}"
   dst="${WIKILM_WORKSPACE_DST}/${rel}"
   mkdir -p "$(dirname "$dst")"
-  if [[ -f "$dst" && "$FORCE" != "true" ]]; then
-    info "wikilm/${rel} existe déjà — ignoré"
-  else
+  if [[ "$rel" == "AGENTS.md" || "$FORCE" == "true" || ! -f "$dst" ]]; then
     envsubst "$SUBST_VARS" < "$src" > "$dst"
     info "wikilm/${rel} installé"
+  else
+    info "wikilm/${rel} existe déjà — ignoré"
   fi
 done < <(find "$WIKILM_WORKSPACE_SRC" -name "*.md" -print0)
 
