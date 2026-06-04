@@ -195,7 +195,8 @@
       },
       "workspace": "${HOME}/.openclaw/workspace",
       "compaction": {
-        "mode": "safeguard"
+        "mode": "safeguard",
+        "reserveTokensFloor": 20000
       },
       "maxConcurrent": 1,
       "subagents": {
