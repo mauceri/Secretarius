@@ -1,6 +1,8 @@
 {
   "env": {
-    "DEEPSEEK_API_KEY": "${DEEPSEEK_API_KEY}"
+    "DEEPSEEK_API_KEY": "${DEEPSEEK_API_KEY}",
+    "EURIA_API_KEY": "${EURIA_API_KEY}",
+    "EURIA_PRODUCT_ID": "${EURIA_PRODUCT_ID}"
   },
   "meta": {
     "lastTouchedVersion": "2026.4.24",
@@ -17,6 +19,10 @@
       "openai-codex:default": {
         "provider": "openai-codex",
         "mode": "oauth"
+      },
+      "euria:default": {
+        "provider": "euria",
+        "mode": "api_key"
       },
       "deepseek:default": {
         "provider": "deepseek",
@@ -40,9 +46,7 @@
             "name": "Gemma 4 8B (local)",
             "api": "openai-completions",
             "reasoning": false,
-            "input": [
-              "text"
-            ],
+            "input": ["text"],
             "contextWindow": 8192,
             "maxTokens": 2048
           },
@@ -51,9 +55,7 @@
             "name": "GLM 4 9B (local)",
             "api": "openai-completions",
             "reasoning": false,
-            "input": [
-              "text"
-            ],
+            "input": ["text"],
             "contextWindow": 8192,
             "maxTokens": 2048
           },
@@ -62,9 +64,7 @@
             "name": "Granite 4 3B (local)",
             "api": "openai-completions",
             "reasoning": false,
-            "input": [
-              "text"
-            ],
+            "input": ["text"],
             "contextWindow": 8192,
             "maxTokens": 2048
           },
@@ -73,9 +73,7 @@
             "name": "Granite 4 3B 131k (local)",
             "api": "openai-completions",
             "reasoning": false,
-            "input": [
-              "text"
-            ],
+            "input": ["text"],
             "contextWindow": 8192,
             "maxTokens": 2048
           }
@@ -90,11 +88,39 @@
             "name": "DeepSeek V3.1 (OLLM)",
             "api": "openai-completions",
             "reasoning": false,
-            "input": [
-              "text"
-            ],
+            "input": ["text"],
             "contextWindow": 131072,
             "maxTokens": 8192
+          }
+        ]
+      },
+      "euria": {
+        "baseUrl": "https://api.infomaniak.com/2/ai/${EURIA_PRODUCT_ID}/openai/v1",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "mistralai/Mistral-Small-4-119B-2603",
+            "name": "Mistral Small 4 (Euria)",
+            "api": "openai-completions",
+            "reasoning": false,
+            "input": ["text"],
+            "contextWindow": 131072,
+            "maxTokens": 8192
+          }
+        ]
+      },
+      "tiron-llm": {
+        "baseUrl": "http://127.0.0.1:8998/v1",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "phi-4-mini-instruct",
+            "name": "Phi-4-mini (SLM local)",
+            "api": "openai-completions",
+            "reasoning": false,
+            "input": ["text"],
+            "contextWindow": 32768,
+            "maxTokens": 2048
           }
         ]
       },
@@ -107,9 +133,7 @@
             "name": "DeepSeek Chat",
             "api": "openai-completions",
             "reasoning": false,
-            "input": [
-              "text"
-            ],
+            "input": ["text"],
             "cost": {
               "input": 0.28,
               "output": 0.42,
@@ -124,9 +148,7 @@
             "name": "DeepSeek Reasoner",
             "api": "openai-completions",
             "reasoning": true,
-            "input": [
-              "text"
-            ],
+            "input": ["text"],
             "cost": {
               "input": 0.28,
               "output": 0.42,
@@ -143,9 +165,15 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "deepseek/deepseek-chat"
+        "primary": "euria/mistralai/Mistral-Small-4-119B-2603"
       },
       "models": {
+        "euria/mistralai/Mistral-Small-4-119B-2603": {
+          "alias": "Euria"
+        },
+        "tiron-llm/phi-4-mini-instruct": {
+          "alias": "TironSLM"
+        },
         "deepseek/deepseek-chat": {
           "alias": "DeepSeek"
         },
@@ -169,9 +197,9 @@
       "compaction": {
         "mode": "safeguard"
       },
-      "maxConcurrent": 4,
+      "maxConcurrent": 1,
       "subagents": {
-        "maxConcurrent": 8
+        "maxConcurrent": 2
       },
       "sandbox": {
         "mode": "all",
@@ -183,8 +211,13 @@
       {
         "id": "main",
         "subagents": {
-          "allowAgents": ["scout"]
+          "allowAgents": ["scout", "wikilm"]
         }
+      },
+      {
+        "id": "wikilm",
+        "model": "deepseek/deepseek-chat",
+        "workspace": "${HOME}/.openclaw/agents/wikilm/workspace"
       },
       {
         "id": "scout",
@@ -221,17 +254,12 @@
       "tools": {
         "allow": [
           "gog",
-          "exec",
           "read",
-          "write",
-          "edit",
-          "apply_path",
           "sessions_list",
           "sessions_send",
           "sessions_spawn",
           "session_status",
           "group:runtime",
-          "group:fs",
           "wiki_capture",
           "wiki_ingest",
           "wiki_query",
@@ -245,7 +273,16 @@
           "wiki-lm__wiki_tags",
           "wiki-lm__wiki_ingest_status",
           "wiki-lm__wiki_list_pending",
-          "wiki-lm__wiki_kb_update"
+          "wiki-lm__wiki_kb_update",
+          "gog__gmail_unread",
+          "gog__gmail_search",
+          "gog__gmail_get",
+          "gog__gmail_send",
+          "gog__gmail_reply",
+          "gog__calendar_events",
+          "gog__drive_search",
+          "gog__drive_download",
+          "router-mcp__route_intent"
         ],
         "deny": [
           "browser",
@@ -255,7 +292,15 @@
           "discord",
           "gateway",
           "web_search",
-          "web_fetch"
+          "web_fetch",
+          "exec",
+          "write",
+          "edit",
+          "apply_path",
+          "group:fs",
+          "gog__calendar_create",
+          "gog__calendar_delete",
+          "gog__drive_upload"
         ]
       }
     }
@@ -354,8 +399,16 @@
   "mcp": {
     "servers": {
       "wiki-lm": {
-        "command": "${HOME}/Secretarius/Wiki_LM/.venv/bin/python3",
-        "args": ["${HOME}/Secretarius/Wiki_LM/tools/mcp_server.py"]
+        "url": "http://127.0.0.1:8901/mcp",
+        "transport": "http"
+      },
+      "gog": {
+        "url": "http://127.0.0.1:8902/mcp",
+        "transport": "http"
+      },
+      "router-mcp": {
+        "url": "http://127.0.0.1:8903/mcp",
+        "transport": "http"
       }
     }
   }
