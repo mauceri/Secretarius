@@ -46,9 +46,7 @@
             "name": "Gemma 4 8B (local)",
             "api": "openai-completions",
             "reasoning": false,
-            "input": [
-              "text"
-            ],
+            "input": ["text"],
             "contextWindow": 8192,
             "maxTokens": 2048
           },
@@ -57,9 +55,7 @@
             "name": "GLM 4 9B (local)",
             "api": "openai-completions",
             "reasoning": false,
-            "input": [
-              "text"
-            ],
+            "input": ["text"],
             "contextWindow": 8192,
             "maxTokens": 2048
           },
@@ -68,9 +64,7 @@
             "name": "Granite 4 3B (local)",
             "api": "openai-completions",
             "reasoning": false,
-            "input": [
-              "text"
-            ],
+            "input": ["text"],
             "contextWindow": 8192,
             "maxTokens": 2048
           },
@@ -79,9 +73,7 @@
             "name": "Granite 4 3B 131k (local)",
             "api": "openai-completions",
             "reasoning": false,
-            "input": [
-              "text"
-            ],
+            "input": ["text"],
             "contextWindow": 8192,
             "maxTokens": 2048
           }
@@ -96,9 +88,7 @@
             "name": "DeepSeek V3.1 (OLLM)",
             "api": "openai-completions",
             "reasoning": false,
-            "input": [
-              "text"
-            ],
+            "input": ["text"],
             "contextWindow": 131072,
             "maxTokens": 8192
           }
@@ -143,9 +133,7 @@
             "name": "DeepSeek Chat",
             "api": "openai-completions",
             "reasoning": false,
-            "input": [
-              "text"
-            ],
+            "input": ["text"],
             "cost": {
               "input": 0.28,
               "output": 0.42,
@@ -160,9 +148,7 @@
             "name": "DeepSeek Reasoner",
             "api": "openai-completions",
             "reasoning": true,
-            "input": [
-              "text"
-            ],
+            "input": ["text"],
             "cost": {
               "input": 0.28,
               "output": 0.42,
