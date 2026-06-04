@@ -212,13 +212,8 @@
       {
         "id": "main",
         "subagents": {
-          "allowAgents": ["scout", "wikilm"]
+          "allowAgents": ["scout"]
         }
-      },
-      {
-        "id": "wikilm",
-        "model": "deepseek/deepseek-chat",
-        "workspace": "${HOME}/.openclaw/agents/wikilm/workspace"
       },
       {
         "id": "scout",
@@ -370,9 +365,7 @@
     }
   },
   "plugins": {
-    "allow": [
-      "openclaw-mcp-adapter"
-    ],
+    "allow": [],
     "entries": {
       "telegram": {
         "enabled": true
@@ -384,9 +377,6 @@
         "enabled": true
       },
       "ollama": {
-        "enabled": true
-      },
-      "openclaw-mcp-adapter": {
         "enabled": true
       }
     },
