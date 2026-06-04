@@ -401,15 +401,15 @@
     "servers": {
       "wiki-lm": {
         "url": "http://127.0.0.1:8901/mcp",
-        "transport": "http"
+        "transport": "streamable-http"
       },
       "gog": {
         "url": "http://127.0.0.1:8902/mcp",
-        "transport": "http"
+        "transport": "streamable-http"
       },
       "router-mcp": {
         "url": "http://127.0.0.1:8903/mcp",
-        "transport": "http"
+        "transport": "streamable-http"
       }
     }
   }
