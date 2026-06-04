@@ -179,7 +179,7 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "tiron-llm/phi-4-mini-instruct"
+        "primary": "euria/mistralai/Mistral-Small-4-119B-2603"
       },
       "models": {
         "euria/mistralai/Mistral-Small-4-119B-2603": {
