@@ -140,10 +140,11 @@ Section « Résultats » à compléter dans ce document après exécution :
 
 | Mesure | Valeur |
 |---|---|
-| TTFT prompt prod (médiane 3 appels) | — |
-| TTFT prompt léger (médiane 3 appels) | — |
-| Checklist UI (4/4 ?) | — |
-| Verdict | — |
+| TTFT prompt prod (médiane 3 appels) | 0.31 s (workspace texte seul — gain MCP non mesurable via bench) |
+| TTFT prompt léger (médiane 3 appels) | 0.28 s |
+| Comportement orchestrateur (API directe) | phi-4-mini s'identifie correctement comme Tiron, cite zéro initiative et règles SOUL.md |
+| Checklist UI | Non validée (accès navigateur bloqué : contexte sécurisé requis sans HTTPS/Tailscale) |
+| Verdict | PARTIEL — instance démarrée, workspace réduit chargé, comportement orchestrateur confirmé. Checklist UI à valider quand Tailscale Serve sera activé sur l'instance slm. |
 
 ---
 

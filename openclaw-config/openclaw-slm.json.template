@@ -110,9 +110,10 @@
   "gateway": {
     "port": 18790,
     "mode": "local",
-    "bind": "loopback",
+    "bind": "lan",
     "controlUi": {
-      "allowedOrigins": ["http://localhost:18790"]
+      "allowedOrigins": ["http://localhost:18790", "http://sanroque:18790"],
+      "allowInsecureAuth": true
     },
     "auth": {
       "mode": "token",
