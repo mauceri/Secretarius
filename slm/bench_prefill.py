@@ -55,7 +55,7 @@ def measure_ttft(system_prompt: str, n: int = 3) -> float:
                         break
                 except json.JSONDecodeError:
                     continue
-    return statistics.median(times)
+    return statistics.median(times) if times else float("inf")
 
 
 if __name__ == "__main__":
