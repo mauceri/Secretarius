@@ -8,11 +8,22 @@ source "${SCRIPT_DIR}/../install.conf"
 OBSIDIAN_PATH="${OBSIDIAN_PATH:-$HOME/Documents/Obsidian}"
 ASSISTANT_NAME="${ASSISTANT_NAME:-Tiron}"
 LLM_BACKEND="${LLM_BACKEND:-deepseek}"
-OPENCLAW_PATH="${OPENCLAW_PATH:-$HOME/.openclaw}"
 FORCE="${FORCE:-false}"
-for _arg in "$@"; do
-  [[ "$_arg" == "--force" ]] && FORCE="true"
+PROFILE="${PROFILE:-prod}"
+_i=0; _args=("$@")
+while [[ $_i -lt ${#_args[@]} ]]; do
+  case "${_args[$_i]}" in
+    --force) FORCE="true" ;;
+    --profile) _i=$((_i+1)); PROFILE="${_args[$_i]:-prod}" ;;
+  esac
+  _i=$((_i+1))
 done
+unset _i _args
+if [[ "$PROFILE" == "slm" ]]; then
+  OPENCLAW_PATH="${OPENCLAW_PATH:-$HOME/.openclaw-slm}"
+else
+  OPENCLAW_PATH="${OPENCLAW_PATH:-$HOME/.openclaw}"
+fi
 
 TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 GATEWAY_PASSWORD="${GATEWAY_PASSWORD:-}"
@@ -48,6 +59,21 @@ if [[ -z "$OPENCLAW_BIN" ]]; then
 fi
 OPENCLAW_BIN="${OPENCLAW_BIN:-/usr/bin/openclaw}"
 export OPENCLAW_BIN
+# Instance slm : installer openclaw@2026.5.12 localement (n'affecte pas la prod)
+if [[ "$PROFILE" == "slm" ]]; then
+  mkdir -p "${OPENCLAW_PATH}/npm"
+  info "Installation d'openclaw@2026.5.12 dans ${OPENCLAW_PATH}/npm..."
+  npm install --prefix "${OPENCLAW_PATH}/npm" "openclaw@2026.5.12" --silent 2>&1 || \
+    warn "npm install openclaw@2026.5.12 échoué — vérifier npm registry"
+  SLM_BIN="${OPENCLAW_PATH}/npm/node_modules/.bin/openclaw"
+  if [[ -x "$SLM_BIN" ]]; then
+    OPENCLAW_BIN="$SLM_BIN"
+    export OPENCLAW_BIN
+    info "OpenClaw SLM : ${OPENCLAW_BIN}"
+  else
+    warn "Binaire openclaw@2026.5.12 non trouvé dans ${OPENCLAW_PATH}/npm"
+  fi
+fi
 
 # Migration GATEWAY_TOKEN → OPENCLAW_GATEWAY_TOKEN
 if [[ -z "${OPENCLAW_GATEWAY_TOKEN:-}" && -n "${GATEWAY_TOKEN:-}" ]]; then
@@ -94,9 +120,11 @@ if [[ -f "$TARGET" && "$FORCE" != "true" ]]; then
   info "openclaw.json existe déjà — ignoré (utilisez --force pour écraser)"
 else
   export HOME HOSTNAME OBSIDIAN_PATH ASSISTANT_NAME LLM_BACKEND DEEPSEEK_API_KEY OPENCLAW_GATEWAY_TOKEN EURIA_API_KEY EURIA_PRODUCT_ID
+  _json_tpl="${SCRIPT_DIR}/openclaw.json.template"
+  [[ "$PROFILE" == "slm" ]] && _json_tpl="${SCRIPT_DIR}/openclaw-slm.json.template"
   envsubst '${HOME} ${HOSTNAME} ${OBSIDIAN_PATH} ${ASSISTANT_NAME} ${LLM_BACKEND} ${DEEPSEEK_API_KEY} ${OPENCLAW_GATEWAY_TOKEN} ${EURIA_API_KEY} ${EURIA_PRODUCT_ID}' \
-    < "${SCRIPT_DIR}/openclaw.json.template" \
-    > "$TARGET"
+    < "$_json_tpl" > "$TARGET"
+  unset _json_tpl
   # Sync .bak pour éviter que le gateway détecte notre écriture comme un "clobber"
   # et restaure silencieusement l'ancienne config au démarrage suivant.
   cp "$TARGET" "${OPENCLAW_PATH}/openclaw.json.bak" 2>/dev/null || true
@@ -104,6 +132,8 @@ else
 fi
 
 # gateway.systemd.env
+_env_tpl="${SCRIPT_DIR}/gateway.systemd.env.template"
+[[ "$PROFILE" == "slm" ]] && _env_tpl="${SCRIPT_DIR}/gateway-slm.systemd.env.template"
 ENV_TARGET="${OPENCLAW_PATH}/gateway.systemd.env"
 if [[ -f "$ENV_TARGET" && "$FORCE" != "true" ]]; then
   info "gateway.systemd.env existe déjà — ignoré"
@@ -111,7 +141,7 @@ elif [[ "$FORCE" != "true" ]]; then
   # Premier passage : TELEGRAM_BOT_TOKEN vide (à renseigner), OPENCLAW_GATEWAY_TOKEN auto-généré
   TELEGRAM_BOT_TOKEN="" GATEWAY_PASSWORD="" \
     envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD} ${OPENCLAW_BIN} ${HOME}' \
-    < "${SCRIPT_DIR}/gateway.systemd.env.template" \
+    < "$_env_tpl" \
     > "$ENV_TARGET"
   chmod 600 "$ENV_TARGET"
   info "gateway.systemd.env généré (600) — renseigner TELEGRAM_BOT_TOKEN et DEEPSEEK_API_KEY avant de démarrer le service"
@@ -122,24 +152,28 @@ else
   fi
   export TELEGRAM_BOT_TOKEN OPENCLAW_GATEWAY_TOKEN GATEWAY_PASSWORD OPENCLAW_BIN GOG_ACCOUNT
   envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD} ${OPENCLAW_BIN} ${HOME} ${GOG_ACCOUNT}' \
-    < "${SCRIPT_DIR}/gateway.systemd.env.template" \
+    < "$_env_tpl" \
     > "$ENV_TARGET"
   chmod 600 "$ENV_TARGET"
   info "gateway.systemd.env mis à jour (600)"
 fi
+unset _env_tpl
 
 # Service systemd user
 SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
 mkdir -p "$SYSTEMD_USER_DIR"
-SERVICE_TARGET="${SYSTEMD_USER_DIR}/openclaw-gateway.service"
+_gw_svc="openclaw-gateway.service"
+[[ "$PROFILE" == "slm" ]] && _gw_svc="openclaw-gateway-slm.service"
+SERVICE_TARGET="${SYSTEMD_USER_DIR}/${_gw_svc}"
 if [[ -f "$SERVICE_TARGET" && "$FORCE" != "true" ]]; then
-  info "openclaw-gateway.service existe déjà — ignoré"
+  info "${_gw_svc} existe déjà — ignoré"
 else
   envsubst '${OPENCLAW_BIN}' \
-    < "${SCRIPT_DIR}/openclaw-gateway.service" \
+    < "${SCRIPT_DIR}/${_gw_svc}" \
     > "$SERVICE_TARGET"
   info "Service systemd installé dans ${SYSTEMD_USER_DIR} (${OPENCLAW_BIN})"
 fi
+unset _gw_svc
 
 # switch-model
 SWITCH_MODEL_TARGET="${HOME}/.local/bin/switch-model"
@@ -148,6 +182,7 @@ cp "${SCRIPT_DIR}/switch-model" "$SWITCH_MODEL_TARGET"
 chmod +x "$SWITCH_MODEL_TARGET"
 info "switch-model installé dans ${HOME}/.local/bin"
 
+if [[ "$PROFILE" != "slm" ]]; then
 # Services MCP SSE
 for _svc in wiki-lm-mcp gog-mcp; do
   _svc_src="${SCRIPT_DIR}/${_svc}.service"
@@ -302,8 +337,11 @@ else
   info "Démarrer avec : systemctl --user start openclaw-injection-guard.service"
 fi
 
+fi  # end guard 1 (services MCP, Scout, injection-guard, Python deps)
+
 # Workspace .md et skills
 WORKSPACE_SRC="${SCRIPT_DIR}/workspace"
+[[ "$PROFILE" == "slm" ]] && WORKSPACE_SRC="${SCRIPT_DIR}/workspace-slm"
 WORKSPACE_DST="${OPENCLAW_PATH}/workspace"
 export HOME HOSTNAME OBSIDIAN_PATH ASSISTANT_NAME
 SUBST_VARS='${HOME} ${HOSTNAME} ${OBSIDIAN_PATH} ${ASSISTANT_NAME}'
@@ -321,6 +359,7 @@ while IFS= read -r -d '' src; do
   fi
 done < <(find "$WORKSPACE_SRC" -name "*.md" -print0)
 
+if [[ "$PROFILE" != "slm" ]]; then
 # Workspace scout (isolé dans agents/scout/workspace/)
 SCOUT_WORKSPACE_SRC="${SCRIPT_DIR}/agents/scout/workspace"
 SCOUT_WORKSPACE_DST="${OPENCLAW_PATH}/agents/scout/workspace"
@@ -373,4 +412,16 @@ if docker ps &>/dev/null 2>&1; then
   fi
 else
   info "Docker inaccessible — image sandbox non construite (relancer install.sh après reconnexion)"
+fi
+fi  # end guard 2 (Scout workspace, wikilm workspace, Docker image)
+
+# Finalisation instance slm
+if [[ "$PROFILE" == "slm" ]]; then
+  systemctl --user daemon-reload 2>/dev/null || true
+  systemctl --user enable openclaw-gateway-slm.service 2>/dev/null && \
+    info "openclaw-gateway-slm.service activé" || \
+    warn "Activation échouée — lancer manuellement"
+  info "Installation slm terminée."
+  info "Démarrer : systemctl --user start openclaw-gateway-slm.service"
+  info "UI : http://localhost:18790"
 fi
