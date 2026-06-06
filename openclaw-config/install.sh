@@ -20,7 +20,7 @@ while [[ $_i -lt ${#_args[@]} ]]; do
 done
 unset _i _args
 if [[ "$PROFILE" == "slm" ]]; then
-  OPENCLAW_PATH="${OPENCLAW_PATH:-$HOME/.openclaw-slm}"
+  OPENCLAW_PATH="$HOME/.openclaw-slm"
 else
   OPENCLAW_PATH="${OPENCLAW_PATH:-$HOME/.openclaw}"
 fi
@@ -140,7 +140,7 @@ if [[ -f "$ENV_TARGET" && "$FORCE" != "true" ]]; then
 elif [[ "$FORCE" != "true" ]]; then
   # Premier passage : TELEGRAM_BOT_TOKEN vide (à renseigner), OPENCLAW_GATEWAY_TOKEN auto-généré
   TELEGRAM_BOT_TOKEN="" GATEWAY_PASSWORD="" \
-    envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD} ${OPENCLAW_BIN} ${HOME}' \
+    envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD} ${OPENCLAW_BIN} ${HOME} ${EURIA_API_KEY} ${EURIA_PRODUCT_ID} ${GOG_ACCOUNT}' \
     < "$_env_tpl" \
     > "$ENV_TARGET"
   chmod 600 "$ENV_TARGET"
@@ -150,8 +150,8 @@ else
   if [[ -z "$TELEGRAM_BOT_TOKEN" ]]; then
     warn "TELEGRAM_BOT_TOKEN non défini — à renseigner dans ${ENV_TARGET}"
   fi
-  export TELEGRAM_BOT_TOKEN OPENCLAW_GATEWAY_TOKEN GATEWAY_PASSWORD OPENCLAW_BIN GOG_ACCOUNT
-  envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD} ${OPENCLAW_BIN} ${HOME} ${GOG_ACCOUNT}' \
+  export TELEGRAM_BOT_TOKEN OPENCLAW_GATEWAY_TOKEN GATEWAY_PASSWORD OPENCLAW_BIN GOG_ACCOUNT EURIA_API_KEY EURIA_PRODUCT_ID
+  envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD} ${OPENCLAW_BIN} ${HOME} ${GOG_ACCOUNT} ${EURIA_API_KEY} ${EURIA_PRODUCT_ID}' \
     < "$_env_tpl" \
     > "$ENV_TARGET"
   chmod 600 "$ENV_TARGET"
