@@ -108,7 +108,7 @@ Routine de session : lire SOUL.md et USER.md avant de répondre au premier messa
 },
 "mcp": {},
 "channels": { "telegram": { "enabled": false } },
-"gateway": { "port": 18790, "tailscale": { "mode": "off" } }
+"gateway": { "port": 18790 }
 ```
 
 ---
@@ -158,6 +158,9 @@ Section « Résultats » à compléter dans ce document après exécution :
 | Copier | `workspace/SOUL.md`, `USER.md`, `IDENTITY.md` → `workspace-slm/` |
 | Modifier | `install.sh` — flag `--profile slm` + épinglage `openclaw@2026.5.12` |
 | Créer | `slm/bench_prefill.py` |
+
+Le bloc `gateway.tailscale` est absent du template slm (omis = désactivé) plutôt
+que `"mode": "off"` dont la validité n'est pas garantie par la doc OpenClaw.
 
 La prod (`openclaw.json.template`, `workspace/`, `install.sh` sans flag) reste
 inchangée.
