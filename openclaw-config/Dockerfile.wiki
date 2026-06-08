@@ -1,0 +1,12 @@
+FROM openclaw-sandbox:bookworm-slim
+USER root
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    python3-pip \
+    build-essential \
+  && rm -rf /var/lib/apt/lists/*
+COPY Wiki_LM/requirements.txt /tmp/wiki-requirements.txt
+RUN pip3 install --break-system-packages --no-cache-dir -r /tmp/wiki-requirements.txt \
+  && rm /tmp/wiki-requirements.txt
+RUN python3 -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-m3')"
+USER sandbox
