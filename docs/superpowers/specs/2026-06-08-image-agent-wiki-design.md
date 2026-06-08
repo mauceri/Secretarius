@@ -118,8 +118,10 @@ Nouvelle entrée dans `agents.list[]`, sur le modèle du Pilier A :
       ],
       "env": {
         "WIKI_PATH": "/Wiki_LM",
-        "WIKI_LLM_BACKEND": "...",
-        "DEEPSEEK_API_KEY": "${DEEPSEEK_API_KEY}"
+        "WIKI_LLM_BACKEND": "openai",
+        "OPENAI_BASE_URL": "https://api.infomaniak.com/2/ai/${EURIA_PRODUCT_ID}/openai/v1",
+        "OPENAI_API_KEY": "${EURIA_API_KEY}",
+        "OPENAI_MODEL": "mistralai/Mistral-Small-4-119B-2603"
       }
     }
   },
@@ -191,8 +193,13 @@ dédié, échec pour `main`) :
   — même patron, à dérouler séparément
 - Conception du skill wiki lui-même (comment le skill orchestre
   capture/ingest/query, intégration du filtrage anti-injection façon Scout)
-- Question ouverte : quel backend LLM pour les appels internes de `ingest.py`
-  (`llm.py`, génération de concepts/entités) — garder le mécanisme
-  multi-backend existant ou faire passer ces appels par le modèle natif de
-  l'agent (Euria) ? À trancher lors de la conception du skill.
 - Intégration du build d'image à `install.sh`
+
+**Question tranchée pendant l'écriture du plan (2026-06-08)** : le backend LLM
+pour les appels internes de `ingest.py` (`llm.py`, génération de
+concepts/entités) passera par le modèle natif de l'agent — Euria — via le
+backend générique `openai` de `llm.py` (compatible OpenAI). D'où le câblage
+`WIKI_LLM_BACKEND=openai` + `OPENAI_BASE_URL`/`OPENAI_API_KEY`/`OPENAI_MODEL`
+pointant sur Euria en §5 : réutilise les secrets `EURIA_API_KEY`/
+`EURIA_PRODUCT_ID` déjà présents dans `gateway-slm.systemd.env`, sans
+provisionner de nouveau secret (`DEEPSEEK_API_KEY` abandonné pour ce canal).
