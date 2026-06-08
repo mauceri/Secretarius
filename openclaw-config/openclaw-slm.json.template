@@ -69,7 +69,33 @@
       }
     },
     "list": [
-      { "id": "main" }
+      { "id": "main" },
+      {
+        "id": "wiki",
+        "model": { "primary": "euria/mistralai/Mistral-Small-4-119B-2603" },
+        "workspace": "${HOME}/.openclaw-slm/workspace-wiki",
+        "sandbox": {
+          "docker": {
+            "image": "secretarius-wiki:latest",
+            "binds": [
+              "/home/mauceric/Secretarius/Wiki_LM/tools:/wiki-tools:ro",
+              "/home/mauceric/Documents/Arbath/Wiki_LM:/Wiki_LM:rw"
+            ],
+            "env": {
+              "WIKI_PATH": "/Wiki_LM",
+              "WIKI_LLM_BACKEND": "openai",
+              "OPENAI_BASE_URL": "https://api.infomaniak.com/2/ai/${EURIA_PRODUCT_ID}/openai/v1",
+              "OPENAI_API_KEY": "${EURIA_API_KEY}",
+              "OPENAI_MODEL": "mistralai/Mistral-Small-4-119B-2603",
+              "HF_HUB_OFFLINE": "1",
+              "TRANSFORMERS_OFFLINE": "1"
+            }
+          }
+        },
+        "tools": {
+          "exec": { "host": "sandbox" }
+        }
+      }
     ]
   },
   "tools": {
