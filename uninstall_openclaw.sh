@@ -98,8 +98,8 @@ for svc in openclaw-gateway openclaw-scout; do
 done
 systemctl --user daemon-reload 2>/dev/null || true
 
-# scout-watcher + scout-query
-for bin in scout-watcher scout-query; do
+# scout-watcher
+for bin in scout-watcher; do
   TARGET="$HOME/.local/bin/$bin"
   if [[ -f "$TARGET" ]]; then
     rm -f "$TARGET"
