@@ -112,6 +112,7 @@ Nouvelle entrée dans `agents.list[]`, sur le modèle du Pilier A :
   "sandbox": {
     "docker": {
       "image": "secretarius-wiki:latest",
+      "dangerouslyAllowExternalBindSources": true,
       "binds": [
         "/home/mauceric/Secretarius/Wiki_LM/tools:/wiki-tools:ro",
         "/home/mauceric/Documents/Arbath/Wiki_LM:/Wiki_LM:rw"
@@ -132,6 +133,33 @@ Nouvelle entrée dans `agents.list[]`, sur le modèle du Pilier A :
   }
 }
 ```
+
+**Deux découvertes faites en validation, absentes de la conception initiale :**
+
+- **`dangerouslyAllowExternalBindSources: true`** — par défaut, OpenClaw
+  n'autorise les sources de bind que sous le répertoire `workspace` de l'agent
+  (`/home/mauceric/.openclaw-slm/workspace-wiki`) ; toute source en dehors est
+  rejetée (« outside allowed roots »), *avant même* la liste noire des chemins
+  dangereux décrite plus bas. Les deux binds de cette conception
+  (`Wiki_LM/tools` et `Documents/Arbath/Wiki_LM`) sont tous deux externes au
+  workspace — sans ce drapeau, aucun des deux ne peut être monté, et la
+  conception entière (binds vivants, cf. §2.2) est inopérante. La liste noire
+  des chemins dangereux (`/etc`, `~/.ssh`, etc.) reste active par-dessus :
+  le drapeau élargit l'ensemble des sources *candidates*, pas l'ensemble des
+  sources *autorisées en clair*.
+- **Credential OpenClaw pour le modèle propre de l'agent** — distinct de
+  `OPENAI_API_KEY` (§2.3, qui alimente uniquement les appels internes des
+  outils Wiki_LM dans le sandbox), l'agent a besoin d'un credential stocké
+  dans son propre magasin OpenClaw
+  (`~/.openclaw-slm/agents/wiki/agent/auth-profiles.json`, format
+  `{"version": 1, "profiles": {"euria:default": {"type": "api_key",
+  "provider": "euria", "key": "<valeur de EURIA_API_KEY>"}}}`, miroir du
+  motif déjà en place côté prod) pour que *l'agent lui-même* (son
+  raisonnement, pas les outils qu'il invoque) puisse appeler son modèle
+  `euria/mistralai/Mistral-Small-4-119B-2603`. Sans ce credential,
+  `FailoverError: No API key found for provider "euria"` empêche même la
+  création du conteneur sandbox. Pas de commande CLI non interactive pour le
+  provisionner — fichier écrit directement, à l'image du motif prod.
 
 Confirmé dans la documentation OpenClaw (les points laissés ouverts à la fin
 de la session de design sont désormais tranchés) :
@@ -197,6 +225,27 @@ dédié, échec pour `main`) :
    redémarrage du conteneur
 4. **Test du bind données** : vérifier lecture/écriture dans `/Wiki_LM`
    (capture/ingest)
+
+### Résultats (exécutés le 2026-06-08)
+
+| Test | Résultat |
+|---|---|
+| Build de l'image (`secretarius-wiki:latest`) | ✅ 10,5 Go (au-delà de l'estimation ~5 Go du §4 — torch + transformers + poids BGE-M3 ; pas un problème, image locale mono-machine) |
+| Chargement hors-ligne BGE-M3 (`--network none`, `HF_HUB_OFFLINE=1`/`TRANSFORMERS_OFFLINE=1`) | ✅ dimension 1024 — voir note ci-dessous sur ces deux variables |
+| Isolation — `wiki` charge BGE-M3 hors-ligne dans son conteneur sandbox réel | ✅ dimension 1024 |
+| Isolation — `main` échoue sur `import sentence_transformers` | ✅ `ModuleNotFoundError: No module named 'sentence_transformers'` |
+| Bind code — fichier créé/supprimé sur l'hôte visible immédiatement dans `/wiki-tools` | ✅ visible et disparaît sans rebuild ni redémarrage |
+| Bind données — écriture/lecture/suppression cohérente entre `/Wiki_LM` (conteneur) et `Documents/Arbath/Wiki_LM` (hôte) | ✅ contenu identique des deux côtés, suppression propagée |
+
+**Note sur `HF_HUB_OFFLINE`/`TRANSFORMERS_OFFLINE`** : le premier essai du test
+de chargement hors-ligne (sans ces variables) a échoué — `sentence-transformers`
+tente une vérification réseau (`HEAD` sur `adapter_config.json`) avant
+d'utiliser le cache local, et cette vérification échoue brutalement sous
+`--network none`. Cette découverte a conduit à ajouter ces deux variables à la
+fois à la commande de test et à l'environnement de l'agent (§5) — réalisant
+ainsi pleinement l'objectif du §2.1 (« démarrage sans dépendance réseau »),
+y compris en déploiement réel où le réseau est disponible mais où la
+vérification serait un aller-retour évitable.
 
 ---
 
