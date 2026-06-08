@@ -121,7 +121,9 @@ Nouvelle entrée dans `agents.list[]`, sur le modèle du Pilier A :
         "WIKI_LLM_BACKEND": "openai",
         "OPENAI_BASE_URL": "https://api.infomaniak.com/2/ai/${EURIA_PRODUCT_ID}/openai/v1",
         "OPENAI_API_KEY": "${EURIA_API_KEY}",
-        "OPENAI_MODEL": "mistralai/Mistral-Small-4-119B-2603"
+        "OPENAI_MODEL": "mistralai/Mistral-Small-4-119B-2603",
+        "HF_HUB_OFFLINE": "1",
+        "TRANSFORMERS_OFFLINE": "1"
       }
     }
   },
@@ -146,6 +148,17 @@ de la session de design sont désormais tranchés) :
   de toucher ce réglage global, l'agent `wiki` porte son propre override
   `"tools": { "exec": { "host": "sandbox" } }` — local, sans effet de bord sur
   Tiron. C'est la solution retenue (cf. JSON ci-dessus).
+
+**`HF_HUB_OFFLINE`/`TRANSFORMERS_OFFLINE`** : ajoutés suite à un constat fait en
+validation (Task 3 du plan) — sans ces variables, `sentence-transformers`
+effectue une vérification réseau (`HEAD` sur `adapter_config.json`) avant
+d'utiliser les poids déjà présents en cache, à chaque chargement du modèle.
+En déploiement le réseau est disponible (Euria), donc cette vérification
+réussirait et le chargement utiliserait quand même le cache local — mais elle
+ajoute un aller-retour réseau évitable au démarrage, contraire à l'objectif du
+§2.1 (« démarrage sans dépendance réseau au chargement du modèle »). Forcer le
+mode hors-ligne fait sauter cette vérification : le modèle se charge
+directement depuis le cache embarqué dans l'image.
 
 **Garde-fous des binds (`gateway/sandboxing.md`)** : OpenClaw bloque les
 sources dangereuses (`/etc`, `/proc`, `/sys`, `/dev`, `docker.sock`) et les

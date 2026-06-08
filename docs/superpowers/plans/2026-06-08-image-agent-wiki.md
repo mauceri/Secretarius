@@ -113,15 +113,25 @@ réseau au chargement du modèle").
 - [ ] **Step 1: Lancer un conteneur jetable sans accès réseau et charger le modèle**
 
 ```bash
-docker run --rm --network none secretarius-wiki:latest \
+docker run --rm --network none -e HF_HUB_OFFLINE=1 -e TRANSFORMERS_OFFLINE=1 secretarius-wiki:latest \
   python3 -c "from sentence_transformers import SentenceTransformer; m = SentenceTransformer('BAAI/bge-m3'); print(m.get_sentence_embedding_dimension())"
 ```
+
+`HF_HUB_OFFLINE=1`/`TRANSFORMERS_OFFLINE=1` sont nécessaires ici : sans elles,
+`sentence-transformers` tente une vérification réseau (`HEAD` sur
+`adapter_config.json`) avant d'utiliser le cache local, et cette vérification
+échoue brutalement (erreur de résolution DNS non rattrapée) sous
+`--network none` — alors même que les poids sont bien présents dans l'image.
+Ces deux variables seront aussi câblées dans l'environnement de l'agent
+(Tasks 5 et 6) pour éviter cette vérification réseau évitable au démarrage
+réel (cf. spec §5).
 
 Expected: la commande affiche `1024` (dimension des embeddings BGE-M3) et se
 termine sans erreur réseau — preuve que les poids sont pré-téléchargés dans
 l'image et que le chargement ne dépend d'aucun accès externe.
 
-Si cette étape échoue (erreur de résolution DNS / téléchargement), le
+Si cette étape échoue avec les deux variables d'environnement définies (erreur
+de résolution DNS / téléchargement persistante), le
 `RUN python3 -c "... SentenceTransformer('BAAI/bge-m3')"` du Dockerfile (Task 1)
 n'a pas mis les poids au bon endroit dans le cache HuggingFace — revoir avant
 de poursuivre.
@@ -221,7 +231,9 @@ par :
               "WIKI_LLM_BACKEND": "openai",
               "OPENAI_BASE_URL": "https://api.infomaniak.com/2/ai/${EURIA_PRODUCT_ID}/openai/v1",
               "OPENAI_API_KEY": "${EURIA_API_KEY}",
-              "OPENAI_MODEL": "mistralai/Mistral-Small-4-119B-2603"
+              "OPENAI_MODEL": "mistralai/Mistral-Small-4-119B-2603",
+              "HF_HUB_OFFLINE": "1",
+              "TRANSFORMERS_OFFLINE": "1"
             }
           }
         },
@@ -291,7 +303,9 @@ par :
               "WIKI_LLM_BACKEND": "openai",
               "OPENAI_BASE_URL": "https://api.infomaniak.com/2/ai/${EURIA_PRODUCT_ID}/openai/v1",
               "OPENAI_API_KEY": "${EURIA_API_KEY}",
-              "OPENAI_MODEL": "mistralai/Mistral-Small-4-119B-2603"
+              "OPENAI_MODEL": "mistralai/Mistral-Small-4-119B-2603",
+              "HF_HUB_OFFLINE": "1",
+              "TRANSFORMERS_OFFLINE": "1"
             }
           }
         },
