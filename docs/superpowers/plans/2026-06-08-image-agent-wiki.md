@@ -343,8 +343,14 @@ Expected: `active`
 - [ ] **Step 4: Vérifier que l'agent `wiki` est chargé**
 
 ```bash
-~/.openclaw-slm/npm/node_modules/.bin/openclaw agents list --json | python3 -c "import json,sys; ids=[a['id'] for a in json.load(sys.stdin)]; print(ids)"
+~/.openclaw-slm/npm/node_modules/.bin/openclaw agents list --profile slm --json | python3 -c "import json,sys; ids=[a['id'] for a in json.load(sys.stdin)]; print(ids)"
 ```
+
+`--profile slm` est nécessaire : sans lui, la commande résout vers une autre
+instance OpenClaw installée sur la machine (constaté en exécution — elle
+affiche un avertissement de version différente et liste les agents d'une
+config différente, p. ex. `['main', 'scout']`, qui ne sont pas ceux de
+l'instance slm).
 
 Expected: une liste contenant `'main'` et `'wiki'`.
 
