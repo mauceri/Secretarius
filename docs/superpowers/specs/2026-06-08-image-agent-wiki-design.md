@@ -122,25 +122,28 @@ Nouvelle entrée dans `agents.list[]`, sur le modèle du Pilier A :
         "DEEPSEEK_API_KEY": "${DEEPSEEK_API_KEY}"
       }
     }
+  },
+  "tools": {
+    "exec": { "host": "sandbox" }
   }
 }
 ```
 
-Confirmé dans `gateway/sandboxing.md` (les deux points laissés ouverts à la
-fin de la session de design sont désormais tranchés) :
+Confirmé dans la documentation OpenClaw (les points laissés ouverts à la fin
+de la session de design sont désormais tranchés) :
 - **Format des binds** : `"host:container:mode"`
   (`sandbox.docker.binds`, fusion entre `agents.defaults` et `agents.list[]`)
 - **Variables d'environnement du sandbox** : `sandbox.docker.env`, *pas* un
   bloc `env` générique au niveau de l'agent (cf. §2.3) — même mécanisme de
   fusion global/par-agent que `binds`
-- **`tools.exec.host`** : la valeur par défaut `"auto"` résout déjà vers
-  `"sandbox"` dès qu'un runtime sandbox est actif (`agents.defaults.sandbox.mode
-  = "all"`, déjà le cas dans `openclaw-slm.json.template`) — **mais le
-  template actuel force `"tools.exec.host": "gateway"`**, ce qui ferait
-  tourner l'exec sur l'hôte et désactiverait l'isolation par image. Il faudra
-  retirer cette valeur (ou la passer à `"sandbox"`/`"auto"`) pour que
-  l'isolation par contenu d'image ait un effet — cf. tâche dédiée dans le plan
-  d'implémentation.
+- **`tools.exec.host` par agent** : `gateway/cli-backends.md` confirme que
+  *« per-agent `agents.list[].tools.exec` settings override global
+  `tools.exec` for that agent »*. Le template actuel force
+  `"tools.exec.host": "gateway"` globalement (nécessaire à `main`/Tiron pour
+  exécuter `gog`, qui vit sur l'hôte — règle « gog chez Tiron »). Plutôt que
+  de toucher ce réglage global, l'agent `wiki` porte son propre override
+  `"tools": { "exec": { "host": "sandbox" } }` — local, sans effet de bord sur
+  Tiron. C'est la solution retenue (cf. JSON ci-dessus).
 
 **Garde-fous des binds (`gateway/sandboxing.md`)** : OpenClaw bloque les
 sources dangereuses (`/etc`, `/proc`, `/sys`, `/dev`, `docker.sock`) et les
