@@ -57,9 +57,14 @@ modification — friction incompatible avec ce rythme.
 remplace jamais une variable d'environnement déjà définie**
 (`if key and key not in os.environ`). On exploite cette priorité : les
 variables nécessaires (`WIKI_PATH`, `WIKI_LLM_BACKEND`, `DEEPSEEK_API_KEY`,
-etc.) sont injectées via le bloc `env` de la config de l'agent — comme
-`EURIA_API_KEY` aujourd'hui — plutôt que de monter `Wiki_LM/.env` (qui
-contient un secret en clair) dans le conteneur.
+etc.) sont injectées via `sandbox.docker.env` — **pas** un bloc `env` générique
+au niveau de l'agent : la documentation OpenClaw (`gateway/sandboxing.md`) est
+explicite, *« Sandbox exec ne hérite pas de `process.env` de l'hôte ; utilisez
+`agents.defaults.sandbox.docker.env` (ou une image personnalisée) pour les
+clés des skills »*. Comme `binds`, `docker.env` se règle globalement ou par
+agent (`agents.list[].sandbox.docker.env`), les deux niveaux étant fusionnés.
+Pas de fichier secret monté dans le conteneur — `Wiki_LM/.env` reste sur
+l'hôte, inutilisé par l'agent.
 
 ---
 
@@ -110,26 +115,38 @@ Nouvelle entrée dans `agents.list[]`, sur le modèle du Pilier A :
       "binds": [
         "/home/mauceric/Secretarius/Wiki_LM/tools:/wiki-tools:ro",
         "/home/mauceric/Documents/Arbath/Wiki_LM:/Wiki_LM:rw"
-      ]
+      ],
+      "env": {
+        "WIKI_PATH": "/Wiki_LM",
+        "WIKI_LLM_BACKEND": "...",
+        "DEEPSEEK_API_KEY": "${DEEPSEEK_API_KEY}"
+      }
     }
-  },
-  "env": {
-    "WIKI_PATH": "/Wiki_LM",
-    "WIKI_LLM_BACKEND": "...",
-    "DEEPSEEK_API_KEY": "${DEEPSEEK_API_KEY}"
   }
 }
 ```
 
-`tools.exec.host` reste `"sandbox"` (ou `"auto"`) pour que l'agent exécute
-dans son conteneur (règle de conception n°2 de l'archi doc).
+Confirmé dans `gateway/sandboxing.md` (les deux points laissés ouverts à la
+fin de la session de design sont désormais tranchés) :
+- **Format des binds** : `"host:container:mode"`
+  (`sandbox.docker.binds`, fusion entre `agents.defaults` et `agents.list[]`)
+- **Variables d'environnement du sandbox** : `sandbox.docker.env`, *pas* un
+  bloc `env` générique au niveau de l'agent (cf. §2.3) — même mécanisme de
+  fusion global/par-agent que `binds`
+- **`tools.exec.host`** : la valeur par défaut `"auto"` résout déjà vers
+  `"sandbox"` dès qu'un runtime sandbox est actif (`agents.defaults.sandbox.mode
+  = "all"`, déjà le cas dans `openclaw-slm.json.template`) — **mais le
+  template actuel force `"tools.exec.host": "gateway"`**, ce qui ferait
+  tourner l'exec sur l'hôte et désactiverait l'isolation par image. Il faudra
+  retirer cette valeur (ou la passer à `"sandbox"`/`"auto"`) pour que
+  l'isolation par contenu d'image ait un effet — cf. tâche dédiée dans le plan
+  d'implémentation.
 
-**Points à vérifier à l'implémentation** (non couverts par le Pilier A, qui ne
-montait rien) :
-- le nom exact de la clé de bind mounts dans `sandbox.docker`
-  (`AgentSandboxConfig.docker` — `binds` ci-dessus est une supposition à
-  confirmer dans le schéma OpenClaw)
-- si `tools.exec.host` se déclare globalement ou peut être ciblé par agent
+**Garde-fous des binds (`gateway/sandboxing.md`)** : OpenClaw bloque les
+sources dangereuses (`/etc`, `/proc`, `/sys`, `/dev`, `docker.sock`) et les
+racines de credentials usuelles (`~/.config`, `~/.ssh`, `~/.aws`, etc.). Les
+deux binds prévus ici (`Wiki_LM/tools` et `Documents/Arbath/Wiki_LM`) ne
+touchent aucune racine bloquée.
 
 ---
 
