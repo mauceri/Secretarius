@@ -39,7 +39,7 @@
             "api": "openai-completions",
             "reasoning": false,
             "input": ["text"],
-            "contextWindow": 32768,
+            "contextWindow": 10240,
             "maxTokens": 2048
           }
         ]
@@ -49,7 +49,7 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "tiron-llm/phi-4-mini-instruct"
+        "primary": "euria/mistralai/Mistral-Small-4-119B-2603"
       },
       "models": {
         "tiron-llm/phi-4-mini-instruct": { "alias": "TironSLM" },
