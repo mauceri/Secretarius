@@ -77,7 +77,6 @@
             "env": {
               "XDG_CONFIG_HOME": "/agent/.gog-config",
               "GOG_KEYRING_BACKEND": "file",
-              "GOG_KEYRING_PASSWORD": "${GOG_KEYRING_PASSWORD}",
               "GOG_ACCOUNT": "${GOG_ACCOUNT}"
             }
           }
@@ -155,7 +154,7 @@
     "mode": "local",
     "bind": "lan",
     "controlUi": {
-      "allowedOrigins": ["http://localhost:18790", "http://sanroque:18790"],
+      "allowedOrigins": ["http://localhost:18790", "http://sanroque:18790", "https://sanroque.tailc69141.ts.net:8443"],
       "allowInsecureAuth": true
     },
     "auth": {
