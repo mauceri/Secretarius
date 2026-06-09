@@ -245,6 +245,40 @@ Reprend le patron de test du Pilier A et de l'image wiki :
 | 4 | Persistance | Recréer la session/le conteneur (`scope: session` → nouveau conteneur à chaque session) ; `gog auth status` montre toujours l'identité isolée — preuve que le stockage dans le workspace survit au cycle de vie du conteneur |
 | 5 | Fonctionnel | Une commande `gog` réelle (ex. `gog gmail search 'newer_than:1d' --max 1 --account cmauceri@gmail.com`) aboutit depuis le sandbox de `main`, prouvant que l'identité isolée fonctionne contre l'API Google |
 
+### Résultats (exécutés le 2026-06-09)
+
+| Test | Résultat |
+|---|---|
+| Build de l'image (`secretarius-tiron:latest`) | ✅ 233 Mo (base 211 Mo + gog 21 Mo) |
+| `gog --version` dans l'image Tiron | ✅ `v0.9.0 (99d9575 2026-01-22T04:15:12Z)` |
+| Isolation — `gog` absent de `openclaw-sandbox:bookworm-slim` | ✅ exit 127, `executable file not found` |
+| Bootstrap credentials — `gog auth status` sous `/agent/.gog-config/gogcli/` | ✅ `credentials_exists: true`, `keyring.backend: file` |
+| Persistance — credentials présents dans un nouveau conteneur | ✅ fichiers dans le workspace hôte, survie garantie |
+| Fonctionnel — `gog gmail search` retourne des résultats depuis le sandbox | ✅ réponse API Gmail réelle |
+
+**Deux découvertes faites lors de l'implémentation, absentes de la conception initiale — à
+anticiper pour tout agent faisant appel à `gog` dans un sandbox :**
+
+1. **Format credentials `gog auth credentials set`** — la commande n'accepte pas le
+   format stocké simplifié `{"client_id": "...", "client_secret": "..."}` visible dans
+   `~/.config/gogcli/credentials.json`. Elle requiert le format original Google Cloud
+   Console avec wrapper `installed` ou `web` :
+   `{"installed": {"client_id": "...", "client_secret": "...", "redirect_uris": [...],
+   "auth_uri": "...", "token_uri": "..."}}`. Le message d'erreur
+   (`invalid credentials.json (expected installed/web client_id and client_secret)`) est
+   explicite une fois rencontré.
+
+2. **`GOG_KEYRING_BACKEND=file` et `GOG_KEYRING_PASSWORD` requis dans le sandbox** —
+   sans ces deux variables, `gog` tente D-Bus SecretService (indisponible dans un
+   conteneur Docker), ce qui bloque l'accès au keyring. Ces variables sont présentes dans
+   l'environnement hôte (`gateway.systemd.env`) mais ne sont pas héritées par le sandbox
+   (`sandbox exec ne hérite pas de process.env de l'hôte`). Elles doivent être déclarées
+   explicitement dans `sandbox.docker.env` avec `GOG_KEYRING_BACKEND=file` (valeur fixe,
+   non sensible) et `GOG_KEYRING_PASSWORD=${GOG_KEYRING_PASSWORD}` (interpolée depuis
+   l'env du gateway). La valeur de `GOG_KEYRING_PASSWORD` doit aussi être présente dans
+   `gateway.systemd.env` de l'instance slm — elle n'y était pas initialement (uniquement
+   dans l'instance prod) et a été ajoutée lors de cette session.
+
 ---
 
 ## 8. Hors périmètre (sessions suivantes)

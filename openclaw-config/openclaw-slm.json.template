@@ -75,7 +75,10 @@
           "docker": {
             "image": "secretarius-tiron:latest",
             "env": {
-              "XDG_CONFIG_HOME": "/agent/.gog-config"
+              "XDG_CONFIG_HOME": "/agent/.gog-config",
+              "GOG_KEYRING_BACKEND": "file",
+              "GOG_KEYRING_PASSWORD": "${GOG_KEYRING_PASSWORD}",
+              "GOG_ACCOUNT": "${GOG_ACCOUNT}"
             }
           }
         },
