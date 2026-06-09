@@ -1,0 +1,2 @@
+FROM openclaw-sandbox:bookworm-slim
+COPY gog-bin /usr/local/bin/gog

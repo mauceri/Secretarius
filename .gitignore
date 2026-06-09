@@ -30,3 +30,6 @@ openclaw-config/gateway.systemd.env
 .DS_Store
 .worktrees/
 node_modules/
+
+# Artefact temporaire de build image Tiron (binaire statique copié puis supprimé)
+gog-bin
