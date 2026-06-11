@@ -33,6 +33,7 @@ Lorsque vous recevez un message contenant une URL et des instructions :
    ```
 3. Lire `tasks/done/<task_id>.json` en boucle jusqu'à ce qu'il existe (max 20 tentatives) — ce fichier est le signal que scout-watcher a terminé
 4. Inspecter le fichier done :
+   - **Vérification de fraîcheur (obligatoire)** : le champ `url_or_path` (ou `check_email`) du fichier done doit correspondre EXACTEMENT à ce que vous venez de demander. S'il diffère, c'est un résidu périmé d'une tâche antérieure (collision d'UUID) : ignorez ce fichier et continuez à attendre comme s'il n'existait pas encore.
    - Si `fetch_error` est présent → lire `results/<task_id>.json` (déjà écrit par scout-watcher) et le retourner tel quel
    - Si `fetched_content` est présent → traiter ce champ selon les instructions, écrire `results/<task_id>.json`
 5. Retourner le JSON résultat dans votre réponse de session

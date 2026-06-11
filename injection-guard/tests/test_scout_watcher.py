@@ -1,8 +1,41 @@
 import json
 import os
+import subprocess
+import time
 import pytest
 from unittest.mock import patch, MagicMock
 import scout_process
+
+WATCHER = os.path.join(
+    os.path.dirname(__file__), '..', '..', 'openclaw-config', 'scout-watcher'
+)
+
+
+def _run_watcher_briefly(workspace):
+    """Lance le watcher ~1 s avec SCOUT_WORKSPACE surchargé, puis l'arrête."""
+    env = {**os.environ, 'SCOUT_WORKSPACE': str(workspace)}
+    proc = subprocess.Popen(['bash', WATCHER], env=env,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(1)
+    proc.terminate()
+    proc.wait(timeout=5)
+
+
+def test_watcher_purges_stale_done_and_results_on_startup(tmp_path):
+    ws = tmp_path / 'workspace-scout'
+    (ws / 'tasks' / 'pending').mkdir(parents=True)
+    (ws / 'tasks' / 'done').mkdir(parents=True)
+    (ws / 'results').mkdir(parents=True)
+    stale_done = ws / 'tasks' / 'done' / 'a1b2c3d4-e5f6-7890-abcd-ef1234567890.json'
+    stale_done.write_text('{"stale": true}')
+    stale_result = ws / 'results' / 'a1b2c3d4-e5f6-7890-abcd-ef1234567890.json'
+    stale_result.write_text('{"stale": true}')
+
+    _run_watcher_briefly(ws)
+
+    assert not stale_done.exists()
+    assert not stale_result.exists()
+
 
 
 def _write_task(tmp_path, url="https://example.com", check_email=None):

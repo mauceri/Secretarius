@@ -3,13 +3,18 @@
 # Installé dans ~/.local/bin/scout-watcher par install.sh
 set -euo pipefail
 
-SCOUT_WORKSPACE="${HOME}/.openclaw/agents/scout/workspace"
+SCOUT_WORKSPACE="${SCOUT_WORKSPACE:-${HOME}/.openclaw/agents/scout/workspace}"
 PENDING="${SCOUT_WORKSPACE}/tasks/pending"
 DONE="${SCOUT_WORKSPACE}/tasks/done"
 RESULTS="${SCOUT_WORKSPACE}/results"
 SCOUT_PROCESS="${HOME}/.local/bin/scout_process.py"
 
 mkdir -p "$PENDING" "$DONE" "$RESULTS"
+
+# Purge des résidus au démarrage : un done/results périmé (UUID réutilisé par
+# le LLM scout) serait relu comme résultat frais. Aucune tâche en vol à un
+# (re)démarrage.
+rm -f "$DONE"/*.json "$RESULTS"/*.json
 
 echo "[scout-watcher] Démarré — surveillance de ${PENDING}"
 
@@ -19,6 +24,10 @@ while true; do
 
     task_id="$(basename "$task_file" .json)"
     echo "[scout-watcher] Tâche détectée : ${task_id}"
+
+    # Supprimer un éventuel résidu de même id (collision d'UUID) avant de
+    # produire le done frais, pour qu'aucun ancien résultat ne subsiste.
+    rm -f "${DONE}/${task_id}.json" "${RESULTS}/${task_id}.json"
 
     # Tâche check_email (pas de fetch réseau)
     CHECK_EMAIL="$(python3 -c "
