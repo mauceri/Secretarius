@@ -14,6 +14,7 @@ from flask import Flask, request, jsonify
 # ─── Constantes ──────────────────────────────────────────────────────────────
 
 MAX_CONTENT_LEN = 15_000
+MAX_RAW_LEN = 200_000
 DEBERTA_MAX_TOKENS = 512
 DEBERTA_BLOCK_THRESHOLD = 0.7
 DEBERTA_MEDIUM_THRESHOLD = 0.3
@@ -34,6 +35,10 @@ def clean_html(content: str) -> str:
     for tag in soup(['script', 'style']):
         tag.decompose()
     for tag in soup.find_all(style=True):
+        # Un tag déjà décomposé (descendant d'un ancêtre invisible retiré
+        # plus tôt dans la boucle) a attrs=None — on l'ignore.
+        if tag.attrs is None:
+            continue
         if _INVISIBLE_STYLE.search(tag.get('style', '')):
             tag.decompose()
     text = soup.get_text(separator=' ')
@@ -138,16 +143,22 @@ def check():
     content = str(data.get('content', '') or '')
     content_type = data.get('type', 'text')
 
-    truncated = len(content) > MAX_CONTENT_LEN
-    if truncated:
-        content = content[:MAX_CONTENT_LEN]
+    # Garde-fou : borne le brut avant parsing (anti-payload pathologique),
+    # bien au-dessus du budget de texte nettoyé.
+    if len(content) > MAX_RAW_LEN:
+        content = content[:MAX_RAW_LEN]
 
     if content_type == 'html':
         clean_text = clean_html(content)
-        full_content = content
     else:
         clean_text = content
-        full_content = content
+
+    # Troncature APRÈS nettoyage : le budget s'applique au texte utile,
+    # pas au boilerplate <head>.
+    truncated = len(clean_text) > MAX_CONTENT_LEN
+    if truncated:
+        clean_text = clean_text[:MAX_CONTENT_LEN]
+    full_content = content[:MAX_CONTENT_LEN]
 
     risk, patterns = check_regex(clean_text)
     if risk == "blocked":

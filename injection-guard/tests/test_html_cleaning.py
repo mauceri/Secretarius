@@ -43,6 +43,15 @@ def test_removes_opacity_zero():
     assert 'GHOST' not in result
 
 
+def test_handles_nested_invisible_styled_tags():
+    # Un ancêtre invisible contenant un descendant stylé : décomposer l'ancêtre
+    # ne doit pas faire planter le parcours sur le descendant déjà détruit.
+    html = '<div style="display:none"><span style="color:red">HIDDEN</span></div><p>Visible</p>'
+    result = clean_html(html)
+    assert 'HIDDEN' not in result
+    assert 'Visible' in result
+
+
 def test_decodes_html_entities():
     html = '<p>AT&amp;T &lt;rocks&gt; &#x27;yes&#x27;</p>'
     result = clean_html(html)

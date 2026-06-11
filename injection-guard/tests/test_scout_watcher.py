@@ -84,9 +84,9 @@ def test_guard_unavailable_sets_blocked_failsafe(tmp_path):
     assert 'unavailable' in fetched['reason']
 
 
-def test_long_content_truncated_before_post(tmp_path):
+def test_long_content_capped_at_raw_limit_before_post(tmp_path):
     task_file = _write_task(tmp_path)
-    long_html = "<p>" + "x" * 20_000 + "</p>"
+    long_html = "<p>" + "x" * 250_000 + "</p>"
     content_file = _write_content(tmp_path, long_html)
     guard_response = _make_guard_response(clean_text="x" * 15_000, full_content="x" * 15_000)
 
@@ -102,7 +102,30 @@ def test_long_content_truncated_before_post(tmp_path):
     with patch('scout_process.requests.post', side_effect=capture_post):
         scout_process.process(task_file, content_file)
 
-    assert len(captured['content']) <= 15_000
+    assert len(captured['content']) <= scout_process.MAX_RAW_LEN
+
+
+def test_body_after_large_head_reaches_guard(tmp_path):
+    # Le corps situé au-delà des 15000 premiers caractères (gros <head>) doit
+    # parvenir au guard, sinon le nettoyage ne voit jamais l'article.
+    task_file = _write_task(tmp_path)
+    big_head = '<head><style>' + ('a' * 20_000) + '</style></head>'
+    html = '<html>' + big_head + '<body><article>CONTENU ARTICLE REEL</article></body></html>'
+    content_file = _write_content(tmp_path, html)
+    guard_response = _make_guard_response()
+    captured = {}
+
+    def capture_post(url, json=None, **kwargs):
+        captured['content'] = (json or {}).get('content', '')
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = guard_response
+        mock_resp.raise_for_status.return_value = None
+        return mock_resp
+
+    with patch('scout_process.requests.post', side_effect=capture_post):
+        scout_process.process(task_file, content_file)
+
+    assert 'CONTENU ARTICLE REEL' in captured['content']
 
 
 def test_html_type_sent_to_guard(tmp_path):

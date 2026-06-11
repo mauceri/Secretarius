@@ -14,7 +14,7 @@ import requests
 
 GUARD_URL = "http://localhost:8990/check"
 GUARD_TIMEOUT = 3
-MAX_CONTENT_LEN = 15_000
+MAX_RAW_LEN = 200_000
 
 
 def process(task_file: str, fetched_file: str = None) -> int:
@@ -25,10 +25,10 @@ def process(task_file: str, fetched_file: str = None) -> int:
         with open(fetched_file, errors='replace') as f:
             raw = f.read()
         content_type = "html"
-        content = raw[:MAX_CONTENT_LEN]
+        content = raw[:MAX_RAW_LEN]
     elif 'check_email' in data:
         content_type = "text"
-        content = data['check_email'][:MAX_CONTENT_LEN]
+        content = data['check_email'][:MAX_RAW_LEN]
     else:
         content_type = "text"
         content = ""
