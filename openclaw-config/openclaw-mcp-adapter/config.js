@@ -25,7 +25,11 @@ export function parseConfig(raw) {
         const srv = s;
         if (!srv.name)
             throw new Error("Server missing 'name'");
-        const transport = srv.transport ?? (srv.url ? "http" : "stdio");
+        let transport = srv.transport ?? (srv.url ? "http" : "stdio");
+        // "streamable-http" est le terme standard MCP ; l'adaptateur le traite
+        // comme "http" (StreamableHTTPClientTransport).
+        if (transport === "streamable-http")
+            transport = "http";
         if (transport === "stdio" && !srv.command)
             throw new Error(`Server "${srv.name}" missing 'command'`);
         if (transport === "http" && !srv.url)
