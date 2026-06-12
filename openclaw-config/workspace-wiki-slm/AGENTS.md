@@ -17,22 +17,29 @@ Chaque appel écrit un **objet JSON** sur stdout. Opérations :
 | op | argument | sortie JSON |
 |----|----------|-------------|
 | `capture` | `"<texte ou URL + #tags>"` | `{"files": ["…url", …]}` |
-| `ingest` | — | `{"status": "started"\|"nothing_to_do"\|"already_running", "queued": N}` |
+| `ingest` | — | **cas spécial** : voir « Procédure d'ingestion » (un seul `exec` `background: true` sur `_ingest_worker`) |
 | `status` | — | `{"running": bool, "last_run": {...}\|null, "pending": N, "blocked_files": [...]}` |
 | `query` | `"<question>"` | `{"synthesis": "…", "references": [...]}` ou `{"error": "…"}` |
 
 ## Procédure
 
 1. La tâche reçue de Tiron a la forme `op: <op> | <argument>`. Extrayez `op` et l'argument.
-2. Exécutez **une seule fois** `python /wiki-tools/wiki.py <op> "<argument>"` via l'outil exec.
+2. Pour `capture`, `status`, `query` : exécutez **une seule fois** `python /wiki-tools/wiki.py <op> "<argument>"` via l'outil exec. Pour `ingest`, suivez la procédure dédiée ci-dessous.
 3. Lisez le JSON renvoyé et **reformulez-le** sobrement pour l'utilisateur. N'inventez jamais de contenu : si le JSON contient `error`, rapportez-le tel quel.
 
-## Règle d'ingestion (async — impérative)
+## Procédure d'ingestion (async — impérative)
 
-`ingest` **rend la main immédiatement** (`status: "started"`). Le traitement continue en tâche de fond.
+L'ingestion d'un lot peut durer plusieurs minutes ; elle tourne **en arrière-plan**, pas dans l'appel exec. Pour `op: ingest`, faites **exactement un appel** à l'outil `exec`, avec le paramètre **`background: true`**, sur la commande :
 
-- Après `ingest`, répondez **une seule fois** « Ingestion de N éléments lancée en arrière-plan. » puis **arrêtez-vous**.
-- **N'appelez pas `status` de votre propre initiative**, et **ne relancez jamais `ingest`**. Un `pending > 0` ou `running: true` juste après est **normal**, pas un échec.
+```
+python3 /wiki-tools/wiki.py _ingest_worker
+```
+
+Ce worker s'auto-gère entièrement (rien à ingérer, ingestion déjà en cours, état). Vous **n'avez pas** à exécuter `ingest` ni `status` avant.
+
+- L'appel `background: true` rend la main immédiatement. Répondez alors **une seule fois** « Ingestion lancée en arrière-plan. » puis **arrêtez-vous**.
+- **Impératif : le paramètre `background: true` est obligatoire** — sans lui, un gros lot dépasserait le délai de l'exec.
+- **N'appelez pas `status`, `poll` ni `process` de votre propre initiative**, et **ne relancez jamais** `_ingest_worker`. Un `running: true` juste après est **normal**.
 - N'exécutez `status` que si l'utilisateur demande explicitement où en est l'ingestion.
 
 ## Frontière de confiance

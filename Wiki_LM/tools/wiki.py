@@ -7,10 +7,23 @@ Sortie : JSON sur stdout ; code retour 0 (erreurs encodées dans le JSON).
 import json
 import os
 import re
-import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+def _bootstrap_api_key() -> None:
+    # OpenClaw 6.1 efface les valeurs de secret du templating de sandbox.docker.env :
+    # ${EURIA_API_KEY} arrive vide dans le conteneur. La clé est donc fournie via un
+    # fichier monté (convention Docker _FILE), lu ici avant toute construction de LLM.
+    key_file = os.environ.get("OPENAI_API_KEY_FILE")
+    if key_file and not os.environ.get("OPENAI_API_KEY"):
+        try:
+            os.environ["OPENAI_API_KEY"] = Path(key_file).read_text(encoding="utf-8").strip()
+        except OSError:
+            pass
+
+
+_bootstrap_api_key()
 
 sys.path.insert(0, str(Path(__file__).parent))
 from capture import _parse_hashtags, capture_urls, capture_comment
@@ -101,10 +114,32 @@ def op_status() -> dict:
 
 
 def op_ingest() -> dict:
-    raw = _raw_dir()
-    pending = _pending_files(raw)
+    # Pré-vérification seule. Le worker (_ingest_worker) est lancé en arrière-plan
+    # par l'agent via exec(background:true) — l'auto-détache (subprocess.Popen) ne
+    # survit pas au nettoyage de l'outil exec d'OpenClaw.
+    pending = _pending_files(_raw_dir())
     if not pending:
         return {"status": "nothing_to_do", "queued": 0}
+    if _read_state().get("running"):
+        return {"status": "already_running", "queued": len(pending)}
+    return {"status": "ready", "queued": len(pending)}
+
+
+def _do_ingest() -> dict:
+    # ingest_raw_dir ne renvoie que les slugs des fichiers ingérés avec succès ;
+    # les échecs sont marqués au manifeste mais absents de la liste. On dérive
+    # donc le total des fichiers en attente avant traitement.
+    raw = _raw_dir()
+    queued = len(_pending_files(raw))
+    ingestor = Ingestor(_wiki_root(), raw_path=raw)
+    slugs = ingestor.ingest_raw_dir()
+    ingested = sum(1 for s in slugs if s)
+    return {"status": "done", "ingested": ingested, "errors": queued - ingested, "total": queued}
+
+
+def op_ingest_worker() -> dict:
+    # Lancé en arrière-plan par l'agent. Auto-gardé : pose le verrou running au
+    # début, traite le batch (synchrone en interne), libère le verrou à la fin.
     if _read_state().get("running"):
         return {"status": "already_running"}
     _write_state({
@@ -112,24 +147,6 @@ def op_ingest() -> dict:
         "started_at": datetime.now(timezone.utc).isoformat(),
         "last_run": None,
     })
-    subprocess.Popen(
-        [sys.executable, str(Path(__file__)), "_ingest_worker"],
-        start_new_session=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    return {"status": "started", "queued": len(pending)}
-
-
-def _do_ingest() -> dict:
-    ingestor = Ingestor(_wiki_root(), raw_path=_raw_dir())
-    slugs = ingestor.ingest_raw_dir()
-    ingested = sum(1 for s in slugs if s)
-    errors = sum(1 for s in slugs if not s)
-    return {"status": "done", "ingested": ingested, "errors": errors, "total": len(slugs)}
-
-
-def op_ingest_worker() -> dict:
     try:
         result = _do_ingest()
     except Exception as exc:

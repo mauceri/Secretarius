@@ -1,6 +1,7 @@
 """Tests de la façade CLI wiki.py (agent wiki SLM)."""
 
 import importlib
+import os
 
 
 def _wiki(monkeypatch, tmp_path):
@@ -9,6 +10,24 @@ def _wiki(monkeypatch, tmp_path):
     import wiki
     importlib.reload(wiki)
     return wiki
+
+
+def test_bootstrap_api_key_from_file(monkeypatch, tmp_path):
+    key_file = tmp_path / "euria-key"
+    key_file.write_text("secret-xyz\n")
+    monkeypatch.setenv("OPENAI_API_KEY_FILE", str(key_file))
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    _wiki(monkeypatch, tmp_path)
+    assert os.environ["OPENAI_API_KEY"] == "secret-xyz"
+
+
+def test_bootstrap_keeps_existing_api_key(monkeypatch, tmp_path):
+    key_file = tmp_path / "euria-key"
+    key_file.write_text("from-file\n")
+    monkeypatch.setenv("OPENAI_API_KEY_FILE", str(key_file))
+    monkeypatch.setenv("OPENAI_API_KEY", "already-set")
+    _wiki(monkeypatch, tmp_path)
+    assert os.environ["OPENAI_API_KEY"] == "already-set"
 
 
 def test_capture_url_with_tags(monkeypatch, tmp_path):
@@ -89,39 +108,71 @@ def test_ingest_nothing_to_do(monkeypatch, tmp_path):
     assert wiki.op_ingest() == {"status": "nothing_to_do", "queued": 0}
 
 
-def test_ingest_started(monkeypatch, tmp_path):
+def test_ingest_ready_without_launching(monkeypatch, tmp_path):
+    # op_ingest = pré-vérification seule : ne lance rien, ne pose pas le verrou.
+    # Le lancement du worker en arrière-plan est fait par l'agent (exec background).
     wiki = _wiki(monkeypatch, tmp_path)
     (tmp_path / "raw" / "x.url").write_text("https://example.com\n")
-    calls = {}
-    monkeypatch.setattr(wiki.subprocess, "Popen",
-                        lambda *a, **k: calls.setdefault("spawned", True))
     out = wiki.op_ingest()
-    assert out["status"] == "started" and out["queued"] == 1
-    assert calls.get("spawned") is True
-    assert wiki._read_state()["running"] is True
+    assert out == {"status": "ready", "queued": 1}
+    assert wiki._read_state()["running"] is False
 
 
 def test_ingest_already_running(monkeypatch, tmp_path):
     wiki = _wiki(monkeypatch, tmp_path)
     (tmp_path / "raw" / "x.url").write_text("https://example.com\n")
     wiki._write_state({"running": True, "last_run": None})
-    assert wiki.op_ingest() == {"status": "already_running"}
+    assert wiki.op_ingest() == {"status": "already_running", "queued": 1}
+
+
+def test_ingest_worker_skips_when_already_running(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    wiki._write_state({"running": True, "last_run": "sentinel"})
+    called = {"ingest": False}
+
+    class _Ing:
+        _MANIFEST = ".ingested"
+
+        def __init__(self, *a, **k):
+            pass
+
+        def _load_manifest(self):
+            return {}
+
+        def ingest_raw_dir(self, *a, **k):
+            called["ingest"] = True
+            return []
+
+    monkeypatch.setattr(wiki, "Ingestor", _Ing)
+    assert wiki.op_ingest_worker() == {"status": "already_running"}
+    assert called["ingest"] is False
+    assert wiki._read_state()["last_run"] == "sentinel"
 
 
 def test_do_ingest_writes_last_run(monkeypatch, tmp_path):
     wiki = _wiki(monkeypatch, tmp_path)
+    # Deux fichiers en attente ; ingest_raw_dir ne renvoie que les succès
+    # (les échecs n'apparaissent pas dans la liste — vrai contrat d'ingest.py).
+    (tmp_path / "raw" / "a.url").write_text("https://a.example\n")
+    (tmp_path / "raw" / "b.md").write_text("note\n")
 
     class _Ing:
+        _MANIFEST = ".ingested"
+
         def __init__(self, *a, **k):
             pass
 
+        def _load_manifest(self):
+            return {}
+
         def ingest_raw_dir(self, *a, **k):
-            return ["src-x", ""]
+            return ["src-a"]  # un seul succès ; le second a échoué (absent)
 
     monkeypatch.setattr(wiki, "Ingestor", _Ing)
     wiki.op_ingest_worker()
     st = wiki._read_state()
     assert st["running"] is False
+    assert st["last_run"]["total"] == 2
     assert st["last_run"]["ingested"] == 1
     assert st["last_run"]["errors"] == 1
 
