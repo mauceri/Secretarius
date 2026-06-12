@@ -98,3 +98,41 @@ def op_status() -> dict:
         "pending": len(_pending_files(raw)),
         "blocked_files": _blocked_files(raw),
     }
+
+
+def op_ingest() -> dict:
+    raw = _raw_dir()
+    pending = _pending_files(raw)
+    if not pending:
+        return {"status": "nothing_to_do", "queued": 0}
+    if _read_state().get("running"):
+        return {"status": "already_running"}
+    _write_state({
+        "running": True,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "last_run": None,
+    })
+    subprocess.Popen(
+        [sys.executable, str(Path(__file__)), "_ingest_worker"],
+        start_new_session=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return {"status": "started", "queued": len(pending)}
+
+
+def _do_ingest() -> dict:
+    ingestor = Ingestor(_wiki_root(), raw_path=_raw_dir())
+    slugs = ingestor.ingest_raw_dir()
+    ingested = sum(1 for s in slugs if s)
+    errors = sum(1 for s in slugs if not s)
+    return {"status": "done", "ingested": ingested, "errors": errors, "total": len(slugs)}
+
+
+def op_ingest_worker() -> dict:
+    try:
+        result = _do_ingest()
+    except Exception as exc:
+        result = {"status": "error", "error": str(exc)}
+    _write_state({"running": False, "last_run": result})
+    return {"status": "worker_done"}

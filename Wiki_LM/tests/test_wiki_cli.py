@@ -82,3 +82,45 @@ def test_status_reports_blocked_files(monkeypatch, tmp_path):
     out = wiki.op_status()
     assert out["blocked_files"] == ["bad.url.error"]
     assert out["pending"] == 0  # un .url.error n'est pas "pending"
+
+
+def test_ingest_nothing_to_do(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    assert wiki.op_ingest() == {"status": "nothing_to_do", "queued": 0}
+
+
+def test_ingest_started(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    (tmp_path / "raw" / "x.url").write_text("https://example.com\n")
+    calls = {}
+    monkeypatch.setattr(wiki.subprocess, "Popen",
+                        lambda *a, **k: calls.setdefault("spawned", True))
+    out = wiki.op_ingest()
+    assert out["status"] == "started" and out["queued"] == 1
+    assert calls.get("spawned") is True
+    assert wiki._read_state()["running"] is True
+
+
+def test_ingest_already_running(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    (tmp_path / "raw" / "x.url").write_text("https://example.com\n")
+    wiki._write_state({"running": True, "last_run": None})
+    assert wiki.op_ingest() == {"status": "already_running"}
+
+
+def test_do_ingest_writes_last_run(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+
+    class _Ing:
+        def __init__(self, *a, **k):
+            pass
+
+        def ingest_raw_dir(self, *a, **k):
+            return ["src-x", ""]
+
+    monkeypatch.setattr(wiki, "Ingestor", _Ing)
+    wiki.op_ingest_worker()
+    st = wiki._read_state()
+    assert st["running"] is False
+    assert st["last_run"]["ingested"] == 1
+    assert st["last_run"]["errors"] == 1
