@@ -16,9 +16,9 @@ Ce skill s'active dans deux cas :
 1. Message commençant par `/c <argument>`
 2. **Message contenant uniquement une ou plusieurs URLs nues** (commençant par `http://` ou `https://`)
 
-## Exécution
+## Exécution — un seul outil
 
-Appeler `wiki_capture` avec tout ce qui suit `/c`, ou l'URL nue si c'est le cas 2.
+Appeler **uniquement** `wiki_capture` avec tout ce qui suit `/c`, ou l'URL nue si c'est le cas 2. C'est la **seule** action de ce skill.
 
 ```
 wiki_capture("<argument>")
@@ -30,12 +30,12 @@ Exemples :
 - `/c #memo Acheter du Gewurztraminer` → `wiki_capture("#memo Acheter du Gewurztraminer")`
 - URL nue `https://example.com` → `wiki_capture("https://example.com")`
 
-## Réponse
+## Réponse — puis arrêt
 
-Confirmer avec les noms de fichiers retournés par `wiki_capture` :
+Après `wiki_capture`, la tâche est **terminée**. Confirmer avec les noms de fichiers retournés, puis s'arrêter :
 `{files: ["20260527-HHMMSS-example-com.url"]}` → "Capturé : 20260527-HHMMSS-example-com.url"
 
-**Ne pas appeler `wiki_ingest` après `wiki_capture` sauf si l'utilisateur le demande explicitement.**
+**N'appeler AUCUN autre outil après `wiki_capture` — en particulier jamais `wiki_ingest`.** La capture ne déclenche **jamais** l'ingestion : elle ne fait que déposer le fichier dans `raw/`. N'ingérer que si l'utilisateur le demande explicitement dans un message **distinct** (ex. « ingère »).
 
 ## Fichiers joints
 
