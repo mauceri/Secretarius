@@ -28,12 +28,13 @@ Exemple : `wiki_capture("#linguistique https://example.com Note personnelle")`
 
 ### `wiki_ingest()`
 
-Traite tous les `.url` en attente : fetch → injection-guard → ingest.
+Lance en arrière-plan le traitement des `.url` en attente (fetch → injection-guard → ingest) et **rend la main immédiatement**.
 
 - Aucun paramètre
-- Retourne `{ingested: N, blocked: M, errors: K, blocked_details: [...], error_details: [...]}`
-- Si `blocked > 0` : signaler à l'utilisateur quels fichiers ont été bloqués et pourquoi
-- Si `errors > 0` : signaler les erreurs de fetch
+- Retourne un accusé : `{status: "started", queued: N}` (ou `{status: "already_running"}` si un run est déjà en cours, `{status: "nothing_to_do", queued: 0}` si rien à traiter)
+- `queued` = nombre d'éléments mis en file. Ce n'est **pas** un compte d'éléments déjà ingérés : le traitement se poursuit en tâche de fond.
+
+**Comportement obligatoire après `wiki_ingest` :** répondre une seule fois à l'utilisateur (ex. « Ingestion de N éléments lancée en arrière-plan. ») puis **s'arrêter**. Ne PAS interroger `wiki_ingest_status` de votre propre initiative, ne JAMAIS relancer `wiki_ingest`. Le résultat final n'est pas disponible immédiatement, c'est normal.
 
 ### `wiki_query(question, top_k=5)`
 
@@ -48,9 +49,13 @@ Liste les tags disponibles. Retourne `{tags: [...]}`.
 
 ### `wiki_ingest_status()`
 
-État de la file d'attente. Retourne `{pending: N, blocked_files: [...]}`.
+État de l'ingestion. **À n'appeler que si l'utilisateur demande explicitement où en est l'ingestion** — jamais spontanément après `wiki_ingest`.
 
-- `pending` : URLs prêtes à être ingérées au prochain `wiki_ingest()`
+Retourne `{running: bool, last_run: {ingested, blocked, errors, ...} | null, pending: N, blocked_files: [...]}`.
+
+- `running: true` → ingestion encore en cours : répondre « en cours » et s'arrêter (ne pas relancer).
+- `running: false` avec `last_run` non nul → ingestion terminée : rapporter `last_run` (ingérés / bloqués / erreurs).
+- `pending` : éléments pas encore traités. Juste après un `wiki_ingest`, `pending > 0` et `running: true` sont **normaux**, ce n'est pas un échec.
 - `blocked_files` : fichiers bloqués par injection-guard (ne seront pas réingérés automatiquement)
 
 ### `wiki_kb_update()`
@@ -70,7 +75,8 @@ Tiron: wiki_capture("#nlp https://arxiv.org/abs/2406.12345")
 
 Utilisateur: "Ingère"
 Tiron: wiki_ingest()
-→ Réponse : "Ingéré : 1 article. Aucun blocage."
+→ {status: "started", queued: 1}
+→ Réponse : "Ingestion de 1 élément lancée en arrière-plan." (puis s'arrêter, ne pas vérifier le statut)
 
 Utilisateur: "Que dit le wiki sur l'attention multi-tête ?"
 Tiron: wiki_query("Que dit le wiki sur l'attention multi-tête ?")
