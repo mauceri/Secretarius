@@ -57,3 +57,28 @@ def test_query_empty_kb(monkeypatch, tmp_path):
 
     monkeypatch.setattr(wiki, "WikiQuery", _Q)
     assert "error" in wiki.op_query("q")
+
+
+def test_status_empty(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    out = wiki.op_status()
+    assert out["running"] is False
+    assert out["last_run"] is None
+    assert out["pending"] == 0
+
+
+def test_status_running_with_pending(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    (tmp_path / "raw" / "x.url").write_text("https://example.com\n")
+    wiki._write_state({"running": True, "last_run": None})
+    out = wiki.op_status()
+    assert out["running"] is True
+    assert out["pending"] == 1
+
+
+def test_status_reports_blocked_files(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    (tmp_path / "raw" / "bad.url.error").write_text("https://x\n")
+    out = wiki.op_status()
+    assert out["blocked_files"] == ["bad.url.error"]
+    assert out["pending"] == 0  # un .url.error n'est pas "pending"

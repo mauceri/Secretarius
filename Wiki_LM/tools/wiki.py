@@ -50,3 +50,51 @@ def op_query(question: str) -> dict:
         return {"synthesis": result.text, "references": result.references}
     except Exception as exc:
         return {"error": str(exc)}
+
+
+def _state_path() -> Path:
+    return _wiki_root() / ".ingest_state.json"
+
+
+def _read_state() -> dict:
+    p = _state_path()
+    if not p.exists():
+        return {"running": False, "last_run": None}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {"running": False, "last_run": None}
+
+
+def _write_state(state: dict) -> None:
+    _state_path().write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+
+
+def _pending_files(raw: Path) -> list[str]:
+    if not raw.exists():
+        return []
+    ingestor = Ingestor(_wiki_root(), raw_path=raw)
+    manifest = ingestor._load_manifest()
+    return [
+        f.name for f in sorted(raw.iterdir())
+        if f.suffix in _INGESTABLE_SUFFIXES
+        and f.name not in manifest
+        and f.name != ingestor._MANIFEST
+    ]
+
+
+def _blocked_files(raw: Path) -> list[str]:
+    if not raw.exists():
+        return []
+    return sorted(f.name for f in raw.iterdir() if f.name.endswith(".url.error"))
+
+
+def op_status() -> dict:
+    state = _read_state()
+    raw = _raw_dir()
+    return {
+        "running": bool(state.get("running")),
+        "last_run": state.get("last_run"),
+        "pending": len(_pending_files(raw)),
+        "blocked_files": _blocked_files(raw),
+    }
