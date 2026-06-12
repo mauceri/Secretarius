@@ -287,3 +287,23 @@ class TestParseUrlFile:
         f.write_text("")
         from ingest import Ingestor
         assert Ingestor._parse_url_file(f) == ""
+
+
+class TestEncodeUrl:
+    def test_encodes_raw_accents(self):
+        from ingest import _encode_url
+        url = "https://fr.linkedin.com/pulse/usurpation-didentité-voix-clonée-x"
+        out = _encode_url(url)
+        assert out.isascii()
+        assert "%C3%A9" in out  # é encodé
+        assert out.startswith("https://fr.linkedin.com/pulse/")
+
+    def test_leaves_encoded_url_unchanged(self):
+        from ingest import _encode_url
+        url = "https://fr.wikipedia.org/wiki/Philon_d%27Alexandrie"
+        assert _encode_url(url) == url
+
+    def test_leaves_plain_ascii_unchanged(self):
+        from ingest import _encode_url
+        url = "https://example.com/path?a=1&b=2"
+        assert _encode_url(url) == url

@@ -153,6 +153,29 @@ def _is_binary_content(text: str) -> bool:
     return printable / len(sample) < 0.70
 
 
+def _encode_url(url: str) -> str:
+    """Percent-encode les caractères non-ASCII d'une URL (IRI → URI).
+
+    urllib refuse les URLs contenant des caractères bruts non-ASCII (ex.
+    accents) avec UnicodeEncodeError. Les séquences `%xx` déjà présentes
+    sont préservées (`%` est dans `safe`), donc l'opération est idempotente.
+    """
+    import urllib.parse
+
+    parts = urllib.parse.urlsplit(url)
+    netloc = parts.netloc
+    if not netloc.isascii():
+        try:
+            netloc = netloc.encode("idna").decode("ascii")
+        except Exception:
+            netloc = urllib.parse.quote(netloc, safe=":@")
+    safe_path = "/%:@-._~!$&'()*+,;="
+    path = urllib.parse.quote(parts.path, safe=safe_path)
+    query = urllib.parse.quote(parts.query, safe=safe_path + "?")
+    fragment = urllib.parse.quote(parts.fragment, safe=safe_path + "?")
+    return urllib.parse.urlunsplit((parts.scheme, netloc, path, query, fragment))
+
+
 def _read_url(url: str) -> str:
     """Télécharge une page web et retourne le texte brut.
 
@@ -192,7 +215,7 @@ def _read_url(url: str) -> str:
                 if stripped:
                     self.parts.append(stripped)
 
-    req = urllib.request.Request(url, headers={"User-Agent": _USER_AGENT})
+    req = urllib.request.Request(_encode_url(url), headers={"User-Agent": _USER_AGENT})
     with urllib.request.urlopen(req, timeout=30) as resp:
         raw_html = resp.read().decode("utf-8", errors="replace")
 
