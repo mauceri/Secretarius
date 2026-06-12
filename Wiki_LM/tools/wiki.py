@@ -136,3 +136,25 @@ def op_ingest_worker() -> dict:
         result = {"status": "error", "error": str(exc)}
     _write_state({"running": False, "last_run": result})
     return {"status": "worker_done"}
+
+
+def main(argv: list[str]) -> dict:
+    if not argv:
+        return {"error": "usage: wiki.py <capture|ingest|status|query> [arg]"}
+    op, arg = argv[0], (argv[1] if len(argv) > 1 else "")
+    if op == "capture":
+        return op_capture(arg)
+    if op == "ingest":
+        return op_ingest()
+    if op == "status":
+        return op_status()
+    if op == "query":
+        return op_query(arg)
+    if op == "_ingest_worker":
+        return op_ingest_worker()
+    return {"error": f"opération inconnue: {op}"}
+
+
+if __name__ == "__main__":
+    print(json.dumps(main(sys.argv[1:]), ensure_ascii=False))
+    sys.exit(0)

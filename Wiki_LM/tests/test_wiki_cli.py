@@ -124,3 +124,33 @@ def test_do_ingest_writes_last_run(monkeypatch, tmp_path):
     assert st["running"] is False
     assert st["last_run"]["ingested"] == 1
     assert st["last_run"]["errors"] == 1
+
+
+def test_main_unknown_op(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    assert "error" in wiki.main(["nope"])
+
+
+def test_main_no_args(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    assert "error" in wiki.main([])
+
+
+def test_main_capture_dispatch(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    out = wiki.main(["capture", "https://example.com"])
+    assert "files" in out
+
+
+def test_cli_subprocess_outputs_json(monkeypatch, tmp_path):
+    import subprocess as sp
+    import sys as _sys
+    env = {**__import__("os").environ, "WIKI_PATH": str(tmp_path)}
+    (tmp_path / "raw").mkdir(exist_ok=True)
+    wiki_py = __import__("pathlib").Path(__file__).parent.parent / "tools" / "wiki.py"
+    r = sp.run([_sys.executable, str(wiki_py), "status"],
+               capture_output=True, text=True, env=env)
+    assert r.returncode == 0
+    import json as _json
+    data = _json.loads(r.stdout)
+    assert data["running"] is False
