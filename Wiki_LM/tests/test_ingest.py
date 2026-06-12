@@ -307,3 +307,16 @@ class TestEncodeUrl:
         from ingest import _encode_url
         url = "https://example.com/path?a=1&b=2"
         assert _encode_url(url) == url
+
+
+class TestSaveRawNoDuplicate:
+    def test_url_from_raw_skips_duplicate(self, ingestor):
+        # Source venant déjà de raw/ : pas de copie .url (sinon réingestion + perte de tags)
+        before = set(ingestor.raw_dir.glob("*.url"))
+        ingestor._save_raw("https://example.com/page", "contenu", "src-example", from_raw=True)
+        assert set(ingestor.raw_dir.glob("*.url")) == before
+
+    def test_url_direct_creates_archive(self, ingestor):
+        # Ingestion directe (pas depuis raw/) : on conserve l'archive immuable
+        ingestor._save_raw("https://example.com/page2", "contenu", "src-example2", from_raw=False)
+        assert (ingestor.raw_dir / "src-example2.url").exists()

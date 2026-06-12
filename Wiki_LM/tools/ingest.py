@@ -1033,7 +1033,7 @@ class Ingestor:
         print(f"[ingest] Slug : {src_slug}")
 
         # 1. Sauvegarder dans raw/ (immutable)
-        self._save_raw(source, content, src_slug)
+        self._save_raw(source, content, src_slug, from_raw=not rename_raw)
 
         # 2. Générer la page source (ou stub si contenu dégradé/inaccessible)
         stub_status = None
@@ -1113,13 +1113,18 @@ class Ingestor:
     # Helpers internes
     # ------------------------------------------------------------------
 
-    def _save_raw(self, source: str, content: str, slug: str) -> None:
+    def _save_raw(self, source: str, content: str, slug: str, from_raw: bool = False) -> None:
         """Sauvegarde la source dans raw/ (immutable).
 
         - URL  → fichier .url contenant l'URL et la date de récupération
         - Fichier local → copie du fichier original (ou .txt si contenu déjà extrait)
         """
         if source.startswith("http://") or source.startswith("https://"):
+            # Si la source provient déjà d'un .url de raw/, ne pas recréer de copie :
+            # ce doublon non marqué dans le manifeste serait réingéré au prochain
+            # wiki_ingest (et perdrait les tags manuels).
+            if from_raw:
+                return
             raw_path = self.raw_dir / f"{slug}.url"
             if not raw_path.exists():
                 raw_path.write_text(
