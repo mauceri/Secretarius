@@ -40,3 +40,13 @@ def op_capture(text: str) -> dict:
     if note:
         created.append(capture_comment(note, raw, tags=tags or None))
     return {"files": [p.name for p in created if p is not None]}
+
+
+def op_query(question: str) -> dict:
+    try:
+        result = WikiQuery(_wiki_root()).query(question)
+        if not result.text:
+            return {"error": "KB vide — lancer ingest d'abord"}
+        return {"synthesis": result.text, "references": result.references}
+    except Exception as exc:
+        return {"error": str(exc)}

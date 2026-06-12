@@ -59,7 +59,6 @@ Ce qui ne change pas : `semantic_graph_search_milvus()` (accepte déjà N vecteu
 
 ## Règles importantes
 
-- Ne jamais proposer de charger un GGUF dans Ollama (llama.cpp server est le backend, pas Ollama)
 - Ne jamais modifier `llm_ollama.py` pour pointer vers llama.cpp (deux backends distincts intentionnels)
 - Déploiement cible : systemd (pas Docker pour l'application, Docker uniquement pour Milvus)
 - Confirmation requise avant : `systemctl start/stop/enable`, `docker compose up/down`, `git push`
