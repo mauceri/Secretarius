@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from capture import _parse_hashtags, capture_urls, capture_comment
 from ingest import Ingestor
 from query import WikiQuery
+from kb_tags import collect_tags
 
 _INGESTABLE_SUFFIXES = {".url", ".md", ".pdf", ".txt"}
 
@@ -155,6 +156,11 @@ def op_ingest_worker() -> dict:
     return {"status": "worker_done"}
 
 
+def op_tags() -> dict:
+    tags = collect_tags(_wiki_root() / "wiki")
+    return {"tags": sorted(tags.keys())}
+
+
 def main(argv: list[str]) -> dict:
     if not argv:
         return {"error": "usage: wiki.py <capture|ingest|status|query> [arg]"}
@@ -167,6 +173,8 @@ def main(argv: list[str]) -> dict:
         return op_status()
     if op == "query":
         return op_query(arg)
+    if op == "tags":
+        return op_tags()
     if op == "_ingest_worker":
         return op_ingest_worker()
     return {"error": f"opération inconnue: {op}"}
