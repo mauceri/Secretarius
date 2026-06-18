@@ -30,6 +30,7 @@ from capture import _parse_hashtags, capture_urls, capture_comment
 from ingest import Ingestor
 from query import WikiQuery
 from kb_tags import collect_tags
+from kb_update import update_kb, _DEFAULT_EMBED_DIR, _DEFAULT_KB_DIR
 
 _INGESTABLE_SUFFIXES = {".url", ".md", ".pdf", ".txt"}
 
@@ -161,6 +162,42 @@ def op_tags() -> dict:
     return {"tags": sorted(tags.keys())}
 
 
+def _kb_update_state() -> Path:
+    return _wiki_root() / ".kb_update_state.json"
+
+
+def op_kb_update() -> dict:
+    wiki_dir = _wiki_root() / "wiki"
+    clusterings_dir = wiki_dir / "clusterings"
+    if not clusterings_dir.exists():
+        return {"status": "error", "reason": "répertoire clusterings/ introuvable"}
+    candidates = sorted(
+        (c for c in clusterings_dir.iterdir() if c.is_dir()),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    if not candidates:
+        return {"status": "error", "reason": "aucun clustering disponible"}
+    clustering_name = candidates[0].name
+    stats = update_kb(
+        wiki_root=wiki_dir,
+        clustering_name=clustering_name,
+        embed_dir=_DEFAULT_EMBED_DIR,
+        kb_dir=_DEFAULT_KB_DIR,
+    )
+    return {"status": "ok", "clustering": clustering_name, **stats}
+
+
+def op_kb_update_worker() -> dict:
+    state = _kb_update_state()
+    try:
+        result = op_kb_update()
+    except Exception as exc:
+        result = {"status": "error", "error": str(exc)}
+    state.write_text(json.dumps(result, ensure_ascii=False), encoding="utf-8")
+    return {"status": "worker_done"}
+
+
 def main(argv: list[str]) -> dict:
     if not argv:
         return {"error": "usage: wiki.py <capture|ingest|status|query> [arg]"}
@@ -175,6 +212,10 @@ def main(argv: list[str]) -> dict:
         return op_query(arg)
     if op == "tags":
         return op_tags()
+    if op == "kb_update":
+        return op_kb_update()
+    if op == "_kb_update_worker":
+        return op_kb_update_worker()
     if op == "_ingest_worker":
         return op_ingest_worker()
     return {"error": f"opération inconnue: {op}"}
