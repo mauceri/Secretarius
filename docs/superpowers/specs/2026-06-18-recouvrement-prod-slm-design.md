@@ -115,10 +115,14 @@ L'agent gog exécute déjà le binaire `gog`. Commandes prod de référence :
     (send ou reply) écrase l'ancien.
   - Ajouter l'op `reply` à `workspace-gog/AGENTS.md` (`gog gmail reply <id> --body <texte>`).
 
-### wiki (2) — rebuild de l'image `Dockerfile.wiki`
+### wiki (2) — sans rebuild d'image (bind ro)
 L'agent wiki exécute une `wiki.py` allégée (ops capture/ingest/status/query/_ingest_worker).
 `tags` et `kb_update` n'existent que dans le `mcp_server.py` prod ; il faut les
-ajouter à la CLI `wiki.py` puis reconstruire l'image.
+ajouter à la CLI `wiki.py`. **Pas de rebuild** : `tools/` est monté en bind ro
+(`/home/mauceric/Secretarius/Wiki_LM/tools:/wiki-tools:ro`), `kb_tags.py`/`kb_update.py`
+y sont déjà et leurs deps (`frontmatter`, `numpy`) sont dans l'image. Modifier
+`wiki.py` sur l'hôte suffit ; le prochain `exec python3 /wiki-tools/wiki.py` lit la
+nouvelle version (sessions wiki fraîches à chaque délégation).
 
 - **`/tags`** : ajouter l'op `tags` à `wiki.py` → appelle `collect_tags(wiki_root/"wiki")`,
   renvoie `{"tags":[…]}`. Lecture rapide, synchrone. Outil `wiki_tags` + skill `/tags`.
@@ -145,8 +149,8 @@ ajouter à la CLI `wiki.py` puis reconstruire l'image.
 ## Build / déploiement
 
 - Images : build `secretarius-gog` (Dockerfile.gog) + rebuild `secretarius-tiron`
-  (base nue) à l'étape 0 ; rebuild `secretarius-wiki` (Dockerfile.wiki) après modif
-  de `wiki.py` à l'étape 2.
+  (base nue) à l'étape 0 uniquement. **Aucun rebuild wiki** : `wiki.py` est monté
+  en bind ro, la modif prend effet au prochain appel.
 - Plugin : `npm run build` → `openclaw --profile slm plugins install . --force` →
   `systemctl --user restart openclaw-gateway-slm`.
 
@@ -156,7 +160,7 @@ ajouter à la CLI `wiki.py` puis reconstruire l'image.
    de l'agent gog) → vérifier `/inbox` toujours OK sur la nouvelle image.
 1. gog : `/connecter` → `/chercher` → `/lire` → `/drive` → `/repondre` (pas de
    rebuild image gog pour les commandes — l'image gog est figée à l'étape 0).
-2. wiki : `/tags` → `/kbupdate` (rebuild image wiki).
+2. wiki : `/tags` → `/kbupdate` (modif `wiki.py`, sans rebuild — bind ro).
 
 Chaque commande **testée E2E via Telegram en session neuve** avant la suivante
 (biais de session SLM : tester les skills en session neuve).
