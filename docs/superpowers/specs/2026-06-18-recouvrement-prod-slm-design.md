@@ -8,7 +8,8 @@ Branche cible : travail SLM (archi par intention)
 Porter sur la version SLM (commandes déterministes) les fonctionnalités de la
 version prod (outils MCP v0.1.0) encore manquantes, afin que le SLM puisse
 remplacer la prod. Ce lot couvre les **6 fonctionnalités débloquées** (sans
-re-consentement OAuth). **Calendar** est hors périmètre (scope non consenti, 403
+re-consentement OAuth), précédées d'une **refonte d'image** isolant gog dans une
+image dédiée `secretarius-gog` (étape 0). **Calendar** est hors périmètre (scope non consenti, 403
 vérifié 2026-06-18). **Drive en lecture** s'est révélé déjà consenti (recherche
 testée OK 2026-06-18) → `drive_search` intégré ; drive download/upload restent
 hors lot (transfert de fichier à concevoir, scope write non vérifié).
@@ -25,6 +26,26 @@ hors lot (transfert de fichier à concevoir, scope write non vérifié).
 | `/kbupdate` | `wiki_kb_update` | wiki · `kb_update` (nouvelle CLI) | écriture → async background |
 
 Noms de commandes validés avec l'utilisateur (2026-06-18).
+
+## Étape 0 — image dédiée `secretarius-gog`
+
+Refonte de sécurité (moindre privilège) à faire **avant** les commandes gog.
+Aujourd'hui l'agent `gog` **et** `main` partagent `secretarius-tiron:latest`, qui
+n'ajoute à la base que le binaire gog (`Dockerfile.tiron` = base + `gog-bin` +
+`gog-wrapper`). Résultat : le conteneur de `main` embarque inutilement gog.
+
+- Créer `openclaw-config/Dockerfile.gog` = contenu actuel de `Dockerfile.tiron`
+  (`FROM openclaw-sandbox:bookworm-slim` + COPY `gog-bin` + COPY `gog-wrapper.sh`).
+  Build → image `secretarius-gog:latest`.
+- Réduire `Dockerfile.tiron` à `FROM openclaw-sandbox:bookworm-slim` (base nue,
+  nom conservé pour évolution future de `main`). Rebuild `secretarius-tiron:latest`.
+- Basculer l'agent `gog` dans `openclaw.json` : image `secretarius-tiron:latest`
+  → `secretarius-gog:latest`. `main` reste sur `secretarius-tiron`. Restart gateway.
+- Vérifier : l'agent gog exécute toujours `gog` (creds montés, `/inbox` OK) ;
+  le conteneur de `main` n'a plus le binaire gog.
+
+Aucun impact fonctionnel attendu : `main` délègue déjà à l'agent gog, il n'exécute
+jamais gog lui-même.
 
 ## Patron commun (déjà prouvé)
 
@@ -88,20 +109,27 @@ ajouter à la CLI `wiki.py` puis reconstruire l'image.
 
 ## Build / déploiement
 
+- Images : build `secretarius-gog` (Dockerfile.gog) + rebuild `secretarius-tiron`
+  (base nue) à l'étape 0 ; rebuild `secretarius-wiki` (Dockerfile.wiki) après modif
+  de `wiki.py` à l'étape 2.
 - Plugin : `npm run build` → `openclaw --profile slm plugins install . --force` →
   `systemctl --user restart openclaw-gateway-slm`.
-- Image wiki : reconstruire `Dockerfile.wiki` après modif de `wiki.py`, recharger l'image.
 
 ## Ordre d'exécution
 
-1. gog : `/chercher` → `/lire` → `/drive` → `/repondre` (pas de rebuild).
-2. wiki : `/tags` → `/kbupdate` (rebuild image).
+0. Image dédiée `secretarius-gog` (Dockerfile.gog, tiron réduit à la base, bascule
+   de l'agent gog) → vérifier `/inbox` toujours OK sur la nouvelle image.
+1. gog : `/chercher` → `/lire` → `/drive` → `/repondre` (pas de rebuild image gog
+   pour les commandes — l'image gog est figée à l'étape 0).
+2. wiki : `/tags` → `/kbupdate` (rebuild image wiki).
 
 Chaque commande **testée E2E via Telegram en session neuve** avant la suivante
 (biais de session SLM : tester les skills en session neuve).
 
 ## Critères de succès (vérifiables)
 
+- Image : `secretarius-gog:latest` existe ; l'agent gog y tourne et `/inbox` répond ;
+  `docker run --rm secretarius-tiron:latest which gog` ne trouve plus le binaire.
 - `/chercher motclé` → liste réelle de mails correspondants.
 - `/lire <id>` (id issu de /inbox ou /chercher) → contenu du mail, encadré non fiable.
 - `/drive motclé` → liste réelle de fichiers Drive correspondants.
