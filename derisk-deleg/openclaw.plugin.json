@@ -1,0 +1,25 @@
+{
+  "id": "derisk-deleg",
+  "name": "Derisk Deleg",
+  "description": "Spike: deterministic command tool delegating to the wiki subagent.",
+  "version": "0.1.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "activation": {
+    "onStartup": true
+  },
+  "contracts": {
+    "tools": [
+      "wiki_capture",
+      "wiki_status",
+      "wiki_ingest",
+      "wiki_query",
+      "source_read",
+      "gog_inbox",
+      "gog_send"
+    ]
+  }
+}
