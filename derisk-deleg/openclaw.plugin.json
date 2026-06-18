@@ -19,7 +19,14 @@
       "wiki_query",
       "source_read",
       "gog_inbox",
-      "gog_send"
+      "gog_send",
+      "gog_connect_start",
+      "gog_search",
+      "gog_get",
+      "gog_drive_search",
+      "gog_reply",
+      "wiki_tags",
+      "wiki_kb_update"
     ]
   }
 }
