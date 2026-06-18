@@ -20,8 +20,8 @@
   Commités dans `~/Secretarius`.
 - Plugin (tout le code) : `parse.ts` + tests (4/4 vitest), les 7 outils, état `pending` unifié
   (send|reply), `/connecter` (`gog_connect_start` + interception OAuth), `wiki_tags`/`wiki_kb_update`.
-  `npm run build` OK. **NON COMMITÉ** : `~/secretarius-plugin-spike/derisk-deleg` n'est pas un
-  dépôt git → décision de versioning à prendre (git init ?).
+  `npm run build` OK. **Intégré au dépôt `~/Secretarius/derisk-deleg`** (déplacé depuis
+  l'ancien `secretarius-plugin-spike`, à côté de `gog_mcp` ; `node_modules`/`dist` ignorés) et commité.
 - `wiki.py` : ops `tags`, `kb_update`, `_kb_update_worker`. `wiki.py tags` testé OK. Commités.
 - Caractérisation OAuth (Task 1.7) : **faite** — bridge correct tel quel, scopes calendar+drive
   confirmés dans l'URL de consentement, aucun rebuild nécessaire.
@@ -40,7 +40,7 @@ en fin de document.
 - **Vérification E2E** : via Telegram, **en session neuve** (`/new`) à chaque fois (biais de session SLM). Le bot SLM est `@secretarius_tiron_bot`.
 - **Cycle de déploiement plugin** (après toute modif de `src/`) :
   ```bash
-  cd ~/secretarius-plugin-spike/derisk-deleg && npm run build \
+  cd ~/Secretarius/derisk-deleg && npm run build \
     && openclaw --profile slm plugins install . --force \
     && systemctl --user restart openclaw-gateway-slm
   ```
@@ -53,9 +53,9 @@ en fin de document.
 | `~/Secretarius/openclaw-config/Dockerfile.gog` | image dédiée gog (base + gog + bridge) | créer |
 | `~/Secretarius/openclaw-config/gog-auth-bridge.sh` | pont OAuth `--manual` | créer |
 | `~/Secretarius/openclaw-config/Dockerfile.tiron` | image main, réduite à la base nue | modifier |
-| `~/secretarius-plugin-spike/derisk-deleg/src/parse.ts` | helpers purs (`parseReply`) | créer |
-| `~/secretarius-plugin-spike/derisk-deleg/src/parse.test.ts` | tests des helpers | créer |
-| `~/secretarius-plugin-spike/derisk-deleg/src/index.ts` | tools + hooks + état pending | modifier |
+| `~/Secretarius/derisk-deleg/src/parse.ts` | helpers purs (`parseReply`) | créer |
+| `~/Secretarius/derisk-deleg/src/parse.test.ts` | tests des helpers | créer |
+| `~/Secretarius/derisk-deleg/src/index.ts` | tools + hooks + état pending | modifier |
 | `~/Secretarius/Wiki_LM/tools/wiki.py` | ops CLI `tags`, `kb_update`, `_kb_update_worker` | modifier |
 | `~/.openclaw-slm/workspace-gog/AGENTS.md` | ops gog `get`/`drive_search`/`reply`/`auth_start` | modifier |
 | `~/.openclaw-slm/workspace-wiki/AGENTS.md` | ops wiki `tags`/`kb_update` | modifier |
@@ -212,8 +212,8 @@ Si la config est versionnée dans un dépôt, committer ; sinon, le backup `.bak
 ### Task 1.1 : Helper pur `parseReply` (TDD)
 
 **Files:**
-- Create: `~/secretarius-plugin-spike/derisk-deleg/src/parse.ts`
-- Create: `~/secretarius-plugin-spike/derisk-deleg/src/parse.test.ts`
+- Create: `~/Secretarius/derisk-deleg/src/parse.ts`
+- Create: `~/Secretarius/derisk-deleg/src/parse.test.ts`
 
 - [ ] **Step 1 : Écrire le test (échoue)**
 
@@ -247,7 +247,7 @@ describe("parseReply", () => {
 
 - [ ] **Step 2 : Lancer le test (échoue)**
 
-Run: `cd ~/secretarius-plugin-spike/derisk-deleg && npx vitest run src/parse.test.ts`
+Run: `cd ~/Secretarius/derisk-deleg && npx vitest run src/parse.test.ts`
 Expected : FAIL (`Cannot find module './parse'`).
 
 - [ ] **Step 3 : Implémenter `src/parse.ts`**
@@ -271,20 +271,20 @@ export function parseReply(
 
 - [ ] **Step 4 : Lancer le test (passe)**
 
-Run: `cd ~/secretarius-plugin-spike/derisk-deleg && npx vitest run src/parse.test.ts`
+Run: `cd ~/Secretarius/derisk-deleg && npx vitest run src/parse.test.ts`
 Expected : PASS (4 tests).
 
 - [ ] **Step 5 : Commit**
 
 ```bash
-cd ~/secretarius-plugin-spike/derisk-deleg && git add src/parse.ts src/parse.test.ts \
+cd ~/Secretarius/derisk-deleg && git add src/parse.ts src/parse.test.ts \
   && git commit -m "feat(plugin): parseReply helper + tests"
 ```
 
 ### Task 1.2 : Outils gog lecture (`gog_search`, `gog_get`, `gog_drive_search`)
 
 **Files:**
-- Modify: `~/secretarius-plugin-spike/derisk-deleg/src/index.ts`
+- Modify: `~/Secretarius/derisk-deleg/src/index.ts`
 
 - [ ] **Step 1 : Ajouter les trois outils**
 
@@ -338,7 +338,7 @@ Dans `register(api)`, après l'outil `gog_inbox` (vers la ligne 179), insérer :
 
 - [ ] **Step 2 : Build + validate**
 
-Run: `cd ~/secretarius-plugin-spike/derisk-deleg && npm run build`
+Run: `cd ~/Secretarius/derisk-deleg && npm run build`
 Expected : exit 0.
 
 - [ ] **Step 3 : Commit**
@@ -350,7 +350,7 @@ git add src/index.ts && git commit -m "feat(plugin): outils gog_search/gog_get/g
 ### Task 1.3 : Outil `gog_reply` + état `pendingSend` généralisé (send|reply)
 
 **Files:**
-- Modify: `~/secretarius-plugin-spike/derisk-deleg/src/index.ts`
+- Modify: `~/Secretarius/derisk-deleg/src/index.ts`
 
 - [ ] **Step 1 : Importer `parseReply` et généraliser l'état**
 
@@ -450,7 +450,7 @@ Le garde-fou bloque déjà `reply` (la regex `/(send|reply|forward|delete|…)/`
 
 - [ ] **Step 6 : Build**
 
-Run: `cd ~/secretarius-plugin-spike/derisk-deleg && npm run build && npx vitest run`
+Run: `cd ~/Secretarius/derisk-deleg && npm run build && npx vitest run`
 Expected : build exit 0, tests PASS.
 
 - [ ] **Step 7 : Commit**
@@ -570,7 +570,7 @@ command-arg-mode: raw
 
 Run (cycle plugin complet) :
 ```bash
-cd ~/secretarius-plugin-spike/derisk-deleg && npm run build \
+cd ~/Secretarius/derisk-deleg && npm run build \
   && openclaw --profile slm plugins install . --force \
   && systemctl --user restart openclaw-gateway-slm && sleep 3 \
   && systemctl --user is-active openclaw-gateway-slm
@@ -598,7 +598,7 @@ Expected : réponse réellement envoyée (vérifier dans le fil Gmail).
 
 **Files:**
 - Modify: `~/Secretarius/openclaw-config/gog-auth-bridge.sh` (ajuster motifs si besoin)
-- Modify: `~/secretarius-plugin-spike/derisk-deleg/src/index.ts`
+- Modify: `~/Secretarius/derisk-deleg/src/index.ts`
 - Modify: `~/.openclaw-slm/workspace-gog/AGENTS.md`
 - Modify: `~/.openclaw-slm/openclaw.json`
 - Create: `~/.openclaw-slm/workspace/skills/connecter/SKILL.md`
@@ -724,7 +724,7 @@ Config (`openclaw.json`, backup d'abord `cp … .bak-connecter`) : ajouter
 - [ ] **Step 6 : Déployer**
 
 ```bash
-cd ~/secretarius-plugin-spike/derisk-deleg && npm run build \
+cd ~/Secretarius/derisk-deleg && npm run build \
   && openclaw --profile slm plugins install . --force \
   && systemctl --user restart openclaw-gateway-slm && sleep 3 \
   && systemctl --user is-active openclaw-gateway-slm
@@ -746,7 +746,7 @@ Expected : plus de 403 (événements ou liste vide, mais pas « insufficient sco
 ```bash
 cd ~/Secretarius && git add openclaw-config/gog-auth-bridge.sh \
   && git commit -m "feat(connecter): ajustement bridge OAuth après caractérisation" --allow-empty
-cd ~/secretarius-plugin-spike/derisk-deleg && git add src/index.ts \
+cd ~/Secretarius/derisk-deleg && git add src/index.ts \
   && git commit -m "feat(plugin): /connecter — gog_connect_start + interception retour OAuth"
 ```
 
@@ -867,7 +867,7 @@ cd ~/Secretarius && git add Wiki_LM/tools/wiki.py && git commit -m "feat(wiki): 
 ### Task 2.3 : Outils plugin wiki + AGENTS.md wiki + config + skills
 
 **Files:**
-- Modify: `~/secretarius-plugin-spike/derisk-deleg/src/index.ts`
+- Modify: `~/Secretarius/derisk-deleg/src/index.ts`
 - Modify: `~/.openclaw-slm/workspace-wiki/AGENTS.md`
 - Modify: `~/.openclaw-slm/openclaw.json`
 - Create: `~/.openclaw-slm/workspace/skills/{tags,kbupdate}/SKILL.md`
@@ -945,7 +945,7 @@ command-arg-mode: raw
 - [ ] **Step 5 : Déployer**
 
 ```bash
-cd ~/secretarius-plugin-spike/derisk-deleg && npm run build \
+cd ~/Secretarius/derisk-deleg && npm run build \
   && openclaw --profile slm plugins install . --force \
   && systemctl --user restart openclaw-gateway-slm && sleep 3 \
   && systemctl --user is-active openclaw-gateway-slm
@@ -987,8 +987,7 @@ Le code/les images/les tests locaux sont faits. Reste les actions « live » (to
 gateway SLM / les sous-agents) et les vérifications E2E. **Backup `openclaw.json` avant chaque
 édition** (`cp … .bak-<motif>`), **restart** après chaque bloc de config/AGENTS.md.
 
-0. **Versioning plugin** : décider — `git init` `~/secretarius-plugin-spike/derisk-deleg`
-   (`.gitignore` = `node_modules/`, `dist/`) puis committer les fichiers construits, OU autre.
+0. **Versioning plugin** : FAIT — `derisk-deleg` intégré au dépôt `~/Secretarius` et commité.
 1. **Rebuild tiron** (base nue) : `cd ~/Secretarius && docker build -f openclaw-config/Dockerfile.tiron -t secretarius-tiron:latest .`
 2. **Bascule image gog** (Task 0.3) : `openclaw.json` agent `gog` → image `secretarius-gog:latest`.
 3. **AGENTS.md gog** (Task 1.4) : ops `get`, `drive_search`, `reply` + note contraintes.
@@ -998,7 +997,7 @@ gateway SLM / les sous-agents) et les vérifications E2E. **Backup `openclaw.jso
    chaque sous-agent (wiki/scout/gog) les 7 outils : `gog_connect_start, gog_search, gog_get,
    gog_drive_search, gog_reply, wiki_tags, wiki_kb_update`.
 6. **Skills** (×7) : créer `~/.openclaw-slm/workspace/skills/{connecter,chercher,lire,drive,repondre,tags,kbupdate}/SKILL.md` (contenus dans le plan).
-7. **Déployer** : `cd ~/secretarius-plugin-spike/derisk-deleg && npm run build && openclaw --profile slm plugins install . --force && systemctl --user restart openclaw-gateway-slm`.
+7. **Déployer** : `cd ~/Secretarius/derisk-deleg && npm run build && openclaw --profile slm plugins install . --force && systemctl --user restart openclaw-gateway-slm`.
 8. **Tests E2E Telegram** (session neuve `/new` à chaque) : `/inbox` (image gog OK) → `/chercher` →
    `/lire <id>` → `/drive` → `/repondre <id> …` + `/annuler` puis `/confirm` → `/tags` → `/kbupdate`.
 9. **OAuth** : `/connecter` → ouvrir le lien, autoriser, recoller l'URL `http://localhost:1/?code=…`
