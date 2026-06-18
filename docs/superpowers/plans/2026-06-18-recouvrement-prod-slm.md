@@ -12,6 +12,28 @@
 
 ---
 
+## État d'avancement (2026-06-18) — construction autonome faite, déploiement en attente
+
+**FAIT (construit + vérifié, sans toucher au gateway live) :**
+- Phase 0 fichiers : `Dockerfile.gog`, `gog-auth-bridge.sh`, `Dockerfile.tiron` réduit ; image
+  `secretarius-gog:latest` buildée ; isolation vérifiée (gog présent dans gog, absent de tiron).
+  Commités dans `~/Secretarius`.
+- Plugin (tout le code) : `parse.ts` + tests (4/4 vitest), les 7 outils, état `pending` unifié
+  (send|reply), `/connecter` (`gog_connect_start` + interception OAuth), `wiki_tags`/`wiki_kb_update`.
+  `npm run build` OK. **NON COMMITÉ** : `~/secretarius-plugin-spike/derisk-deleg` n'est pas un
+  dépôt git → décision de versioning à prendre (git init ?).
+- `wiki.py` : ops `tags`, `kb_update`, `_kb_update_worker`. `wiki.py tags` testé OK. Commités.
+- Caractérisation OAuth (Task 1.7) : **faite** — bridge correct tel quel, scopes calendar+drive
+  confirmés dans l'URL de consentement, aucun rebuild nécessaire.
+
+**Divergences appliquées (nécessaires, NodeNext) :** import `"./parse.js"` (pas `"./parse"`) dans
+`index.ts` ; `tsconfig.json` exclut `src/**/*.test.ts` du build tsc (tests via vitest).
+
+**RESTE (déploiement + tests, à faire avec l'utilisateur)** — voir « Checklist de déploiement »
+en fin de document.
+
+---
+
 ## Conventions de vérification
 
 - **Tests unitaires** (vitest) : seulement pour la logique pure (`src/parse.ts`).
@@ -953,4 +975,31 @@ Expected : `{"status": "ok", "clustering": "...", ...}`.
 
 - **Couverture spec** : étape 0 (Task 0.1-0.3) ; /connecter (1.7) ; /chercher /lire /drive (1.2,1.5,1.6) ; /repondre (1.1,1.3,1.5,1.6) ; /tags (2.1,2.3,2.4) ; /kbupdate (2.2,2.3,2.4). Config allow/deny + skills à chaque phase.
 - **Cohérence des noms** : outils `gog_search/gog_get/gog_drive_search/gog_reply/gog_connect_start/wiki_tags/wiki_kb_update` ; ops agent `search/get/drive_search/reply/auth_start/tags/kb_update` ; état `pending` (union) + `pendingAuth`.
-- **Risque connu** : le format exact du flux `gog auth add --manual` (Task 1.7 Step 1) — caractériser avant de figer le bridge. C'est la seule inconnue technique du lot.
+- **Risque connu (LEVÉ)** : le flux `gog auth add --manual` a été caractérisé (2026-06-18) —
+  URL après « Visit this URL », `redirect_uri=http://localhost:1`, prompt « Paste redirect URL »,
+  scopes calendar+drive présents. Le bridge fonctionne tel quel.
+
+---
+
+## Checklist de déploiement (à faire avec l'utilisateur, après l'absence)
+
+Le code/les images/les tests locaux sont faits. Reste les actions « live » (touchent le
+gateway SLM / les sous-agents) et les vérifications E2E. **Backup `openclaw.json` avant chaque
+édition** (`cp … .bak-<motif>`), **restart** après chaque bloc de config/AGENTS.md.
+
+0. **Versioning plugin** : décider — `git init` `~/secretarius-plugin-spike/derisk-deleg`
+   (`.gitignore` = `node_modules/`, `dist/`) puis committer les fichiers construits, OU autre.
+1. **Rebuild tiron** (base nue) : `cd ~/Secretarius && docker build -f openclaw-config/Dockerfile.tiron -t secretarius-tiron:latest .`
+2. **Bascule image gog** (Task 0.3) : `openclaw.json` agent `gog` → image `secretarius-gog:latest`.
+3. **AGENTS.md gog** (Task 1.4) : ops `get`, `drive_search`, `reply` + note contraintes.
+   **AGENTS.md gog** (Task 1.7 Step 3) : op `auth_start` (async background sur `gog-auth-bridge cmauceri@gmail.com`).
+4. **AGENTS.md wiki** (Task 2.3 Step 2) : ops `tags`, `kb_update` (async).
+5. **Config** (Tasks 1.5, 1.7 Step 5, 2.3 Step 3) : ajouter à l'allow global ET au deny de
+   chaque sous-agent (wiki/scout/gog) les 7 outils : `gog_connect_start, gog_search, gog_get,
+   gog_drive_search, gog_reply, wiki_tags, wiki_kb_update`.
+6. **Skills** (×7) : créer `~/.openclaw-slm/workspace/skills/{connecter,chercher,lire,drive,repondre,tags,kbupdate}/SKILL.md` (contenus dans le plan).
+7. **Déployer** : `cd ~/secretarius-plugin-spike/derisk-deleg && npm run build && openclaw --profile slm plugins install . --force && systemctl --user restart openclaw-gateway-slm`.
+8. **Tests E2E Telegram** (session neuve `/new` à chaque) : `/inbox` (image gog OK) → `/chercher` →
+   `/lire <id>` → `/drive` → `/repondre <id> …` + `/annuler` puis `/confirm` → `/tags` → `/kbupdate`.
+9. **OAuth** : `/connecter` → ouvrir le lien, autoriser, recoller l'URL `http://localhost:1/?code=…`
+   → « Compte Google connecté » → vérifier `gog calendar events --max 1` ne renvoie plus 403.
