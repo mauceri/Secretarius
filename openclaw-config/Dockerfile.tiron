@@ -1,3 +1,1 @@
 FROM openclaw-sandbox:bookworm-slim
-COPY --chmod=755 gog-bin /usr/local/bin/gog-bin
-COPY --chmod=755 openclaw-config/gog-wrapper.sh /usr/local/bin/gog
