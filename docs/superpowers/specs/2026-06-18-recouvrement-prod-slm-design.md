@@ -7,16 +7,19 @@ Branche cible : travail SLM (archi par intention)
 
 Porter sur la version SLM (commandes déterministes) les fonctionnalités de la
 version prod (outils MCP v0.1.0) encore manquantes, afin que le SLM puisse
-remplacer la prod. Ce lot couvre les **5 fonctionnalités débloquées** (sans
-dépendance OAuth). Calendar et Drive sont hors périmètre (re-consentement OAuth
-requis, traités séparément).
+remplacer la prod. Ce lot couvre les **6 fonctionnalités débloquées** (sans
+re-consentement OAuth). **Calendar** est hors périmètre (scope non consenti, 403
+vérifié 2026-06-18). **Drive en lecture** s'est révélé déjà consenti (recherche
+testée OK 2026-06-18) → `drive_search` intégré ; drive download/upload restent
+hors lot (transfert de fichier à concevoir, scope write non vérifié).
 
-## Périmètre — 5 commandes
+## Périmètre — 6 commandes
 
 | Commande | Outil plugin | Agent · op | Nature |
 |----------|--------------|-----------|--------|
 | `/chercher <requête>` | `gog_search` | gog · `search` (op déjà mappée) | lecture |
 | `/lire <id>` | `gog_get` | gog · `get` (nouvelle) | lecture, contenu non fiable |
+| `/drive <requête>` | `gog_drive_search` | gog · `drive_search` (nouvelle) | lecture, contenu non fiable |
 | `/repondre <id> <texte>` | `gog_reply` | gog · `reply` (nouvelle) | écriture → brouillon + /confirm |
 | `/tags` | `wiki_tags` | wiki · `tags` (nouvelle CLI) | lecture |
 | `/kbupdate` | `wiki_kb_update` | wiki · `kb_update` (nouvelle CLI) | écriture → async background |
@@ -34,9 +37,10 @@ Réf. patron : `docs/architecture/spec-architecture-par-intention.md` et la mém
 
 ## Conception par commande
 
-### gog (3) — pas de rebuild d'image
+### gog (4) — pas de rebuild d'image
 L'agent gog exécute déjà le binaire `gog`. Commandes prod de référence :
-`gog gmail search <q> --max 10`, `gog gmail get <id>`, `gog gmail reply <id> --body <texte>`.
+`gog gmail search <q> --max 10`, `gog gmail get <id>`, `gog gmail reply <id> --body <texte>`,
+`gog drive search <q> --max 10`.
 
 - **`/chercher`** : op `search` déjà présente dans `workspace-gog/AGENTS.md`.
   N'ajouter que l'outil `gog_search` + la skill `/chercher`. `delegateGog(api,"search",requête)`.
@@ -45,6 +49,9 @@ L'agent gog exécute déjà le binaire `gog`. Commandes prod de référence :
   est externe → **non fiable** : `main` l'encadre `<UNTRUSTED>` comme pour `/q` et
   `/source`. (La prod le passe en plus par l'injection-guard `_screen` ; durcissement
   de parité noté comme suite optionnelle, hors de ce lot.)
+- **`/drive`** : ajouter l'op `drive_search` à `workspace-gog/AGENTS.md`
+  (`gog drive search "<argument>" --max 10`). Outil `gog_drive_search` + skill `/drive`.
+  Noms de fichiers externes → encadrés `<UNTRUSTED>` par `main`, comme `/lire`.
 - **`/repondre`** : écriture. Réutiliser le mécanisme de brouillon existant.
   - Généraliser `pendingSend` en union discriminée :
     `{kind:"send", to, subject, body}` | `{kind:"reply", messageId, body}`.
@@ -72,12 +79,12 @@ ajouter à la CLI `wiki.py` puis reconstruire l'image.
 
 ## Configuration
 
-- `tools.sandbox.tools.allow` (global) : ajouter `gog_search, gog_get, gog_reply,
-  wiki_tags, wiki_kb_update`.
-- Deny chez les sous-agents : ajouter les 5 outils au `deny` de **chaque** sous-agent
+- `tools.sandbox.tools.allow` (global) : ajouter `gog_search, gog_get, gog_drive_search,
+  gog_reply, wiki_tags, wiki_kb_update`.
+- Deny chez les sous-agents : ajouter les 6 outils au `deny` de **chaque** sous-agent
   (wiki, scout, gog) — règle établie : tout sous-agent denie tous les outils
   d'orchestration, sinon il les voit et les appelle au lieu de faire son travail (boucle).
-- Skills dans `~/.openclaw-slm/workspace/skills/` : `chercher, lire, repondre, tags, kbupdate`.
+- Skills dans `~/.openclaw-slm/workspace/skills/` : `chercher, lire, drive, repondre, tags, kbupdate`.
 
 ## Build / déploiement
 
@@ -87,7 +94,7 @@ ajouter à la CLI `wiki.py` puis reconstruire l'image.
 
 ## Ordre d'exécution
 
-1. gog : `/chercher` → `/lire` → `/repondre` (pas de rebuild).
+1. gog : `/chercher` → `/lire` → `/drive` → `/repondre` (pas de rebuild).
 2. wiki : `/tags` → `/kbupdate` (rebuild image).
 
 Chaque commande **testée E2E via Telegram en session neuve** avant la suivante
@@ -97,6 +104,7 @@ Chaque commande **testée E2E via Telegram en session neuve** avant la suivante
 
 - `/chercher motclé` → liste réelle de mails correspondants.
 - `/lire <id>` (id issu de /inbox ou /chercher) → contenu du mail, encadré non fiable.
+- `/drive motclé` → liste réelle de fichiers Drive correspondants.
 - `/repondre <id> bonjour` → « Brouillon de réponse prêt. /confirm » ; `/annuler`
   → message d'abandon exact ; re-faire → `/confirm` → réponse réellement envoyée
   (vérifier réception).
@@ -106,7 +114,10 @@ Chaque commande **testée E2E via Telegram en session neuve** avant la suivante
 
 ## Hors périmètre
 
-- Calendar (events/create/delete) et Drive (search/download/upload) : re-consentement
-  OAuth requis + arguments structurés → voie conversation, lot séparé.
-- Durcissement injection-guard sur le corps des mails lus (`/lire`) : parité prod
-  optionnelle, suite possible.
+- Calendar (events/create/delete) : scope OAuth non consenti (403 vérifié 2026-06-18,
+  re-consentement utilisateur requis) + arguments structurés (create/delete) → voie
+  conversation, lot séparé.
+- Drive download/upload : transfert de fichier vers/depuis le sandbox à concevoir ;
+  upload = scope write non vérifié. Lot séparé. (drive_search est dans ce lot.)
+- Durcissement injection-guard sur le corps des mails lus (`/lire`) et les résultats
+  drive (`/drive`) : parité prod optionnelle, suite possible.
