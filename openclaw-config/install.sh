@@ -198,6 +198,23 @@ if [[ -x "${HOME}/Secretarius/Wiki_LM/.venv/bin/python3" && -f "${HOME}/Secretar
     warn "Activation de wiki-lm-server.service échouée"
 fi
 
+# Timer Wiki_LM embeddings : recalcul incrémental périodique (+ reload du serveur).
+for _wl in wiki-lm-embed.service wiki-lm-embed.timer; do
+  _wl_dst="${SYSTEMD_USER_DIR}/${_wl}"
+  if [[ -f "$_wl_dst" && "$FORCE" != "true" ]]; then
+    info "${_wl} existe déjà — ignoré"
+  else
+    cp "${SCRIPT_DIR}/${_wl}" "$_wl_dst"
+    info "${_wl} installé dans ${SYSTEMD_USER_DIR}"
+  fi
+done
+if [[ -x "${HOME}/Secretarius/Wiki_LM/.venv/bin/python3" && -f "${HOME}/Secretarius/Wiki_LM/tools/embed.py" ]]; then
+  systemctl --user daemon-reload 2>/dev/null || true
+  systemctl --user enable --now wiki-lm-embed.timer 2>/dev/null && \
+    info "wiki-lm-embed.timer activé (toutes les 6 h)" || \
+    warn "Activation de wiki-lm-embed.timer échouée"
+fi
+
 if [[ "$PROFILE" != "slm" ]]; then
 # Services MCP SSE
 for _svc in wiki-lm-mcp gog-mcp; do

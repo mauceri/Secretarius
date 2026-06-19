@@ -1,0 +1,12 @@
+[Unit]
+Description=Wiki_LM — recalcul incrémental des embeddings BGE-M3 + reload du serveur
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/Secretarius/Wiki_LM/tools
+EnvironmentFile=%h/Secretarius/Wiki_LM/.env
+ExecStart=%h/Secretarius/Wiki_LM/.venv/bin/python3 %h/Secretarius/Wiki_LM/tools/embed.py
+ExecStartPost=-/usr/bin/curl -fsS -X POST http://localhost:5051/reload
+StandardOutput=journal
+StandardError=journal
