@@ -222,9 +222,9 @@ def _watch_wiki(wiki_dir: Path) -> None:
             if current > last:
                 pages = _reload_index()
                 last = current
-                print(f"[server] changement détecté → index rechargé ({pages} pages)")
+                print(f"[server] changement détecté → index rechargé ({pages} pages)", flush=True)
         except Exception as e:
-            print(f"[server] watch error: {e}")
+            print(f"[server] watch error: {e}", flush=True)
 
 
 def main() -> None:
