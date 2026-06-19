@@ -63,6 +63,48 @@ npx obsidian-headless sync-status --path ~/Documents/Arbath
 npx obsidian-headless sync-list-local
 ```
 
+## Template de requête Wiki_LM (Templater)
+
+Interroger le wiki en langage naturel **directement depuis Obsidian** (desktop ou
+Android) : la synthèse et les liens `[[source]]` sont insérés dans la note courante.
+Le template appelle le serveur `wiki-lm-server` (port 5051, voir
+`docs/components/wiki-lm.md`). Fichier source : `Wiki_LM/obsidian_template_wikilm_android.md`.
+
+### Prérequis
+
+- Service `wiki-lm-server` actif sur sanroque (`systemctl --user status wiki-lm-server`).
+- L'appareil Obsidian atteint `sanroque:5051` (réseau local ou **Tailscale** ;
+  tester : `curl http://sanroque:5051/health`).
+- Plugin communautaire **Templater** installé et activé
+  (Paramètres → Modules complémentaires → Templater).
+
+### Installation dans Obsidian
+
+1. Paramètres → Templater → **Template folder location** : choisir un dossier du
+   coffre (p. ex. `Templates`).
+2. Copier `obsidian_template_wikilm_android.md` dans ce dossier (p. ex.
+   `Templates/Wiki_LM Query.md`). Le coffre étant synchronisé, le fichier est déjà
+   présent sous `Wiki_LM/` ; il suffit de le copier dans le dossier de templates.
+3. (Optionnel) Raccourci : Paramètres → Templater → **Template Hotkeys** → ajouter
+   le template et lui affecter un raccourci.
+
+### Utilisation
+
+1. Ouvrir/créer la note où insérer le résultat.
+2. Lancer le template : via le raccourci, ou Ctrl/Cmd-P → « Templater: Open Insert
+   Template modal » → choisir le template.
+3. Choisir le **mode** (Hybride recommandé / Sémantique / BM25).
+4. Saisir la **question** → la synthèse + les sources s'insèrent au curseur.
+
+### Dépannage
+
+- « Wiki_LM : erreur — … » : serveur injoignable → vérifier
+  `curl http://sanroque:5051/health` depuis l'appareil.
+- Le template utilise **`requestUrl`** (API Obsidian), pas `fetch()`, pour
+  contourner le CSP d'Electron — ne pas revenir à `fetch()`.
+- « Aucune information » sur un document récent : normalement résolu par
+  l'auto-reload du serveur ; sinon forcer `curl -X POST http://sanroque:5051/reload`.
+
 ## Archivage du coffre
 
 Il est fortement recommandé d'archiver régulièrement le coffre :

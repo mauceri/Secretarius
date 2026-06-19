@@ -20,6 +20,7 @@ import os
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 
 from flask import Flask, jsonify, request
@@ -71,12 +72,18 @@ def health():
     return jsonify({"status": "ok", "pages": len(_wq._search._pages)})
 
 
+def _reload_index() -> int:
+    """Reconstruit l'index BM25 et recharge les embeddings depuis le disque.
+    Retourne le nombre de pages après rechargement."""
+    _wq._search.reload()
+    _wq._semantic._load_index()
+    return len(_wq._search._pages)
+
+
 @app.post("/reload")
 def reload_index():
     """Reconstruit l'index BM25 et recharge les embeddings depuis le disque."""
-    _wq._search.reload()
-    _wq._semantic._load_index()
-    return jsonify({"status": "ok", "pages": len(_wq._search._pages)})
+    return jsonify({"status": "ok", "pages": _reload_index()})
 
 
 @app.post("/embed")
@@ -187,6 +194,39 @@ def cluster_quality():
     return jsonify(stats)
 
 
+WATCH_INTERVAL_S = int(os.environ.get("WIKI_WATCH_INTERVAL", 30))
+
+
+def _wiki_mtime(wiki_dir: Path) -> float:
+    """mtime le plus récent parmi les pages .md du wiki (0.0 si aucune)."""
+    latest = 0.0
+    for p in Path(wiki_dir).rglob("*.md"):
+        try:
+            m = p.stat().st_mtime
+        except OSError:
+            continue
+        if m > latest:
+            latest = m
+    return latest
+
+
+def _watch_wiki(wiki_dir: Path) -> None:
+    """Recharge l'index à chaud quand le wiki change (corrige l'index figé au
+    démarrage : sans ça, les documents ingérés après le lancement du serveur
+    restent invisibles jusqu'au prochain redémarrage)."""
+    last = _wiki_mtime(wiki_dir)
+    while True:
+        time.sleep(WATCH_INTERVAL_S)
+        try:
+            current = _wiki_mtime(wiki_dir)
+            if current > last:
+                pages = _reload_index()
+                last = current
+                print(f"[server] changement détecté → index rechargé ({pages} pages)")
+        except Exception as e:
+            print(f"[server] watch error: {e}")
+
+
 def main() -> None:
     global _wq
 
@@ -207,6 +247,10 @@ def main() -> None:
     print(f"[server] Chargement Wiki_LM ({args.wiki})…")
     _wq = WikiQuery(args.wiki, llm=llm, mode=args.mode)
     print(f"[server] {len(_wq._search._pages)} pages indexées, mode={_wq.mode}")
+    threading.Thread(
+        target=_watch_wiki, args=(Path(_wq._search.wiki_dir),), daemon=True
+    ).start()
+    print(f"[server] surveillance du wiki active (reload auto ~{WATCH_INTERVAL_S}s)")
     host = "127.0.0.1" if args.no_public else "0.0.0.0"
     print(f"[server] Écoute sur http://{host}:{args.port}")
 

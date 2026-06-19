@@ -182,6 +182,22 @@ cp "${SCRIPT_DIR}/switch-model" "$SWITCH_MODEL_TARGET"
 chmod +x "$SWITCH_MODEL_TARGET"
 info "switch-model installé dans ${HOME}/.local/bin"
 
+# Service Wiki_LM Query Server (Flask :5051, pour le template de requête Obsidian).
+# Installé quel que soit le profil ; activé seulement si le venv et server.py existent.
+WIKI_SERVER_DST="${SYSTEMD_USER_DIR}/wiki-lm-server.service"
+if [[ -f "$WIKI_SERVER_DST" && "$FORCE" != "true" ]]; then
+  info "wiki-lm-server.service existe déjà — ignoré"
+else
+  cp "${SCRIPT_DIR}/wiki-lm-server.service" "$WIKI_SERVER_DST"
+  info "wiki-lm-server.service installé dans ${SYSTEMD_USER_DIR}"
+fi
+if [[ -x "${HOME}/Secretarius/Wiki_LM/.venv/bin/python3" && -f "${HOME}/Secretarius/Wiki_LM/tools/server.py" ]]; then
+  systemctl --user daemon-reload 2>/dev/null || true
+  systemctl --user enable wiki-lm-server.service 2>/dev/null && \
+    info "wiki-lm-server.service activé au boot" || \
+    warn "Activation de wiki-lm-server.service échouée"
+fi
+
 if [[ "$PROFILE" != "slm" ]]; then
 # Services MCP SSE
 for _svc in wiki-lm-mcp gog-mcp; do

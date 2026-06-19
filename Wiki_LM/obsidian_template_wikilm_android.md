@@ -15,15 +15,20 @@ const mode = await tp.system.suggester(
 const question = await tp.system.prompt("Question pour Wiki_LM");
 if (!question) { return; }
 
+// requestUrl (API Obsidian) contourne le CSP d'Electron, contrairement à fetch().
+const { requestUrl } = tp.obsidian ?? require("obsidian");
+
 let data;
 try {
-    const resp = await fetch(`${WIKI_SERVER}/query`, {
+    const resp = await requestUrl({
+        url: `${WIKI_SERVER}/query`,
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        contentType: "application/json",
         body: JSON.stringify({ question: question, top_k: 5, mode: mode }),
+        throw: false,
     });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    data = await resp.json();
+    if (resp.status !== 200) throw new Error(`HTTP ${resp.status}`);
+    data = resp.json;
 } catch (e) {
     new Notice(`Wiki_LM : erreur — ${e.message}`, 8000);
     return;

@@ -1,0 +1,16 @@
+[Unit]
+Description=Wiki_LM Query Server (Flask :5051)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Secretarius/Wiki_LM/tools
+EnvironmentFile=%h/Secretarius/Wiki_LM/.env
+ExecStart=%h/Secretarius/Wiki_LM/.venv/bin/python3 %h/Secretarius/Wiki_LM/tools/server.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

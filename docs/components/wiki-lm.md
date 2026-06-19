@@ -113,9 +113,31 @@ python tools/lint.py   # détecte liens brisés, pages orphelines
 
 **`server.py`** — Serveur Flask (port 5051) pour Obsidian
 
+Interroge le wiki par HTTP. C'est le serveur qu'appelle le **template de requête
+Obsidian** (voir `docs/components/obsidian.md`).
+
+Géré par le service systemd **`wiki-lm-server.service`** (installé par `install.sh`
+quel que soit le profil, activé au boot) :
+
 ```bash
-python tools/server.py
+systemctl --user status  wiki-lm-server      # état
+systemctl --user restart wiki-lm-server      # redémarrer
+journalctl --user -u wiki-lm-server -f       # logs
+# Lancement manuel (debug) : python tools/server.py [--port 5051] [--mode hybrid]
 ```
+
+Endpoints : `POST /query` `{question, top_k, mode}` → `{text, references, saved_slug}` ;
+`GET /health` → `{status, pages}` ; `POST /reload` (reconstruit l'index) ;
+`POST /embed`, `POST /cluster` (tâches de fond).
+
+**Rechargement à chaud (auto-reload).** Le serveur charge son index au démarrage.
+Pour que les documents **ingérés après** le lancement deviennent cherchables sans
+redémarrage, un thread surveille le dossier `wiki/` et **reconstruit l'index dès
+qu'un document change** (intervalle ~30 s, réglable via `WIKI_WATCH_INTERVAL`).
+Un rechargement immédiat reste possible : `curl -X POST http://localhost:5051/reload`.
+Note : l'index sémantique dépend des embeddings sur disque (`knowledge_base/embeddings/`) ;
+relancer `embed.py` pour les rafraîchir. En mode `hybrid` (défaut), BM25 couvre les
+documents récents même sans embeddings à jour.
 
 ### Embeddings et similarité
 
