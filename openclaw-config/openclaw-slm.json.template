@@ -96,10 +96,13 @@
             "dangerouslyAllowExternalBindSources": true,
             "binds": [
               "/home/mauceric/Secretarius/Wiki_LM/tools:/wiki-tools:ro",
-              "/home/mauceric/Documents/Arbath/Wiki_LM:/Wiki_LM:rw"
+              "/home/mauceric/Documents/Arbath/Wiki_LM:/Wiki_LM:rw",
+              "/home/mauceric/Secretarius/Wiki_LM/zim:/zim:ro"
             ],
             "env": {
               "WIKI_PATH": "/Wiki_LM",
+              "WIKI_ZIM_DIR": "/zim",
+              "WIKI_LOOKUP_OFFLINE": "1",
               "WIKI_LLM_BACKEND": "openai",
               "OPENAI_BASE_URL": "https://api.infomaniak.com/2/ai/${EURIA_PRODUCT_ID}/openai/v1",
               "OPENAI_API_KEY": "${EURIA_API_KEY}",
