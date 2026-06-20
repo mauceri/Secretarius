@@ -3,8 +3,6 @@ name: wiki-deleg
 description: Déléguer toute opération Wiki_LM (capture / ingest / status / query) à l'agent wiki via sessions_spawn. Déclencher sur /c, une URL nue, « ingère », ou une question sur le wiki.
 ---
 
-> **Draft non déployé.** Destiné à `~/.openclaw-slm/workspace/skills/wiki-deleg/` (instance SLM). Voir `docs/superpowers/specs/2026-06-12-agent-wiki-slm-design.md`.
-
 # Skill : wiki-deleg
 
 ## Rôle
@@ -26,6 +24,13 @@ Tiron ne porte **aucune** logique wiki dans son contexte. Il **délègue** à l'
 sessions_spawn(agentId="wiki", task="op: <op> | <argument>")
 ```
 puis `sessions_yield` (obligatoire) pour attendre la réponse de l'agent, et la relayer.
+
+**Impératif — le `task` est EXACTEMENT la chaîne `op: <op> | <argument>`, rien d'autre.**
+- Ne **jamais** paraphraser ni ajouter de consigne (« analyser », « synthétiser », « traduire », « extraire les thèmes »…). L'agent wiki fait le travail ; vous ne passez que l'op et son argument brut, puis relayez sa réponse.
+- `op: ingest` n'a **jamais** d'argument : `op: ingest | ` traite **toute la file** des fichiers en attente. N'y mettez **jamais** d'URL, même si une capture vient d'avoir lieu.
+- ❌ NE PAS faire : `task="Analyser la page <url> et fournir une traduction"` ni `task="Ingérer le contenu de la page <url>"`.
+- ✅ FAIRE : `task="op: capture | <url>"` ; `task="op: ingest | "`.
+- `/c` et les **URLs nues** vont **toujours** à l'agent `wiki` (op `capture`), **jamais** à `scout`. Scout ne sert que si l'utilisateur veut *lire/consulter* une page maintenant (« que dit cette page ? »), hors wiki.
 
 Exemples :
 - `/c #nlp https://arxiv.org/abs/1706.03762` → `sessions_spawn(agentId="wiki", task="op: capture | #nlp https://arxiv.org/abs/1706.03762")`

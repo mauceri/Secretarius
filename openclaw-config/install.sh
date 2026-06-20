@@ -229,7 +229,7 @@ if [[ -x "${HOME}/Secretarius/Wiki_LM/.venv/bin/python3" && -f "${HOME}/Secretar
 fi
 
 # Workspace .md et skills
-WORKSPACE_SRC="${SCRIPT_DIR}/workspace-slm"
+WORKSPACE_SRC="${SCRIPT_DIR}/workspace"
 WORKSPACE_DST="${OPENCLAW_PATH}/workspace"
 export HOME HOSTNAME OBSIDIAN_PATH ASSISTANT_NAME
 SUBST_VARS='${HOME} ${HOSTNAME} ${OBSIDIAN_PATH} ${ASSISTANT_NAME}'
@@ -239,7 +239,7 @@ while IFS= read -r -d '' src; do
   dst="${WORKSPACE_DST}/${rel}"
   mkdir -p "$(dirname "$dst")"
   # AGENTS.md est de la configuration — toujours mis à jour
-  if [[ "$rel" == "AGENTS.md" || "$FORCE" == "true" || ! -f "$dst" ]]; then
+  if [[ "$rel" == "AGENTS.md" || "$rel" == */SKILL.md || "$FORCE" == "true" || ! -f "$dst" ]]; then
     envsubst "$SUBST_VARS" < "$src" > "$dst"
     info "${rel} installé"
   else
@@ -248,7 +248,7 @@ while IFS= read -r -d '' src; do
 done < <(find "$WORKSPACE_SRC" -name "*.md" -print0)
 
 # Workspaces sous-agents (wiki, scout, gog)
-for _pair in "workspace-wiki-slm:workspace-wiki" "workspace-scout-slm:workspace-scout" "workspace-gog:workspace-gog"; do
+for _pair in "workspace-wiki:workspace-wiki" "workspace-scout:workspace-scout" "workspace-gog:workspace-gog"; do
   _wa_src="${SCRIPT_DIR}/${_pair%%:*}"
   _wa_dst="${OPENCLAW_PATH}/${_pair##*:}"
   if [[ ! -d "$_wa_src" ]]; then
@@ -260,7 +260,7 @@ for _pair in "workspace-wiki-slm:workspace-wiki" "workspace-scout-slm:workspace-
     rel="${src#${_wa_src}/}"
     dst="${_wa_dst}/${rel}"
     mkdir -p "$(dirname "$dst")"
-    if [[ "$rel" == "AGENTS.md" || "$FORCE" == "true" || ! -f "$dst" ]]; then
+    if [[ "$rel" == "AGENTS.md" || "$rel" == */SKILL.md || "$FORCE" == "true" || ! -f "$dst" ]]; then
       envsubst "$SUBST_VARS" < "$src" > "$dst"
       info "${_pair##*:}/${rel} installé"
     else
