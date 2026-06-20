@@ -161,7 +161,31 @@ Les pages de concepts et d'entités sont enrichies avec un extrait Wikipedia pou
 python tools/build_wiki_cache.py
 ```
 
-Placer un fichier ZIM dans `zim/` (ex. `wikipedia_fr_all_mini_2026-02.zim`) pour activer le mode hors-ligne.
+Placer un fichier ZIM dans `~/Secretarius/Wiki_LM/zim/` (ex. `wikipedia_fr_all_mini_2026-02.zim`) pour activer le backend ZIM local. Pour utiliser un autre répertoire, définir `WIKI_ZIM_DIR` :
+
+```bash
+export WIKI_ZIM_DIR=/chemin/vers/zim
+```
+
+Pour garantir qu'aucun appel réseau Wikipedia ne soit effectué, activer le mode offline :
+
+```bash
+export WIKI_LOOKUP_OFFLINE=1
+```
+
+Ce mode force l'ordre `zim,cache` et désactive entièrement le fallback API. Les valeurs `1`, `true`, `yes` et `on` sont acceptées.
+
+Pour une configuration avancée, `WIKI_LOOKUP_BACKENDS` permet de choisir les backends et leur ordre :
+
+```bash
+export WIKI_LOOKUP_BACKENDS=cache
+export WIKI_LOOKUP_BACKENDS=zim,cache
+export WIKI_LOOKUP_BACKENDS=cache,api
+```
+
+Les backends reconnus sont `zim`, `cache` et `api`. Les valeurs inconnues sont ignorées ; si aucune valeur reconnue ne reste, l'ordre par défaut `zim,cache,api` est conservé.
+
+`ingest.py` et `build_wiki_cache.py` utilisent ces variables indirectement via `WikiLookup`, sans option CLI supplémentaire.
 
 ---
 

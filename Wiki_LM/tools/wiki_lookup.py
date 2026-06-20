@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import html.parser
 import json
+import os
 import re
 import sqlite3
 import urllib.parse
@@ -30,6 +31,24 @@ from typing import Any
 
 USER_AGENT = "WikiLM/1.0 (personal wiki; python-urllib)"
 _API = "https://{lang}.wikipedia.org/api/rest_v1/page/summary/{title}"
+_DEFAULT_BACKENDS = ("zim", "cache", "api")
+_OFFLINE_BACKENDS = ("zim", "cache")
+_BACKEND_NAMES = set(_DEFAULT_BACKENDS)
+
+
+def _env_truthy(value: str | None) -> bool:
+    return value is not None and value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _parse_backends(value: str | None) -> tuple[str, ...]:
+    if value is None:
+        return _DEFAULT_BACKENDS
+    parsed = tuple(
+        backend
+        for backend in (part.strip().lower() for part in value.split(","))
+        if backend in _BACKEND_NAMES
+    )
+    return parsed or _DEFAULT_BACKENDS
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +172,17 @@ class WikiLookup:
         self._root = Path(wiki_path)
         self._db_path = self._root / "wiki_cache.db"
         # ZIM hors vault Obsidian — dans Secretarius/Wiki_LM/zim/ par défaut
-        self._zim_dir = Path(zim_dir) if zim_dir is not None else self._DEFAULT_ZIM
+        env_zim_dir = os.environ.get("WIKI_ZIM_DIR")
+        self._zim_dir = (
+            Path(zim_dir)
+            if zim_dir is not None
+            else Path(env_zim_dir) if env_zim_dir else self._DEFAULT_ZIM
+        )
+        self._backends = (
+            _OFFLINE_BACKENDS
+            if _env_truthy(os.environ.get("WIKI_LOOKUP_OFFLINE"))
+            else _parse_backends(os.environ.get("WIKI_LOOKUP_BACKENDS"))
+        )
         self._conn: sqlite3.Connection | None = None
         self._zims: dict[str, Path] | None = None
 
@@ -206,24 +235,26 @@ class WikiLookup:
     # -- Public API ----------------------------------------------------------
 
     def lookup(self, title: str, langs: list[str] | None = None) -> dict[str, Any] | None:
-        """Cherche title dans les trois backends, dans l'ordre ZIM → cache → API."""
-        zims = self._get_zims()
+        """Cherche title dans les backends configurés, par défaut ZIM → cache → API."""
+        zims = self._get_zims() if "zim" in self._backends else {}
         for lang in (langs or ["fr", "en"]):
-            # 1. ZIM local
-            if lang in zims:
-                result = _zim_lookup(title, lang, zims[lang])
-                if result:
-                    self._cache_set(result)
-                    return result
-            # 2. Cache SQLite
-            result = self._cache_get(title, lang)
-            if result:
-                return result
-            # 3. API Wikipedia
-            result = _fetch_api(title, lang)
-            if result:
-                self._cache_set(result)
-                return result
+            for backend in self._backends:
+                if backend == "zim":
+                    if lang not in zims:
+                        continue
+                    result = _zim_lookup(title, lang, zims[lang])
+                    if result:
+                        self._cache_set(result)
+                        return result
+                elif backend == "cache":
+                    result = self._cache_get(title, lang)
+                    if result:
+                        return result
+                elif backend == "api":
+                    result = _fetch_api(title, lang)
+                    if result:
+                        self._cache_set(result)
+                        return result
         return None
 
     def zim_langs(self) -> list[str]:

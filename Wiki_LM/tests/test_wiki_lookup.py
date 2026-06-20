@@ -14,6 +14,101 @@ def lookup(tmp_path):
 
 
 class TestCache:
+    def test_env_zim_dir_used_when_argument_missing(self, tmp_path, monkeypatch):
+        configured = tmp_path / "configured-zim"
+        monkeypatch.setenv("WIKI_ZIM_DIR", str(configured))
+
+        lookup = WikiLookup(tmp_path)
+
+        assert lookup._zim_dir == configured
+
+    def test_explicit_zim_dir_overrides_env(self, tmp_path, monkeypatch):
+        configured = tmp_path / "configured-zim"
+        explicit = tmp_path / "explicit-zim"
+        monkeypatch.setenv("WIKI_ZIM_DIR", str(configured))
+
+        lookup = WikiLookup(tmp_path, zim_dir=explicit)
+
+        assert lookup._zim_dir == explicit
+
+    def test_offline_mode_skips_api(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("WIKI_LOOKUP_OFFLINE", "1")
+        monkeypatch.setattr("wiki_lookup._zim_files", lambda zim_dir: {})
+        calls = []
+        monkeypatch.setattr(
+            "wiki_lookup._fetch_api",
+            lambda *args: calls.append(args) or {
+                "lang": args[1],
+                "title": args[0],
+                "abstract": "api",
+                "url": "",
+            },
+        )
+
+        lookup = WikiLookup(tmp_path)
+
+        assert lookup.lookup("Offline", langs=["fr"]) is None
+        assert calls == []
+
+    def test_backends_cache_only_uses_cache_without_api_or_zim(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("WIKI_LOOKUP_BACKENDS", "cache")
+        monkeypatch.setattr("wiki_lookup._zim_files", lambda zim_dir: {"fr": tmp_path / "fake.zim"})
+        monkeypatch.setattr("wiki_lookup._zim_lookup", lambda *args: pytest.fail("ZIM should not be called"))
+        monkeypatch.setattr("wiki_lookup._fetch_api", lambda *args: pytest.fail("API should not be called"))
+        lookup = WikiLookup(tmp_path)
+        lookup._cache_set({"lang": "fr", "title": "Cached", "abstract": "cache", "url": ""})
+
+        result = lookup.lookup("Cached", langs=["fr"])
+
+        assert result["abstract"] == "cache"
+
+    def test_default_backend_order_is_zim_cache_api(self, tmp_path, monkeypatch):
+        calls = []
+        monkeypatch.setattr("wiki_lookup._zim_files", lambda zim_dir: {"fr": tmp_path / "fake.zim"})
+        monkeypatch.setattr("wiki_lookup._zim_lookup", lambda *args: calls.append("zim") or None)
+        monkeypatch.setattr(
+            "wiki_lookup._fetch_api",
+            lambda title, lang: calls.append("api") or {
+                "lang": lang,
+                "title": title,
+                "abstract": "api",
+                "url": "",
+            },
+        )
+        lookup = WikiLookup(tmp_path)
+        original_cache_get = lookup._cache_get
+
+        def cache_get(title, lang):
+            calls.append("cache")
+            return original_cache_get(title, lang)
+
+        monkeypatch.setattr(lookup, "_cache_get", cache_get)
+
+        result = lookup.lookup("Order", langs=["fr"])
+
+        assert result["abstract"] == "api"
+        assert calls == ["zim", "cache", "api"]
+
+    def test_invalid_backend_list_falls_back_to_default(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("WIKI_LOOKUP_BACKENDS", "nonsense,other")
+        calls = []
+        monkeypatch.setattr("wiki_lookup._zim_files", lambda zim_dir: {})
+        monkeypatch.setattr(
+            "wiki_lookup._fetch_api",
+            lambda title, lang: calls.append("api") or {
+                "lang": lang,
+                "title": title,
+                "abstract": "api",
+                "url": "",
+            },
+        )
+
+        lookup = WikiLookup(tmp_path)
+        result = lookup.lookup("Fallback", langs=["fr"])
+
+        assert result["abstract"] == "api"
+        assert calls == ["api"]
+
     def test_miss_returns_none_offline(self, lookup, monkeypatch):
         """Sans réseau, un titre inconnu retourne None."""
         monkeypatch.setattr("wiki_lookup._fetch_api", lambda *a, **kw: None)
