@@ -106,28 +106,42 @@ else
   warn "EURIA_API_KEY absent — secrets/euria-key non créé (l'agent wiki échouera)"
 fi
 
-# auth-profiles.json de l'agent principal — injecter les clés API des providers configurés
-AUTH_PROFILES="${OPENCLAW_PATH}/agents/main/agent/auth-profiles.json"
-if [[ -f "$AUTH_PROFILES" ]] && [[ -n "${EURIA_API_KEY:-}" ]]; then
-  python3 - <<PYEOF
+# auth-profiles.json par agent — chaque sous-agent (gog/wiki/scout) a son propre
+# auth store et N'HÉRITE PAS du provider global ; sans clé statique il échoue en
+# "No API key found for provider". On écrit donc le profil api_key adéquat pour
+# chaque agent selon son provider (main: euria+deepseek, wiki/gog: euria, scout: deepseek).
+if [[ -n "${EURIA_API_KEY:-}" || -n "${DEEPSEEK_API_KEY:-}" ]]; then
+  export EURIA_API_KEY DEEPSEEK_API_KEY OPENCLAW_PATH
+  python3 - <<'PYEOF'
 import json, os
-path = os.environ.get('AUTH_PROFILES', '$AUTH_PROFILES')
-try:
-    with open(path) as f:
-        d = json.load(f)
-    d.setdefault('profiles', {})
-    if isinstance(d['profiles'], list):
-        d['profiles'] = {p: {} for p in d['profiles']}
-    d['profiles']['euria:default'] = {
-        'type': 'api_key',
-        'provider': 'euria',
-        'key': '${EURIA_API_KEY}'
-    }
+base = os.path.join(os.environ['OPENCLAW_PATH'], 'agents')
+euria = os.environ.get('EURIA_API_KEY', '')
+deepseek = os.environ.get('DEEPSEEK_API_KEY', '')
+# agent id -> liste de providers à provisionner
+plan = {
+    'main':  [('euria', euria), ('deepseek', deepseek)],
+    'wiki':  [('euria', euria)],
+    'gog':   [('euria', euria)],
+    'scout': [('deepseek', deepseek)],
+}
+for aid, provs in plan.items():
+    path = os.path.join(base, aid, 'agent', 'auth-profiles.json')
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    try:
+        with open(path) as f:
+            d = json.load(f)
+    except Exception:
+        d = {'version': 1, 'profiles': {}}
+    d.setdefault('version', 1)
+    if not isinstance(d.get('profiles'), dict):
+        d['profiles'] = {}
+    for prov, key in provs:
+        if not key:
+            continue
+        d['profiles'][f'{prov}:default'] = {'type': 'api_key', 'provider': prov, 'key': key}
     with open(path, 'w') as f:
         json.dump(d, f, indent=2)
-    print('[INFO] Profil euria:default écrit dans auth-profiles.json')
-except Exception as e:
-    print(f'[WARN] auth-profiles.json non mis à jour : {e}')
+    print(f"[INFO] auth-profiles.json écrit pour l'agent {aid}")
 PYEOF
 fi
 
