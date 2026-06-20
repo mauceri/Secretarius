@@ -1,179 +1,380 @@
 {
-  "env": {
-    "EURIA_API_KEY": "${EURIA_API_KEY}",
-    "EURIA_PRODUCT_ID": "${EURIA_PRODUCT_ID}"
-  },
-  "auth": {
-    "profiles": {
-      "euria:default": {
-        "provider": "euria",
-        "mode": "api_key"
-      }
-    }
-  },
-  "models": {
-    "mode": "merge",
-    "providers": {
-      "euria": {
-        "baseUrl": "https://api.infomaniak.com/2/ai/${EURIA_PRODUCT_ID}/openai/v1",
-        "api": "openai-completions",
-        "models": [
-          {
-            "id": "mistralai/Mistral-Small-4-119B-2603",
-            "name": "Mistral Small 4 (Euria)",
-            "api": "openai-completions",
-            "reasoning": false,
-            "input": ["text"],
-            "contextWindow": 131072,
-            "maxTokens": 8192
-          }
-        ]
-      },
-      "tiron-llm": {
-        "baseUrl": "http://127.0.0.1:8998/v1",
-        "api": "openai-completions",
-        "models": [
-          {
-            "id": "phi-4-mini-instruct",
-            "name": "Phi-4-mini (SLM local)",
-            "api": "openai-completions",
-            "reasoning": false,
-            "input": ["text"],
-            "contextWindow": 10240,
-            "maxTokens": 2048
-          }
-        ]
-      }
-    }
-  },
-  "agents": {
-    "defaults": {
-      "model": {
-        "primary": "euria/mistralai/Mistral-Small-4-119B-2603"
-      },
-      "models": {
-        "tiron-llm/phi-4-mini-instruct": { "alias": "TironSLM" },
-        "euria/mistralai/Mistral-Small-4-119B-2603": { "alias": "Euria" }
-      },
-      "workspace": "${HOME}/.openclaw-slm/workspace",
-      "compaction": {
-        "mode": "safeguard",
-        "reserveTokensFloor": 20000
-      },
-      "maxConcurrent": 1,
-      "subagents": { "maxConcurrent": 2 },
-      "sandbox": {
-        "mode": "all",
-        "workspaceAccess": "rw",
-        "scope": "session"
-      }
-    },
-    "list": [
-      {
-        "id": "main",
-        "sandbox": {
-          "docker": {
-            "image": "secretarius-tiron:latest",
-            "network": "bridge",
-            "env": {
-              "XDG_CONFIG_HOME": "/workspace/.gog-config",
-              "GOG_KEYRING_BACKEND": "file",
-              "GOG_ACCOUNT": "${GOG_ACCOUNT}"
-            }
-          }
-        },
-        "tools": {
-          "exec": { "host": "sandbox" }
-        }
-      },
-      {
-        "id": "wiki",
-        "model": { "primary": "euria/mistralai/Mistral-Small-4-119B-2603" },
-        "workspace": "${HOME}/.openclaw-slm/workspace-wiki",
-        "sandbox": {
-          "docker": {
-            "image": "secretarius-wiki:latest",
-            "dangerouslyAllowExternalBindSources": true,
-            "binds": [
-              "/home/mauceric/Secretarius/Wiki_LM/tools:/wiki-tools:ro",
-              "/home/mauceric/Documents/Arbath/Wiki_LM:/Wiki_LM:rw",
-              "/home/mauceric/Secretarius/Wiki_LM/zim:/zim:ro"
-            ],
-            "env": {
-              "WIKI_PATH": "/Wiki_LM",
-              "WIKI_ZIM_DIR": "/zim",
-              "WIKI_LOOKUP_OFFLINE": "1",
-              "WIKI_LLM_BACKEND": "openai",
-              "OPENAI_BASE_URL": "https://api.infomaniak.com/2/ai/${EURIA_PRODUCT_ID}/openai/v1",
-              "OPENAI_API_KEY": "${EURIA_API_KEY}",
-              "OPENAI_MODEL": "mistralai/Mistral-Small-4-119B-2603",
-              "HF_HUB_OFFLINE": "1",
-              "TRANSFORMERS_OFFLINE": "1"
-            }
-          }
-        },
-        "tools": {
-          "exec": { "host": "sandbox" }
-        }
-      }
+ "env": {
+  "EURIA_API_KEY": "${EURIA_API_KEY}",
+  "EURIA_PRODUCT_ID": "${EURIA_PRODUCT_ID}",
+  "DEEPSEEK_API_KEY": "${DEEPSEEK_API_KEY}"
+ },
+ "auth": {
+  "profiles": {
+   "euria:default": {
+    "provider": "euria",
+    "mode": "api_key"
+   },
+   "deepseek:default": {
+    "provider": "deepseek",
+    "mode": "api_key"
+   }
+  }
+ },
+ "models": {
+  "mode": "merge",
+  "providers": {
+   "euria": {
+    "baseUrl": "https://api.infomaniak.com/2/ai/${EURIA_PRODUCT_ID}/openai/v1",
+    "api": "openai-completions",
+    "models": [
+     {
+      "id": "mistralai/Mistral-Small-4-119B-2603",
+      "name": "Mistral Small 4 (Euria)",
+      "api": "openai-completions",
+      "reasoning": false,
+      "input": ["text"],
+      "contextWindow": 131072,
+      "maxTokens": 8192
+     },
+     {
+      "id": "Qwen/Qwen3.5-397B-A17B-FP8",
+      "name": "Qwen3.5 397B-A17B (Euria)",
+      "api": "openai-completions",
+      "reasoning": false,
+      "input": ["text"],
+      "contextWindow": 131072,
+      "maxTokens": 8192
+     },
+     {
+      "id": "google/gemma-4-31B-it",
+      "name": "Gemma 4 31B (Euria)",
+      "api": "openai-completions",
+      "reasoning": false,
+      "input": ["text"],
+      "contextWindow": 131072,
+      "maxTokens": 8192
+     },
+     {
+      "id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8",
+      "name": "Nemotron 3 Nano 30B-A3B (Euria)",
+      "api": "openai-completions",
+      "reasoning": false,
+      "input": ["text"],
+      "contextWindow": 131072,
+      "maxTokens": 8192
+     },
+     {
+      "id": "Qwen/Qwen3.5-122B-A10B-FP8",
+      "name": "Qwen3.5 122B-A10B (Euria)",
+      "api": "openai-completions",
+      "reasoning": false,
+      "input": ["text"],
+      "contextWindow": 131072,
+      "maxTokens": 8192
+     }
     ]
+   },
+   "deepseek": {
+    "baseUrl": "https://api.deepseek.com",
+    "api": "openai-completions",
+    "models": [
+     {
+      "id": "deepseek-chat",
+      "name": "DeepSeek Chat",
+      "api": "openai-completions",
+      "reasoning": false,
+      "input": ["text"],
+      "contextWindow": 131072,
+      "maxTokens": 8192
+     }
+    ]
+   },
+   "tiron-llm": {
+    "baseUrl": "http://127.0.0.1:8998/v1",
+    "api": "openai-completions",
+    "models": [
+     {
+      "id": "phi-4-mini-instruct",
+      "name": "Phi-4-mini (SLM local)",
+      "api": "openai-completions",
+      "reasoning": false,
+      "input": ["text"],
+      "contextWindow": 10240,
+      "maxTokens": 2048
+     }
+    ]
+   },
+   "ollama": {
+    "baseUrl": "http://127.0.0.1:11434/v1",
+    "api": "openai-completions",
+    "models": [
+     {
+      "id": "qwen3:8b",
+      "name": "Qwen3 8B (Ollama local)",
+      "api": "openai-completions",
+      "reasoning": false,
+      "input": ["text"],
+      "contextWindow": 16384,
+      "maxTokens": 2048
+     },
+     {
+      "id": "qwen2.5:7b",
+      "name": "Qwen2.5 7B (Ollama local)",
+      "api": "openai-completions",
+      "reasoning": false,
+      "input": ["text"],
+      "contextWindow": 16384,
+      "maxTokens": 2048
+     },
+     {
+      "id": "phi4-mini",
+      "name": "Phi-4-mini (Ollama local)",
+      "api": "openai-completions",
+      "reasoning": false,
+      "input": ["text"],
+      "contextWindow": 16384,
+      "maxTokens": 2048
+     }
+    ]
+   }
+  }
+ },
+ "agents": {
+  "defaults": {
+   "model": {
+    "primary": "euria/mistralai/Mistral-Small-4-119B-2603"
+   },
+   "models": {
+    "tiron-llm/phi-4-mini-instruct": { "alias": "TironSLM" },
+    "ollama/qwen3:8b": { "alias": "Qwen3SLM" },
+    "ollama/qwen2.5:7b": { "alias": "Qwen25SLM" },
+    "ollama/phi4-mini": { "alias": "Phi4OllamaSLM" },
+    "euria/mistralai/Mistral-Small-4-119B-2603": { "alias": "Euria" },
+    "euria/Qwen/Qwen3.5-397B-A17B-FP8": { "alias": "Qwen397" },
+    "euria/google/gemma-4-31B-it": { "alias": "Gemma4" },
+    "euria/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8": { "alias": "Nemotron3" },
+    "euria/Qwen/Qwen3.5-122B-A10B-FP8": { "alias": "Qwen122" }
+   },
+   "workspace": "${HOME}/${OPENCLAW_DIR}/workspace",
+   "compaction": {
+    "mode": "safeguard",
+    "reserveTokensFloor": 20000
+   },
+   "maxConcurrent": 1,
+   "subagents": {
+    "maxConcurrent": 2
+   },
+   "sandbox": {
+    "mode": "all",
+    "workspaceAccess": "rw",
+    "scope": "session"
+   }
   },
-  "tools": {
-    "exec": {
-      "host": "gateway",
-      "security": "allowlist",
-      "ask": "on-miss",
-      "safeBins": ["gog", "cat", "ls", "find"],
-      "applyPatch": { "enabled": false },
-      "safeBinProfiles": {
-        "cat": {}, "find": {}, "gog": {}, "ls": {}
-      }
+  "list": [
+   {
+    "id": "main",
+    "model": {
+     "primary": "euria/Qwen/Qwen3.5-397B-A17B-FP8"
+    },
+    "subagents": {
+     "allowAgents": ["wiki", "scout", "gog"]
     },
     "sandbox": {
-      "tools": {
-        "allow": [
-          "gog",
-          "read",
-          "sessions_list",
-          "sessions_spawn",
-          "sessions_yield",
-          "group:runtime"
-        ],
-        "deny": [
-          "browser", "canvas", "nodes", "cron",
-          "web_search", "web_fetch",
-          "write", "edit", "apply_patch", "group:fs"
-        ]
+     "docker": {
+      "image": "secretarius-tiron:latest",
+      "network": "bridge",
+      "env": {
+       "XDG_CONFIG_HOME": "/workspace/.gog-config",
+       "GOG_KEYRING_BACKEND": "file",
+       "GOG_ACCOUNT": "${GOG_ACCOUNT}"
       }
-    }
-  },
-  "messages": { "ackReactionScope": "group-mentions" },
-  "commands": { "native": "auto", "nativeSkills": "auto", "restart": true },
-  "session": { "dmScope": "per-channel-peer" },
-  "channels": {
-    "telegram": { "enabled": false }
-  },
-  "gateway": {
-    "port": 18790,
-    "mode": "local",
-    "bind": "lan",
-    "controlUi": {
-      "allowedOrigins": ["http://localhost:18790", "http://sanroque:18790", "https://sanroque.tailc69141.ts.net:8443"],
-      "allowInsecureAuth": true
+     }
     },
-    "auth": {
-      "mode": "token",
-      "token": "${OPENCLAW_GATEWAY_TOKEN}"
-    },
-    "trustedProxies": ["127.0.0.1", "::1"],
-    "nodes": {
-      "denyCommands": [
-        "camera.snap", "camera.clip", "screen.record",
-        "contacts.add", "calendar.add", "reminders.add",
-        "sms.send", "config.patch", "config.apply"
-      ]
+    "tools": {
+     "exec": { "host": "sandbox" }
     }
+   },
+   {
+    "id": "wiki",
+    "model": {
+     "primary": "euria/mistralai/Mistral-Small-4-119B-2603"
+    },
+    "workspace": "${HOME}/${OPENCLAW_DIR}/workspace-wiki",
+    "sandbox": {
+     "docker": {
+      "image": "secretarius-wiki:latest",
+      "network": "bridge",
+      "dangerouslyAllowExternalBindSources": true,
+      "binds": [
+       "${HOME}/Secretarius/Wiki_LM/tools:/wiki-tools:ro",
+       "${HOME}/Documents/Arbath/Wiki_LM:/Wiki_LM:rw",
+       "${HOME}/${OPENCLAW_DIR}/secrets/euria-key:/run/euria-key:ro",
+       "${HOME}/Secretarius/Wiki_LM/zim:/zim:ro"
+      ],
+      "env": {
+       "WIKI_PATH": "/Wiki_LM",
+       "WIKI_LLM_BACKEND": "openai",
+       "OPENAI_BASE_URL": "https://api.infomaniak.com/2/ai/${EURIA_PRODUCT_ID}/openai/v1",
+       "OPENAI_API_KEY_FILE": "/run/euria-key",
+       "OPENAI_MODEL": "mistralai/Mistral-Small-4-119B-2603",
+       "HF_HUB_OFFLINE": "1",
+       "TRANSFORMERS_OFFLINE": "1",
+       "WIKI_ZIM_DIR": "/zim",
+       "WIKI_LOOKUP_OFFLINE": "1"
+      }
+     }
+    },
+    "tools": {
+     "exec": { "host": "sandbox" },
+     "sandbox": {
+      "tools": {
+       "allow": [
+        "gog", "read", "sessions_list", "sessions_spawn", "sessions_yield", "group:runtime"
+       ],
+       "deny": [
+        "wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read",
+        "gog_inbox", "gog_send", "gog_connect_start", "gog_search", "gog_get",
+        "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update"
+       ]
+      }
+     }
+    }
+   },
+   {
+    "id": "scout",
+    "model": {
+     "primary": "deepseek/deepseek-chat"
+    },
+    "workspace": "${HOME}/${OPENCLAW_DIR}/workspace-scout",
+    "tools": {
+     "deny": ["exec"],
+     "sandbox": {
+      "tools": {
+       "allow": ["read", "write", "process", "sessions_yield", "image"],
+       "deny": [
+        "wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read",
+        "gog_inbox", "gog_send", "gog_connect_start", "gog_search", "gog_get",
+        "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update"
+       ]
+      }
+     }
+    }
+   },
+   {
+    "id": "gog",
+    "model": {
+     "primary": "euria/mistralai/Mistral-Small-4-119B-2603"
+    },
+    "workspace": "${HOME}/${OPENCLAW_DIR}/workspace-gog",
+    "sandbox": {
+     "docker": {
+      "image": "secretarius-gog:latest",
+      "network": "bridge",
+      "dangerouslyAllowExternalBindSources": true,
+      "binds": [
+       "${HOME}/${OPENCLAW_DIR}/workspace/.gog-config:/gog-config:rw"
+      ],
+      "env": {
+       "XDG_CONFIG_HOME": "/gog-config",
+       "GOG_KEYRING_BACKEND": "file",
+       "GOG_ACCOUNT": "${GOG_ACCOUNT}"
+      }
+     }
+    },
+    "tools": {
+     "exec": { "host": "sandbox" },
+     "sandbox": {
+      "tools": {
+       "allow": [
+        "gog", "read", "sessions_list", "sessions_spawn", "sessions_yield", "group:runtime"
+       ],
+       "deny": [
+        "wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read",
+        "gog_inbox", "gog_send", "gog_connect_start", "gog_search", "gog_get",
+        "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update"
+       ]
+      }
+     }
+    }
+   }
+  ]
+ },
+ "tools": {
+  "exec": {
+   "host": "sandbox",
+   "security": "allowlist",
+   "ask": "on-miss",
+   "safeBins": ["gog", "cat", "ls", "find"],
+   "applyPatch": { "enabled": false },
+   "safeBinProfiles": {
+    "cat": {}, "find": {}, "gog": {}, "ls": {}
+   }
   },
-  "plugins": { "allow": [], "entries": {} },
-  "skills": { "install": { "nodeManager": "npm" } }
+  "sandbox": {
+   "tools": {
+    "allow": [
+     "gog", "read", "sessions_list", "sessions_spawn", "sessions_yield", "group:runtime",
+     "wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read",
+     "gog_inbox", "gog_send", "gog_connect_start", "gog_search", "gog_get",
+     "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update"
+    ],
+    "deny": [
+     "browser", "canvas", "nodes", "cron",
+     "web_search", "web_fetch",
+     "write", "edit", "apply_patch", "group:fs"
+    ]
+   }
+  }
+ },
+ "messages": {
+  "ackReactionScope": "group-mentions"
+ },
+ "commands": {
+  "native": "auto",
+  "nativeSkills": "auto",
+  "restart": true,
+  "ownerAllowFrom": [
+   "telegram:220537738"
+  ]
+ },
+ "session": {
+  "dmScope": "per-channel-peer"
+ },
+ "channels": {
+  "telegram": {
+   "enabled": true,
+   "dmPolicy": "pairing",
+   "groupPolicy": "allowlist",
+   "streaming": {
+    "mode": "partial"
+   },
+   "execApprovals": {
+    "enabled": true,
+    "approvers": ["220537738"]
+   }
+  }
+ },
+ "gateway": {
+  "port": ${OPENCLAW_PORT},
+  "mode": "local",
+  "bind": "lan",
+  "controlUi": {
+   "allowedOrigins": [
+    "http://localhost:${OPENCLAW_PORT}",
+    "http://${HOSTNAME}:${OPENCLAW_PORT}",
+    "https://${HOSTNAME}.tailc69141.ts.net:8443"
+   ],
+   "allowInsecureAuth": true
+  },
+  "auth": {
+   "mode": "token",
+   "token": "${OPENCLAW_GATEWAY_TOKEN}"
+  },
+  "trustedProxies": ["127.0.0.1", "::1"],
+  "nodes": {
+   "denyCommands": [
+    "camera.snap", "camera.clip", "screen.record",
+    "contacts.add", "calendar.add", "reminders.add",
+    "sms.send", "config.patch", "config.apply"
+   ]
+  }
+ },
+ "plugins": { "allow": [], "entries": {} },
+ "skills": { "install": { "nodeManager": "npm" } }
 }
