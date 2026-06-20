@@ -27,12 +27,16 @@ warn() { echo "[WARN] $*"; }
 
 SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
 
-SERVICES=(
-  "$GW_SVC"
-  "wiki-lm-server.service"
-  "wiki-lm-embed.timer"
-  "wiki-lm-embed.service"
-)
+SERVICES=("$GW_SVC")
+# wiki-lm-server / embed sont des services partagés (Obsidian :5051, timer
+# d'embeddings) — ne les retirer que pour le profil prod, jamais pour slm.
+if [[ "$PROFILE" != "slm" ]]; then
+  SERVICES+=(
+    "wiki-lm-server.service"
+    "wiki-lm-embed.timer"
+    "wiki-lm-embed.service"
+  )
+fi
 
 echo ""
 echo "Profil   : $PROFILE"
@@ -70,8 +74,8 @@ else
   info "${OPENCLAW_PATH} absent — ignoré"
 fi
 
-# switch-model
-if [[ -f "${HOME}/.local/bin/switch-model" ]]; then
+# switch-model (partagé — ne retirer que pour le profil prod)
+if [[ "$PROFILE" != "slm" && -f "${HOME}/.local/bin/switch-model" ]]; then
   rm -f "${HOME}/.local/bin/switch-model"
   info "switch-model supprimé"
 fi
