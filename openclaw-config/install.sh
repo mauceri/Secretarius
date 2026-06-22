@@ -64,6 +64,12 @@ if [[ -z "$OPENCLAW_BIN" ]]; then
   [[ -n "$NPM_PREFIX" ]] && OPENCLAW_BIN="${NPM_PREFIX}/bin/openclaw"
 fi
 OPENCLAW_BIN="${OPENCLAW_BIN:-/usr/bin/openclaw}"
+if [[ ! -x "$OPENCLAW_BIN" ]]; then
+  warn "openclaw introuvable. Installer avec :"
+  warn "  npm install -g openclaw@latest"
+  warn "puis relancer ce script."
+  exit 1
+fi
 export OPENCLAW_BIN
 # Instance slm : installer openclaw@2026.5.12 localement (n'affecte pas la prod)
 if [[ "$PROFILE" == "slm" ]]; then
@@ -171,7 +177,7 @@ elif [[ "$FORCE" != "true" ]]; then
     < "$_env_tpl" \
     > "$ENV_TARGET"
   chmod 600 "$ENV_TARGET"
-  info "gateway.systemd.env généré (600) — renseigner TELEGRAM_BOT_TOKEN et DEEPSEEK_API_KEY avant de démarrer le service"
+  info "gateway.systemd.env généré (600) — renseigner TELEGRAM_BOT_TOKEN et EURIA_API_KEY avant de démarrer le service"
 else
   # Passage --force : injecter les secrets (depuis le fichier existant ou --env-file)
   if [[ -z "$TELEGRAM_BOT_TOKEN" ]]; then
@@ -301,8 +307,21 @@ systemctl --user enable "${_gw_svc_final}" 2>/dev/null && \
   info "${_gw_svc_final} activé" || \
   warn "Activation échouée — lancer manuellement"
 info "Installation terminée."
-info "Après démarrage du gateway, installer le plugin derisk-deleg :"
-info "  cd ${HOME}/Secretarius/derisk-deleg && ${OPENCLAW_BIN} plugins install ."
+info "Modèles Euria disponibles (agent main) :"
+info "  - mistralai/Mistral-Small-4-119B-2603  [défaut si Qwen397 indispo]"
+info "  - Qwen/Qwen3.5-397B-A17B-FP8           [recommandé — meilleur routage wiki]"
+info "  - Qwen/Qwen3.5-122B-A10B-FP8"
+info "  - google/gemma-4-31B-it"
+info "  - nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8"
+info "Agent scout : deepseek/deepseek-chat (DEEPSEEK_API_KEY requis)"
+info ""
+info "Post-install — plugin derisk-deleg (NVM : copie manuelle requise) :"
+info "  SRC=\${HOME}/Secretarius/derisk-deleg"
+info "  DST=\${HOME}/.openclaw/extensions/derisk-deleg"
+info "  mkdir -p \$DST && cp -r \$SRC/dist \$SRC/node_modules \$SRC/openclaw.plugin.json \$SRC/package.json \$DST/"
+info "  Puis dans l'UI gateway : activer le plugin + hooks:allowConversationAccess=true"
+info "  ⚠️  Après --force : plugins.entries est réinitialisé — rajouter l'entrée manuellement"
+info ""
 info "Démarrer : systemctl --user start ${_gw_svc_final}"
 info "UI : http://localhost:${_gw_port_final}"
 unset _gw_svc_final _gw_port_final
