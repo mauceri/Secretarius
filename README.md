@@ -2,112 +2,95 @@
 
 **Secretarius est une configuration sécurisée d'[OpenClaw](https://openclaw.dev) pour individus et petites structures**, enrichie d'une base de connaissances personnelle.
 
-OpenClaw est un agent IA puissant, mais dangereux dans sa configuration standard : il donne à l'IA un accès large à la machine hôte et reste vulnérable aux injections de prompt. Secretarius corrige cela par une architecture de sécurité en plusieurs couches, tout en ajoutant une mémoire documentaire durable.
+OpenClaw est un agent IA puissant, mais risqué dans sa configuration standard : il donne à l'IA un accès large à la machine hôte et reste vulnérable aux injections de prompt. Secretarius corrige cela par une architecture de sécurité en plusieurs couches, tout en ajoutant une mémoire documentaire durable.
 
 Trois principes fondateurs :
-- **Indépendance** : hébergé sur votre propre machine ou serveur, sans dépendance aux fournisseurs cloud d'IA.
-- **Frugalité** : consommation comparable à un ordinateur de jeu.
+- **Indépendance** : hébergé sur votre propre machine ou serveur.
+- **Frugalité** : backend cloud léger (Euria/Infomaniak), pas de GPU requis.
 - **Confidentialité** : vos données restent sous votre contrôle.
 
-→ `docs/Secretarius.md` — présentation complète du projet
+→ `docs/Secretarius.md` — présentation complète du projet  
+→ `openclaw-config/INSTALL.md` — procédure d'installation détaillée
 
 ---
 
 ## Architecture
 
-Secretarius repose sur [OpenClaw](https://openclaw.dev), enrichi d'un gestionnaire de base de connaissances inspiré du patron *LLM Wiki* (Andrej Karpathy).
+Quatre agents spécialisés, un plugin, des sandboxes Docker isolés :
 
-Trois composants principaux :
+```
+Telegram ──► openclaw-gateway
+                  │
+                  ├── Tiron (main)   Euria/Qwen3.5-397B ou Mistral-Small-4
+                  │       sandbox Docker secretarius-tiron
+                  │       15 skills déterministes (/inbox /c /q /ingest …)
+                  │
+                  ├── wiki           Euria/Mistral-Small-4
+                  │       sandbox Docker secretarius-wiki
+                  │       outils Python Wiki_LM + ZIM Wikipedia FR offline
+                  │
+                  ├── scout          DeepSeek
+                  │       fetch sécurisé de contenus externes (anti-injection)
+                  │
+                  └── gog            Euria/Mistral-Small-4
+                          sandbox Docker secretarius-gog
+                          CLI Google (email, agenda, drive)
 
-**Tiron** — l'agent principal, accessible via Telegram. Il mémorise, recherche, synthétise et agit selon les instructions de l'utilisateur. Il s'appuie sur un système de *skills* (compétences réutilisables décrites en langage naturel) et sur le wiki personnel.
+Plugin derisk-deleg : fournit gog_* et wiki_* aux agents ; intercepte /confirm et /annuler
+```
 
-**Scout** — agent isolé, sans accès réseau direct. Toute lecture de source externe (URL, page web) passe par Scout, qui filtre le contenu avant de le transmettre à Tiron. Cela réduit fortement le risque d'injection de prompt indirecte.
+**Tiron** reçoit les demandes via Telegram. Il dispose de 15 commandes déterministes (aucune décision LLM : `/inbox`, `/q`, `/c`, `/ingest`, `/repondre`…) et délègue au sous-agent `wiki` pour les questions documentaires.
 
-**Wiki_LM** — pipeline de base de connaissances personnelle. Il ingère des sources (URLs, PDFs, notes), génère des pages wiki Markdown structurées (résumés, concepts, entités), et expose 7 outils MCP à Tiron : `wiki_capture`, `wiki_ingest`, `wiki_ingest_status`, `wiki_list_pending`, `wiki_query`, `wiki_tags`, `wiki_kb_update`.
+**Scout** reçoit les URLs à lire. Il fetche, nettoie, filtre le contenu avant de le transmettre — réduisant le risque d'injection de prompt indirecte.
+
+**Wiki** gère la base de connaissances personnelle (capture, ingest, query). Il tourne dans un sandbox isolé avec accès en lecture seule aux fichiers ZIM Wikipedia FR pour la lookup offline.
+
+**Gog** exécute les opérations Google dans son propre sandbox. L'envoi d'email nécessite une confirmation explicite (`/confirm`) — jamais exécuté silencieusement.
 
 ---
 
 ## Prérequis
 
-- Python 3.11+
-- Node.js 22+ via NVM (`nvm install 22` recommandé)
-- OpenClaw 2026.6.1+ : `npm install -g openclaw`
-- `envsubst` : `apt install gettext` / `brew install gettext`
-- Git
-- Un bot Telegram (token obtenu via [@BotFather](https://t.me/botfather))
-- Une clé API pour le modèle principal : Euria/Infomaniak (Mistral Small 4, défaut) ou DeepSeek ; Ollama en local possible
+- Node.js 20+ via NVM — `nvm install 22`
+- openclaw : `npm install -g openclaw@latest`
+- Docker 24+
+- Python 3.10+ (pour Wiki_LM)
+- `envsubst` : `apt install gettext`
+- Bot Telegram (token via [@BotFather](https://t.me/botfather))
+- Clé API **Euria/Infomaniak** (backend principal)
+- Clé API **DeepSeek** (agent scout)
 
 ---
 
-## Installation
+## Installation rapide
 
-> **Important** : ne pas lancer `openclaw` manuellement avant la fin de l'installation — OpenClaw initialiserait le workspace avec ses fichiers par défaut (en anglais) et écraserait la configuration française.
-
-### 1. Cloner
+Voir `openclaw-config/INSTALL.md` pour la procédure complète. En résumé :
 
 ```bash
+# 1. Cloner
 git clone https://github.com/mauceri/Secretarius
 cd Secretarius
-```
 
-### 2. Installer
+# 2. Variables d'environnement (lues automatiquement par install.sh)
+#    Créer ~/.config/secrets.env avec :
+#    TELEGRAM_BOT_TOKEN, EURIA_API_KEY, EURIA_PRODUCT_ID, DEEPSEEK_API_KEY, GOG_ACCOUNT
 
-```bash
-./install.sh
-```
+# 3. Builder les images Docker
+docker build -f openclaw-config/Dockerfile.tiron -t secretarius-tiron:latest .
+docker build -f openclaw-config/Dockerfile.wiki  -t secretarius-wiki:latest  .
+docker build -f openclaw-config/Dockerfile.gog   -t secretarius-gog:latest   .
 
-Le script pose trois questions interactivement :
-- Chemin du coffre Obsidian (ex. `~/Documents/Obsidian`)
-- Nom de l'assistant (défaut : `Tiron`)
-- Backend LLM (`deepseek` | `ollama` | `claude`)
+# 4. Installer
+cd openclaw-config && bash install.sh
 
-### 3. Renseigner les secrets
+# 5. Installer le plugin derisk-deleg (copie manuelle si NVM — voir INSTALL.md §2)
 
-```bash
-nano ~/.openclaw/gateway.systemd.env
-```
+# 6. Démarrer
+systemctl --user start openclaw-gateway
 
-Compléter :
-```
-TELEGRAM_BOT_TOKEN=<token BotFather>
-EURIA_API_KEY=<clé API Infomaniak/Euria>
-EURIA_PRODUCT_ID=<identifiant produit Infomaniak>
-DEEPSEEK_API_KEY=<clé API DeepSeek, optionnel>
-```
-(`OPENCLAW_GATEWAY_TOKEN` est généré automatiquement.)
-
-Si vous utilisez les outils Google (gog), ajouter aussi :
-```
-GOG_ACCOUNT=<votre adresse gmail>
-GOG_KEYRING_BACKEND=file
-GOG_KEYRING_PASSWORD=<mot de passe du keyring gog>
-```
-
-**OpenClaw 2026.6.1** ne lit plus les clés API depuis ce fichier pour
-l'authentification des modèles : il faut les enregistrer dans son magasin d'auth.
-Pour chaque fournisseur utilisé :
-```bash
-echo "$EURIA_API_KEY"    | openclaw models auth paste-api-key --provider euria
-echo "$DEEPSEEK_API_KEY" | openclaw models auth paste-api-key --provider deepseek
-```
-
-### 4. Démarrer
-
-```bash
-./start.sh
-```
-
-Le script démarre les services. Les serveurs MCP (wiki-lm, gog) sont exposés en
-`streamable-http` et connectés nativement par OpenClaw (plus de plugin adapter
-depuis la 2026.6.1). Vérification : `openclaw mcp probe`.
-
-### 5. Appairer Telegram
-
-Envoyer `/start` au bot Telegram, puis :
-
-```bash
+# 7. Appairer Telegram
 openclaw pairing approve telegram <CODE>
-systemctl --user restart openclaw-gateway.service
+systemctl --user restart openclaw-gateway
 ```
 
 ---
@@ -115,8 +98,14 @@ systemctl --user restart openclaw-gateway.service
 ## Mise à jour
 
 ```bash
-git pull && ./install.sh --force && ./start.sh
+git pull
+cd openclaw-config
+bash uninstall.sh --yes
+bash install.sh
+# Ré-activer le plugin derisk-deleg dans l'UI gateway
 ```
+
+> `uninstall` + `install` est plus sûr que `--force` (évite l'effacement de l'entrée plugin).
 
 ---
 
@@ -124,42 +113,48 @@ git pull && ./install.sh --force && ./start.sh
 
 ```
 Secretarius/
-├── install.sh                      # Installation idempotente
-├── start.sh                        # Démarrage des services au quotidien
-├── uninstall_openclaw.sh           # Désinstallation
-├── install.conf                    # Valeurs par défaut
-├── PATTERN.md                      # Patron LLM Wiki (Karpathy)
+├── openclaw-config/
+│   ├── INSTALL.md                      # Procédure d'installation détaillée
+│   ├── install.sh                      # Génère ~/.openclaw/ via envsubst
+│   ├── uninstall.sh                    # Désinstallation propre
+│   ├── openclaw-slm.json.template      # Configuration OpenClaw (4 agents + plugin)
+│   ├── gateway-slm.systemd.env.template
+│   ├── openclaw-gateway.service        # Service systemd user
+│   ├── Dockerfile.tiron                # Sandbox agent principal
+│   ├── Dockerfile.wiki                 # Sandbox agent wiki
+│   ├── Dockerfile.gog                  # Sandbox agent gog
+│   ├── workspace/                      # Workspace Tiron (AGENTS.md, SOUL.md, skills/)
+│   │   └── skills/                     # 15 skills déterministes
+│   ├── workspace-wiki/                 # Workspace agent wiki
+│   ├── workspace-scout/                # Workspace agent scout
+│   ├── workspace-gog/                  # Workspace agent gog
+│   └── switch-model                    # Changer le modèle de l'agent main
+│
+├── derisk-deleg/                       # Plugin OpenClaw (gog_* + wiki_* + /confirm)
+│   ├── src/index.ts
+│   └── openclaw.plugin.json
 │
 ├── Wiki_LM/
-│   ├── tools/                      # Pipeline : ingest, query, cluster, kb_*
-│   ├── tests/                      # Suite pytest (170+ tests, zéro réseau)
-│   ├── .env.template               # Configuration LLM
-│   └── requirements.txt
-│
-├── openclaw-config/
-│   ├── openclaw.json.template      # Configuration OpenClaw complète
-│   ├── workspace/                  # Workspace Tiron (SOUL.md, AGENTS.md, skills/)
-│   ├── agents/scout/workspace/     # Workspace Scout (isolé)
-│   ├── injection_guard.py          # Filtre anti-injection de prompt
-│   ├── scout_process.py            # Logique de fetch sécurisé
-│   └── install.sh                  # Génère ~/.openclaw/ via envsubst
+│   ├── tools/                          # Pipeline : capture, ingest, query, kb_*
+│   ├── tests/                          # Suite pytest (170+ tests, zéro réseau)
+│   └── zim/                            # Fichiers ZIM Wikipedia FR (non versionnés)
 │
 └── docs/
-    ├── Secretarius.md              # Présentation complète du projet
-    └── history/                    # Historique des sessions de développement
+    ├── Secretarius.md                  # Présentation complète
+    └── architecture/                   # Documents d'architecture
 ```
 
-Les données wiki (`raw/`, `wiki/`, `knowledge_base/`) vivent dans le coffre Obsidian (`OBSIDIAN_PATH/Wiki_LM/`) et ne sont pas versionnées.
+Les données wiki (`raw/`, `wiki/`, `knowledge_base/`) vivent dans `~/Documents/Arbath/Wiki_LM/` et ne sont pas versionnées.
 
 ---
 
 ## Sécurité
 
-OpenClaw présente des risques de sécurité importants dans sa configuration standard. Secretarius les atténue par :
+Secretarius atténue les risques d'OpenClaw par :
 
-- **Sandbox strict** : Tiron n'a accès qu'à son workspace, pas à la machine hôte.
-- **Scout** : tout contenu externe passe par un agent isolé avant d'atteindre Tiron.
-- **Injection guard** : filtre heuristique sur le contenu fetché.
-- **Allowlist réseau** : les communications externes sont limitées aux destinations pré-approuvées.
+- **Sandboxes Docker par agent** : chaque agent est isolé dans son propre conteneur. Tiron n'a accès qu'à son workspace et au répertoire `.gog-config` monté explicitement.
+- **Scout** : tout contenu externe passe par un agent isolé (sans accès réseau direct depuis les autres agents) avant d'atteindre Tiron.
+- **Confirmation obligatoire pour les envois** : `gog_send` prépare un brouillon ; seul `/confirm` de l'utilisateur déclenche l'envoi réel.
+- **Allowlist d'outils par agent** : chaque agent ne voit que les outils qui lui sont nécessaires.
 
 Ces mesures réduisent fortement la surface d'attaque sans l'éliminer complètement. Voir `docs/Secretarius.md` pour une analyse détaillée.
