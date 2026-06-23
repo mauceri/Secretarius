@@ -101,10 +101,28 @@ fi
 # Mode interactif
 if [[ "$INTERACTIVE" == true ]]; then
   echo "=== Installation Secretarius ==="
-  read -rp "Coffre Obsidian [${OBSIDIAN_PATH}]: " v; OBSIDIAN_PATH="${v:-$OBSIDIAN_PATH}"
+  while true; do
+    read -rp "Coffre Obsidian [${OBSIDIAN_PATH}]: " v || true
+    OBSIDIAN_PATH="${v:-$OBSIDIAN_PATH}"
+    OBSIDIAN_PATH="${OBSIDIAN_PATH/#\~/$HOME}"
+    if [[ -d "$OBSIDIAN_PATH" ]]; then
+      info "Coffre Obsidian ✓ (${OBSIDIAN_PATH})"
+      break
+    fi
+    warn "Répertoire absent : ${OBSIDIAN_PATH}"
+    read -rp "Créer le répertoire ? [y/N] " _c || true
+    if [[ "$_c" =~ ^[Yy] ]]; then
+      mkdir -p "$OBSIDIAN_PATH"
+      info "Créé : ${OBSIDIAN_PATH}"
+      break
+    fi
+    echo "Entrez un autre chemin (ou Ctrl-C pour annuler)."
+  done
+  unset _c v
   read -rp "Nom de l'assistant [${ASSISTANT_NAME}]: " v; ASSISTANT_NAME="${v:-$ASSISTANT_NAME}"
   read -rp "LLM (euria|deepseek|ollama|claude) [${LLM_BACKEND}]: " v; LLM_BACKEND="${v:-$LLM_BACKEND}"
   read -rp "Config OpenClaw [${OPENCLAW_PATH}]: " v; OPENCLAW_PATH="${v:-$OPENCLAW_PATH}"
+  unset v
 fi
 
 # Charger les secrets
@@ -126,28 +144,22 @@ if command -v docker &>/dev/null; then
     DOCKER_OK=true
   else
     info "docker $(docker --version | cut -d' ' -f3 | tr -d ',') — accès refusé au socket"
-    WARNINGS+=("utilisateur non dans le groupe docker — requis pour Milvus\n    sudo usermod -aG docker \$USER && newgrp docker")
+    WARNINGS+=("utilisateur non dans le groupe docker — requis pour les sandboxes")
   fi
 else
-  WARNINGS+=("docker non trouvé — requis pour Milvus\n    Ubuntu/Debian : sudo apt install docker.io docker-compose-plugin\n    Puis : sudo usermod -aG docker \$USER && newgrp docker")
+  WARNINGS+=("docker non trouvé — requis pour les sandboxes Docker\n    Ubuntu/Debian : sudo apt install docker.io docker-compose-plugin\n    Puis : sudo usermod -aG docker \$USER && newgrp docker")
 fi
 
-# Étape 2 — Coffre Obsidian
-OBSIDIAN_PATH="${OBSIDIAN_PATH/#\~/$HOME}"
-info "Validation du coffre Obsidian : ${OBSIDIAN_PATH}"
-if [[ ! -d "$OBSIDIAN_PATH" ]]; then
-  warn "Répertoire absent : ${OBSIDIAN_PATH}"
-  read -rp "Créer le répertoire ? [y/N] " _c || true
-  if [[ "$_c" =~ ^[Yy] ]]; then
-    mkdir -p "$OBSIDIAN_PATH"
-    info "Créé : ${OBSIDIAN_PATH}"
-  else
-    error "Coffre Obsidian requis. Utilisez --obsidian-path PATH pour spécifier un autre chemin."
+# Étape 2 — Coffre Obsidian (mode non-interactif)
+if [[ "$INTERACTIVE" != true ]]; then
+  OBSIDIAN_PATH="${OBSIDIAN_PATH/#\~/$HOME}"
+  if [[ ! -d "$OBSIDIAN_PATH" ]]; then
+    error "Coffre Obsidian introuvable : ${OBSIDIAN_PATH}"
+    error "Utilisez --obsidian-path PATH ou créez le répertoire manuellement."
     exit 1
   fi
-  unset _c
+  info "Coffre Obsidian ✓ (${OBSIDIAN_PATH})"
 fi
-info "Coffre Obsidian ✓ (${OBSIDIAN_PATH})"
 
 # Étape 3 — Config OpenClaw
 info "Génération de la configuration OpenClaw..."
