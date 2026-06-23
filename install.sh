@@ -272,8 +272,7 @@ if ! grep -q "^TELEGRAM_BOT_TOKEN=.\+" "${OPENCLAW_PATH}/gateway.systemd.env" 2>
   fi
 fi
 
-echo "  2. Builder et copier le plugin derisk-deleg :"
-echo "       cd ${SECRETARIUS_ROOT}/derisk-deleg && npm install && npm run build && cd ~"
+echo "  2. Copier le plugin derisk-deleg :"
 echo "       SRC=${SECRETARIUS_ROOT}/derisk-deleg"
 echo "       DST=${OPENCLAW_PATH}/extensions/derisk-deleg"
 echo "       mkdir -p \"\$DST\" && cp -r \"\$SRC/dist\" \"\$SRC/node_modules\" \"\$SRC/openclaw.plugin.json\" \"\$SRC/package.json\" \"\$DST/\""
