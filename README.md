@@ -198,7 +198,7 @@ L'agent gog s'authentifie via des identifiants stockés dans `~/.openclaw/worksp
 
 Ces fichiers **ne sont pas versionnés** et sont perdus si `~/.openclaw` est supprimé (désinstallation).
 
-**Si vous disposez déjà d'un `.gog-config` fonctionnel**, copiez-le — c'est bien plus simple que de refaire le flux OAuth. Sur une installation Secretarius existante, il se trouve **au même chemin** : `~/.openclaw/workspace/.gog-config/`. (Note : `~/.openclaw` n'étant lisible que par son propriétaire, copiez-le pendant que l'instance source est installée, ou depuis une sauvegarde que vous en avez faite.)
+**Si gog est déjà installé et autorisé sur une autre machine** (une installation Secretarius existante), **ses identifiants sont directement réutilisables** : ils se trouvent **au même chemin**, `~/.openclaw/workspace/.gog-config/`. Copiez ce répertoire vers la nouvelle machine plutôt que de refaire le flux OAuth — le compte Google y est déjà autorisé, le refresh token est inclus. (Note : `~/.openclaw` n'étant lisible que par son propriétaire, copiez-le pendant que l'instance source est installée, ou depuis une sauvegarde que vous en avez faite.)
 
 ```bash
 # Depuis une machine source vers la cible (le point final copie aussi les fichiers cachés) :
