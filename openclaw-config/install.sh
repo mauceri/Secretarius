@@ -57,16 +57,27 @@ if ! command -v openclaw &>/dev/null; then
   [[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh" 2>/dev/null || true
 fi
 
-# Détecter le binaire openclaw (NVM, npm global, ou chemin par défaut)
+# Détecter le binaire openclaw (PATH, versions NVM, npm global)
 OPENCLAW_BIN=$(command -v openclaw 2>/dev/null || true)
+# Fallback : sourcer nvm.sh ne met pas toujours node dans le PATH (pas de nvm use) —
+# chercher directement dans les versions NVM installées (la plus récente).
+if [[ -z "$OPENCLAW_BIN" ]]; then
+  for _cand in "$HOME"/.nvm/versions/node/*/bin/openclaw; do
+    [[ -x "$_cand" ]] && OPENCLAW_BIN="$_cand"
+  done
+  unset _cand
+fi
 if [[ -z "$OPENCLAW_BIN" ]]; then
   NPM_PREFIX=$(npm prefix -g 2>/dev/null || true)
   [[ -n "$NPM_PREFIX" ]] && OPENCLAW_BIN="${NPM_PREFIX}/bin/openclaw"
 fi
 OPENCLAW_BIN="${OPENCLAW_BIN:-/usr/bin/openclaw}"
 if [[ ! -x "$OPENCLAW_BIN" ]]; then
-  warn "openclaw introuvable. Installer avec :"
-  warn "  npm install -g openclaw@latest"
+  warn "openclaw introuvable. Installer Node.js 22+ via NVM puis openclaw :"
+  echo "    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash"
+  echo "    source ~/.bashrc"
+  echo "    nvm install 22 && nvm use 22"
+  echo "    npm install -g openclaw"
   warn "puis relancer ce script."
   exit 1
 fi
