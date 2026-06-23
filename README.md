@@ -56,6 +56,7 @@ Plugin derisk-deleg : fournit gog_* et wiki_* aux agents ; intercepte /confirm e
 - Docker 24+
 - Python 3.10+ (pour Wiki_LM)
 - `envsubst` : `apt install gettext`
+- `gog-bin` : binaire CLI Google (non versionné — à copier depuis une machine déjà configurée via `scp`)
 - Bot Telegram (token via [@BotFather](https://t.me/botfather))
 - Clé API **Euria/Infomaniak** (backend principal)
 - Clé API **DeepSeek** (agent scout)
