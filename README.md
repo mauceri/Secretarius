@@ -141,6 +141,12 @@ grep '^OPENCLAW_GATEWAY_TOKEN=' ~/.openclaw/gateway.systemd.env
 
 Ouvrir l'interface depuis un poste ayant accès réseau à la machine — directement (poste de bureau), via Tailscale (`https://<hôte>.<tailnet>.ts.net`) ou par tunnel SSH si la machine est sans écran. Mode **jeton** : coller la valeur affichée, **laisser le champ mot de passe vide**, Connecter.
 
+À la **première connexion d'un navigateur**, l'interface affiche « Appairage de l'appareil requis » avec un identifiant. C'est normal (approbation unique). Approuvez-le sur l'hôte, puis reconnectez-vous :
+
+```bash
+openclaw devices approve <ID-affiché>
+```
+
 Puis dans l'interface : **Plugins** → activer `derisk-deleg` → cocher `allowConversationAccess` → **Restart**.
 
 **9. Appairer Telegram**

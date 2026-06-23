@@ -127,44 +127,9 @@ else
   warn "EURIA_API_KEY absent — secrets/euria-key non créé (l'agent wiki échouera)"
 fi
 
-# auth-profiles.json par agent — chaque sous-agent (gog/wiki/scout) a son propre
-# auth store et N'HÉRITE PAS du provider global ; sans clé statique il échoue en
-# "No API key found for provider". On écrit donc le profil api_key adéquat pour
-# chaque agent selon son provider (main: euria+deepseek, wiki/gog: euria, scout: deepseek).
-if [[ -n "${EURIA_API_KEY:-}" || -n "${DEEPSEEK_API_KEY:-}" ]]; then
-  export EURIA_API_KEY DEEPSEEK_API_KEY OPENCLAW_PATH
-  python3 - <<'PYEOF'
-import json, os
-base = os.path.join(os.environ['OPENCLAW_PATH'], 'agents')
-euria = os.environ.get('EURIA_API_KEY', '')
-deepseek = os.environ.get('DEEPSEEK_API_KEY', '')
-# agent id -> liste de providers à provisionner
-plan = {
-    'main':  [('euria', euria), ('deepseek', deepseek)],
-    'wiki':  [('euria', euria)],
-    'gog':   [('euria', euria)],
-    'scout': [('deepseek', deepseek)],
-}
-for aid, provs in plan.items():
-    path = os.path.join(base, aid, 'agent', 'auth-profiles.json')
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    try:
-        with open(path) as f:
-            d = json.load(f)
-    except Exception:
-        d = {'version': 1, 'profiles': {}}
-    d.setdefault('version', 1)
-    if not isinstance(d.get('profiles'), dict):
-        d['profiles'] = {}
-    for prov, key in provs:
-        if not key:
-            continue
-        d['profiles'][f'{prov}:default'] = {'type': 'api_key', 'provider': prov, 'key': key}
-    with open(path, 'w') as f:
-        json.dump(d, f, indent=2)
-    print(f"[INFO] auth-profiles.json écrit pour l'agent {aid}")
-PYEOF
-fi
+# Note : l'auth par agent (clés API) est configurée plus bas, APRÈS la génération
+# d'openclaw.json, via `openclaw models auth paste-api-key` (openclaw 2026.6.x lit
+# son propre store et ignore un auth-profiles.json écrit à la main).
 
 # openclaw.json
 TARGET="${OPENCLAW_PATH}/openclaw.json"
@@ -203,6 +168,32 @@ for name in ('openclaw.json', 'openclaw.json.bak', 'openclaw.json.last-good'):
     json.dump(d, open(p, 'w'), indent=1)
 print("[INFO] token gateway réconcilié (auth=remote) dans openclaw.json + .bak/.last-good")
 PYEOF
+fi
+
+# Auth par agent (clés API). openclaw 2026.6.x stocke l'auth dans un store par
+# agent et IGNORE un auth-profiles.json écrit à la main → "No API key found for
+# provider". La commande officielle `models auth paste-api-key` écrit le profil ET
+# met à jour la config. La clé est passée sur stdin. Chaque agent a son store isolé.
+if [[ -f "$TARGET" && ( -n "${EURIA_API_KEY:-}" || -n "${DEEPSEEK_API_KEY:-}" ) ]]; then
+  export OPENCLAW_GATEWAY_TOKEN   # éviter que la commande régénère le token gateway
+  _set_auth() {  # $1=agent  $2=provider  $3=clé
+    [[ -n "$3" ]] || return 0
+    if printf '%s\n' "$3" | "$OPENCLAW_BIN" models auth --agent "$1" \
+         paste-api-key --provider "$2" --profile-id "$2:default" >/dev/null 2>&1; then
+      info "auth ${2} → agent ${1}"
+    else
+      warn "auth ${2} → agent ${1} échouée"
+    fi
+  }
+  _set_auth main  euria    "${EURIA_API_KEY:-}"
+  _set_auth wiki  euria    "${EURIA_API_KEY:-}"
+  _set_auth gog   euria    "${EURIA_API_KEY:-}"
+  _set_auth main  deepseek "${DEEPSEEK_API_KEY:-}"
+  _set_auth scout deepseek "${DEEPSEEK_API_KEY:-}"
+  unset -f _set_auth
+  # paste-api-key réécrit openclaw.json (et un .bak décalé) à chaque appel :
+  # resync .bak = openclaw.json pour éviter la restauration anti-clobber au démarrage.
+  cp "$TARGET" "${OPENCLAW_PATH}/openclaw.json.bak" 2>/dev/null || true
 fi
 
 # gateway.systemd.env
