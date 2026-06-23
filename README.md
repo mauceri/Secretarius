@@ -95,6 +95,33 @@ systemctl --user restart openclaw-gateway
 
 ---
 
+## Changer de modèle
+
+L'agent principal (`main`) utilise par défaut `Mistral-Small-4` (Euria). Pour basculer sur un autre modèle :
+
+```bash
+switch-model Qwen397    # Qwen3.5-397B — meilleur routage wiki, recommandé
+switch-model Euria      # Mistral-Small-4 (défaut)
+switch-model Qwen122    # Qwen3.5-122B — variante légère
+systemctl --user restart openclaw-gateway
+```
+
+Modèles disponibles via Euria/Infomaniak :
+
+| Alias | Modèle | Notes |
+|-------|--------|-------|
+| `Euria` | Mistral-Small-4-119B-2603 | Défaut — fiable, rapide |
+| `Qwen397` | Qwen3.5-397B-A17B-FP8 | Recommandé : meilleur routage `/c`→wiki |
+| `Qwen122` | Qwen3.5-122B-A10B-FP8 | Variante légère de Qwen397 |
+| `Gemma4` | google/gemma-4-31B-it | — |
+| `Nemotron3` | nvidia/Nemotron-3-Nano-30B-A3B | — |
+
+> **Note santiago** : Qwen3.5-397B est indisponible sur ce compte Euria (product_id 109005). L'agent main tourne sur Mistral-Small-4.
+
+L'agent `scout` utilise toujours DeepSeek (`deepseek-chat`) — non modifiable via `switch-model`.
+
+---
+
 ## Mise à jour
 
 ```bash
