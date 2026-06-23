@@ -90,13 +90,9 @@ _oc_ver="$(timeout 15 openclaw --version 2>/dev/null | head -1 || true)"
 if [[ -n "$_oc_ver" ]]; then
   info "openclaw ${_oc_ver} ✓"
 else
-  error "openclaw absent ou non fonctionnel — (ré)installer :"
+  error "openclaw absent ou non fonctionnel — (ré)installer (installeur officiel) :"
   echo ""
-  echo "    npm install -g openclaw"
-  echo ""
-  echo "  (si npm/node absents : installer Node.js 22+ via NVM d'abord :"
-  echo "    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash"
-  echo "    source ~/.bashrc && nvm install 22 && nvm use 22)"
+  echo "    curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install.sh | bash"
   echo ""
   echo "Puis relancer : ./install.sh --env-file ~/.config/secrets.env"
   exit 1

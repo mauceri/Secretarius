@@ -18,14 +18,14 @@ python3 --version
 
 ### openclaw
 
-openclaw **doit être installé avant** de lancer `install.sh` :
+openclaw **doit être installé avant** de lancer `install.sh`, via l'installeur officiel (qui installe aussi Node) :
 
 ```bash
-npm install -g openclaw@latest
+curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install.sh | bash
 openclaw --version
 ```
 
-Avec NVM, le binaire atterrit dans `~/.nvm/versions/node/<x>/bin/openclaw`. `install.sh` le détecte automatiquement via `nvm.sh`.
+`install.sh` détecte le binaire automatiquement (PATH, versions NVM, ou prefix npm global).
 
 ---
 

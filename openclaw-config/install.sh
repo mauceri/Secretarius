@@ -80,11 +80,8 @@ if [[ -z "$OPENCLAW_BIN" ]]; then
 fi
 OPENCLAW_BIN="${OPENCLAW_BIN:-/usr/bin/openclaw}"
 if [[ ! -x "$OPENCLAW_BIN" ]]; then
-  warn "openclaw introuvable. Installer Node.js 22+ via NVM puis openclaw :"
-  echo "    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash"
-  echo "    source ~/.bashrc"
-  echo "    nvm install 22 && nvm use 22"
-  echo "    npm install -g openclaw"
+  warn "openclaw introuvable. Installer (installeur officiel) :"
+  echo "    curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install.sh | bash"
   warn "puis relancer ce script."
   exit 1
 fi
@@ -212,26 +209,18 @@ fi
 _env_tpl="${SCRIPT_DIR}/gateway-slm.systemd.env.template"
 ENV_TARGET="${OPENCLAW_PATH}/gateway.systemd.env"
 if [[ -f "$ENV_TARGET" && "$FORCE" != "true" ]]; then
-  info "gateway.systemd.env existe déjà — ignoré"
-elif [[ "$FORCE" != "true" ]]; then
-  # Premier passage : TELEGRAM_BOT_TOKEN vide (à renseigner), OPENCLAW_GATEWAY_TOKEN auto-généré
-  TELEGRAM_BOT_TOKEN="" GATEWAY_PASSWORD="" \
-    envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD} ${OPENCLAW_BIN} ${HOME} ${EURIA_API_KEY} ${EURIA_PRODUCT_ID} ${DEEPSEEK_API_KEY} ${GOG_ACCOUNT}' \
-    < "$_env_tpl" \
-    > "$ENV_TARGET"
-  chmod 600 "$ENV_TARGET"
-  info "gateway.systemd.env généré (600) — renseigner TELEGRAM_BOT_TOKEN et EURIA_API_KEY avant de démarrer le service"
+  info "gateway.systemd.env existe déjà — ignoré (utilisez --force pour régénérer)"
 else
-  # Passage --force : injecter les secrets (depuis le fichier existant ou --env-file)
-  if [[ -z "$TELEGRAM_BOT_TOKEN" ]]; then
-    warn "TELEGRAM_BOT_TOKEN non défini — à renseigner dans ${ENV_TARGET}"
-  fi
+  # Génère gateway.systemd.env avec les secrets fournis (env/--env-file).
+  # Variables manquantes = chaîne vide ; on avertit pour les indispensables.
+  [[ -z "${TELEGRAM_BOT_TOKEN:-}" ]] && warn "TELEGRAM_BOT_TOKEN non défini — à renseigner dans ${ENV_TARGET} avant de démarrer"
+  [[ -z "${EURIA_API_KEY:-}" ]] && warn "EURIA_API_KEY non défini — à renseigner dans ${ENV_TARGET} avant de démarrer"
   export TELEGRAM_BOT_TOKEN OPENCLAW_GATEWAY_TOKEN GATEWAY_PASSWORD OPENCLAW_BIN GOG_ACCOUNT EURIA_API_KEY EURIA_PRODUCT_ID DEEPSEEK_API_KEY
   envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD} ${OPENCLAW_BIN} ${HOME} ${GOG_ACCOUNT} ${EURIA_API_KEY} ${EURIA_PRODUCT_ID} ${DEEPSEEK_API_KEY}' \
     < "$_env_tpl" \
     > "$ENV_TARGET"
   chmod 600 "$ENV_TARGET"
-  info "gateway.systemd.env mis à jour (600)"
+  info "gateway.systemd.env généré (600)"
 fi
 unset _env_tpl
 

@@ -51,8 +51,8 @@ Plugin derisk-deleg : fournit gog_* et wiki_* aux agents ; intercepte /confirm e
 
 ## Prérequis
 
-- Node.js 20+ via NVM — `nvm install 22`
-- openclaw : `npm install -g openclaw@latest`
+- openclaw (installeur officiel, installe Node + openclaw) :
+  `curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install.sh | bash`
 - Docker 24+
 - Python 3.10+ (pour Wiki_LM)
 - `envsubst` : `apt install gettext`
