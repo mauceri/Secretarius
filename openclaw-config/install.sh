@@ -350,5 +350,6 @@ info "  Puis dans l'UI gateway : activer le plugin + hooks:allowConversationAcce
 info "  ⚠️  Après --force : plugins.entries est réinitialisé — rajouter l'entrée manuellement"
 info ""
 info "Démarrer : systemctl --user start ${_gw_svc_final}"
-info "Control UI : openclaw dashboard --no-open (imprime l'URL avec jeton)"
+info "Control UI : ouvrir depuis un poste réseau, mode jeton ="
+info "  grep OPENCLAW_GATEWAY_TOKEN ${OPENCLAW_PATH}/gateway.systemd.env"
 unset _gw_svc_final _gw_port_final

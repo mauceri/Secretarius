@@ -159,7 +159,12 @@ mkdir -p "$DST"
 cp -r "$SRC/dist" "$SRC/node_modules" "$SRC/openclaw.plugin.json" "$SRC/package.json" "$DST/"
 ```
 
-Puis dans la Control UI — obtenir l'URL (jeton inclus) avec `openclaw dashboard --no-open`, et l'ouvrir depuis un poste ayant accès réseau (direct, Tailscale ou tunnel SSH si headless) :
+Puis dans la Control UI, ouverte depuis un poste ayant accès réseau (direct, Tailscale ou tunnel SSH si headless). Le jeton de connexion (mode **jeton**, mot de passe vide) est dans `gateway.systemd.env` :
+
+```bash
+grep '^OPENCLAW_GATEWAY_TOKEN=' ~/.openclaw/gateway.systemd.env
+```
+
 - Aller dans **Plugins** → activer `derisk-deleg`
 - Cocher **Hooks → allowConversationAccess**
 - Redémarrer le gateway : `systemctl --user restart openclaw-gateway`

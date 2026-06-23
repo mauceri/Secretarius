@@ -116,13 +116,13 @@ mkdir -p "$DST" && cp -r "$SRC/dist" "$SRC/node_modules" "$SRC/openclaw.plugin.j
 systemctl --user start openclaw-gateway
 ```
 
-**8. Activer le plugin** dans la Control UI. Obtenir l'URL (avec jeton intégré) :
+**8. Activer le plugin** dans la Control UI. Récupérer le jeton du gateway :
 
 ```bash
-openclaw dashboard --no-open
+grep '^OPENCLAW_GATEWAY_TOKEN=' ~/.openclaw/gateway.systemd.env
 ```
 
-Ouvrir cette URL depuis un poste ayant accès réseau à la machine — directement si poste de bureau, via Tailscale (`https://<host>.<tailnet>.ts.net`) ou tunnel SSH si la machine est headless. Puis : → Plugins → activer `derisk-deleg` → cocher `hooks: allowConversationAccess` → Restart.
+Ouvrir la Control UI depuis un poste ayant accès réseau à la machine (direct si poste de bureau, via Tailscale `https://<host>.<tailnet>.ts.net` ou tunnel SSH si headless). Mode **jeton** : coller la valeur de `OPENCLAW_GATEWAY_TOKEN`, **laisser le mot de passe vide**. Puis : → Plugins → activer `derisk-deleg` → cocher `hooks: allowConversationAccess` → Restart.
 
 **9. Appairer Telegram** : envoyer `/start` au bot, puis :
 
@@ -131,7 +131,7 @@ openclaw pairing approve telegram <CODE>
 systemctl --user restart openclaw-gateway
 ```
 
-> `install.sh` crée un lien `~/.local/bin/openclaw` : la commande `openclaw` est utilisable dans toute session, sans avoir à charger NVM. Pour ouvrir le tableau de bord avec le bon jeton : `openclaw dashboard --no-open`.
+> `install.sh` crée un lien `~/.local/bin/openclaw` : la commande `openclaw` est utilisable dans toute session, sans avoir à charger NVM.
 
 ---
 
