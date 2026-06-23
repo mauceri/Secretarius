@@ -74,14 +74,7 @@ git clone https://github.com/mauceri/Secretarius
 cd Secretarius
 ```
 
-**2. Copier `gog-bin`** (binaire CLI Google, non versionné) :
-
-```bash
-# Depuis la machine source (sanroque) :
-scp ~/Secretarius/gog-bin claw@santiago:~/Secretarius/
-# Ou depuis santiago si sanroque est accessible :
-# scp mauceric@sanroque:~/Secretarius/gog-bin ~/Secretarius/
-```
+**2. Installer `gog-bin`** : télécharger le binaire Linux de [gogcli](https://github.com/openclaw/gogcli/releases), le renommer `gog-bin` et le placer à la racine du dépôt (ou le copier via `scp` depuis une machine déjà configurée).
 
 **3. Builder les images Docker** :
 
@@ -168,7 +161,7 @@ Modèles disponibles via Euria/Infomaniak :
 | `Gemma4` | google/gemma-4-31B-it | — |
 | `Nemotron3` | nvidia/Nemotron-3-Nano-30B-A3B | — |
 
-> **Note santiago** : Qwen3.5-397B est indisponible sur ce compte Euria (product_id 109005). L'agent main tourne sur Mistral-Small-4.
+> **Note** : Qwen3.5-397B n'est pas disponible sur tous les comptes Euria. Si l'agent ne répond pas après un `switch-model Qwen397`, revenir à `Euria` (Mistral-Small-4).
 
 L'agent `scout` utilise toujours DeepSeek (`deepseek-chat`) — non modifiable via `switch-model`.
 
