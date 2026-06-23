@@ -110,7 +110,21 @@ for bin in scout-watcher; do
 done
 
 # 2 — Supprimer la configuration OpenClaw
+# Les sandboxes Docker écrivent des fichiers possédés par root dans le workspace
+# (ex. workspace/.openclaw/sandbox-skills/skills) → un rm direct échoue en
+# "Permission denied". On reprend la propriété via un conteneur (Docker tourne en
+# root), sans sudo, avant de supprimer.
 if [[ -d "$OPENCLAW_PATH" ]]; then
+  if find "$OPENCLAW_PATH" ! -uid "$(id -u)" -print -quit 2>/dev/null | grep -q .; then
+    if command -v docker &>/dev/null && docker ps &>/dev/null 2>&1; then
+      info "Fichiers créés par Docker (root) détectés — reprise de propriété via conteneur..."
+      docker run --rm -v "${OPENCLAW_PATH}:/target" alpine \
+        chown -R "$(id -u):$(id -g)" /target 2>/dev/null \
+        || warn "Reprise de propriété via Docker échouée — la suppression peut échouer"
+    else
+      warn "Fichiers root présents mais Docker indisponible — la suppression peut échouer"
+    fi
+  fi
   rm -rf "$OPENCLAW_PATH"
   info "Répertoire supprimé : ${OPENCLAW_PATH}"
 else
