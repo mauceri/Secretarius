@@ -183,6 +183,31 @@ else
   info "openclaw.json généré dans ${OPENCLAW_PATH}"
 fi
 
+# Réconcilier le token gateway (même quand openclaw.json est "ignoré").
+# Le gateway (systemd) s'authentifie via OPENCLAW_GATEWAY_TOKEN (env) ; le CLI et la
+# Control UI lisent gateway.{auth,remote}.token du fichier. S'ils divergent →
+# "unauthorized: gateway token mismatch". On force auth=remote=OPENCLAW_GATEWAY_TOKEN
+# dans openclaw.json + .bak + .last-good (sinon un ancien token persiste et casse l'UI).
+if [[ -f "$TARGET" && -n "${OPENCLAW_GATEWAY_TOKEN:-}" ]]; then
+  OPENCLAW_GATEWAY_TOKEN="$OPENCLAW_GATEWAY_TOKEN" python3 - "$OPENCLAW_PATH" <<'PYEOF'
+import json, os, sys
+base, tok = sys.argv[1], os.environ['OPENCLAW_GATEWAY_TOKEN']
+for name in ('openclaw.json', 'openclaw.json.bak', 'openclaw.json.last-good'):
+    p = os.path.join(base, name)
+    if not os.path.exists(p):
+        continue
+    try:
+        d = json.load(open(p))
+    except Exception:
+        continue
+    g = d.setdefault('gateway', {})
+    g.setdefault('auth', {}).update({'mode': 'token', 'token': tok})
+    g.setdefault('remote', {})['token'] = tok
+    json.dump(d, open(p, 'w'), indent=1)
+print("[INFO] token gateway réconcilié (auth=remote) dans openclaw.json + .bak/.last-good")
+PYEOF
+fi
+
 # gateway.systemd.env
 _env_tpl="${SCRIPT_DIR}/gateway-slm.systemd.env.template"
 ENV_TARGET="${OPENCLAW_PATH}/gateway.systemd.env"
@@ -233,13 +258,26 @@ cp "${SCRIPT_DIR}/switch-model" "$SWITCH_MODEL_TARGET"
 chmod +x "$SWITCH_MODEL_TARGET"
 info "switch-model installé dans ${HOME}/.local/bin"
 
-# Lien openclaw dans ~/.local/bin : NVM n'est pas chargé dans les sessions SSH,
-# d'où "openclaw: command not found" pour pairing/dashboard. ~/.local/bin est
-# dans le PATH par défaut (Ubuntu, via ~/.profile) → openclaw devient accessible
-# partout sans sourcer NVM. Le shebang du binaire pointe son propre node.
+# Wrapper openclaw dans ~/.local/bin (au lieu d'un symlink) :
+#  1) NVM n'est pas chargé dans les sessions SSH → openclaw introuvable. ~/.local/bin
+#     est dans le PATH par défaut (Ubuntu, via ~/.profile).
+#  2) SURTOUT : toute commande `openclaw` lancée SANS OPENCLAW_GATEWAY_TOKEN dans
+#     l'environnement RÉGÉNÈRE le token gateway dans openclaw.json → désynchronise
+#     le service en cours et casse l'auth (CLI + Control UI). Le wrapper charge le
+#     token depuis gateway.systemd.env avant d'appeler le vrai binaire.
 if [[ -x "$OPENCLAW_BIN" && "$OPENCLAW_BIN" != "${HOME}/.local/bin/openclaw" ]]; then
-  ln -sf "$OPENCLAW_BIN" "${HOME}/.local/bin/openclaw"
-  info "openclaw lié dans ${HOME}/.local/bin (→ ${OPENCLAW_BIN})"
+  cat > "${HOME}/.local/bin/openclaw" <<WRAP
+#!/usr/bin/env bash
+# Généré par Secretarius install.sh — ne pas éditer.
+_envf="\${HOME}/.openclaw/gateway.systemd.env"
+if [[ -f "\$_envf" ]]; then
+  _t=\$(grep '^OPENCLAW_GATEWAY_TOKEN=' "\$_envf" | cut -d= -f2-)
+  [[ -n "\$_t" ]] && export OPENCLAW_GATEWAY_TOKEN="\$_t"
+fi
+exec "${OPENCLAW_BIN}" "\$@"
+WRAP
+  chmod +x "${HOME}/.local/bin/openclaw"
+  info "wrapper openclaw installé dans ${HOME}/.local/bin (→ ${OPENCLAW_BIN}, token chargé)"
 fi
 
 # Service Wiki_LM Query Server (Flask :5051, pour le template de requête Obsidian).

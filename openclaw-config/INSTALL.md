@@ -172,6 +172,15 @@ grep '^OPENCLAW_GATEWAY_TOKEN=' ~/.openclaw/gateway.systemd.env
 > **Piège --force** : `install.sh --force` régénère `openclaw.json` avec `plugins.entries:{}`,
 > ce qui efface l'entrée du plugin. Après chaque `--force`, ré-activer le plugin dans l'UI.
 
+> **Piège token gateway** : le gateway (systemd) s'authentifie via `OPENCLAW_GATEWAY_TOKEN`
+> (env), mais le CLI et la Control UI lisent `gateway.auth.token` / `gateway.remote.token`
+> dans `openclaw.json`. **Toute commande `openclaw` lancée sans `OPENCLAW_GATEWAY_TOKEN`
+> dans l'environnement régénère un token aléatoire dans `openclaw.json`** et casse l'auth
+> (« unauthorized: gateway token mismatch »). `install.sh` installe un *wrapper*
+> `~/.local/bin/openclaw` qui charge ce token automatiquement — utilisez toujours cette
+> commande (et non le binaire NVM direct). Le jeton à coller dans l'UI :
+> `grep '^OPENCLAW_GATEWAY_TOKEN=' ~/.openclaw/gateway.systemd.env` (mode jeton, mot de passe vide).
+
 ### 3. Credentials Google (gog)
 
 Les credentials vivent dans `~/.openclaw/workspace/.gog-config/gogcli/` :
