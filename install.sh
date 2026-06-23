@@ -272,14 +272,20 @@ if ! grep -q "^TELEGRAM_BOT_TOKEN=.\+" "${OPENCLAW_PATH}/gateway.systemd.env" 2>
   fi
 fi
 
-echo "  2. Démarrer les services :"
+echo "  2. Builder et copier le plugin derisk-deleg :"
+echo "       cd ${SECRETARIUS_ROOT}/derisk-deleg && npm install && npm run build && cd ~"
+echo "       SRC=${SECRETARIUS_ROOT}/derisk-deleg"
+echo "       DST=${OPENCLAW_PATH}/extensions/derisk-deleg"
+echo "       mkdir -p \"\$DST\" && cp -r \"\$SRC/dist\" \"\$SRC/node_modules\" \"\$SRC/openclaw.plugin.json\" \"\$SRC/package.json\" \"\$DST/\""
+echo ""
+echo "  3. Démarrer les services :"
 echo "       cd ${SECRETARIUS_ROOT} && ./start.sh"
 echo ""
-echo "  3. Appairer Telegram (première fois) : envoyer /start au bot, puis :"
+echo "  4. Appairer Telegram (première fois) : envoyer /start au bot, puis :"
 echo "       openclaw pairing approve telegram <CODE>"
 echo "       ./start.sh   # redémarrer pour prendre en compte le pairing"
 echo ""
-echo "  4. Tester Wiki_LM :"
+echo "  5. Tester Wiki_LM :"
 echo "       cd ${WIKI_LM_PATH} && .venv/bin/python -m pytest tests/"
 
 # Si docker inaccessible, rappeler la correction avant Milvus

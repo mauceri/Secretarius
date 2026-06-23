@@ -99,9 +99,14 @@ GOG_ACCOUNT=<adresse gmail>
 
 > Si `~/.config/secrets.env` est en place et sourcé par `.bashrc`, `install.sh` l'a déjà lu — vérifier simplement que les valeurs sont correctes.
 
-**5. Copier le plugin derisk-deleg** (`openclaw plugins install .` échoue avec NVM) :
+**5. Builder et copier le plugin derisk-deleg** (`openclaw plugins install .` échoue avec NVM) :
 
 ```bash
+cd ~/Secretarius/derisk-deleg
+npm install
+npm run build
+cd ~
+
 SRC=~/Secretarius/derisk-deleg
 DST=~/.openclaw/extensions/derisk-deleg
 mkdir -p "$DST" && cp -r "$SRC/dist" "$SRC/node_modules" "$SRC/openclaw.plugin.json" "$SRC/package.json" "$DST/"
