@@ -84,19 +84,24 @@ if ! command -v openclaw &>/dev/null; then
   [[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh" 2>/dev/null || true
 fi
 
-if command -v openclaw &>/dev/null; then
-  info "openclaw $(openclaw --version 2>/dev/null | head -1 || echo '?') ✓"
+# Tester openclaw avec un timeout : un binaire résiduel (paquet npm désinstallé)
+# reste dans le PATH mais part en boucle sur --version → l'install se figeait.
+_oc_ver="$(timeout 15 openclaw --version 2>/dev/null | head -1 || true)"
+if [[ -n "$_oc_ver" ]]; then
+  info "openclaw ${_oc_ver} ✓"
 else
-  error "openclaw requis — installer Node.js 22+ via NVM puis openclaw :"
+  error "openclaw absent ou non fonctionnel — (ré)installer :"
   echo ""
-  echo "    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash"
-  echo "    source ~/.bashrc"
-  echo "    nvm install 22 && nvm use 22"
   echo "    npm install -g openclaw"
   echo ""
-  echo "Puis relancer : ./install.sh"
+  echo "  (si npm/node absents : installer Node.js 22+ via NVM d'abord :"
+  echo "    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash"
+  echo "    source ~/.bashrc && nvm install 22 && nvm use 22)"
+  echo ""
+  echo "Puis relancer : ./install.sh --env-file ~/.config/secrets.env"
   exit 1
 fi
+unset _oc_ver
 
 # Mode interactif
 if [[ "$INTERACTIVE" == true ]]; then
