@@ -18,12 +18,16 @@ python3 --version
 
 ### openclaw
 
-openclaw **doit être installé avant** de lancer `install.sh`, via l'installeur CLI (sans onboarding) :
+openclaw **doit être installé avant** de lancer `install.sh`, dans votre Node (NVM) :
 
 ```bash
-curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install-cli.sh | bash
+npm install -g openclaw
 openclaw --version
 ```
+
+> **Ne pas utiliser l'installeur `curl … install-cli.sh`** : il installe openclaw
+> dans `~/.openclaw` (son Node user-space), or `~/.openclaw` est le répertoire de
+> config de Secretarius → l'uninstall supprimerait openclaw, et la détection échoue.
 
 `install.sh` détecte le binaire automatiquement (PATH, versions NVM, ou prefix npm global).
 

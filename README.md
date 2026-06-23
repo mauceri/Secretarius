@@ -51,8 +51,10 @@ Plugin derisk-deleg : fournit gog_* et wiki_* aux agents ; intercepte /confirm e
 
 ## Prérequis
 
-- openclaw (CLI seul, sans onboarding) :
-  `curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install-cli.sh | bash`
+- openclaw, installé dans votre Node (NVM) avec `npm install -g openclaw`.
+  **Ne pas utiliser l'installeur `curl … install-cli.sh`** : il place openclaw dans
+  `~/.openclaw`, qui est le répertoire de config de Secretarius → l'uninstall
+  supprimerait openclaw avec.
 - Docker 24+
 - Python 3.10+ (pour Wiki_LM)
 - `envsubst` : `apt install gettext`

@@ -80,8 +80,9 @@ if [[ -z "$OPENCLAW_BIN" ]]; then
 fi
 OPENCLAW_BIN="${OPENCLAW_BIN:-/usr/bin/openclaw}"
 if [[ ! -x "$OPENCLAW_BIN" ]]; then
-  warn "openclaw introuvable. Installer le CLI (sans onboarding) :"
-  echo "    curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install-cli.sh | bash"
+  warn "openclaw introuvable. Installer dans votre Node (NVM) :"
+  echo "    npm install -g openclaw"
+  warn "(NE PAS utiliser install-cli.sh : openclaw irait dans ~/.openclaw, collision.)"
   warn "puis relancer ce script."
   exit 1
 fi
