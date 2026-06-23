@@ -98,10 +98,13 @@ for svc in openclaw-gateway openclaw-scout; do
 done
 systemctl --user daemon-reload 2>/dev/null || true
 
-# scout-watcher
-for bin in scout-watcher; do
+# Binaires/wrappers déposés dans ~/.local/bin par install.sh.
+# IMPORTANT : retirer le wrapper openclaw, sinon il survit à la désinstallation et
+# peut pointer vers une version de node où openclaw n'est plus installé →
+# "openclaw absent ou non fonctionnel" à la réinstallation.
+for bin in scout-watcher openclaw switch-model; do
   TARGET="$HOME/.local/bin/$bin"
-  if [[ -f "$TARGET" ]]; then
+  if [[ -e "$TARGET" ]]; then
     rm -f "$TARGET"
     info "$bin supprimé"
   else
