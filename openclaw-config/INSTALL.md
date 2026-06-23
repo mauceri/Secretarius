@@ -159,7 +159,7 @@ mkdir -p "$DST"
 cp -r "$SRC/dist" "$SRC/node_modules" "$SRC/openclaw.plugin.json" "$SRC/package.json" "$DST/"
 ```
 
-Puis dans l'UI gateway (`http://localhost:18789`) :
+Puis dans la Control UI — obtenir l'URL (jeton inclus) avec `openclaw dashboard --no-open`, et l'ouvrir depuis un poste ayant accès réseau (direct, Tailscale ou tunnel SSH si headless) :
 - Aller dans **Plugins** → activer `derisk-deleg`
 - Cocher **Hooks → allowConversationAccess**
 - Redémarrer le gateway : `systemctl --user restart openclaw-gateway`

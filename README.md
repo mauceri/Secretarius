@@ -116,8 +116,13 @@ mkdir -p "$DST" && cp -r "$SRC/dist" "$SRC/node_modules" "$SRC/openclaw.plugin.j
 systemctl --user start openclaw-gateway
 ```
 
-**8. Activer le plugin** dans l'UI (`http://localhost:18789`) :
-→ Plugins → activer `derisk-deleg` → cocher `hooks: allowConversationAccess` → Restart
+**8. Activer le plugin** dans la Control UI. Obtenir l'URL (avec jeton intégré) :
+
+```bash
+openclaw dashboard --no-open
+```
+
+Ouvrir cette URL depuis un poste ayant accès réseau à la machine — directement si poste de bureau, via Tailscale (`https://<host>.<tailnet>.ts.net`) ou tunnel SSH si la machine est headless. Puis : → Plugins → activer `derisk-deleg` → cocher `hooks: allowConversationAccess` → Restart.
 
 **9. Appairer Telegram** : envoyer `/start` au bot, puis :
 
