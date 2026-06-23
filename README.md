@@ -198,12 +198,20 @@ L'agent gog s'authentifie via des identifiants stockés dans `~/.openclaw/worksp
 
 Ces fichiers **ne sont pas versionnés** et sont perdus si `~/.openclaw` est supprimé (désinstallation).
 
-**Si vous disposez déjà d'un `.gog-config` fonctionnel** (autre machine, sauvegarde), copiez-le — c'est bien plus simple que de refaire le flux OAuth :
+**Si vous disposez déjà d'un `.gog-config` fonctionnel**, copiez-le — c'est bien plus simple que de refaire le flux OAuth. Sur une installation Secretarius existante, il se trouve **au même chemin** : `~/.openclaw/workspace/.gog-config/`. (Note : `~/.openclaw` n'étant lisible que par son propriétaire, copiez-le pendant que l'instance source est installée, ou depuis une sauvegarde que vous en avez faite.)
 
 ```bash
-# Depuis la source vers la cible (le point final copie aussi les fichiers cachés)
-scp -r <source>/.gog-config/. <utilisateur>@<cible>:~/.openclaw/workspace/.gog-config/
+# Depuis une machine source vers la cible (le point final copie aussi les fichiers cachés) :
+scp -r <utilisateur>@<machine-source>:~/.openclaw/workspace/.gog-config/. \
+       ~/.openclaw/workspace/.gog-config/
+
+# Ou, si la sauvegarde est locale (ex. ~/gog-config-backup) :
+mkdir -p ~/.openclaw/workspace/.gog-config
+cp -a ~/gog-config-backup/. ~/.openclaw/workspace/.gog-config/
 ```
+
+> **Conseil** : avant toute désinstallation, sauvegardez ce répertoire hors de `~/.openclaw` :
+> `cp -a ~/.openclaw/workspace/.gog-config ~/gog-config-backup`
 
 La cible doit contenir exactement l'arborescence ci-dessus. Aucun redémarrage du gateway n'est nécessaire (le conteneur gog monte ce répertoire à chaque exécution).
 
