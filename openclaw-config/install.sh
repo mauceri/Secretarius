@@ -59,6 +59,13 @@ fi
 
 # Détecter le binaire openclaw (PATH, versions NVM, npm global)
 OPENCLAW_BIN=$(command -v openclaw 2>/dev/null || true)
+# Ignorer notre propre lien ~/.local/bin/openclaw : on doit résoudre le binaire
+# RÉEL (NVM). Sinon, si ce lien est en tête du PATH, le symlink créé plus bas
+# pointerait vers lui-même → "Too many levels of symbolic links".
+# (Couvre aussi le cas où ce lien est déjà cassé : -x échoue → on re-détecte.)
+if [[ "$OPENCLAW_BIN" == "${HOME}/.local/bin/openclaw" || ! -x "$OPENCLAW_BIN" ]]; then
+  OPENCLAW_BIN=""
+fi
 # Fallback : sourcer nvm.sh ne met pas toujours node dans le PATH (pas de nvm use) —
 # chercher directement dans les versions NVM installées (la plus récente).
 if [[ -z "$OPENCLAW_BIN" ]]; then
@@ -230,7 +237,7 @@ info "switch-model installé dans ${HOME}/.local/bin"
 # d'où "openclaw: command not found" pour pairing/dashboard. ~/.local/bin est
 # dans le PATH par défaut (Ubuntu, via ~/.profile) → openclaw devient accessible
 # partout sans sourcer NVM. Le shebang du binaire pointe son propre node.
-if [[ -x "$OPENCLAW_BIN" ]]; then
+if [[ -x "$OPENCLAW_BIN" && "$OPENCLAW_BIN" != "${HOME}/.local/bin/openclaw" ]]; then
   ln -sf "$OPENCLAW_BIN" "${HOME}/.local/bin/openclaw"
   info "openclaw lié dans ${HOME}/.local/bin (→ ${OPENCLAW_BIN})"
 fi
