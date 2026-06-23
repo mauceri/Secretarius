@@ -103,7 +103,7 @@ if [[ "$INTERACTIVE" == true ]]; then
   echo "=== Installation Secretarius ==="
   read -rp "Coffre Obsidian [${OBSIDIAN_PATH}]: " v; OBSIDIAN_PATH="${v:-$OBSIDIAN_PATH}"
   read -rp "Nom de l'assistant [${ASSISTANT_NAME}]: " v; ASSISTANT_NAME="${v:-$ASSISTANT_NAME}"
-  read -rp "LLM (deepseek|ollama|claude) [${LLM_BACKEND}]: " v; LLM_BACKEND="${v:-$LLM_BACKEND}"
+  read -rp "LLM (euria|deepseek|ollama|claude) [${LLM_BACKEND}]: " v; LLM_BACKEND="${v:-$LLM_BACKEND}"
   read -rp "Config OpenClaw [${OPENCLAW_PATH}]: " v; OPENCLAW_PATH="${v:-$OPENCLAW_PATH}"
 fi
 
@@ -161,7 +161,7 @@ if [[ ! -f "$WIKI_ENV" || "$FORCE" == "true" ]]; then
   cp "$WIKI_ENV_TEMPLATE" "$WIKI_ENV"
   sed -i "s|^WIKI_PATH=.*|WIKI_PATH=${WIKI_PATH}|" "$WIKI_ENV"
   case "$LLM_BACKEND" in
-    deepseek) sed -i "s|^WIKI_LLM_BACKEND=.*|WIKI_LLM_BACKEND=openai|" "$WIKI_ENV" ;;
+    euria|deepseek) sed -i "s|^WIKI_LLM_BACKEND=.*|WIKI_LLM_BACKEND=openai|" "$WIKI_ENV" ;;
     ollama)
       sed -i "s|^WIKI_LLM_BACKEND=.*|WIKI_LLM_BACKEND=ollama|" "$WIKI_ENV"
       sed -i "s|^OPENAI_BASE_URL=.*|# OPENAI_BASE_URL=https://api.deepseek.com/v1|" "$WIKI_ENV"
@@ -207,30 +207,14 @@ fi
 SYSTEMD_OK=false
 if systemctl --user daemon-reload &>/dev/null 2>&1 && command -v openclaw &>/dev/null; then
   systemctl --user daemon-reload
-  systemctl --user enable openclaw-gateway.service openclaw-scout.service 2>/dev/null || true
+  systemctl --user enable openclaw-gateway.service 2>/dev/null || true
   SYSTEMD_OK=true
   # Démarrer seulement si les secrets sont renseignés
   if grep -q "^TELEGRAM_BOT_TOKEN=.\+" "${OPENCLAW_PATH}/gateway.systemd.env" 2>/dev/null; then
-    systemctl --user restart openclaw-gateway.service openclaw-scout.service
-    info "Services OpenClaw démarrés ✓"
-    # Étape 1 : openclaw plugins install déploie les fichiers JS dans extensions/
-    # et écrit plugins.installs dans openclaw.json. Cela déclenche un
-    # "supervisor restart" (exit 0) — le gateway s'arrête, Restart=on-failure
-    # ne le relance pas. C'est attendu.
-    sleep 5
-    ADAPTER_SRC="${SECRETARIUS_ROOT}/openclaw-config/openclaw-mcp-adapter"
-    info "Installation de openclaw-mcp-adapter..."
-    openclaw plugins install --force "${ADAPTER_SRC}" 2>&1 | grep -E "(Installed|failed|WARN|warn)" || true
-    info "openclaw-mcp-adapter installé ✓"
-    # Étape 2 : re-synchroniser .bak (plugins.installs vient d'être mis à jour
-    # par openclaw plugins install ; sans sync, le prochain démarrage détecte
-    # une divergence et restaure silencieusement l'ancienne config).
-    cp "${OPENCLAW_PATH}/openclaw.json" "${OPENCLAW_PATH}/openclaw.json.bak" 2>/dev/null || true
-    # Étape 3 : redémarrer le gateway avec les nouveaux fichiers JS déployés.
-    systemctl --user restart openclaw-gateway.service openclaw-scout.service
-    info "Gateway redémarré avec l'adaptateur MCP à jour ✓"
+    systemctl --user restart openclaw-gateway.service
+    info "openclaw-gateway démarré ✓"
   else
-    info "Services OpenClaw activés (démarreront après renseignement des secrets)"
+    info "openclaw-gateway activé (démarrera après renseignement des secrets)"
   fi
 fi
 
@@ -253,7 +237,9 @@ if ! grep -q "^TELEGRAM_BOT_TOKEN=.\+" "${OPENCLAW_PATH}/gateway.systemd.env" 2>
   echo "  1. Renseigner les secrets dans ${OPENCLAW_PATH}/gateway.systemd.env :"
   echo ""
   echo "       TELEGRAM_BOT_TOKEN=<token BotFather>"
-  echo "       DEEPSEEK_API_KEY=<clé API DeepSeek>"
+  echo "       EURIA_API_KEY=<clé API Euria/Infomaniak — 80 chars>"
+  echo "       EURIA_PRODUCT_ID=<identifiant produit Infomaniak>"
+  echo "       DEEPSEEK_API_KEY=<clé API DeepSeek — agent scout uniquement>"
   echo "       GATEWAY_PASSWORD=<mot de passe optionnel pour l'interface web>"
   echo ""
   echo "       (OPENCLAW_GATEWAY_TOKEN est généré automatiquement)"
@@ -261,8 +247,8 @@ if ! grep -q "^TELEGRAM_BOT_TOKEN=.\+" "${OPENCLAW_PATH}/gateway.systemd.env" 2>
   echo "       nano ${OPENCLAW_PATH}/gateway.systemd.env"
   echo ""
   if [[ "$SYSTEMD_OK" == true ]]; then
-    echo "       Puis démarrer les services :"
-    echo "       systemctl --user start openclaw-gateway.service openclaw-scout.service"
+    echo "       Puis démarrer le gateway :"
+    echo "       systemctl --user start openclaw-gateway.service"
     echo ""
   fi
 fi
