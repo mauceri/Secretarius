@@ -81,7 +81,7 @@ type Pending =
 let pending: Pending | null = null;
 
 const AUTH_TTL_MS = 10 * 60 * 1000;
-const GOG_CFG = `${process.env.HOME}/.openclaw-slm/workspace/.gog-config`;
+const GOG_CFG = `${process.env.HOME}/.openclaw/workspace/.gog-config`;
 let pendingAuth: { ts: number } | null = null;
 
 export default definePluginEntry({
