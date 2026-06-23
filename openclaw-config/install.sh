@@ -226,6 +226,15 @@ cp "${SCRIPT_DIR}/switch-model" "$SWITCH_MODEL_TARGET"
 chmod +x "$SWITCH_MODEL_TARGET"
 info "switch-model installé dans ${HOME}/.local/bin"
 
+# Lien openclaw dans ~/.local/bin : NVM n'est pas chargé dans les sessions SSH,
+# d'où "openclaw: command not found" pour pairing/dashboard. ~/.local/bin est
+# dans le PATH par défaut (Ubuntu, via ~/.profile) → openclaw devient accessible
+# partout sans sourcer NVM. Le shebang du binaire pointe son propre node.
+if [[ -x "$OPENCLAW_BIN" ]]; then
+  ln -sf "$OPENCLAW_BIN" "${HOME}/.local/bin/openclaw"
+  info "openclaw lié dans ${HOME}/.local/bin (→ ${OPENCLAW_BIN})"
+fi
+
 # Service Wiki_LM Query Server (Flask :5051, pour le template de requête Obsidian).
 # Installé quel que soit le profil ; activé seulement si le venv et server.py existent.
 WIKI_SERVER_DST="${SYSTEMD_USER_DIR}/wiki-lm-server.service"

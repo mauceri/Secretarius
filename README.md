@@ -119,11 +119,14 @@ systemctl --user start openclaw-gateway
 **8. Activer le plugin** dans l'UI (`http://localhost:18789`) :
 → Plugins → activer `derisk-deleg` → cocher `hooks: allowConversationAccess` → Restart
 
+**9. Appairer Telegram** : envoyer `/start` au bot, puis :
+
 ```bash
-# 8. Appairer Telegram : envoyer /start au bot, puis
 openclaw pairing approve telegram <CODE>
 systemctl --user restart openclaw-gateway
 ```
+
+> `install.sh` crée un lien `~/.local/bin/openclaw` : la commande `openclaw` est utilisable dans toute session, sans avoir à charger NVM. Pour ouvrir le tableau de bord avec le bon jeton : `openclaw dashboard --no-open`.
 
 ---
 
