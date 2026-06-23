@@ -160,7 +160,18 @@ openclaw pairing approve telegram <CODE>
 ./start.sh
 ```
 
-**10. Tester**
+**10. Identifiants Google (gog)**
+
+Pour que `/inbox` et l'envoi de mail fonctionnent, l'agent gog doit être authentifié. **Si gog est déjà installé et autorisé sur une autre machine Secretarius, ses identifiants sont directement réutilisables** (même chemin, refresh token inclus) — copiez-les vers cette machine :
+
+```bash
+scp -r <utilisateur>@<machine-source>:~/.openclaw/workspace/.gog-config/. \
+       ~/.openclaw/workspace/.gog-config/
+```
+
+Sinon (première authentification depuis zéro), voir la section [Identifiants Google (gog)](#identifiants-google-gog) plus bas.
+
+**11. Tester**
 
 Sur Telegram : `/inbox`, puis un envoi de mail suivi de `/confirm`.
 
