@@ -18,10 +18,10 @@ python3 --version
 
 ### openclaw
 
-openclaw **doit être installé avant** de lancer `install.sh`, via l'installeur officiel (qui installe aussi Node) :
+openclaw **doit être installé avant** de lancer `install.sh`, via l'installeur CLI (sans onboarding) :
 
 ```bash
-curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install.sh | bash
+curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install-cli.sh | bash
 openclaw --version
 ```
 

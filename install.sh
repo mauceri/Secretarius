@@ -90,9 +90,9 @@ _oc_ver="$(timeout 15 openclaw --version 2>/dev/null | head -1 || true)"
 if [[ -n "$_oc_ver" ]]; then
   info "openclaw ${_oc_ver} ✓"
 else
-  error "openclaw absent ou non fonctionnel — (ré)installer (installeur officiel) :"
+  error "openclaw absent ou non fonctionnel — (ré)installer le CLI (sans onboarding) :"
   echo ""
-  echo "    curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install.sh | bash"
+  echo "    curl -fsSL --proto '=https' --tlsv1.2 https://openclaw.ai/install-cli.sh | bash"
   echo ""
   echo "Puis relancer : ./install.sh --env-file ~/.config/secrets.env"
   exit 1
