@@ -73,7 +73,16 @@ git clone https://github.com/mauceri/Secretarius
 cd Secretarius
 ```
 
-**2. Builder les images Docker** :
+**2. Copier `gog-bin`** (binaire CLI Google, non versionné) :
+
+```bash
+# Depuis la machine source (sanroque) :
+scp ~/Secretarius/gog-bin claw@santiago:~/Secretarius/
+# Ou depuis santiago si sanroque est accessible :
+# scp mauceric@sanroque:~/Secretarius/gog-bin ~/Secretarius/
+```
+
+**3. Builder les images Docker** :
 
 ```bash
 docker build -f openclaw-config/Dockerfile.tiron -t secretarius-tiron:latest .
@@ -81,13 +90,13 @@ docker build -f openclaw-config/Dockerfile.wiki  -t secretarius-wiki:latest  .
 docker build -f openclaw-config/Dockerfile.gog   -t secretarius-gog:latest   .
 ```
 
-**3. Installer** :
+**4. Installer** :
 
 ```bash
 cd openclaw-config && bash install.sh
 ```
 
-**4. Renseigner les secrets** dans `~/.openclaw/gateway.systemd.env` :
+**5. Renseigner les secrets** dans `~/.openclaw/gateway.systemd.env` :
 
 ```
 TELEGRAM_BOT_TOKEN=<token BotFather>
@@ -99,7 +108,7 @@ GOG_ACCOUNT=<adresse gmail>
 
 > Si `~/.config/secrets.env` est en place et sourcé par `.bashrc`, `install.sh` l'a déjà lu — vérifier simplement que les valeurs sont correctes.
 
-**5. Copier le plugin derisk-deleg** (`openclaw plugins install .` échoue avec NVM) :
+**6. Copier le plugin derisk-deleg** (`openclaw plugins install .` échoue avec NVM) :
 
 ```bash
 SRC=~/Secretarius/derisk-deleg
@@ -107,13 +116,13 @@ DST=~/.openclaw/extensions/derisk-deleg
 mkdir -p "$DST" && cp -r "$SRC/dist" "$SRC/node_modules" "$SRC/openclaw.plugin.json" "$SRC/package.json" "$DST/"
 ```
 
-**6. Démarrer le gateway** :
+**7. Démarrer le gateway** :
 
 ```bash
 systemctl --user start openclaw-gateway
 ```
 
-**7. Activer le plugin** dans l'UI (`http://localhost:18789`) :
+**8. Activer le plugin** dans l'UI (`http://localhost:18789`) :
 → Plugins → activer `derisk-deleg` → cocher `hooks: allowConversationAccess` → Restart
 
 ```bash
