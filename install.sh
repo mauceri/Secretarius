@@ -133,14 +133,21 @@ else
 fi
 
 # Étape 2 — Coffre Obsidian
-info "Validation du coffre Obsidian: ${OBSIDIAN_PATH}"
 OBSIDIAN_PATH="${OBSIDIAN_PATH/#\~/$HOME}"
+info "Validation du coffre Obsidian : ${OBSIDIAN_PATH}"
 if [[ ! -d "$OBSIDIAN_PATH" ]]; then
-  read -rp "Répertoire absent. Créer ? [y/N] " c
-  [[ "$c" =~ ^[Yy] ]] && mkdir -p "$OBSIDIAN_PATH" && info "Créé: $OBSIDIAN_PATH" \
-    || { error "Coffre Obsidian requis. Annulation."; exit 1; }
+  warn "Répertoire absent : ${OBSIDIAN_PATH}"
+  read -rp "Créer le répertoire ? [y/N] " _c || true
+  if [[ "$_c" =~ ^[Yy] ]]; then
+    mkdir -p "$OBSIDIAN_PATH"
+    info "Créé : ${OBSIDIAN_PATH}"
+  else
+    error "Coffre Obsidian requis. Utilisez --obsidian-path PATH pour spécifier un autre chemin."
+    exit 1
+  fi
+  unset _c
 fi
-info "Coffre Obsidian ✓"
+info "Coffre Obsidian ✓ (${OBSIDIAN_PATH})"
 
 # Étape 3 — Config OpenClaw
 info "Génération de la configuration OpenClaw..."
