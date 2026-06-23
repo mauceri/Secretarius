@@ -83,7 +83,13 @@ docker build -f openclaw-config/Dockerfile.gog   -t secretarius-gog:latest   .
 # 4. Installer
 cd openclaw-config && bash install.sh
 
-# 5. Installer le plugin derisk-deleg (copie manuelle si NVM — voir INSTALL.md §2)
+# 5. Installer le plugin derisk-deleg
+#    (openclaw plugins install . échoue avec NVM — copie manuelle requise)
+SRC=~/Secretarius/derisk-deleg
+DST=~/.openclaw/extensions/derisk-deleg
+mkdir -p "$DST" && cp -r "$SRC/dist" "$SRC/node_modules" "$SRC/openclaw.plugin.json" "$SRC/package.json" "$DST/"
+#    Puis dans l'UI gateway (http://localhost:18789) :
+#      → Plugins → activer derisk-deleg → cocher hooks:allowConversationAccess → Restart
 
 # 6. Démarrer
 systemctl --user start openclaw-gateway
