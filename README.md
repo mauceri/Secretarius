@@ -66,17 +66,24 @@ Plugin derisk-deleg : fournit gog_* et wiki_* aux agents ; intercepte /confirm e
 
 Voir `openclaw-config/INSTALL.md` pour la procédure complète. En résumé :
 
+**1. Cloner** :
+
 ```bash
-# 1. Cloner
 git clone https://github.com/mauceri/Secretarius
 cd Secretarius
+```
 
-# 2. Builder les images Docker
+**2. Builder les images Docker** :
+
+```bash
 docker build -f openclaw-config/Dockerfile.tiron -t secretarius-tiron:latest .
 docker build -f openclaw-config/Dockerfile.wiki  -t secretarius-wiki:latest  .
 docker build -f openclaw-config/Dockerfile.gog   -t secretarius-gog:latest   .
+```
 
-# 3. Installer
+**3. Installer** :
+
+```bash
 cd openclaw-config && bash install.sh
 ```
 
