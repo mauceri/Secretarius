@@ -63,20 +63,36 @@ Plugin derisk-deleg : fournit gog_* et wiki_* aux agents ; intercepte /confirm e
 
 ---
 
-## Installation rapide
+## Installation
 
-Voir `openclaw-config/INSTALL.md` pour la procédure complète. En résumé :
+Procédure complète pour une première installation. Chaque étape indique le résultat attendu. (Pour mettre à jour une installation existante, voir « Mise à jour ».)
 
-**1. Cloner** :
+**1. Cloner le dépôt**
 
 ```bash
 git clone https://github.com/mauceri/Secretarius
 cd Secretarius
 ```
 
-**2. Installer `gog-bin`** : télécharger le binaire Linux de [gogcli](https://github.com/openclaw/gogcli/releases), le renommer `gog-bin` et le placer à la racine du dépôt (ou le copier via `scp` depuis une machine déjà configurée).
+**2. Installer `gog-bin`**
 
-**3. Builder les images Docker** :
+Télécharger le binaire Linux de [gogcli](https://github.com/openclaw/gogcli/releases), le renommer `gog-bin`, le placer à la racine du dépôt (ou le copier via `scp` depuis une machine déjà configurée) :
+
+```bash
+ls -l gog-bin        # le fichier doit exister
+```
+
+**3. Créer le fichier de secrets** `~/.config/secrets.env`
+
+```
+TELEGRAM_BOT_TOKEN=<token BotFather>
+EURIA_API_KEY=<clé Euria, 80 caractères>
+EURIA_PRODUCT_ID=<identifiant produit Infomaniak>
+DEEPSEEK_API_KEY=<clé DeepSeek — agent scout>
+GOG_ACCOUNT=<adresse gmail>
+```
+
+**4. Construire les images Docker**
 
 ```bash
 docker build -f openclaw-config/Dockerfile.tiron -t secretarius-tiron:latest .
@@ -84,54 +100,77 @@ docker build -f openclaw-config/Dockerfile.wiki  -t secretarius-wiki:latest  .
 docker build -f openclaw-config/Dockerfile.gog   -t secretarius-gog:latest   .
 ```
 
-**4. Installer** :
+→ attendu : `naming to ... secretarius-*:latest` pour chacune.
+
+**5. Lancer l'installation**
 
 ```bash
-cd openclaw-config && bash install.sh
+./install.sh --env-file ~/.config/secrets.env
 ```
 
-**5. Renseigner les secrets** dans `~/.openclaw/gateway.systemd.env` :
+Répondre aux 4 questions (coffre Obsidian, nom de l'assistant, LLM, chemin OpenClaw). `install.sh` génère `~/.openclaw`, écrit un jeton de gateway cohérent, installe la commande `openclaw`, puis démarre le gateway.
 
-```
-TELEGRAM_BOT_TOKEN=<token BotFather>
-EURIA_API_KEY=<clé Euria 80 chars>
-EURIA_PRODUCT_ID=<identifiant produit Infomaniak>
-DEEPSEEK_API_KEY=<clé DeepSeek — agent scout uniquement>
-GOG_ACCOUNT=<adresse gmail>
-```
+→ attendu : `Installation terminée` et `token gateway réconcilié`.
 
-> Si `~/.config/secrets.env` est en place et sourcé par `.bashrc`, `install.sh` l'a déjà lu — vérifier simplement que les valeurs sont correctes.
+**6. Copier le plugin derisk-deleg**
 
-**6. Copier le plugin derisk-deleg** (`openclaw plugins install .` échoue avec NVM) :
+`openclaw plugins install .` échoue avec NVM ; on copie les fichiers (déjà construits dans le dépôt) :
 
 ```bash
 SRC=~/Secretarius/derisk-deleg
 DST=~/.openclaw/extensions/derisk-deleg
-mkdir -p "$DST" && cp -r "$SRC/dist" "$SRC/node_modules" "$SRC/openclaw.plugin.json" "$SRC/package.json" "$DST/"
+mkdir -p "$DST"
+cp -r "$SRC/dist" "$SRC/node_modules" "$SRC/openclaw.plugin.json" "$SRC/package.json" "$DST/"
 ```
 
-**7. Démarrer le gateway** :
+**7. Redémarrer pour charger le plugin**
 
 ```bash
-systemctl --user start openclaw-gateway
+./start.sh
 ```
 
-**8. Activer le plugin** dans la Control UI. Récupérer le jeton du gateway :
+→ attendu : `openclaw-gateway démarré`.
+
+**8. Activer le plugin dans l'interface web**
+
+Afficher le jeton de connexion :
 
 ```bash
 grep '^OPENCLAW_GATEWAY_TOKEN=' ~/.openclaw/gateway.systemd.env
 ```
 
-Ouvrir la Control UI depuis un poste ayant accès réseau à la machine (direct si poste de bureau, via Tailscale `https://<host>.<tailnet>.ts.net` ou tunnel SSH si headless). Mode **jeton** : coller la valeur de `OPENCLAW_GATEWAY_TOKEN`, **laisser le mot de passe vide**. Puis : → Plugins → activer `derisk-deleg` → cocher `hooks: allowConversationAccess` → Restart.
+Ouvrir l'interface depuis un poste ayant accès réseau à la machine — directement (poste de bureau), via Tailscale (`https://<hôte>.<tailnet>.ts.net`) ou par tunnel SSH si la machine est sans écran. Mode **jeton** : coller la valeur affichée, **laisser le champ mot de passe vide**, Connecter.
 
-**9. Appairer Telegram** : envoyer `/start` au bot, puis :
+Puis dans l'interface : **Plugins** → activer `derisk-deleg` → cocher `allowConversationAccess` → **Restart**.
+
+**9. Appairer Telegram**
+
+Envoyer `/start` au bot, puis :
 
 ```bash
 openclaw pairing approve telegram <CODE>
-systemctl --user restart openclaw-gateway
+./start.sh
 ```
 
-> `install.sh` crée un lien `~/.local/bin/openclaw` : la commande `openclaw` est utilisable dans toute session, sans avoir à charger NVM.
+**10. Tester**
+
+Sur Telegram : `/inbox`, puis un envoi de mail suivi de `/confirm`.
+
+---
+
+## Le jeton du gateway (à lire absolument)
+
+Le gateway exige un jeton d'authentification. Trois règles, sinon l'interface web affiche « L'authentification ne correspond pas » :
+
+1. **Le jeton à coller dans l'interface** est toujours celui-ci, et lui seul :
+   ```bash
+   grep '^OPENCLAW_GATEWAY_TOKEN=' ~/.openclaw/gateway.systemd.env
+   ```
+   Mode **jeton**, mot de passe **vide**.
+
+2. **Utilisez toujours la commande `openclaw` telle quelle.** `install.sh` en fait un script (`~/.local/bin/openclaw`) qui charge ce jeton automatiquement. **Ne lancez jamais le binaire par son chemin complet** (`~/.nvm/.../openclaw`) : lancé sans son jeton, il en réécrit un nouveau, aléatoire, dans `openclaw.json`, et l'authentification cesse de fonctionner.
+
+3. Si l'authentification a déjà été cassée (jeton réécrit), il suffit de relancer `./install.sh --env-file ~/.config/secrets.env` puis `./start.sh` : l'installation réaligne le jeton partout.
 
 ---
 

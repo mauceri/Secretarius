@@ -125,10 +125,12 @@ if [[ "$INTERACTIVE" == true ]]; then
   unset v
 fi
 
-# Charger les secrets
+# Charger les secrets — set -a pour EXPORTER toutes les variables du fichier
+# (sinon EURIA_API_KEY, EURIA_PRODUCT_ID, GOG_ACCOUNT ne sont pas transmis au
+# sous-script openclaw-config/install.sh, et l'agent wiki/gog échoue).
 if [[ -n "$ENV_FILE" ]]; then
   [[ -f "$ENV_FILE" ]] || { error "Fichier introuvable: $ENV_FILE"; exit 1; }
-  source "$ENV_FILE"
+  set -a; source "$ENV_FILE"; set +a
 fi
 
 export OBSIDIAN_PATH ASSISTANT_NAME LLM_BACKEND OPENCLAW_PATH FORCE
