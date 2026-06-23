@@ -71,30 +71,42 @@ Voir `openclaw-config/INSTALL.md` pour la procédure complète. En résumé :
 git clone https://github.com/mauceri/Secretarius
 cd Secretarius
 
-# 2. Variables d'environnement (lues automatiquement par install.sh)
-#    Créer ~/.config/secrets.env avec :
-#    TELEGRAM_BOT_TOKEN, EURIA_API_KEY, EURIA_PRODUCT_ID, DEEPSEEK_API_KEY, GOG_ACCOUNT
-
-# 3. Builder les images Docker
+# 2. Builder les images Docker
 docker build -f openclaw-config/Dockerfile.tiron -t secretarius-tiron:latest .
 docker build -f openclaw-config/Dockerfile.wiki  -t secretarius-wiki:latest  .
 docker build -f openclaw-config/Dockerfile.gog   -t secretarius-gog:latest   .
 
-# 4. Installer
+# 3. Installer
 cd openclaw-config && bash install.sh
+```
 
-# 5. Installer le plugin derisk-deleg
-#    (openclaw plugins install . échoue avec NVM — copie manuelle requise)
+**4. Renseigner les secrets** dans `~/.openclaw/gateway.systemd.env` :
+
+```
+TELEGRAM_BOT_TOKEN=<token BotFather>
+EURIA_API_KEY=<clé Euria 80 chars>
+EURIA_PRODUCT_ID=<identifiant produit Infomaniak>
+DEEPSEEK_API_KEY=<clé DeepSeek — agent scout uniquement>
+GOG_ACCOUNT=<adresse gmail>
+```
+
+> Si `~/.config/secrets.env` est en place et sourcé par `.bashrc`, `install.sh` l'a déjà lu — vérifier simplement que les valeurs sont correctes.
+
+```bash
+# 5. Copier le plugin derisk-deleg (openclaw plugins install . échoue avec NVM)
 SRC=~/Secretarius/derisk-deleg
 DST=~/.openclaw/extensions/derisk-deleg
 mkdir -p "$DST" && cp -r "$SRC/dist" "$SRC/node_modules" "$SRC/openclaw.plugin.json" "$SRC/package.json" "$DST/"
-#    Puis dans l'UI gateway (http://localhost:18789) :
-#      → Plugins → activer derisk-deleg → cocher hooks:allowConversationAccess → Restart
 
-# 6. Démarrer
+# 6. Démarrer le gateway
 systemctl --user start openclaw-gateway
+```
 
-# 7. Appairer Telegram
+**7. Activer le plugin** dans l'UI (`http://localhost:18789`) :
+→ Plugins → activer `derisk-deleg` → cocher `hooks: allowConversationAccess` → Restart
+
+```bash
+# 8. Appairer Telegram : envoyer /start au bot, puis
 openclaw pairing approve telegram <CODE>
 systemctl --user restart openclaw-gateway
 ```
