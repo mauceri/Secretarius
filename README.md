@@ -180,6 +180,35 @@ Le gateway exige un jeton d'authentification. Trois règles, sinon l'interface w
 
 ---
 
+## Identifiants Google (gog)
+
+L'agent gog s'authentifie via des identifiants stockés dans `~/.openclaw/workspace/.gog-config/` :
+
+```
+.gog-config/
+├── keyring-password                       # mot de passe du keyring
+└── gogcli/
+    ├── credentials.json                   # OAuth client ID (application Desktop)
+    └── keyring/
+        ├── token:<compte>@gmail.com       # refresh token (l'autorisation effective)
+        └── token:default:<compte>@gmail.com
+```
+
+Ces fichiers **ne sont pas versionnés** et sont perdus si `~/.openclaw` est supprimé (désinstallation).
+
+**Si vous disposez déjà d'un `.gog-config` fonctionnel** (autre machine, sauvegarde), copiez-le — c'est bien plus simple que de refaire le flux OAuth :
+
+```bash
+# Depuis la source vers la cible (le point final copie aussi les fichiers cachés)
+scp -r <source>/.gog-config/. <utilisateur>@<cible>:~/.openclaw/workspace/.gog-config/
+```
+
+La cible doit contenir exactement l'arborescence ci-dessus. Aucun redémarrage du gateway n'est nécessaire (le conteneur gog monte ce répertoire à chaque exécution).
+
+**Sinon (première authentification)** : placer `credentials.json` (OAuth client ID Desktop, depuis Google Cloud Console) dans `~/.openclaw/workspace/.gog-config/gogcli/`, puis lancer le flux d'autorisation gog (ouvre un navigateur pour autoriser le compte).
+
+---
+
 ## Démarrage quotidien
 
 Après une installation réussie, `start.sh` est le point d'entrée unique :
