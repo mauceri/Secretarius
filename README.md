@@ -124,6 +124,19 @@ systemctl --user restart openclaw-gateway
 
 ---
 
+## Démarrage quotidien
+
+Après une installation réussie, `start.sh` est le point d'entrée unique :
+
+```bash
+cd ~/Secretarius
+./start.sh
+```
+
+Il vérifie le binaire openclaw, contrôle que `TELEGRAM_BOT_TOKEN` est renseigné, redémarre `openclaw-gateway` et `wiki-lm-server` (si activé).
+
+---
+
 ## Changer de modèle
 
 L'agent principal (`main`) utilise par défaut `Mistral-Small-4` (Euria). Pour basculer sur un autre modèle :

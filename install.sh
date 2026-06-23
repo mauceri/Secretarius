@@ -272,14 +272,14 @@ if ! grep -q "^TELEGRAM_BOT_TOKEN=.\+" "${OPENCLAW_PATH}/gateway.systemd.env" 2>
   fi
 fi
 
-echo "  2. Appairer Telegram : envoyer /start au bot, puis :"
+echo "  2. Démarrer les services :"
+echo "       cd ${SECRETARIUS_ROOT} && ./start.sh"
+echo ""
+echo "  3. Appairer Telegram (première fois) : envoyer /start au bot, puis :"
 echo "       openclaw pairing approve telegram <CODE>"
-echo "       (la connexion Telegram est interrompue — le gateway restart ci-dessous la rétablit)"
+echo "       ./start.sh   # redémarrer pour prendre en compte le pairing"
 echo ""
-echo "       Puis redémarrer le gateway pour prendre en compte le pairing :"
-echo "       openclaw gateway restart"
-echo ""
-echo "  3. Tester Wiki_LM :"
+echo "  4. Tester Wiki_LM :"
 echo "       cd ${WIKI_LM_PATH} && .venv/bin/python -m pytest tests/"
 
 # Si docker inaccessible, rappeler la correction avant Milvus
