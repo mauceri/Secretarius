@@ -184,6 +184,7 @@ else
   # Variables manquantes = chaîne vide ; on avertit pour les indispensables.
   [[ -z "${TELEGRAM_BOT_TOKEN:-}" ]] && warn "TELEGRAM_BOT_TOKEN non défini — à renseigner dans ${ENV_TARGET} avant de démarrer"
   [[ -z "${EURIA_API_KEY:-}" ]] && warn "EURIA_API_KEY non défini — à renseigner dans ${ENV_TARGET} avant de démarrer"
+  [[ -z "${EURIA_PRODUCT_ID:-}" ]] && warn "EURIA_PRODUCT_ID non défini — l'URL Euria sera invalide (erreur '404 method_not_found' sur tous les appels). À renseigner dans ${ENV_TARGET} (et ~/.config/secrets.env)."
   export TELEGRAM_BOT_TOKEN OPENCLAW_GATEWAY_TOKEN GATEWAY_PASSWORD OPENCLAW_BIN GOG_ACCOUNT EURIA_API_KEY EURIA_PRODUCT_ID DEEPSEEK_API_KEY
   envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD} ${OPENCLAW_BIN} ${HOME} ${GOG_ACCOUNT} ${EURIA_API_KEY} ${EURIA_PRODUCT_ID} ${DEEPSEEK_API_KEY}' \
     < "$_env_tpl" \

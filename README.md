@@ -215,24 +215,32 @@ L'agent gog s'authentifie via des identifiants stockés dans `~/.openclaw/worksp
 
 Ces fichiers **ne sont pas versionnés** et sont perdus si `~/.openclaw` est supprimé (désinstallation).
 
-**Si gog est déjà installé et autorisé sur une autre machine** (une installation Secretarius existante), **ses identifiants sont directement réutilisables** : ils se trouvent **au même chemin**, `~/.openclaw/workspace/.gog-config/`. Copiez ce répertoire vers la nouvelle machine plutôt que de refaire le flux OAuth — le compte Google y est déjà autorisé, le refresh token est inclus. (Note : `~/.openclaw` n'étant lisible que par son propriétaire, copiez-le pendant que l'instance source est installée, ou depuis une sauvegarde que vous en avez faite.)
+### Autoriser le compte (méthode recommandée)
+
+`credentials.json` (OAuth client ID **Desktop**, créé dans Google Cloud Console) doit d'abord être présent dans `~/.openclaw/workspace/.gog-config/gogcli/`. Lancez ensuite l'autorisation **en shell**, via le script fourni — c'est plus fiable que la commande Telegram `/connecter` (qui passe par un pont FIFO fragile) :
 
 ```bash
-# Depuis une machine source vers la cible (le point final copie aussi les fichiers cachés) :
-scp -r <utilisateur>@<machine-source>:~/.openclaw/workspace/.gog-config/. \
-       ~/.openclaw/workspace/.gog-config/
+cd ~/Secretarius
+./gog-connect.sh cmauceri@gmail.com      # ou, si GOG_ACCOUNT est défini : ./gog-connect.sh
+```
 
-# Ou, si la sauvegarde est locale (ex. ~/gog-config-backup) :
+Déroulé : ouvrez l'URL Google affichée, connectez-vous et autorisez (Gmail + Drive + Agenda) ; Google redirige vers une URL `http://localhost:1/…` **qui ne charge pas** (normal) — copiez-la depuis la barre d'adresse et collez-la au prompt. Le token est écrit dans `.gog-config` ; l'agent gog le voit immédiatement (aucun redémarrage).
+
+> **Un token par machine.** `--force-consent` donne à chaque machine son **propre** token. **Ne partagez pas un même `.gog-config` entre plusieurs machines en usage simultané** : Google fait tourner les refresh tokens, et les machines s'invalideraient mutuellement (« token révoqué/expiré »). Ré-autorisez chaque machine avec `./gog-connect.sh`.
+
+### Réutiliser un `.gog-config` (dépannage d'une même machine)
+
+Pour restaurer vite une instance après réinstallation **de la même machine**, le `.gog-config` est au même chemin et peut être recopié :
+
+```bash
+# Avant toute désinstallation, sauvegarder hors de ~/.openclaw :
+cp -a ~/.openclaw/workspace/.gog-config ~/gog-config-backup
+# Après réinstallation, restaurer :
 mkdir -p ~/.openclaw/workspace/.gog-config
 cp -a ~/gog-config-backup/. ~/.openclaw/workspace/.gog-config/
 ```
 
-> **Conseil** : avant toute désinstallation, sauvegardez ce répertoire hors de `~/.openclaw` :
-> `cp -a ~/.openclaw/workspace/.gog-config ~/gog-config-backup`
-
-La cible doit contenir exactement l'arborescence ci-dessus. Aucun redémarrage du gateway n'est nécessaire (le conteneur gog monte ce répertoire à chaque exécution).
-
-**Sinon (première authentification)** : placer `credentials.json` (OAuth client ID Desktop, depuis Google Cloud Console) dans `~/.openclaw/workspace/.gog-config/gogcli/`, puis lancer le flux d'autorisation gog (ouvre un navigateur pour autoriser le compte).
+Aucun redémarrage du gateway n'est nécessaire (le conteneur gog monte ce répertoire à chaque exécution). Pour une **autre** machine, n'utilisez pas la copie : ré-autorisez avec `./gog-connect.sh` (token propre).
 
 ---
 
@@ -294,6 +302,8 @@ bash install.sh
 
 ```
 Secretarius/
+├── install.sh, start.sh                # installation / démarrage (racine)
+├── gog-connect.sh                      # (ré)autorisation Google de l'agent gog (shell)
 ├── openclaw-config/
 │   ├── INSTALL.md                      # Procédure d'installation détaillée
 │   ├── install.sh                      # Génère ~/.openclaw/ via envsubst
