@@ -33,12 +33,23 @@ def main():
     with open(CONFIG) as f:
         config = json.load(f)
 
-    current = config["agents"]["defaults"]["model"]["primary"]
+    # L'agent "main" peut avoir son propre model.primary qui prime sur defaults
+    main_agent = next(
+        (a for a in config["agents"].get("list", []) if a.get("id") == "main"),
+        None,
+    )
+    if main_agent and "model" in main_agent:
+        current = main_agent["model"]["primary"]
+    else:
+        current = config["agents"]["defaults"]["model"]["primary"]
+
     if current == model_id:
         print(f"Modèle déjà actif : {model_id}")
         sys.exit(0)
 
     config["agents"]["defaults"]["model"]["primary"] = model_id
+    if main_agent and "model" in main_agent:
+        main_agent["model"]["primary"] = model_id
     with open(CONFIG, "w") as f:
         json.dump(config, f, indent=2)
 
