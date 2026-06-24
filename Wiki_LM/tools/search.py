@@ -30,8 +30,8 @@ from rank_bm25 import BM25Plus
 
 from wiki_paths import iter_pages, slug_to_path
 
-_EMBED_DIR = Path(__file__).resolve().parent.parent / "embeddings"
-_CACHE_PATH = Path(__file__).resolve().parent.parent / "wiki_bm25_cache.pkl"
+_EMBED_DIR = Path(os.environ.get("WIKI_PATH", str(Path(__file__).resolve().parent.parent))) / "embeddings"
+_CACHE_PATH = Path(os.environ.get("WIKI_PATH", str(Path(__file__).resolve().parent.parent))) / "wiki_bm25_cache.pkl"
 _CACHE_VERSION = 1
 
 # ---------------------------------------------------------------------------
