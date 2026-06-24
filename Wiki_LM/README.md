@@ -156,12 +156,53 @@ Les pages de concepts et d'entités sont enrichies avec un extrait Wikipedia pou
 2. **Cache SQLite** (`wiki_cache.db`) — évite les appels réseau répétés
 3. **API REST Wikipedia** — fallback en ligne (FR puis EN)
 
+### Télécharger les fichiers ZIM (Kiwix)
+
+Les ZIM sont des archives Wikipedia hors-ligne distribuées par Kiwix :
+**https://download.kiwix.org/zim/wikipedia/**
+
+Choisir la variante **`all_mini`** : elle ne contient que l'**introduction** des
+articles — exactement ce dont le lookup a besoin (il n'extrait que le premier
+paragraphe) — et c'est de loin la plus légère.
+
+| Variante | Contenu | Taille indicative (fr) |
+|----------|---------|------------------------|
+| `all_mini`  | introductions seules | ~3–4 Go — **recommandé** |
+| `all_nopic` | articles complets, sans images | ~35 Go |
+| `all_maxi`  | articles complets + images | ~90 Go |
+
+Les noms de fichiers sont **datés** (`…_AAAA-MM.zim`) ; prendre le plus récent
+listé sur la page Kiwix. Téléchargement dans le répertoire `zim/` :
+
 ```bash
-# Préchauffer le cache sur les pages existantes
+mkdir -p ~/Secretarius/Wiki_LM/zim
+cd ~/Secretarius/Wiki_LM/zim
+
+# Français (introductions) — ~3,6 Go
+wget https://download.kiwix.org/zim/wikipedia/wikipedia_fr_all_mini_2026-05.zim
+
+# Anglais (introductions) — ~12,5 Go (optionnel)
+wget https://download.kiwix.org/zim/wikipedia/wikipedia_en_all_mini_2026-06.zim
+```
+
+Le fichier doit suivre la convention **`wikipedia_<lang>_*.zim`** (`<lang>` = `fr`,
+`en`, …) : c'est `<lang>` qui détermine la langue côté lookup. Plusieurs langues
+peuvent coexister dans `zim/`.
+
+> **Côté Secretarius** : l'agent wiki (conteneur Docker) monte `~/Secretarius/Wiki_LM/zim`
+> en lecture seule sur `/zim`, avec `WIKI_ZIM_DIR=/zim` et `WIKI_LOOKUP_OFFLINE=1` déjà
+> définis dans la config. Il suffit donc de déposer les `.zim` dans ce répertoire ;
+> aucun réglage supplémentaire n'est nécessaire (redémarrer l'agent si besoin).
+
+### Activer / configurer le backend ZIM
+
+```bash
+# Préchauffer le cache SQLite sur les pages existantes (utilise les ZIM si présents)
 python tools/build_wiki_cache.py
 ```
 
-Placer un fichier ZIM dans `~/Secretarius/Wiki_LM/zim/` (ex. `wikipedia_fr_all_mini_2026-02.zim`) pour activer le backend ZIM local. Pour utiliser un autre répertoire, définir `WIKI_ZIM_DIR` :
+Le backend ZIM s'active automatiquement dès qu'un `.zim` est présent dans `zim/`.
+Pour utiliser un autre répertoire, définir `WIKI_ZIM_DIR` :
 
 ```bash
 export WIKI_ZIM_DIR=/chemin/vers/zim
