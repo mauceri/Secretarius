@@ -60,8 +60,7 @@ echo ""
 echo "=== Désinstallation OpenClaw / Secretarius ==="
 echo ""
 echo "Éléments qui seront supprimés :"
-echo "  - Services systemd : openclaw-gateway.service, openclaw-scout.service"
-echo "  - scout-watcher    : ~/.local/bin/scout-watcher"
+echo "  - Service systemd  : openclaw-gateway.service"
 echo "  - Config OpenClaw  : ${OPENCLAW_PATH}"
 echo "  - Wiki_LM/.env     : ${SECRETARIUS_ROOT}/Wiki_LM/.env"
 if [[ "$REMOVE_NVM" == true ]]; then
@@ -80,7 +79,7 @@ fi
 # 1 — Arrêter et désactiver les services
 SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
 
-for svc in openclaw-gateway openclaw-scout; do
+for svc in openclaw-gateway; do
   if systemctl --user is-active "${svc}.service" &>/dev/null 2>&1; then
     info "Arrêt de ${svc}..."
     systemctl --user stop "${svc}.service" || warn "Impossible d'arrêter ${svc}"
@@ -102,7 +101,7 @@ systemctl --user daemon-reload 2>/dev/null || true
 # IMPORTANT : retirer le wrapper openclaw, sinon il survit à la désinstallation et
 # peut pointer vers une version de node où openclaw n'est plus installé →
 # "openclaw absent ou non fonctionnel" à la réinstallation.
-for bin in scout-watcher openclaw switch-model; do
+for bin in openclaw switch-model; do
   TARGET="$HOME/.local/bin/$bin"
   if [[ -e "$TARGET" ]]; then
     rm -f "$TARGET"
