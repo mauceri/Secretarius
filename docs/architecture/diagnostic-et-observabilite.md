@@ -4,16 +4,14 @@
 > `commande → skill → agent`, un skill par agent, outils **bakés dans l'image**
 > de chaque agent, et une voie conversationnelle où l'intention se résout
 > toujours en une **commande nommée + confirmation** avant toute action.
-> Les chemins de fichiers sont ceux réellement utilisés par l'instance SLM ;
-> on révisera ce document quand l'architecture cible sera en place.
+> Les chemins de fichiers sont ceux réellement utilisés par l'instance unifiée.
 
 ## 0. Conventions
 
-- `$SLM` = racine de l'instance SLM : `~/.openclaw-slm`.
+- `$OC` = racine de l'instance OpenClaw : `~/.openclaw`.
 - `$KB` = base de connaissances wiki : `~/Documents/Arbath/Wiki_LM`.
 - Les conteneurs d'agents n'ont que `python3` (pas de `python`).
-- Service systemd : `openclaw-gateway-slm` (utilisateur). La **prod** est une
-  instance distincte (`~/.openclaw`, service `openclaw-gateway`) — ne pas confondre.
+- Service systemd : `openclaw-gateway` (utilisateur).
 
 ## 1. Modèle mental
 
@@ -45,11 +43,11 @@ entre ce qui est *affirmé* et ce qui s'est *réellement produit*.
 
 | # | Couche | Où | Ce qu'on y trouve |
 |---|--------|-----|-------------------|
-| 1 | Gateway / canal | `journalctl --user -u openclaw-gateway-slm` ; `/tmp/openclaw/openclaw-AAAA-MM-JJ.log` | démarrage, connexion du bot, messages entrants/sortants, erreurs globales |
+| 1 | Gateway / canal | `journalctl --user -u openclaw-gateway` ; `/tmp/openclaw/openclaw-AAAA-MM-JJ.log` | démarrage, connexion du bot, messages entrants/sortants, erreurs globales |
 | 2 | Dispatcher de commandes | log gateway (lignes de dispatch) | quelle commande a matché quel skill ; refus « commande inconnue » |
-| 3 | Orchestrateur Tiron | `$SLM/agents/main/sessions/<sid>.jsonl` (+ `.trajectory.jsonl`) | message reçu, skill/agent choisi, tâche déléguée, réponse relayée |
-| 4 | Sous-agents | `$SLM/agents/<agentId>/sessions/<sid>.jsonl` | commandes `exec` réelles, `toolResult`, sortie finale de l'agent |
-| 5 | Registre des délégations | `$SLM/subagents/runs.json` | `task` déléguée, agent cible, `outcome {status, timing}` |
+| 3 | Orchestrateur Tiron | `$OC/agents/main/sessions/<sid>.jsonl` (+ `.trajectory.jsonl`) | message reçu, skill/agent choisi, tâche déléguée, réponse relayée |
+| 4 | Sous-agents | `$OC/agents/<agentId>/sessions/<sid>.jsonl` | commandes `exec` réelles, `toolResult`, sortie finale de l'agent |
+| 5 | Registre des délégations | `$OC/subagents/runs.json` | `task` déléguée, agent cible, `outcome {status, timing}` |
 | 6 | Artefacts métier | ex. wiki : `$KB/raw/`, `$KB/.ingested`, `$KB/.ingest_state.json`, `$KB/log.md`, `$KB/wiki/` | preuve concrète qu'une opération a (ou non) abouti |
 
 > ⚠️ `runs.json` ne contient **que** le statut et les horodatages d'un run,
@@ -60,11 +58,11 @@ entre ce qui est *affirmé* et ce qui s'est *réellement produit*.
 Les clés de corrélation, dans l'ordre où on les récupère :
 
 1. **`message_id`** (canal) → trouve la requête dans la session `main`.
-2. **`sessionId`** de `main` → fichier `$SLM/agents/main/sessions/<sid>.jsonl`.
+2. **`sessionId`** de `main` → fichier `$OC/agents/main/sessions/<sid>.jsonl`.
    Le `.trajectory.jsonl` donne la séquence d'événements (`model.completed`, etc.).
 3. **commande / skill** déclenché (couche 2) → confirme le routage déterministe.
 4. **`sessions_spawn`** → renvoie `runId` + `childSessionKey` (dans la session `main`).
-5. **`childSessionKey`** → via `$SLM/agents/<agentId>/sessions/sessions.json`,
+5. **`childSessionKey`** → via `$OC/agents/<agentId>/sessions/sessions.json`,
    retrouve le **fichier de session du sous-agent** (couche 4).
 6. **`outcome`** du run → `runs.json` (cherche le `runId` ou le `controllerSessionKey`).
 7. **artefact métier** (couche 6) → preuve finale.
@@ -80,7 +78,7 @@ conclure « non livré » sur la seule sortie one-shot ; vérifier le 2ᵉ tour.
 
 1. Localiser sa session (étape 5 ci-dessus), ou la plus récente :
    ```
-   ls -t $SLM/agents/<agentId>/sessions/*.jsonl | grep -v trajectory | head -1
+   ls -t $OC/agents/<agentId>/sessions/*.jsonl | grep -v trajectory | head -1
    ```
 2. Lire le JSONL. Chaque ligne est un message ; le `content` est une liste de
    blocs : `text` (raisonnement / réponse), `toolUse` (appel d'outil, avec
@@ -92,7 +90,7 @@ conclure « non livré » sur la seule sortie one-shot ; vérifier le 2ᵉ tour.
 
 ## 5. Vérité-terrain : ne jamais croire le récit de l'agent
 
-C'est la règle la plus importante. Un SLM **confabule** volontiers un succès :
+C'est la règle la plus importante. Un modèle **confabule** volontiers un succès :
 il annonce « ingestion terminée avec succès » alors que l'outil a échoué ou
 n'a jamais tourné. **Toujours croiser le récit avec une preuve indépendante :**
 
@@ -137,7 +135,7 @@ seule parade est la preuve métier (couche 6).
 
 | Symptôme | Cause probable | Où confirmer |
 |----------|----------------|--------------|
-| Faux succès (annoncé OK, artefact absent) | confabulation du SLM | couche 6 |
+| Faux succès (annoncé OK, artefact absent) | confabulation du modèle | couche 6 |
 | Opération droppée (capture sans ingest) | tâche bundlée par l'orchestrateur / règle anti-enchaînement de l'agent | `task` en couche 3 |
 | Mauvais routage (commande → mauvais agent) | en arch cible : impossible (dispatch déterministe). Si observé : dispatcher mal configuré, ou routage encore confié au LLM | couche 2 |
 | `NO_REPLY` | course de l'annonce push : le résultat est arrivé après la réponse | `outcome` (couche 5) |
