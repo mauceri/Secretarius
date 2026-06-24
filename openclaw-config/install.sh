@@ -174,6 +174,29 @@ if [[ -f "$TARGET" && ( -n "${EURIA_API_KEY:-}" || -n "${DEEPSEEK_API_KEY:-}" ) 
   cp "$TARGET" "${OPENCLAW_PATH}/openclaw.json.bak" 2>/dev/null || true
 fi
 
+# Appliquer le choix LLM_BACKEND comme modèle de l'agent main.
+# Le template fixe un modèle par défaut ; ici on le remplace par le choix de l'utilisateur.
+_LLM_MODEL=""
+case "${LLM_BACKEND:-}" in
+  deepseek) _LLM_MODEL="deepseek/deepseek-chat" ;;
+  euria)    _LLM_MODEL="euria/mistralai/Mistral-Small-4-119B-2603" ;;
+esac
+if [[ -n "$_LLM_MODEL" && -f "$TARGET" ]]; then
+  _LLM_MODEL="$_LLM_MODEL" python3 - "$TARGET" <<'PYEOF'
+import json, os, sys
+path, model = sys.argv[1], os.environ['_LLM_MODEL']
+d = json.load(open(path))
+d['agents']['defaults']['model']['primary'] = model
+for a in d['agents'].get('list', []):
+    if isinstance(a, dict) and a.get('id') == 'main' and 'model' in a:
+        a['model']['primary'] = model
+json.dump(d, open(path, 'w'), indent=1)
+PYEOF
+  cp "$TARGET" "${OPENCLAW_PATH}/openclaw.json.bak" 2>/dev/null || true
+  info "Modèle agent main : ${_LLM_MODEL}"
+fi
+unset _LLM_MODEL
+
 # gateway.systemd.env
 _env_tpl="${SCRIPT_DIR}/gateway.systemd.env.template"
 ENV_TARGET="${OPENCLAW_PATH}/gateway.systemd.env"
