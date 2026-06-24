@@ -1,9 +1,4 @@
 {
- "env": {
-  "EURIA_API_KEY": "${EURIA_API_KEY}",
-  "EURIA_PRODUCT_ID": "${EURIA_PRODUCT_ID}",
-  "DEEPSEEK_API_KEY": "${DEEPSEEK_API_KEY}"
- },
  "auth": {
   "profiles": {
    "euria:default": {
