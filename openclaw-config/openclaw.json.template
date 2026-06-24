@@ -84,54 +84,6 @@
       "maxTokens": 8192
      }
     ]
-   },
-   "tiron-llm": {
-    "baseUrl": "http://127.0.0.1:8998/v1",
-    "api": "openai-completions",
-    "models": [
-     {
-      "id": "phi-4-mini-instruct",
-      "name": "Phi-4-mini (SLM local)",
-      "api": "openai-completions",
-      "reasoning": false,
-      "input": ["text"],
-      "contextWindow": 10240,
-      "maxTokens": 2048
-     }
-    ]
-   },
-   "ollama": {
-    "baseUrl": "http://127.0.0.1:11434/v1",
-    "api": "openai-completions",
-    "models": [
-     {
-      "id": "qwen3:8b",
-      "name": "Qwen3 8B (Ollama local)",
-      "api": "openai-completions",
-      "reasoning": false,
-      "input": ["text"],
-      "contextWindow": 16384,
-      "maxTokens": 2048
-     },
-     {
-      "id": "qwen2.5:7b",
-      "name": "Qwen2.5 7B (Ollama local)",
-      "api": "openai-completions",
-      "reasoning": false,
-      "input": ["text"],
-      "contextWindow": 16384,
-      "maxTokens": 2048
-     },
-     {
-      "id": "phi4-mini",
-      "name": "Phi-4-mini (Ollama local)",
-      "api": "openai-completions",
-      "reasoning": false,
-      "input": ["text"],
-      "contextWindow": 16384,
-      "maxTokens": 2048
-     }
-    ]
    }
   }
  },
@@ -141,10 +93,6 @@
     "primary": "euria/mistralai/Mistral-Small-4-119B-2603"
    },
    "models": {
-    "tiron-llm/phi-4-mini-instruct": { "alias": "TironSLM" },
-    "ollama/qwen3:8b": { "alias": "Qwen3SLM" },
-    "ollama/qwen2.5:7b": { "alias": "Qwen25SLM" },
-    "ollama/phi4-mini": { "alias": "Phi4OllamaSLM" },
     "euria/mistralai/Mistral-Small-4-119B-2603": { "alias": "Euria" },
     "euria/Qwen/Qwen3.5-397B-A17B-FP8": { "alias": "Qwen397" },
     "euria/google/gemma-4-31B-it": { "alias": "Gemma4" },

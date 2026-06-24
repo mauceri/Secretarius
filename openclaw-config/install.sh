@@ -9,26 +9,18 @@ OBSIDIAN_PATH="${OBSIDIAN_PATH:-$HOME/Documents/Obsidian}"
 ASSISTANT_NAME="${ASSISTANT_NAME:-Tiron}"
 LLM_BACKEND="${LLM_BACKEND:-deepseek}"
 FORCE="${FORCE:-false}"
-PROFILE="${PROFILE:-prod}"
 _i=0; _args=("$@")
 while [[ $_i -lt ${#_args[@]} ]]; do
   case "${_args[$_i]}" in
     --force) FORCE="true" ;;
-    --profile) _i=$((_i+1)); PROFILE="${_args[$_i]:-prod}" ;;
   esac
   _i=$((_i+1))
 done
 unset _i _args
-if [[ "$PROFILE" == "slm" ]]; then
-  OPENCLAW_PATH="$HOME/.openclaw-slm"
-else
-  OPENCLAW_PATH="${OPENCLAW_PATH:-$HOME/.openclaw}"
-fi
+OPENCLAW_PATH="${OPENCLAW_PATH:-$HOME/.openclaw}"
 
 OPENCLAW_DIR=".openclaw"
 OPENCLAW_PORT=18789
-[[ "$PROFILE" == "slm" ]] && OPENCLAW_DIR=".openclaw-slm"
-[[ "$PROFILE" == "slm" ]] && OPENCLAW_PORT=18790
 export OPENCLAW_DIR OPENCLAW_PORT
 
 TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
@@ -87,21 +79,6 @@ if [[ ! -x "$OPENCLAW_BIN" ]]; then
   exit 1
 fi
 export OPENCLAW_BIN
-# Instance slm : installer openclaw@2026.5.12 localement (n'affecte pas la prod)
-if [[ "$PROFILE" == "slm" ]]; then
-  mkdir -p "${OPENCLAW_PATH}/npm"
-  info "Installation d'openclaw@2026.5.12 dans ${OPENCLAW_PATH}/npm..."
-  npm install --prefix "${OPENCLAW_PATH}/npm" "openclaw@2026.5.12" --silent 2>&1 || \
-    warn "npm install openclaw@2026.5.12 échoué — vérifier npm registry"
-  SLM_BIN="${OPENCLAW_PATH}/npm/node_modules/.bin/openclaw"
-  if [[ -x "$SLM_BIN" ]]; then
-    OPENCLAW_BIN="$SLM_BIN"
-    export OPENCLAW_BIN
-    info "OpenClaw SLM : ${OPENCLAW_BIN}"
-  else
-    warn "Binaire openclaw@2026.5.12 non trouvé dans ${OPENCLAW_PATH}/npm"
-  fi
-fi
 
 # Migration GATEWAY_TOKEN → OPENCLAW_GATEWAY_TOKEN
 if [[ -z "${OPENCLAW_GATEWAY_TOKEN:-}" && -n "${GATEWAY_TOKEN:-}" ]]; then
@@ -139,7 +116,7 @@ if [[ -f "$TARGET" && "$FORCE" != "true" ]]; then
 else
   export HOME HOSTNAME OBSIDIAN_PATH ASSISTANT_NAME OPENCLAW_GATEWAY_TOKEN EURIA_API_KEY EURIA_PRODUCT_ID OPENCLAW_DIR OPENCLAW_PORT
   envsubst '${HOME} ${HOSTNAME} ${OBSIDIAN_PATH} ${ASSISTANT_NAME} ${OPENCLAW_GATEWAY_TOKEN} ${EURIA_API_KEY} ${EURIA_PRODUCT_ID} ${OPENCLAW_DIR} ${OPENCLAW_PORT}' \
-    < "${SCRIPT_DIR}/openclaw-slm.json.template" > "$TARGET"
+    < "${SCRIPT_DIR}/openclaw.json.template" > "$TARGET"
   # Sync .bak pour éviter que le gateway détecte notre écriture comme un "clobber"
   # et restaure silencieusement l'ancienne config au démarrage suivant.
   cp "$TARGET" "${OPENCLAW_PATH}/openclaw.json.bak" 2>/dev/null || true
@@ -198,7 +175,7 @@ if [[ -f "$TARGET" && ( -n "${EURIA_API_KEY:-}" || -n "${DEEPSEEK_API_KEY:-}" ) 
 fi
 
 # gateway.systemd.env
-_env_tpl="${SCRIPT_DIR}/gateway-slm.systemd.env.template"
+_env_tpl="${SCRIPT_DIR}/gateway.systemd.env.template"
 ENV_TARGET="${OPENCLAW_PATH}/gateway.systemd.env"
 if [[ -f "$ENV_TARGET" && "$FORCE" != "true" ]]; then
   info "gateway.systemd.env existe déjà — ignoré (utilisez --force pour régénérer)"
@@ -220,7 +197,6 @@ unset _env_tpl
 SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
 mkdir -p "$SYSTEMD_USER_DIR"
 _gw_svc="openclaw-gateway.service"
-[[ "$PROFILE" == "slm" ]] && _gw_svc="openclaw-gateway-slm.service"
 SERVICE_TARGET="${SYSTEMD_USER_DIR}/${_gw_svc}"
 if [[ -f "$SERVICE_TARGET" && "$FORCE" != "true" ]]; then
   info "${_gw_svc} existe déjà — ignoré"
@@ -345,9 +321,6 @@ info "Répertoires scout (tasks/results) et .gog-config créés"
 
 # Finalisation
 _gw_svc_final="openclaw-gateway.service"
-_gw_port_final=18789
-[[ "$PROFILE" == "slm" ]] && _gw_svc_final="openclaw-gateway-slm.service"
-[[ "$PROFILE" == "slm" ]] && _gw_port_final=18790
 systemctl --user daemon-reload 2>/dev/null || true
 systemctl --user enable "${_gw_svc_final}" 2>/dev/null && \
   info "${_gw_svc_final} activé" || \
@@ -371,4 +344,4 @@ info ""
 info "Démarrer : systemctl --user start ${_gw_svc_final}"
 info "Control UI : ouvrir depuis un poste réseau, mode jeton ="
 info "  grep OPENCLAW_GATEWAY_TOKEN ${OPENCLAW_PATH}/gateway.systemd.env"
-unset _gw_svc_final _gw_port_final
+unset _gw_svc_final

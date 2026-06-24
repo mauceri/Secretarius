@@ -292,8 +292,8 @@ Secretarius/
 │   ├── INSTALL.md                      # Procédure d'installation détaillée
 │   ├── install.sh                      # Génère ~/.openclaw/ via envsubst
 │   ├── uninstall.sh                    # Désinstallation propre
-│   ├── openclaw-slm.json.template      # Configuration OpenClaw (4 agents + plugin)
-│   ├── gateway-slm.systemd.env.template
+│   ├── openclaw.json.template          # Configuration OpenClaw (4 agents + plugin)
+│   ├── gateway.systemd.env.template
 │   ├── openclaw-gateway.service        # Service systemd user
 │   ├── Dockerfile.tiron                # Sandbox agent principal
 │   ├── Dockerfile.wiki                 # Sandbox agent wiki

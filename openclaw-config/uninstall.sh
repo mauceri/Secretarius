@@ -3,43 +3,31 @@
 set -euo pipefail
 
 FORCE="${FORCE:-false}"
-PROFILE="${PROFILE:-prod}"
 _i=0; _args=("$@")
 while [[ $_i -lt ${#_args[@]} ]]; do
   case "${_args[$_i]}" in
-    --yes)     FORCE="true" ;;
-    --profile) _i=$((_i+1)); PROFILE="${_args[$_i]:-prod}" ;;
+    --yes) FORCE="true" ;;
   esac
   _i=$((_i+1))
 done
 unset _i _args
 
-if [[ "$PROFILE" == "slm" ]]; then
-  OPENCLAW_PATH="$HOME/.openclaw-slm"
-  GW_SVC="openclaw-gateway-slm.service"
-else
-  OPENCLAW_PATH="${OPENCLAW_PATH:-$HOME/.openclaw}"
-  GW_SVC="openclaw-gateway.service"
-fi
+OPENCLAW_PATH="${OPENCLAW_PATH:-$HOME/.openclaw}"
+GW_SVC="openclaw-gateway.service"
 
 info() { echo "[INFO] $*"; }
 warn() { echo "[WARN] $*"; }
 
 SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
 
-SERVICES=("$GW_SVC")
-# wiki-lm-server / embed sont des services partagés (Obsidian :5051, timer
-# d'embeddings) — ne les retirer que pour le profil prod, jamais pour slm.
-if [[ "$PROFILE" != "slm" ]]; then
-  SERVICES+=(
-    "wiki-lm-server.service"
-    "wiki-lm-embed.timer"
-    "wiki-lm-embed.service"
-  )
-fi
+SERVICES=(
+  "$GW_SVC"
+  "wiki-lm-server.service"
+  "wiki-lm-embed.timer"
+  "wiki-lm-embed.service"
+)
 
 echo ""
-echo "Profil   : $PROFILE"
 echo "Cible    : $OPENCLAW_PATH"
 echo "Services : ${SERVICES[*]}"
 echo ""
@@ -74,8 +62,7 @@ else
   info "${OPENCLAW_PATH} absent — ignoré"
 fi
 
-# switch-model (partagé — ne retirer que pour le profil prod)
-if [[ "$PROFILE" != "slm" && -f "${HOME}/.local/bin/switch-model" ]]; then
+if [[ -f "${HOME}/.local/bin/switch-model" ]]; then
   rm -f "${HOME}/.local/bin/switch-model"
   info "switch-model supprimé"
 fi
