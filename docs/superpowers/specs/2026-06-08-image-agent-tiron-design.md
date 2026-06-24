@@ -14,7 +14,7 @@
 
 ## 1. Contexte et objectif
 
-L'architecture cible (`docs/architecture/secretarius-slm-architecture.md`)
+L'architecture cible (`docs/architecture/secretarius-architecture-socle.md`)
 isole les agents par le **contenu de leur image Docker** : ce qu'un agent peut
 faire dépend des binaires présents dans son image
 (`agents.list[].sandbox.docker.image`, `tools.exec.host = "sandbox"`). Décision

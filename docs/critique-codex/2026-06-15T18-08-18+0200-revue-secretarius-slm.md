@@ -18,7 +18,7 @@ La direction architecturale étudiée consiste à alléger Tiron, déplacer les 
 
 Documents d'architecture consultés :
 
-- `docs/architecture/secretarius-slm-architecture.md`
+- `docs/architecture/secretarius-architecture-socle.md`
 - `docs/architecture/spec-architecture-par-intention.md`
 - `docs/architecture/diagnostic-et-observabilite.md`
 - `docs/Secretarius.md`
@@ -75,7 +75,7 @@ Le dépôt n'avait pas de diff suivi, mais plusieurs documents d'architecture é
 - `.claude/`
 - `docs/architecture/corpus-intentions-seed.md`
 - `docs/architecture/diagnostic-et-observabilite.md`
-- `docs/architecture/secretarius-slm-architecture.md`
+- `docs/architecture/secretarius-architecture-socle.md`
 - `docs/architecture/spec-architecture-par-intention.md`
 - `docs/superpowers/plans/2026-06-10-scout-slm.md`
 

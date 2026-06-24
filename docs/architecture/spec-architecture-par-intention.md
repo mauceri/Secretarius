@@ -1,6 +1,8 @@
-# Spec — Architecture par intention (Secretarius SLM)
+# Spec — Architecture par intention (Secretarius)
 
-> Statut : **proposition**, 2026-06-15. À valider avant implémentation.
+> Statut : **proposition de conception, 2026-06-15** (archive). L'architecture par
+> intention décrite ici a depuis été largement implémentée — voir l'état en service
+> dans `Secretarius.md`.
 > Remplace le routage « par jugement du LLM » par un **dispatch déterministe
 > commande → outil**, et clarifie le rôle des fichiers d'instruction.
 
@@ -170,7 +172,7 @@ portable (VPS), et cohérent avec le futur `agent-plugin` / `create-agent`.
 
 ## 11. Points ouverts (à vérifier avant/pendant l'étape 1-2)
 
-- **Écriture d'un plugin d'outils** pour l'instance SLM : faisabilité et coût.
+- **Écriture d'un plugin d'outils** pour l'instance : faisabilité et coût.
 - **Un outil custom peut-il spawner un sous-agent** (`sessions_spawn` en interne)
   pour atteindre `wiki`/`scout`, ou doit-il appeler le conteneur autrement ?
 - **Permissions** : l'outil cible doit être autorisé pour l'agent `main`
@@ -233,7 +235,7 @@ Chemin complet retenu (natif, sans pont HTTP/file-drop) :
 → `api.runtime.subagent.run(...)` → sous-agent **wiki** exécutant `op: status`.
 Un outil de plugin complet (`definePluginEntry` + `register(api)`, execute fermant
 sur `api`) accède bien à `api.runtime.subagent`. Notes d'impl : import depuis
-`openclaw/plugin-sdk/core` ; install via `openclaw --profile slm plugins install <dir>` ;
+`openclaw/plugin-sdk/core` ; install via `openclaw plugins install <dir>` ;
 outil à déclarer dans `tools.sandbox.tools.allow`.
 
 **E2E impeccable après polissage (2026-06-16)** : `/derisk` → `status=ok` + le vrai

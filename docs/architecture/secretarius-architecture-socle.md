@@ -1,9 +1,12 @@
-# Secretarius SLM — Architecture « Tiron léger »
+# Secretarius — Architecture « Tiron léger » (socle de conception)
 
-> Document de socle, écrit le 2026-06-05 après une séance de validation.
-> But : servir de point de départ à une session de conception (superpowers) neuve.
-> Il est autoporté : un agent qui le lit à froid doit comprendre la cible, ce qui
-> est déjà prouvé, et ce qui reste à trancher.
+> **Statut : archive de conception, écrite le 2026-06-05.** Instantané de la vision
+> de départ du chantier « orchestrateur léger ». Certains détails ont depuis évolué
+> (version d'OpenClaw, bug #84059 caractérisé, abandon effectif de MCP). Conservé
+> comme point de départ historique ; pour l'état en service, voir `Secretarius.md`
+> et `diagnostic-et-observabilite.md`.
+>
+> (« SLM » = *small language model*, ex. phi-4-mini, terme technique conservé ci-dessous.)
 
 ---
 
