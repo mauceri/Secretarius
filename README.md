@@ -143,6 +143,12 @@ grep '^OPENCLAW_GATEWAY_TOKEN=' ~/.openclaw/gateway.systemd.env
 
 Ouvrir l'interface depuis un poste ayant accès réseau à la machine — directement (poste de bureau), via Tailscale (`https://<hôte>.<tailnet>.ts.net`) ou par tunnel SSH si la machine est sans écran. Mode **jeton** : coller la valeur affichée, **laisser le champ mot de passe vide**, Connecter.
 
+> **Trouver l'URL Tailscale** (sur l'hôte) : `tailscale serve status` affiche directement l'URL si le gateway y est exposé (ex. `https://santiago.tailc69141.ts.net → http://127.0.0.1:18789`). Sinon, le nom complet de l'hôte (`<hôte>.<tailnet>.ts.net`) s'obtient par :
+> ```bash
+> tailscale status --json | python3 -c "import json,sys; print(json.load(sys.stdin)['Self']['DNSName'].rstrip('.'))"
+> ```
+> Si l'interface n'est pas encore exposée sur le tailnet d'une machine headless, l'y publier une fois : `tailscale serve --bg 18789`.
+
 À la **première connexion d'un navigateur**, l'interface affiche « Appairage de l'appareil requis » avec un identifiant. C'est normal (approbation unique). Approuvez-le sur l'hôte, puis reconnectez-vous :
 
 ```bash
