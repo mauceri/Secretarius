@@ -114,8 +114,8 @@ TARGET="${OPENCLAW_PATH}/openclaw.json"
 if [[ -f "$TARGET" && "$FORCE" != "true" ]]; then
   info "openclaw.json existe déjà — ignoré (utilisez --force pour écraser)"
 else
-  export HOME HOSTNAME OBSIDIAN_PATH ASSISTANT_NAME OPENCLAW_GATEWAY_TOKEN EURIA_API_KEY EURIA_PRODUCT_ID OPENCLAW_DIR OPENCLAW_PORT
-  envsubst '${HOME} ${HOSTNAME} ${OBSIDIAN_PATH} ${ASSISTANT_NAME} ${OPENCLAW_GATEWAY_TOKEN} ${EURIA_API_KEY} ${EURIA_PRODUCT_ID} ${OPENCLAW_DIR} ${OPENCLAW_PORT}' \
+  export HOME HOSTNAME OBSIDIAN_PATH ASSISTANT_NAME OPENCLAW_GATEWAY_TOKEN EURIA_API_KEY EURIA_PRODUCT_ID OPENCLAW_DIR OPENCLAW_PORT GOG_ACCOUNT
+  envsubst '${HOME} ${HOSTNAME} ${OBSIDIAN_PATH} ${ASSISTANT_NAME} ${OPENCLAW_GATEWAY_TOKEN} ${EURIA_API_KEY} ${EURIA_PRODUCT_ID} ${OPENCLAW_DIR} ${OPENCLAW_PORT} ${GOG_ACCOUNT}' \
     < "${SCRIPT_DIR}/openclaw.json.template" > "$TARGET"
   # Sync .bak pour éviter que le gateway détecte notre écriture comme un "clobber"
   # et restaure silencieusement l'ancienne config au démarrage suivant.
