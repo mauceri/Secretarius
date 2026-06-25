@@ -52,6 +52,18 @@ def op_capture(text: str) -> dict:
     refs = re.findall(r"\bref:(\S+)", note)
     if refs:
         note = re.sub(r"\s*\bref:\S+", "", note).strip()
+    file_paths = re.findall(r"\bfile:(\S+)", note)
+    if file_paths:
+        note = re.sub(r"\s*\bfile:\S+", "", note).strip()
+        for fpath in file_paths:
+            try:
+                content = Path(fpath).read_text(encoding="utf-8")
+                if fpath.endswith(".md"):
+                    content = re.sub(r"^---\n.*?\n---\n", "", content, flags=re.DOTALL).strip()
+                if content:
+                    note = (note + "\n\n" + content).strip() if note else content.strip()
+            except OSError:
+                pass
     wiki_root = _wiki_root()
     if "simple" in directives:
         sources_dir = wiki_root / "wiki" / "sources"
