@@ -47,10 +47,10 @@ def op_capture(text: str) -> dict:
     tags, remaining = _parse_hashtags(text)
     urls = re.findall(r"https?://\S+", text)
     note = re.sub(r"https?://\S+", "", remaining).strip()
-    ref_m = re.search(r"(?m)^ref:(\S+)\s*$", note)
+    ref_m = re.search(r"\bref:(\S+)", note)
     ref = ref_m.group(1) if ref_m else ""
     if ref:
-        note = re.sub(r"(?m)^ref:\S+\s*$", "", note).strip()
+        note = re.sub(r"\s*\bref:\S+", "", note).strip()
     raw = _raw_dir()
     raw.mkdir(parents=True, exist_ok=True)
     created = []

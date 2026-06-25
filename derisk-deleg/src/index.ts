@@ -117,7 +117,7 @@ export default definePluginEntry({
             const dest = join(attachDir, recent.f);
             copyFileSync(join(inboundDir, recent.f), dest);
             rmSync(join(inboundDir, recent.f));
-            arg += `\nref:${dest}`;
+            arg += ` ref:${dest}`;
           }
         }
         const out = await delegateWiki(api, "capture", arg);
