@@ -169,22 +169,35 @@ def capture_urls(urls: list[str], raw: Path, tags: list[str] | None = None) -> l
     return created
 
 
-def capture_comment(text: str, raw: Path, tags: list[str] | None = None, ref: str = "") -> Path:
+def _write_note(path: Path, text: str, tags: list[str] | None, refs: list[str] | None, wiki_root: Path) -> None:
+    body_lines = [text.strip()] if text.strip() else []
+    for ref in (refs or []):
+        try:
+            Path(ref).relative_to(wiki_root)
+            body_lines.append(f"[[{Path(ref).name}]]")
+        except ValueError:
+            pass
+    body = "\n".join(body_lines)
+    if tags or refs:
+        fm = "---\n"
+        if tags:
+            fm += f"tags: [{', '.join(tags)}]\n"
+        if refs:
+            fm += (f"ref: {refs[0]}\n" if len(refs) == 1
+                   else "refs:\n" + "".join(f"  - {r}\n" for r in refs))
+        fm += "---\n"
+        content = fm + body + "\n"
+    else:
+        content = (body + "\n") if body else "\n"
+    path.write_text(content, encoding="utf-8")
+
+
+def capture_comment(text: str, raw: Path, tags: list[str] | None = None, refs: list[str] | None = None) -> Path:
     ts = timestamp()
     slug = slugify(text)
     fname = f"{ts}-{slug}.md"
     path = raw / fname
-    if tags or ref:
-        fm = "---\n"
-        if tags:
-            fm += f"tags: [{', '.join(tags)}]\n"
-        if ref:
-            fm += f"ref: {ref}\n"
-        fm += "---\n"
-        content = fm + text.strip() + "\n"
-    else:
-        content = text.strip() + "\n"
-    path.write_text(content, encoding="utf-8")
+    _write_note(path, text, tags, refs, raw.parent)
     return path
 
 

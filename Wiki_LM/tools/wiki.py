@@ -26,7 +26,7 @@ def _bootstrap_api_key() -> None:
 _bootstrap_api_key()
 
 sys.path.insert(0, str(Path(__file__).parent))
-from capture import _parse_hashtags, capture_urls, capture_comment
+from capture import _parse_hashtags, capture_urls, capture_comment, slugify, timestamp, _write_note
 from ingest import Ingestor
 from query import WikiQuery
 from kb_tags import collect_tags
@@ -44,20 +44,30 @@ def _raw_dir() -> Path:
 
 
 def op_capture(text: str) -> dict:
+    directives = [m.group(1).lower() for m in re.finditer(r"@(\w+)", text)]
+    text = re.sub(r"@\w+\s*", "", text).strip()
     tags, remaining = _parse_hashtags(text)
-    urls = re.findall(r"https?://\S+", text)
+    urls = re.findall(r"https?://\S+", remaining)
     note = re.sub(r"https?://\S+", "", remaining).strip()
-    ref_m = re.search(r"\bref:(\S+)", note)
-    ref = ref_m.group(1) if ref_m else ""
-    if ref:
+    refs = re.findall(r"\bref:(\S+)", note)
+    if refs:
         note = re.sub(r"\s*\bref:\S+", "", note).strip()
+    wiki_root = _wiki_root()
+    if "simple" in directives:
+        sources_dir = wiki_root / "wiki" / "sources"
+        sources_dir.mkdir(parents=True, exist_ok=True)
+        ts = timestamp()
+        slug = slugify(note or (Path(refs[0]).stem if refs else "note"))
+        path = sources_dir / f"src-{ts}-{slug}.md"
+        _write_note(path, note, tags or None, refs or None, wiki_root)
+        return {"files": [path.name], "dest": "sources"}
     raw = _raw_dir()
     raw.mkdir(parents=True, exist_ok=True)
     created = []
     if urls:
         created.extend(capture_urls(urls, raw, tags=tags or None))
-    if note:
-        created.append(capture_comment(note, raw, tags=tags or None, ref=ref))
+    if note or refs:
+        created.append(capture_comment(note, raw, tags=tags or None, refs=refs or None))
     return {"files": [p.name for p in created if p is not None]}
 
 
