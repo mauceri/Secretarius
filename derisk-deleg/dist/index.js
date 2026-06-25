@@ -1,7 +1,9 @@
 import { Type } from "typebox";
 import { definePluginEntry } from "openclaw/plugin-sdk/core";
 import { parseReply } from "./parse.js";
-import { readFileSync, writeFileSync, existsSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync, copyFileSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 // Outils d'orchestration déterministes : une commande -> un outil -> délégation
 // à l'agent wiki via api.runtime.subagent, avec le message "op: <op> | <arg>"
 // construit par le code (routage ET contrat d'op déterministes).
@@ -82,7 +84,24 @@ export default definePluginEntry({
                 command: Type.Optional(Type.String({ description: "Raw args: #tags + URL or text to capture." })),
             }),
             async execute(_id, params) {
-                const arg = (params?.command ?? "").trim();
+                let arg = (params?.command ?? "").trim();
+                // Joindre le fichier le plus récent de media/inbound/ (< 5 min) si présent.
+                const inboundDir = join(homedir(), ".openclaw", "media", "inbound");
+                const attachDir = join(homedir(), "Documents", "Arbath", "Wiki_LM", "attachments");
+                if (existsSync(inboundDir)) {
+                    const now = Date.now();
+                    const recent = readdirSync(inboundDir)
+                        .map((f) => ({ f, mt: statSync(join(inboundDir, f)).mtimeMs }))
+                        .filter(({ mt }) => now - mt < 5 * 60 * 1000)
+                        .sort((a, b) => b.mt - a.mt)[0];
+                    if (recent) {
+                        mkdirSync(attachDir, { recursive: true });
+                        const dest = join(attachDir, recent.f);
+                        copyFileSync(join(inboundDir, recent.f), dest);
+                        rmSync(join(inboundDir, recent.f));
+                        arg += `\nref:${dest}`;
+                    }
+                }
                 const out = await delegateWiki(api, "capture", arg);
                 return { content: [{ type: "text", text: out.slice(0, 1800) }] };
             },

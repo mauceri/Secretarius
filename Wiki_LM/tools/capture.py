@@ -169,13 +169,19 @@ def capture_urls(urls: list[str], raw: Path, tags: list[str] | None = None) -> l
     return created
 
 
-def capture_comment(text: str, raw: Path, tags: list[str] | None = None) -> Path:
+def capture_comment(text: str, raw: Path, tags: list[str] | None = None, ref: str = "") -> Path:
     ts = timestamp()
     slug = slugify(text)
     fname = f"{ts}-{slug}.md"
     path = raw / fname
-    if tags:
-        content = f"---\ntags: [{', '.join(tags)}]\n---\n{text.strip()}\n"
+    if tags or ref:
+        fm = "---\n"
+        if tags:
+            fm += f"tags: [{', '.join(tags)}]\n"
+        if ref:
+            fm += f"ref: {ref}\n"
+        fm += "---\n"
+        content = fm + text.strip() + "\n"
     else:
         content = text.strip() + "\n"
     path.write_text(content, encoding="utf-8")
