@@ -57,7 +57,7 @@ def parse_args(argv=None) -> Config:
 
 def _build_signature(prompt_text: str):
     class GenerateExample(dspy.Signature):
-        f"""{prompt_text}"""
+        __doc__ = prompt_text
         intention: str = dspy.InputField(desc="Intention Tiron à illustrer")
         registre:  str = dspy.InputField(desc="Registre du message")
         variante:  str = dspy.InputField(desc="Type de variante")

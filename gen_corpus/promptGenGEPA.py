@@ -7,16 +7,12 @@ import argparse
 import json
 import logging
 import os
-import time
 from dataclasses import dataclass
-from functools import wraps
 from pathlib import Path
 
 import dspy
 from dspy.clients import configure_cache as dspy_configure_cache
 
-logging.basicConfig(filename="gepa_llm_calls.log", filemode="a", level=logging.INFO,
-                    format="%(asctime)s %(levelname)s: %(message)s")
 try:
     dspy_configure_cache(enable_disk_cache=False, enable_memory_cache=False)
 except Exception:
@@ -94,7 +90,7 @@ def configure_eval_lm(model: str, api_base: str) -> dspy.LM:
 
 def build_example_generator(prompt_text: str) -> dspy.Module:
     class GenerateExample(dspy.Signature):
-        f"""{prompt_text}"""
+        __doc__ = prompt_text
         intention: str = dspy.InputField(desc="Intention Tiron à illustrer (ex: wiki_capture)")
         registre:  str = dspy.InputField(desc="Registre du message: formel, familier, télégraphique, poli, abrégé")
         variante:  str = dspy.InputField(desc="Type de variante (ex: url_avec_tags, question_courte, sans_args…)")
@@ -214,4 +210,6 @@ def main(argv=None) -> int:
 
 
 if __name__ == "__main__":
+    logging.basicConfig(filename="gepa_llm_calls.log", filemode="a", level=logging.INFO,
+                        format="%(asctime)s %(levelname)s: %(message)s")
     raise SystemExit(main())
