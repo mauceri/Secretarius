@@ -86,7 +86,7 @@ Conventions :
 - Intentions sans args (`wiki_ingest`, `wiki_status`, `meta_assistant`) : `"args": ""`
 - Directives `/c` incluses : `@simple`, `file:<path>`, `ref:<slug>`
 
-`convert_seed.py` produit `seed.json` depuis `corpus-intentions-seed.md` par extraction regex (URL, tags, texte résiduel) et ajoute ~9 exemples directives écrits à la main.
+`convert_seed.py` produit `seed.json` depuis `corpus-intentions-seed.md` par extraction regex (URL, tags, texte résiduel) et ajoute 3 exemples par directive (`@simple`, `file:`, `ref:`), soit 9 exemples directives écrits à la main.
 
 ---
 
@@ -107,23 +107,29 @@ class GenerateExample(dspy.Signature):
     args:    str = dspy.OutputField(desc="Arguments bruts de la commande (chaîne vide si pas d'args)")
 ```
 
-### Évaluateur (métrique GEPA)
+### Évaluateur (métrique GEPA — hybride règles + LLM)
+
+Pour éviter le biais "juge et partie" (DeepSeek génère ET évalue), la métrique est divisée en deux critères indépendants :
+
+**Critère 1 — validité structurelle (règle-based, sans LLM) :**
+- La commande est dans la liste des commandes connues ou vaut `null` → 0.5 pt
+- Si l'intention requiert des args (`wiki_capture`, `wiki_query`, `source_read`, `gog_mail`, `gog_calendar`, `gog_drive`), `args` est non vide → 0.5 pt
+- Score : 0 ou 0.5 ou 1
+
+**Critère 2 — réalisme (DeepSeek) :**
 
 ```python
-class EvalExample(dspy.Signature):
-    """Évalue une paire (message, commande) générée.
-    Critère 1 — réalisme (1..5) : ce message ressemble-t-il à une vraie requête utilisateur ?
-    Critère 2 — cohérence (0 ou 1) : la commande est-elle cohérente avec le message ?
-    Répondre avec deux entiers séparés par une virgule, sans commentaire."""
+class EvalRealisme(dspy.Signature):
+    """Ce message ressemble-t-il à une vraie requête utilisateur adressée à un assistant ?
+    Répondre avec un entier 1..5 uniquement, sans commentaire."""
 
-    text:    str = dspy.InputField(desc="Message utilisateur généré")
-    command: str = dspy.InputField(desc="Commande associée")
-    scores:  str = dspy.OutputField(desc="Deux entiers: réalisme,cohérence (ex: 4,1)")
+    text: str = dspy.InputField(desc="Message utilisateur généré")
+    score: int = dspy.OutputField(desc="Entier 1..5")
 ```
 
-**Score final :** `0.6 × réalisme/5 + 0.4 × cohérence`
+**Score final :** `0.5 × réalisme/5 + 0.5 × validité_structurelle`
 
-La cohérence est pondérée plus fortement que dans `gen_corpus_gepa_codex` car c'est la propriété critique pour un routeur.
+DeepSeek ne juge que le réalisme (critère subjectif). La validité structurelle, critère objectif et décisif pour un routeur, est vérifiée hors LLM — ce qui élimine la circularité sur la moitié du score.
 
 ---
 
@@ -174,7 +180,7 @@ Le system prompt est **impératif neutre** (sans pronom personnel) pour rester c
 - `to_lora_format.py` produit du ChatML valide et split 90/10 cohérent
 - 3 exemples générés par appel LM réel en CI
 
-### Validation manuelle
+### Validation manuelle (hors pipeline automatique)
 
 ```bash
 python inspect_corpus.py --sample 20
