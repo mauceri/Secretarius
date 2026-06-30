@@ -149,7 +149,7 @@ def make_metric(eval_lm: dspy.LM):
     evaluator = Evaluator()
     counter = {"n": 0}
 
-    def metric(gold, pred, trace=None):
+    def metric(gold, pred, trace=None, pred_name=None, pred_trace=None):
         text = str((pred or {}).get("text") or "")
         if not text:
             return 0.0
