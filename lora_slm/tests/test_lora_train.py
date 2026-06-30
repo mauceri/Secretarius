@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import subprocess
 from datasets import DatasetDict, Dataset
 
 
@@ -43,3 +44,20 @@ def test_build_text_dataset_rejects_unknown_format():
     ds = DatasetDict({"train": Dataset.from_list([{"unknown": "x"}])})
     with pytest.raises(ValueError):
         build_text_dataset(ds, "", "", num_proc=1)
+
+
+def test_merge_and_quantize_importable():
+    from merge_and_quantize import merge_lora, quantize_gguf
+    assert callable(merge_lora)
+    assert callable(quantize_gguf)
+
+
+def test_merge_and_quantize_cli_help():
+    result = subprocess.run(
+        [sys.executable, "merge_and_quantize.py", "--help"],
+        capture_output=True, text=True,
+        cwd=str(Path(__file__).parent.parent)
+    )
+    assert "--base" in result.stdout
+    assert "--lora" in result.stdout
+    assert "--gguf-dir" in result.stdout
