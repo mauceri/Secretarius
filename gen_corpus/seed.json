@@ -1,0 +1,2092 @@
+[
+  {
+    "text": "`/c https://marp.app/#get-started`",
+    "intention": "wiki_capture",
+    "registre": "abrégé",
+    "variante": "url_avec_tags",
+    "action": {
+      "command": "/c",
+      "args": "https://marp.app/#get-started` #get"
+    }
+  },
+  {
+    "text": "`/c #markdown #presentation https://marp.app/#get-started`",
+    "intention": "wiki_capture",
+    "registre": "abrégé",
+    "variante": "url_avec_tags",
+    "action": {
+      "command": "/c",
+      "args": "https://marp.app/#get-started` #markdown #presentation #get"
+    }
+  },
+  {
+    "text": "garde cet article pour moi : https://example.com/article",
+    "intention": "wiki_capture",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/c",
+      "args": "https://example.com/article"
+    }
+  },
+  {
+    "text": "ajoute ça à mon wiki : https://arxiv.org/abs/1706.03762",
+    "intention": "wiki_capture",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/c",
+      "args": "https://arxiv.org/abs/1706.03762"
+    }
+  },
+  {
+    "text": "capture cette page https://en.wikipedia.org/wiki/Zettelkasten",
+    "intention": "wiki_capture",
+    "registre": "abrégé",
+    "variante": "url_seule",
+    "action": {
+      "command": "/c",
+      "args": "https://en.wikipedia.org/wiki/Zettelkasten"
+    }
+  },
+  {
+    "text": "mets de côté ce lien #ia https://openai.com/research",
+    "intention": "wiki_capture",
+    "registre": "poli",
+    "variante": "url_avec_tags",
+    "action": {
+      "command": "/c",
+      "args": "https://openai.com/research #ia"
+    }
+  },
+  {
+    "text": "note pour plus tard ce lien : https://www.lemonde.fr/un-article",
+    "intention": "wiki_capture",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/c",
+      "args": "https://www.lemonde.fr/un-article"
+    }
+  },
+  {
+    "text": "enregistre cette URL dans ma base",
+    "intention": "wiki_capture",
+    "registre": "poli",
+    "variante": "note_sans_url",
+    "action": {
+      "command": "/c",
+      "args": ""
+    }
+  },
+  {
+    "text": "à classer dans le wiki : https://exemple.org/page",
+    "intention": "wiki_capture",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/c",
+      "args": "https://exemple.org/page"
+    }
+  },
+  {
+    "text": "`/c #productivité` un truc intéressant sur la prise de notes https://exemple.org",
+    "intention": "wiki_capture",
+    "registre": "poli",
+    "variante": "url_avec_tags",
+    "action": {
+      "command": "/c",
+      "args": "https://exemple.org #productivité"
+    }
+  },
+  {
+    "text": "range ce lien dans mes sources",
+    "intention": "wiki_capture",
+    "registre": "poli",
+    "variante": "note_sans_url",
+    "action": {
+      "command": "/c",
+      "args": ""
+    }
+  },
+  {
+    "text": "capture #histoire https://fr.wikipedia.org/wiki/Big_Sur",
+    "intention": "wiki_capture",
+    "registre": "abrégé",
+    "variante": "url_avec_tags",
+    "action": {
+      "command": "/c",
+      "args": "https://fr.wikipedia.org/wiki/Big_Sur #histoire"
+    }
+  },
+  {
+    "text": "j'aimerais conserver cette page : https://exemple.org/x",
+    "intention": "wiki_capture",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/c",
+      "args": "https://exemple.org/x"
+    }
+  },
+  {
+    "text": "garde cette adresse, je l'ingérerai plus tard : https://exemple.org/y",
+    "intention": "wiki_capture",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/c",
+      "args": "https://exemple.org/y"
+    }
+  },
+  {
+    "text": "capture-moi ça stp : https://exemple.org/z",
+    "intention": "wiki_capture",
+    "registre": "familier",
+    "variante": "url_seule",
+    "action": {
+      "command": "/c",
+      "args": "https://exemple.org/z"
+    }
+  },
+  {
+    "text": "`/c` note : penser à relire l'article sur BM25",
+    "intention": "wiki_capture",
+    "registre": "poli",
+    "variante": "note_sans_url",
+    "action": {
+      "command": "/c",
+      "args": ""
+    }
+  },
+  {
+    "text": "sauvegarde ce lien #nlp https://aclanthology.org/abc",
+    "intention": "wiki_capture",
+    "registre": "poli",
+    "variante": "url_avec_tags",
+    "action": {
+      "command": "/c",
+      "args": "https://aclanthology.org/abc #nlp"
+    }
+  },
+  {
+    "text": "mets ce papier dans le wiki https://arxiv.org/abs/2106.00001",
+    "intention": "wiki_capture",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/c",
+      "args": "https://arxiv.org/abs/2106.00001"
+    }
+  },
+  {
+    "text": "pour mémoire, ce lien : https://exemple.org/memo",
+    "intention": "wiki_capture",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/c",
+      "args": "https://exemple.org/memo"
+    }
+  },
+  {
+    "text": "clip ça dans ma base de connaissances : https://exemple.org/clip",
+    "intention": "wiki_capture",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/c",
+      "args": "https://exemple.org/clip"
+    }
+  },
+  {
+    "text": "ingère les fichiers en attente",
+    "intention": "wiki_ingest",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/ingest",
+      "args": ""
+    }
+  },
+  {
+    "text": "lance l'ingestion",
+    "intention": "wiki_ingest",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": "/ingest",
+      "args": ""
+    }
+  },
+  {
+    "text": "`/ingest`",
+    "intention": "wiki_ingest",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": "/ingest",
+      "args": ""
+    }
+  },
+  {
+    "text": "traite la file d'attente du wiki",
+    "intention": "wiki_ingest",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/ingest",
+      "args": ""
+    }
+  },
+  {
+    "text": "ingère ce qui est en attente",
+    "intention": "wiki_ingest",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/ingest",
+      "args": ""
+    }
+  },
+  {
+    "text": "peux-tu lancer l'ingestion maintenant ?",
+    "intention": "wiki_ingest",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/ingest",
+      "args": ""
+    }
+  },
+  {
+    "text": "traite les captures en attente",
+    "intention": "wiki_ingest",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/ingest",
+      "args": ""
+    }
+  },
+  {
+    "text": "démarre le traitement des sources non ingérées",
+    "intention": "wiki_ingest",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/ingest",
+      "args": ""
+    }
+  },
+  {
+    "text": "ingestion stp",
+    "intention": "wiki_ingest",
+    "registre": "familier",
+    "variante": "sans_args",
+    "action": {
+      "command": "/ingest",
+      "args": ""
+    }
+  },
+  {
+    "text": "fais l'ingestion des fichiers capturés",
+    "intention": "wiki_ingest",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/ingest",
+      "args": ""
+    }
+  },
+  {
+    "text": "process la file wiki",
+    "intention": "wiki_ingest",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": "/ingest",
+      "args": ""
+    }
+  },
+  {
+    "text": "lance le worker d'ingestion",
+    "intention": "wiki_ingest",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": "/ingest",
+      "args": ""
+    }
+  },
+  {
+    "text": "intègre les documents en attente dans le wiki",
+    "intention": "wiki_ingest",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/ingest",
+      "args": ""
+    }
+  },
+  {
+    "text": "on peut ingérer maintenant ?",
+    "intention": "wiki_ingest",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/ingest",
+      "args": ""
+    }
+  },
+  {
+    "text": "vide la file d'ingestion",
+    "intention": "wiki_ingest",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": "/ingest",
+      "args": ""
+    }
+  },
+  {
+    "text": "ingère tout ce qui traîne",
+    "intention": "wiki_ingest",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/ingest",
+      "args": ""
+    }
+  },
+  {
+    "text": "déclenche l'ingestion des captures",
+    "intention": "wiki_ingest",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": "/ingest",
+      "args": ""
+    }
+  },
+  {
+    "text": "passe les fichiers en attente à l'ingestion",
+    "intention": "wiki_ingest",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/ingest",
+      "args": ""
+    }
+  },
+  {
+    "text": "traite les `.url` en attente",
+    "intention": "wiki_ingest",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/ingest",
+      "args": ""
+    }
+  },
+  {
+    "text": "lance l'indexation des sources capturées",
+    "intention": "wiki_ingest",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/ingest",
+      "args": ""
+    }
+  },
+  {
+    "text": "où en est l'ingestion ?",
+    "intention": "wiki_status",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/wiki-status",
+      "args": ""
+    }
+  },
+  {
+    "text": "`/wiki-status`",
+    "intention": "wiki_status",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": "/wiki-status",
+      "args": ""
+    }
+  },
+  {
+    "text": "quel est le statut du wiki ?",
+    "intention": "wiki_status",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/wiki-status",
+      "args": ""
+    }
+  },
+  {
+    "text": "combien de fichiers en attente ?",
+    "intention": "wiki_status",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/wiki-status",
+      "args": ""
+    }
+  },
+  {
+    "text": "l'ingestion est-elle terminée ?",
+    "intention": "wiki_status",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": "/wiki-status",
+      "args": ""
+    }
+  },
+  {
+    "text": "y a-t-il des fichiers bloqués ?",
+    "intention": "wiki_status",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/wiki-status",
+      "args": ""
+    }
+  },
+  {
+    "text": "statut de la base de connaissances",
+    "intention": "wiki_status",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/wiki-status",
+      "args": ""
+    }
+  },
+  {
+    "text": "est-ce que l'ingestion tourne en ce moment ?",
+    "intention": "wiki_status",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/wiki-status",
+      "args": ""
+    }
+  },
+  {
+    "text": "donne-moi l'état du traitement wiki",
+    "intention": "wiki_status",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/wiki-status",
+      "args": ""
+    }
+  },
+  {
+    "text": "quel est l'avancement de l'ingestion ?",
+    "intention": "wiki_status",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/wiki-status",
+      "args": ""
+    }
+  },
+  {
+    "text": "il reste des choses à ingérer ?",
+    "intention": "wiki_status",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/wiki-status",
+      "args": ""
+    }
+  },
+  {
+    "text": "le wiki est à jour ?",
+    "intention": "wiki_status",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/wiki-status",
+      "args": ""
+    }
+  },
+  {
+    "text": "état de la file d'ingestion",
+    "intention": "wiki_status",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/wiki-status",
+      "args": ""
+    }
+  },
+  {
+    "text": "est-ce que tout a été ingéré ?",
+    "intention": "wiki_status",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/wiki-status",
+      "args": ""
+    }
+  },
+  {
+    "text": "combien d'erreurs sur la dernière ingestion ?",
+    "intention": "wiki_status",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/wiki-status",
+      "args": ""
+    }
+  },
+  {
+    "text": "dernier run d'ingestion, ça a donné quoi ?",
+    "intention": "wiki_status",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/wiki-status",
+      "args": ""
+    }
+  },
+  {
+    "text": "y a-t-il un traitement en cours côté wiki ?",
+    "intention": "wiki_status",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/wiki-status",
+      "args": ""
+    }
+  },
+  {
+    "text": "fais le point sur l'ingestion",
+    "intention": "wiki_status",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/wiki-status",
+      "args": ""
+    }
+  },
+  {
+    "text": "statut ingestion stp",
+    "intention": "wiki_status",
+    "registre": "familier",
+    "variante": "sans_args",
+    "action": {
+      "command": "/wiki-status",
+      "args": ""
+    }
+  },
+  {
+    "text": "liste les fichiers en échec",
+    "intention": "wiki_status",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/wiki-status",
+      "args": ""
+    }
+  },
+  {
+    "text": "que dit le wiki sur l'attention ?",
+    "intention": "wiki_query",
+    "registre": "poli",
+    "variante": "question_courte",
+    "action": {
+      "command": "/q",
+      "args": "l'attention"
+    }
+  },
+  {
+    "text": "`/q comment fonctionne le Zettelkasten ?`",
+    "intention": "wiki_query",
+    "registre": "poli",
+    "variante": "question_courte",
+    "action": {
+      "command": "/q",
+      "args": "`/q comment fonctionne le Zettelkasten ?`"
+    }
+  },
+  {
+    "text": "cherche dans ma base : qu'est-ce que BM25 ?",
+    "intention": "wiki_query",
+    "registre": "poli",
+    "variante": "question_courte",
+    "action": {
+      "command": "/q",
+      "args": "qu'est-ce que BM25"
+    }
+  },
+  {
+    "text": "d'après mes notes, qui est Niklas Luhmann ?",
+    "intention": "wiki_query",
+    "registre": "poli",
+    "variante": "question_courte",
+    "action": {
+      "command": "/q",
+      "args": "qui est Niklas Luhmann"
+    }
+  },
+  {
+    "text": "interroge le wiki sur les transformeurs",
+    "intention": "wiki_query",
+    "registre": "poli",
+    "variante": "question_courte",
+    "action": {
+      "command": "/q",
+      "args": "les transformeurs"
+    }
+  },
+  {
+    "text": "qu'ai-je sauvegardé à propos de Marp ?",
+    "intention": "wiki_query",
+    "registre": "poli",
+    "variante": "question_courte",
+    "action": {
+      "command": "/q",
+      "args": "Marp"
+    }
+  },
+  {
+    "text": "résume ce que ma base dit sur la productivité",
+    "intention": "wiki_query",
+    "registre": "poli",
+    "variante": "question_courte",
+    "action": {
+      "command": "/q",
+      "args": "la productivité"
+    }
+  },
+  {
+    "text": "dans mon wiki, qu'est-ce qui parle de Big Sur ?",
+    "intention": "wiki_query",
+    "registre": "poli",
+    "variante": "question_courte",
+    "action": {
+      "command": "/q",
+      "args": ", qu'est-ce qui parle de Big Sur"
+    }
+  },
+  {
+    "text": "retrouve mes notes sur l'ingestion de documents",
+    "intention": "wiki_query",
+    "registre": "poli",
+    "variante": "question_courte",
+    "action": {
+      "command": "/q",
+      "args": "l'ingestion de documents"
+    }
+  },
+  {
+    "text": "que sais-je déjà sur la prise de notes ?",
+    "intention": "wiki_query",
+    "registre": "poli",
+    "variante": "question_courte",
+    "action": {
+      "command": "/q",
+      "args": "la prise de notes"
+    }
+  },
+  {
+    "text": "fais une synthèse de mes sources sur le RAG",
+    "intention": "wiki_query",
+    "registre": "poli",
+    "variante": "question_courte",
+    "action": {
+      "command": "/q",
+      "args": "le RAG"
+    }
+  },
+  {
+    "text": "cherche « confidential computing » dans le wiki",
+    "intention": "wiki_query",
+    "registre": "poli",
+    "variante": "question_courte",
+    "action": {
+      "command": "/q",
+      "args": "« confidential computing » dans le wiki"
+    }
+  },
+  {
+    "text": "quelles pages parlent d'anti-injection ?",
+    "intention": "wiki_query",
+    "registre": "poli",
+    "variante": "question_courte",
+    "action": {
+      "command": "/q",
+      "args": "quelles pages parlent d'anti-injection"
+    }
+  },
+  {
+    "text": "d'après le wiki, c'est quoi un MoE ?",
+    "intention": "wiki_query",
+    "registre": "poli",
+    "variante": "question_courte",
+    "action": {
+      "command": "/q",
+      "args": ", c'est quoi un MoE"
+    }
+  },
+  {
+    "text": "interroge ma base sur les adaptateurs LoRA",
+    "intention": "wiki_query",
+    "registre": "poli",
+    "variante": "question_courte",
+    "action": {
+      "command": "/q",
+      "args": "interroge ma base sur les adaptateurs LoRA"
+    }
+  },
+  {
+    "text": "qu'est-ce que j'ai noté sur Qwen ?",
+    "intention": "wiki_query",
+    "registre": "poli",
+    "variante": "question_courte",
+    "action": {
+      "command": "/q",
+      "args": "Qwen"
+    }
+  },
+  {
+    "text": "`/q` liste mes sources sur le markdown",
+    "intention": "wiki_query",
+    "registre": "poli",
+    "variante": "question_courte",
+    "action": {
+      "command": "/q",
+      "args": "`/q` liste mes sources sur le markdown"
+    }
+  },
+  {
+    "text": "dans mes documents, y a-t-il quelque chose sur Scout ?",
+    "intention": "wiki_query",
+    "registre": "poli",
+    "variante": "question_courte",
+    "action": {
+      "command": "/q",
+      "args": ", y a-t-il quelque chose sur Scout"
+    }
+  },
+  {
+    "text": "résume mes notes sur les TEE",
+    "intention": "wiki_query",
+    "registre": "poli",
+    "variante": "question_courte",
+    "action": {
+      "command": "/q",
+      "args": "les TEE"
+    }
+  },
+  {
+    "text": "que contient mon wiki au sujet de la productivité cognitive ?",
+    "intention": "wiki_query",
+    "registre": "poli",
+    "variante": "question_longue",
+    "action": {
+      "command": "/q",
+      "args": "la productivité cognitive"
+    }
+  },
+  {
+    "text": "que dit cette page : https://example.com ?",
+    "intention": "source_read",
+    "registre": "poli",
+    "variante": "url_avec_consigne",
+    "action": {
+      "command": "/source",
+      "args": "https://example.com"
+    }
+  },
+  {
+    "text": "`/source https://news.ycombinator.com`",
+    "intention": "source_read",
+    "registre": "abrégé",
+    "variante": "url_seule",
+    "action": {
+      "command": "/source",
+      "args": "https://news.ycombinator.com`"
+    }
+  },
+  {
+    "text": "résume-moi cet article : https://exemple.org/blog",
+    "intention": "source_read",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/source",
+      "args": "https://exemple.org/blog"
+    }
+  },
+  {
+    "text": "va lire cette page et dis-moi l'essentiel : https://exemple.org/x",
+    "intention": "source_read",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/source",
+      "args": "https://exemple.org/x"
+    }
+  },
+  {
+    "text": "de quoi parle ce lien ? https://exemple.org/y",
+    "intention": "source_read",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/source",
+      "args": "https://exemple.org/y"
+    }
+  },
+  {
+    "text": "peux-tu consulter cette URL et me résumer ? https://exemple.org/z",
+    "intention": "source_read",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/source",
+      "args": "https://exemple.org/z"
+    }
+  },
+  {
+    "text": "lis https://example.com et donne-moi les points clés",
+    "intention": "source_read",
+    "registre": "poli",
+    "variante": "url_avec_consigne",
+    "action": {
+      "command": "/source",
+      "args": "https://example.com"
+    }
+  },
+  {
+    "text": "qu'y a-t-il sur cette page ? https://exemple.org/page",
+    "intention": "source_read",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/source",
+      "args": "https://exemple.org/page"
+    }
+  },
+  {
+    "text": "extrais l'info principale de https://exemple.org/a",
+    "intention": "source_read",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/source",
+      "args": "https://exemple.org/a"
+    }
+  },
+  {
+    "text": "ouvre ce lien et résume https://exemple.org/b",
+    "intention": "source_read",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/source",
+      "args": "https://exemple.org/b"
+    }
+  },
+  {
+    "text": "c'est quoi le contenu de https://exemple.org/c ?",
+    "intention": "source_read",
+    "registre": "poli",
+    "variante": "url_avec_consigne",
+    "action": {
+      "command": "/source",
+      "args": "https://exemple.org/c"
+    }
+  },
+  {
+    "text": "donne-moi un aperçu de cette page https://exemple.org/d",
+    "intention": "source_read",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/source",
+      "args": "https://exemple.org/d"
+    }
+  },
+  {
+    "text": "`/source` résume cet article de blog https://exemple.org/e",
+    "intention": "source_read",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/source",
+      "args": "https://exemple.org/e"
+    }
+  },
+  {
+    "text": "vérifie ce que raconte cette page https://exemple.org/f",
+    "intention": "source_read",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/source",
+      "args": "https://exemple.org/f"
+    }
+  },
+  {
+    "text": "je veux savoir ce que dit https://exemple.org/g sans le garder",
+    "intention": "source_read",
+    "registre": "poli",
+    "variante": "url_avec_consigne",
+    "action": {
+      "command": "/source",
+      "args": "https://exemple.org/g"
+    }
+  },
+  {
+    "text": "parcours cette URL et fais-moi un résumé https://exemple.org/h",
+    "intention": "source_read",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/source",
+      "args": "https://exemple.org/h"
+    }
+  },
+  {
+    "text": "dis-moi en deux lignes ce que contient https://exemple.org/i",
+    "intention": "source_read",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/source",
+      "args": "https://exemple.org/i"
+    }
+  },
+  {
+    "text": "cette page parle de quoi ? https://exemple.org/j",
+    "intention": "source_read",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/source",
+      "args": "https://exemple.org/j"
+    }
+  },
+  {
+    "text": "consulte https://exemple.org/k pour moi",
+    "intention": "source_read",
+    "registre": "abrégé",
+    "variante": "url_avec_consigne",
+    "action": {
+      "command": "/source",
+      "args": "https://exemple.org/k"
+    }
+  },
+  {
+    "text": "lis-moi cet article (juste lire, pas l'enregistrer) https://exemple.org/l",
+    "intention": "source_read",
+    "registre": "poli",
+    "variante": "url_seule",
+    "action": {
+      "command": "/source",
+      "args": "https://exemple.org/l"
+    }
+  },
+  {
+    "text": "envoie un mail à Paul pour décaler la réunion",
+    "intention": "gog_mail",
+    "registre": "poli",
+    "variante": "envoi",
+    "action": {
+      "command": "/mail",
+      "args": "envoie un mail à Paul pour décaler la réunion"
+    }
+  },
+  {
+    "text": "`/mail` lis mes derniers mails",
+    "intention": "gog_mail",
+    "registre": "poli",
+    "variante": "lecture",
+    "action": {
+      "command": "/mail",
+      "args": "`/mail` lis mes derniers mails"
+    }
+  },
+  {
+    "text": "ai-je reçu un message de la banque ?",
+    "intention": "gog_mail",
+    "registre": "poli",
+    "variante": "lecture",
+    "action": {
+      "command": "/mail",
+      "args": "ai-je reçu un message de la banque ?"
+    }
+  },
+  {
+    "text": "réponds à Marie que c'est d'accord",
+    "intention": "gog_mail",
+    "registre": "poli",
+    "variante": "envoi",
+    "action": {
+      "command": "/mail",
+      "args": "réponds à Marie que c'est d'accord"
+    }
+  },
+  {
+    "text": "écris un mail à l'équipe pour annoncer la livraison",
+    "intention": "gog_mail",
+    "registre": "poli",
+    "variante": "envoi",
+    "action": {
+      "command": "/mail",
+      "args": "écris un mail à l'équipe pour annoncer la livraison"
+    }
+  },
+  {
+    "text": "y a-t-il des mails non lus ?",
+    "intention": "gog_mail",
+    "registre": "poli",
+    "variante": "lecture",
+    "action": {
+      "command": "/mail",
+      "args": "y a-t-il des mails non lus ?"
+    }
+  },
+  {
+    "text": "cherche le mail de l'assurance",
+    "intention": "gog_mail",
+    "registre": "poli",
+    "variante": "recherche",
+    "action": {
+      "command": "/mail",
+      "args": "cherche le mail de l'assurance"
+    }
+  },
+  {
+    "text": "transfère ce message à Jean",
+    "intention": "gog_mail",
+    "registre": "poli",
+    "variante": "envoi",
+    "action": {
+      "command": "/mail",
+      "args": "transfère ce message à Jean"
+    }
+  },
+  {
+    "text": "envoie un courriel à contact@exemple.org avec le compte-rendu",
+    "intention": "gog_mail",
+    "registre": "poli",
+    "variante": "envoi",
+    "action": {
+      "command": "/mail",
+      "args": "envoie un courriel à contact@exemple.org avec le compte-rendu"
+    }
+  },
+  {
+    "text": "résume mes mails d'aujourd'hui",
+    "intention": "gog_mail",
+    "registre": "abrégé",
+    "variante": "lecture",
+    "action": {
+      "command": "/mail",
+      "args": "résume mes mails d'aujourd'hui"
+    }
+  },
+  {
+    "text": "`/mail` rédige une relance pour le devis",
+    "intention": "gog_mail",
+    "registre": "poli",
+    "variante": "envoi",
+    "action": {
+      "command": "/mail",
+      "args": "`/mail` rédige une relance pour le devis"
+    }
+  },
+  {
+    "text": "relève ma boîte",
+    "intention": "gog_mail",
+    "registre": "abrégé",
+    "variante": "lecture",
+    "action": {
+      "command": "/mail",
+      "args": "relève ma boîte"
+    }
+  },
+  {
+    "text": "qui m'a écrit ce matin ?",
+    "intention": "gog_mail",
+    "registre": "poli",
+    "variante": "recherche",
+    "action": {
+      "command": "/mail",
+      "args": "qui m'a écrit ce matin ?"
+    }
+  },
+  {
+    "text": "réponds à ce fil que je confirme ma présence",
+    "intention": "gog_mail",
+    "registre": "poli",
+    "variante": "envoi",
+    "action": {
+      "command": "/mail",
+      "args": "réponds à ce fil que je confirme ma présence"
+    }
+  },
+  {
+    "text": "envoie à Sophie les coordonnées du restaurant",
+    "intention": "gog_mail",
+    "registre": "poli",
+    "variante": "envoi",
+    "action": {
+      "command": "/mail",
+      "args": "envoie à Sophie les coordonnées du restaurant"
+    }
+  },
+  {
+    "text": "ai-je un mail d'Infomaniak ?",
+    "intention": "gog_mail",
+    "registre": "poli",
+    "variante": "recherche",
+    "action": {
+      "command": "/mail",
+      "args": "ai-je un mail d'Infomaniak ?"
+    }
+  },
+  {
+    "text": "classe ce mail dans « factures »",
+    "intention": "gog_mail",
+    "registre": "poli",
+    "variante": "recherche",
+    "action": {
+      "command": "/mail",
+      "args": "classe ce mail dans « factures »"
+    }
+  },
+  {
+    "text": "écris à mon comptable pour le rendez-vous",
+    "intention": "gog_mail",
+    "registre": "poli",
+    "variante": "envoi",
+    "action": {
+      "command": "/mail",
+      "args": "écris à mon comptable pour le rendez-vous"
+    }
+  },
+  {
+    "text": "montre-moi le dernier mail de Christian",
+    "intention": "gog_mail",
+    "registre": "poli",
+    "variante": "recherche",
+    "action": {
+      "command": "/mail",
+      "args": "montre-moi le dernier mail de Christian"
+    }
+  },
+  {
+    "text": "envoie un mot de remerciement à l'organisateur",
+    "intention": "gog_mail",
+    "registre": "poli",
+    "variante": "envoi",
+    "action": {
+      "command": "/mail",
+      "args": "envoie un mot de remerciement à l'organisateur"
+    }
+  },
+  {
+    "text": "qu'est-ce que j'ai demain ?",
+    "intention": "gog_calendar",
+    "registre": "poli",
+    "variante": "lecture",
+    "action": {
+      "command": "/agenda",
+      "args": "qu'est-ce que j'ai demain ?"
+    }
+  },
+  {
+    "text": "`/agenda` ajoute « dentiste » jeudi 15h",
+    "intention": "gog_calendar",
+    "registre": "poli",
+    "variante": "creation",
+    "action": {
+      "command": "/agenda",
+      "args": "`/agenda` ajoute « dentiste » jeudi 15h"
+    }
+  },
+  {
+    "text": "crée un rendez-vous avec Paul lundi matin",
+    "intention": "gog_calendar",
+    "registre": "poli",
+    "variante": "creation",
+    "action": {
+      "command": "/agenda",
+      "args": "crée un rendez-vous avec Paul lundi matin"
+    }
+  },
+  {
+    "text": "suis-je libre vendredi après-midi ?",
+    "intention": "gog_calendar",
+    "registre": "poli",
+    "variante": "lecture",
+    "action": {
+      "command": "/agenda",
+      "args": "suis-je libre vendredi après-midi ?"
+    }
+  },
+  {
+    "text": "déplace ma réunion de 10h à 14h",
+    "intention": "gog_calendar",
+    "registre": "poli",
+    "variante": "suppression",
+    "action": {
+      "command": "/agenda",
+      "args": "déplace ma réunion de 10h à 14h"
+    }
+  },
+  {
+    "text": "quel est mon programme de la semaine ?",
+    "intention": "gog_calendar",
+    "registre": "poli",
+    "variante": "lecture",
+    "action": {
+      "command": "/agenda",
+      "args": "quel est mon programme de la semaine ?"
+    }
+  },
+  {
+    "text": "ajoute un créneau « sport » tous les mardis 18h",
+    "intention": "gog_calendar",
+    "registre": "poli",
+    "variante": "creation",
+    "action": {
+      "command": "/agenda",
+      "args": "ajoute un créneau « sport » tous les mardis 18h"
+    }
+  },
+  {
+    "text": "annule mon rendez-vous de demain",
+    "intention": "gog_calendar",
+    "registre": "poli",
+    "variante": "suppression",
+    "action": {
+      "command": "/agenda",
+      "args": "annule mon rendez-vous de demain"
+    }
+  },
+  {
+    "text": "quand ai-je mon prochain rendez-vous médical ?",
+    "intention": "gog_calendar",
+    "registre": "poli",
+    "variante": "lecture",
+    "action": {
+      "command": "/agenda",
+      "args": "quand ai-je mon prochain rendez-vous médical ?"
+    }
+  },
+  {
+    "text": "bloque deux heures jeudi pour la présentation",
+    "intention": "gog_calendar",
+    "registre": "poli",
+    "variante": "creation",
+    "action": {
+      "command": "/agenda",
+      "args": "bloque deux heures jeudi pour la présentation"
+    }
+  },
+  {
+    "text": "`/agenda` mes événements d'aujourd'hui",
+    "intention": "gog_calendar",
+    "registre": "abrégé",
+    "variante": "lecture",
+    "action": {
+      "command": "/agenda",
+      "args": "`/agenda` mes événements d'aujourd'hui"
+    }
+  },
+  {
+    "text": "planifie un appel avec l'équipe mercredi 11h",
+    "intention": "gog_calendar",
+    "registre": "poli",
+    "variante": "creation",
+    "action": {
+      "command": "/agenda",
+      "args": "planifie un appel avec l'équipe mercredi 11h"
+    }
+  },
+  {
+    "text": "ai-je un conflit lundi entre 9h et 11h ?",
+    "intention": "gog_calendar",
+    "registre": "poli",
+    "variante": "lecture",
+    "action": {
+      "command": "/agenda",
+      "args": "ai-je un conflit lundi entre 9h et 11h ?"
+    }
+  },
+  {
+    "text": "rappelle-moi l'heure de la réunion de demain",
+    "intention": "gog_calendar",
+    "registre": "poli",
+    "variante": "lecture",
+    "action": {
+      "command": "/agenda",
+      "args": "rappelle-moi l'heure de la réunion de demain"
+    }
+  },
+  {
+    "text": "crée un événement « anniversaire » le 20 juin",
+    "intention": "gog_calendar",
+    "registre": "poli",
+    "variante": "creation",
+    "action": {
+      "command": "/agenda",
+      "args": "crée un événement « anniversaire » le 20 juin"
+    }
+  },
+  {
+    "text": "qu'y a-t-il à mon agenda ce week-end ?",
+    "intention": "gog_calendar",
+    "registre": "poli",
+    "variante": "lecture",
+    "action": {
+      "command": "/agenda",
+      "args": "qu'y a-t-il à mon agenda ce week-end ?"
+    }
+  },
+  {
+    "text": "décale tous mes rendez-vous d'une heure",
+    "intention": "gog_calendar",
+    "registre": "poli",
+    "variante": "suppression",
+    "action": {
+      "command": "/agenda",
+      "args": "décale tous mes rendez-vous d'une heure"
+    }
+  },
+  {
+    "text": "invite Marie à la réunion de jeudi",
+    "intention": "gog_calendar",
+    "registre": "poli",
+    "variante": "creation",
+    "action": {
+      "command": "/agenda",
+      "args": "invite Marie à la réunion de jeudi"
+    }
+  },
+  {
+    "text": "réserve mon vendredi matin",
+    "intention": "gog_calendar",
+    "registre": "abrégé",
+    "variante": "creation",
+    "action": {
+      "command": "/agenda",
+      "args": "réserve mon vendredi matin"
+    }
+  },
+  {
+    "text": "liste mes rendez-vous de la semaine prochaine",
+    "intention": "gog_calendar",
+    "registre": "poli",
+    "variante": "lecture",
+    "action": {
+      "command": "/agenda",
+      "args": "liste mes rendez-vous de la semaine prochaine"
+    }
+  },
+  {
+    "text": "retrouve le document « budget 2026 » sur mon drive",
+    "intention": "gog_drive",
+    "registre": "poli",
+    "variante": "recherche",
+    "action": {
+      "command": "/drive",
+      "args": "retrouve le document « budget 2026 » sur mon drive"
+    }
+  },
+  {
+    "text": "`/drive` liste mes fichiers récents",
+    "intention": "gog_drive",
+    "registre": "poli",
+    "variante": "liste",
+    "action": {
+      "command": "/drive",
+      "args": "`/drive` liste mes fichiers récents"
+    }
+  },
+  {
+    "text": "partage le fichier « présentation » avec Paul",
+    "intention": "gog_drive",
+    "registre": "poli",
+    "variante": "partage",
+    "action": {
+      "command": "/drive",
+      "args": "partage le fichier « présentation » avec Paul"
+    }
+  },
+  {
+    "text": "crée un dossier « Secretarius » sur le drive",
+    "intention": "gog_drive",
+    "registre": "poli",
+    "variante": "partage",
+    "action": {
+      "command": "/drive",
+      "args": "crée un dossier « Secretarius » sur le drive"
+    }
+  },
+  {
+    "text": "où est le PDF du contrat ?",
+    "intention": "gog_drive",
+    "registre": "poli",
+    "variante": "recherche",
+    "action": {
+      "command": "/drive",
+      "args": "où est le PDF du contrat ?"
+    }
+  },
+  {
+    "text": "télécharge le tableur des dépenses",
+    "intention": "gog_drive",
+    "registre": "poli",
+    "variante": "partage",
+    "action": {
+      "command": "/drive",
+      "args": "télécharge le tableur des dépenses"
+    }
+  },
+  {
+    "text": "cherche sur mon drive les fichiers contenant « facture »",
+    "intention": "gog_drive",
+    "registre": "poli",
+    "variante": "recherche",
+    "action": {
+      "command": "/drive",
+      "args": "cherche sur mon drive les fichiers contenant « facture »"
+    }
+  },
+  {
+    "text": "envoie-moi le lien du document partagé",
+    "intention": "gog_drive",
+    "registre": "poli",
+    "variante": "partage",
+    "action": {
+      "command": "/drive",
+      "args": "envoie-moi le lien du document partagé"
+    }
+  },
+  {
+    "text": "`/drive` ouvre le dernier fichier modifié",
+    "intention": "gog_drive",
+    "registre": "poli",
+    "variante": "recherche",
+    "action": {
+      "command": "/drive",
+      "args": "`/drive` ouvre le dernier fichier modifié"
+    }
+  },
+  {
+    "text": "fais une copie de ce document",
+    "intention": "gog_drive",
+    "registre": "poli",
+    "variante": "partage",
+    "action": {
+      "command": "/drive",
+      "args": "fais une copie de ce document"
+    }
+  },
+  {
+    "text": "quels fichiers ai-je ajoutés cette semaine ?",
+    "intention": "gog_drive",
+    "registre": "poli",
+    "variante": "liste",
+    "action": {
+      "command": "/drive",
+      "args": "quels fichiers ai-je ajoutés cette semaine ?"
+    }
+  },
+  {
+    "text": "déplace ce fichier dans le dossier « archives »",
+    "intention": "gog_drive",
+    "registre": "poli",
+    "variante": "partage",
+    "action": {
+      "command": "/drive",
+      "args": "déplace ce fichier dans le dossier « archives »"
+    }
+  },
+  {
+    "text": "donne accès en lecture à Marie sur ce dossier",
+    "intention": "gog_drive",
+    "registre": "poli",
+    "variante": "partage",
+    "action": {
+      "command": "/drive",
+      "args": "donne accès en lecture à Marie sur ce dossier"
+    }
+  },
+  {
+    "text": "retrouve mes notes de réunion sur le drive",
+    "intention": "gog_drive",
+    "registre": "poli",
+    "variante": "recherche",
+    "action": {
+      "command": "/drive",
+      "args": "retrouve mes notes de réunion sur le drive"
+    }
+  },
+  {
+    "text": "supprime le fichier « brouillon »",
+    "intention": "gog_drive",
+    "registre": "poli",
+    "variante": "partage",
+    "action": {
+      "command": "/drive",
+      "args": "supprime le fichier « brouillon »"
+    }
+  },
+  {
+    "text": "liste le contenu du dossier « projets »",
+    "intention": "gog_drive",
+    "registre": "poli",
+    "variante": "liste",
+    "action": {
+      "command": "/drive",
+      "args": "liste le contenu du dossier « projets »"
+    }
+  },
+  {
+    "text": "quel est le lien de partage de ce document ?",
+    "intention": "gog_drive",
+    "registre": "poli",
+    "variante": "partage",
+    "action": {
+      "command": "/drive",
+      "args": "quel est le lien de partage de ce document ?"
+    }
+  },
+  {
+    "text": "cherche la dernière version du rapport",
+    "intention": "gog_drive",
+    "registre": "poli",
+    "variante": "recherche",
+    "action": {
+      "command": "/drive",
+      "args": "cherche la dernière version du rapport"
+    }
+  },
+  {
+    "text": "crée un document vierge « compte-rendu »",
+    "intention": "gog_drive",
+    "registre": "poli",
+    "variante": "partage",
+    "action": {
+      "command": "/drive",
+      "args": "crée un document vierge « compte-rendu »"
+    }
+  },
+  {
+    "text": "montre-moi les fichiers partagés avec moi",
+    "intention": "gog_drive",
+    "registre": "poli",
+    "variante": "partage",
+    "action": {
+      "command": "/drive",
+      "args": "montre-moi les fichiers partagés avec moi"
+    }
+  },
+  {
+    "text": "qui êtes-vous ?",
+    "intention": "meta_assistant",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": "/help",
+      "args": ""
+    }
+  },
+  {
+    "text": "quel modèle vous anime ?",
+    "intention": "meta_assistant",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/help",
+      "args": ""
+    }
+  },
+  {
+    "text": "que savez-vous faire ?",
+    "intention": "meta_assistant",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": "/help",
+      "args": ""
+    }
+  },
+  {
+    "text": "quelles sont vos commandes ?",
+    "intention": "meta_assistant",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/help",
+      "args": ""
+    }
+  },
+  {
+    "text": "`/help`",
+    "intention": "meta_assistant",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": "/help",
+      "args": ""
+    }
+  },
+  {
+    "text": "comment je capture une page dans le wiki ?",
+    "intention": "meta_assistant",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/help",
+      "args": ""
+    }
+  },
+  {
+    "text": "peux-tu m'expliquer ce que tu sais faire ?",
+    "intention": "meta_assistant",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/help",
+      "args": ""
+    }
+  },
+  {
+    "text": "à quoi sers-tu ?",
+    "intention": "meta_assistant",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": "/help",
+      "args": ""
+    }
+  },
+  {
+    "text": "tu tournes sur quel LLM ?",
+    "intention": "meta_assistant",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/help",
+      "args": ""
+    }
+  },
+  {
+    "text": "quelles intentions comprends-tu ?",
+    "intention": "meta_assistant",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": "/help",
+      "args": ""
+    }
+  },
+  {
+    "text": "bonjour",
+    "intention": "meta_assistant",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": "/help",
+      "args": ""
+    }
+  },
+  {
+    "text": "comment fonctionne l'ingestion ici ?",
+    "intention": "meta_assistant",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/help",
+      "args": ""
+    }
+  },
+  {
+    "text": "liste tes capacités",
+    "intention": "meta_assistant",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": "/help",
+      "args": ""
+    }
+  },
+  {
+    "text": "quelle est la différence entre capturer et ingérer ?",
+    "intention": "meta_assistant",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/help",
+      "args": ""
+    }
+  },
+  {
+    "text": "es-tu connecté à mon agenda ?",
+    "intention": "meta_assistant",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/help",
+      "args": ""
+    }
+  },
+  {
+    "text": "`/commands`",
+    "intention": "meta_assistant",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": "/help",
+      "args": ""
+    }
+  },
+  {
+    "text": "tu peux accéder à mes mails ?",
+    "intention": "meta_assistant",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/help",
+      "args": ""
+    }
+  },
+  {
+    "text": "quelles sont tes limites ?",
+    "intention": "meta_assistant",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/help",
+      "args": ""
+    }
+  },
+  {
+    "text": "comment te donner une URL à lire ?",
+    "intention": "meta_assistant",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/help",
+      "args": ""
+    }
+  },
+  {
+    "text": "merci, c'est noté",
+    "intention": "meta_assistant",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": "/help",
+      "args": ""
+    }
+  },
+  {
+    "text": "commande une pizza",
+    "intention": "out_of_scope",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": null,
+      "args": ""
+    }
+  },
+  {
+    "text": "réserve un billet de train pour Lyon",
+    "intention": "out_of_scope",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": null,
+      "args": ""
+    }
+  },
+  {
+    "text": "allume les lumières du salon",
+    "intention": "out_of_scope",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": null,
+      "args": ""
+    }
+  },
+  {
+    "text": "passe un appel à Paul",
+    "intention": "out_of_scope",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": null,
+      "args": ""
+    }
+  },
+  {
+    "text": "envoie un SMS à Marie",
+    "intention": "out_of_scope",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": null,
+      "args": ""
+    }
+  },
+  {
+    "text": "quel temps fera-t-il demain ?",
+    "intention": "out_of_scope",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": null,
+      "args": ""
+    }
+  },
+  {
+    "text": "mets de la musique",
+    "intention": "out_of_scope",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": null,
+      "args": ""
+    }
+  },
+  {
+    "text": "achète ce produit sur Amazon",
+    "intention": "out_of_scope",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": null,
+      "args": ""
+    }
+  },
+  {
+    "text": "règle un minuteur de 10 minutes",
+    "intention": "out_of_scope",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": null,
+      "args": ""
+    }
+  },
+  {
+    "text": "fais un virement de 50 € à Jean",
+    "intention": "out_of_scope",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": null,
+      "args": ""
+    }
+  },
+  {
+    "text": "poste ce message sur les réseaux sociaux",
+    "intention": "out_of_scope",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": null,
+      "args": ""
+    }
+  },
+  {
+    "text": "imprime ce document",
+    "intention": "out_of_scope",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": null,
+      "args": ""
+    }
+  },
+  {
+    "text": "lance une recherche Google sur les LLM",
+    "intention": "out_of_scope",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": null,
+      "args": ""
+    }
+  },
+  {
+    "text": "prends une photo",
+    "intention": "out_of_scope",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": null,
+      "args": ""
+    }
+  },
+  {
+    "text": "ajoute un rappel sur mon téléphone",
+    "intention": "out_of_scope",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": null,
+      "args": ""
+    }
+  },
+  {
+    "text": "transcris ce fichier audio",
+    "intention": "out_of_scope",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": null,
+      "args": ""
+    }
+  },
+  {
+    "text": "réserve une table au restaurant",
+    "intention": "out_of_scope",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": null,
+      "args": ""
+    }
+  },
+  {
+    "text": "quelle heure est-il à Tokyo ?",
+    "intention": "out_of_scope",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": null,
+      "args": ""
+    }
+  },
+  {
+    "text": "télécharge cette vidéo YouTube",
+    "intention": "out_of_scope",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": null,
+      "args": ""
+    }
+  },
+  {
+    "text": "traduis et envoie ce contrat par fax",
+    "intention": "out_of_scope",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": null,
+      "args": ""
+    }
+  },
+  {
+    "text": "/c @simple #notion ma note sur la productivité",
+    "intention": "wiki_capture",
+    "registre": "télégraphique",
+    "variante": "avec_directive_simple",
+    "action": {
+      "command": "/c",
+      "args": "@simple #notion ma note sur la productivité"
+    }
+  },
+  {
+    "text": "capture @simple cette note rapide #idée",
+    "intention": "wiki_capture",
+    "registre": "familier",
+    "variante": "avec_directive_simple",
+    "action": {
+      "command": "/c",
+      "args": "@simple #idée cette note rapide"
+    }
+  },
+  {
+    "text": "sauvegarde directement dans sources @simple : réflexions sur le RAG",
+    "intention": "wiki_capture",
+    "registre": "poli",
+    "variante": "avec_directive_simple",
+    "action": {
+      "command": "/c",
+      "args": "@simple réflexions sur le RAG"
+    }
+  },
+  {
+    "text": "/c file:/home/user/notes.md #ia",
+    "intention": "wiki_capture",
+    "registre": "télégraphique",
+    "variante": "avec_fichier",
+    "action": {
+      "command": "/c",
+      "args": "file:/home/user/notes.md #ia"
+    }
+  },
+  {
+    "text": "capture le contenu de ce fichier : file:/home/user/rapport.md",
+    "intention": "wiki_capture",
+    "registre": "formel",
+    "variante": "avec_fichier",
+    "action": {
+      "command": "/c",
+      "args": "file:/home/user/rapport.md"
+    }
+  },
+  {
+    "text": "ajoute ce fichier à mon wiki file:/home/user/doc.txt #documentation",
+    "intention": "wiki_capture",
+    "registre": "poli",
+    "variante": "avec_fichier",
+    "action": {
+      "command": "/c",
+      "args": "file:/home/user/doc.txt #documentation"
+    }
+  },
+  {
+    "text": "/c ref:bm25-intro note complémentaire sur BM25",
+    "intention": "wiki_capture",
+    "registre": "télégraphique",
+    "variante": "avec_ref",
+    "action": {
+      "command": "/c",
+      "args": "ref:bm25-intro note complémentaire sur BM25"
+    }
+  },
+  {
+    "text": "capture avec référence à l'article zettelkasten ref:zettelkasten-intro",
+    "intention": "wiki_capture",
+    "registre": "poli",
+    "variante": "avec_ref",
+    "action": {
+      "command": "/c",
+      "args": "ref:zettelkasten-intro"
+    }
+  },
+  {
+    "text": "note liée ref:colbert-paper : les embeddings multi-vecteurs sont plus précis",
+    "intention": "wiki_capture",
+    "registre": "abrégé",
+    "variante": "avec_ref",
+    "action": {
+      "command": "/c",
+      "args": "ref:colbert-paper les embeddings multi-vecteurs sont plus précis"
+    }
+  }
+]
