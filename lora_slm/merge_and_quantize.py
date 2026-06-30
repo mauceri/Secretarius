@@ -24,6 +24,7 @@ import argparse
 import os
 from pathlib import Path
 import subprocess
+import sys
 import logging
 from typing import List
 
@@ -90,7 +91,7 @@ def quantize_gguf(merged_dir: str, gguf_dir: str, llama_cpp: str, qtypes: List[s
 
     print(f"[gguf] Conversion HF -> GGUF (f16) vers {f16_path}")
     log.info(f"[gguf] Conversion HF -> GGUF (f16) vers {f16_path}")
-    run(["python3", convert_script, "--outtype", "f16", "--outfile", f16_path, merged_dir])
+    run([sys.executable, convert_script, "--outtype", "f16", "--outfile", f16_path, merged_dir])
 
     for q in qtypes:
         out_path = os.path.join(gguf_dir, f"model-{q}.gguf")
