@@ -365,7 +365,7 @@ def main():
         train_dataset=train_dataset_final,
         eval_dataset=None,
         data_collator=collator,
-        tokenizer=tok,
+        processing_class=tok,
         callbacks=[loss_logger],
     )
     train_result = trainer.train(resume_from_checkpoint=args.resume_from)
