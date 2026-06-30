@@ -121,3 +121,38 @@ def test_parse_seed_backtick_lines(tmp_path):
     assert all("`" not in e["action"]["args"] for e in captures)
     queries = [e for e in entries if e["intention"] == "wiki_query"]
     assert all("`" not in e["action"]["args"] for e in queries)
+
+
+# --- Tests structural_score et build_trainset ---
+
+def test_structural_score_valid():
+    from promptGenGEPA import structural_score
+    assert structural_score({"command": "/c", "args": "https://ex.com"}, {"intention": "wiki_capture"}) == 1.0
+
+def test_structural_score_missing_args():
+    from promptGenGEPA import structural_score
+    assert structural_score({"command": "/c", "args": ""}, {"intention": "wiki_capture"}) == 0.5
+
+def test_structural_score_no_args_required():
+    from promptGenGEPA import structural_score
+    assert structural_score({"command": "/ingest", "args": ""}, {"intention": "wiki_ingest"}) == 1.0
+
+def test_structural_score_out_of_scope():
+    from promptGenGEPA import structural_score
+    assert structural_score({"command": "null", "args": ""}, {"intention": "out_of_scope"}) == 1.0
+
+def test_structural_score_wrong_command():
+    from promptGenGEPA import structural_score
+    assert structural_score({"command": "/inexistant", "args": "x"}, {"intention": "wiki_capture"}) < 1.0
+
+def test_build_trainset():
+    from promptGenGEPA import build_trainset
+    seed = [{"text": "garde ce lien", "intention": "wiki_capture", "registre": "familier",
+              "variante": "url_seule", "action": {"command": "/c", "args": "https://ex.com"}}]
+    trainset = build_trainset(seed)
+    assert len(trainset) == 1
+    ex = trainset[0]
+    assert ex.intention == "wiki_capture"
+    assert ex.text == "garde ce lien"
+    assert ex.command == "/c"
+    assert ex.args == "https://ex.com"
