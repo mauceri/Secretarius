@@ -1,22 +1,22 @@
 [
   {
-    "text": "`/c https://marp.app/#get-started`",
+    "text": "/c https://marp.app/#get-started",
     "intention": "wiki_capture",
-    "registre": "abrégé",
+    "registre": "télégraphique",
     "variante": "url_avec_tags",
     "action": {
       "command": "/c",
-      "args": "https://marp.app/#get-started` #get"
+      "args": "https://marp.app/#get-started #get"
     }
   },
   {
-    "text": "`/c #markdown #presentation https://marp.app/#get-started`",
+    "text": "/c #markdown #presentation https://marp.app/#get-started",
     "intention": "wiki_capture",
-    "registre": "abrégé",
+    "registre": "télégraphique",
     "variante": "url_avec_tags",
     "action": {
       "command": "/c",
-      "args": "https://marp.app/#get-started` #markdown #presentation #get"
+      "args": "https://marp.app/#get-started #markdown #presentation #get"
     }
   },
   {
@@ -90,9 +90,9 @@
     }
   },
   {
-    "text": "`/c #productivité` un truc intéressant sur la prise de notes https://exemple.org",
+    "text": "/c #productivité un truc intéressant sur la prise de notes https://exemple.org",
     "intention": "wiki_capture",
-    "registre": "poli",
+    "registre": "télégraphique",
     "variante": "url_avec_tags",
     "action": {
       "command": "/c",
@@ -150,9 +150,9 @@
     }
   },
   {
-    "text": "`/c` note : penser à relire l'article sur BM25",
+    "text": "/c note : penser à relire l'article sur BM25",
     "intention": "wiki_capture",
-    "registre": "poli",
+    "registre": "télégraphique",
     "variante": "note_sans_url",
     "action": {
       "command": "/c",
@@ -220,9 +220,9 @@
     }
   },
   {
-    "text": "`/ingest`",
+    "text": "/ingest",
     "intention": "wiki_ingest",
-    "registre": "abrégé",
+    "registre": "télégraphique",
     "variante": "sans_args",
     "action": {
       "command": "/ingest",
@@ -380,7 +380,7 @@
     }
   },
   {
-    "text": "traite les `.url` en attente",
+    "text": "traite les .url en attente",
     "intention": "wiki_ingest",
     "registre": "poli",
     "variante": "sans_args",
@@ -410,9 +410,9 @@
     }
   },
   {
-    "text": "`/wiki-status`",
+    "text": "/wiki-status",
     "intention": "wiki_status",
-    "registre": "abrégé",
+    "registre": "télégraphique",
     "variante": "sans_args",
     "action": {
       "command": "/wiki-status",
@@ -610,13 +610,13 @@
     }
   },
   {
-    "text": "`/q comment fonctionne le Zettelkasten ?`",
+    "text": "/q comment fonctionne le Zettelkasten ?",
     "intention": "wiki_query",
-    "registre": "poli",
+    "registre": "télégraphique",
     "variante": "question_courte",
     "action": {
       "command": "/q",
-      "args": "`/q comment fonctionne le Zettelkasten ?`"
+      "args": "comment fonctionne le Zettelkasten"
     }
   },
   {
@@ -760,13 +760,13 @@
     }
   },
   {
-    "text": "`/q` liste mes sources sur le markdown",
+    "text": "/q liste mes sources sur le markdown",
     "intention": "wiki_query",
-    "registre": "poli",
+    "registre": "télégraphique",
     "variante": "question_courte",
     "action": {
       "command": "/q",
-      "args": "`/q` liste mes sources sur le markdown"
+      "args": "le markdown"
     }
   },
   {
@@ -810,13 +810,13 @@
     }
   },
   {
-    "text": "`/source https://news.ycombinator.com`",
+    "text": "/source https://news.ycombinator.com",
     "intention": "source_read",
-    "registre": "abrégé",
+    "registre": "télégraphique",
     "variante": "url_seule",
     "action": {
       "command": "/source",
-      "args": "https://news.ycombinator.com`"
+      "args": "https://news.ycombinator.com"
     }
   },
   {
@@ -920,9 +920,9 @@
     }
   },
   {
-    "text": "`/source` résume cet article de blog https://exemple.org/e",
+    "text": "/source résume cet article de blog https://exemple.org/e",
     "intention": "source_read",
-    "registre": "poli",
+    "registre": "télégraphique",
     "variante": "url_seule",
     "action": {
       "command": "/source",
@@ -1010,13 +1010,13 @@
     }
   },
   {
-    "text": "`/mail` lis mes derniers mails",
+    "text": "/mail lis mes derniers mails",
     "intention": "gog_mail",
-    "registre": "poli",
+    "registre": "télégraphique",
     "variante": "lecture",
     "action": {
       "command": "/mail",
-      "args": "`/mail` lis mes derniers mails"
+      "args": "lis mes derniers mails"
     }
   },
   {
@@ -1100,13 +1100,13 @@
     }
   },
   {
-    "text": "`/mail` rédige une relance pour le devis",
+    "text": "/mail rédige une relance pour le devis",
     "intention": "gog_mail",
-    "registre": "poli",
+    "registre": "télégraphique",
     "variante": "envoi",
     "action": {
       "command": "/mail",
-      "args": "`/mail` rédige une relance pour le devis"
+      "args": "rédige une relance pour le devis"
     }
   },
   {
@@ -1210,13 +1210,13 @@
     }
   },
   {
-    "text": "`/agenda` ajoute « dentiste » jeudi 15h",
+    "text": "/agenda ajoute « dentiste » jeudi 15h",
     "intention": "gog_calendar",
-    "registre": "poli",
+    "registre": "télégraphique",
     "variante": "creation",
     "action": {
       "command": "/agenda",
-      "args": "`/agenda` ajoute « dentiste » jeudi 15h"
+      "args": "ajoute « dentiste » jeudi 15h"
     }
   },
   {
@@ -1300,13 +1300,13 @@
     }
   },
   {
-    "text": "`/agenda` mes événements d'aujourd'hui",
+    "text": "/agenda mes événements d'aujourd'hui",
     "intention": "gog_calendar",
-    "registre": "abrégé",
+    "registre": "télégraphique",
     "variante": "lecture",
     "action": {
       "command": "/agenda",
-      "args": "`/agenda` mes événements d'aujourd'hui"
+      "args": "mes événements d'aujourd'hui"
     }
   },
   {
@@ -1410,13 +1410,13 @@
     }
   },
   {
-    "text": "`/drive` liste mes fichiers récents",
+    "text": "/drive liste mes fichiers récents",
     "intention": "gog_drive",
-    "registre": "poli",
+    "registre": "télégraphique",
     "variante": "liste",
     "action": {
       "command": "/drive",
-      "args": "`/drive` liste mes fichiers récents"
+      "args": "liste mes fichiers récents"
     }
   },
   {
@@ -1480,13 +1480,13 @@
     }
   },
   {
-    "text": "`/drive` ouvre le dernier fichier modifié",
+    "text": "/drive ouvre le dernier fichier modifié",
     "intention": "gog_drive",
-    "registre": "poli",
+    "registre": "télégraphique",
     "variante": "recherche",
     "action": {
       "command": "/drive",
-      "args": "`/drive` ouvre le dernier fichier modifié"
+      "args": "ouvre le dernier fichier modifié"
     }
   },
   {
@@ -1640,9 +1640,9 @@
     }
   },
   {
-    "text": "`/help`",
+    "text": "/help",
     "intention": "meta_assistant",
-    "registre": "abrégé",
+    "registre": "télégraphique",
     "variante": "sans_args",
     "action": {
       "command": "/help",
@@ -1750,9 +1750,9 @@
     }
   },
   {
-    "text": "`/commands`",
+    "text": "/commands",
     "intention": "meta_assistant",
-    "registre": "abrégé",
+    "registre": "télégraphique",
     "variante": "sans_args",
     "action": {
       "command": "/help",

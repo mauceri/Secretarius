@@ -6,7 +6,6 @@ import argparse
 import json
 import re
 from pathlib import Path
-from typing import Any
 
 REQUIRES_ARGS = {"wiki_capture", "wiki_query", "source_read", "gog_mail", "gog_calendar", "gog_drive"}
 
@@ -140,6 +139,7 @@ def parse_seed(seed_md_path: str, intentions_data: list[dict]) -> list[dict]:
             if not item:
                 continue
             msg = item.group(1).strip()
+            msg = msg.replace("`", "")
             if not msg:
                 continue
             entries.append({

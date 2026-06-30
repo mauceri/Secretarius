@@ -29,6 +29,7 @@ MINI_SEED = """\
 INTENTIONS = [
     {"intention": "wiki_capture",  "command": "/c",      "variantes": ["url_avec_tags","url_seule","note_sans_url","avec_directive_simple","avec_ref","avec_fichier"]},
     {"intention": "wiki_ingest",   "command": "/ingest", "variantes": ["sans_args"]},
+    {"intention": "wiki_query",    "command": "/q",      "variantes": ["question_courte","question_longue"]},
     {"intention": "out_of_scope",  "command": None,      "variantes": ["action_impossible"]},
 ]
 
@@ -96,3 +97,27 @@ def test_wiki_ingest_no_args(tmp_path):
     entries = parse_seed(str(seed_md), INTENTIONS)
     ingest = [e for e in entries if e["intention"] == "wiki_ingest"]
     assert all(e["action"]["args"] == "" for e in ingest)
+
+def test_extract_args_backtick_wrapped():
+    # Les lignes markdown avec backticks doivent être normalisées
+    result = extract_args("/c https://marp.app/#get-started", "wiki_capture")
+    assert "https://marp.app/#get-started" in result
+    assert "`" not in result
+
+def test_parse_seed_backtick_lines(tmp_path):
+    seed_md = tmp_path / "seed.md"
+    seed_md.write_text("""\
+## 1. `wiki_capture` — capturer
+
+1. `/c https://marp.app/#get-started`
+2. `/c #markdown #presentation https://marp.app/#get-started`
+
+## 4. `wiki_query` — interroger
+
+1. `/q comment fonctionne le Zettelkasten ?`
+""", encoding="utf-8")
+    entries = parse_seed(str(seed_md), INTENTIONS)
+    captures = [e for e in entries if e["intention"] == "wiki_capture"]
+    assert all("`" not in e["action"]["args"] for e in captures)
+    queries = [e for e in entries if e["intention"] == "wiki_query"]
+    assert all("`" not in e["action"]["args"] for e in queries)
