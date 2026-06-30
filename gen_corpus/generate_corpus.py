@@ -92,6 +92,8 @@ def main(argv=None) -> int:
 
     buffer = []
     stime = time.time()
+    consecutive_errors = 0
+    max_consecutive = max(10, cfg.count // 10)
     with open(cfg.output, "w", encoding="utf-8") as fout:
         for i in range(cfg.count):
             obj = random.choice(intentions)
@@ -99,8 +101,12 @@ def main(argv=None) -> int:
                 entry = generate_one(predict, obj["intention"], random.choice(registres),
                                      random.choice(obj["variantes"]))
                 buffer.append(entry)
+                consecutive_errors = 0
             except Exception as e:
                 print(f"[{i+1}] Erreur: {e}", flush=True)
+                consecutive_errors += 1
+                if consecutive_errors > max_consecutive:
+                    raise RuntimeError(f"Trop d'erreurs consécutives ({consecutive_errors}), arrêt.") from e
                 continue
             if len(buffer) >= cfg.batch_size:
                 for e in buffer:
