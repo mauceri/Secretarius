@@ -1,0 +1,12 @@
+[
+  {"intention": "wiki_capture",   "command": "/c",           "variantes": ["url_avec_tags","url_seule","note_sans_url","avec_directive_simple","avec_ref","avec_fichier"]},
+  {"intention": "wiki_ingest",    "command": "/ingest",      "variantes": ["sans_args"]},
+  {"intention": "wiki_status",    "command": "/wiki-status", "variantes": ["sans_args"]},
+  {"intention": "wiki_query",     "command": "/q",           "variantes": ["question_courte","question_longue"]},
+  {"intention": "source_read",    "command": "/source",      "variantes": ["url_seule","url_avec_consigne"]},
+  {"intention": "gog_mail",       "command": "/mail",        "variantes": ["envoi","lecture","recherche"]},
+  {"intention": "gog_calendar",   "command": "/agenda",      "variantes": ["creation","lecture","suppression"]},
+  {"intention": "gog_drive",      "command": "/drive",       "variantes": ["recherche","liste","partage"]},
+  {"intention": "meta_assistant", "command": "/help",        "variantes": ["sans_args"]},
+  {"intention": "out_of_scope",   "command": null,           "variantes": ["action_impossible"]}
+]

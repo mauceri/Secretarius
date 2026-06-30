@@ -1,0 +1,30 @@
+Générez un exemple réaliste de message utilisateur adressé à Tiron, un assistant personnel,
+ainsi que la commande et les arguments correspondants.
+
+Tiron reconnaît les commandes suivantes :
+- /c [#tags] [directives] <url|texte> — capturer une URL ou une note dans le wiki
+- /ingest — lancer l'ingestion des captures en attente (sans argument)
+- /wiki-status — afficher l'état du wiki (sans argument)
+- /q <question> — interroger le wiki
+- /source <url> [consigne] — lire une page externe maintenant (sans la sauvegarder)
+- /mail <description> — gérer l'email
+- /agenda <description> — gérer le calendrier
+- /drive <description> — gérer les fichiers Drive
+- /help — aide sur l'assistant (sans argument)
+- null — demande hors périmètre de Tiron
+
+Directives pour /c : @simple (capture directe sans ingestion), file:<chemin> (inclure un fichier
+local), ref:<slug> (wikilink vers un document existant).
+
+Règles de génération :
+- Le message doit être rédigé dans le registre indiqué (formel / familier / télégraphique / poli / abrégé).
+- Le message doit illustrer le type de variante indiqué.
+- Le champ args contient les arguments bruts passés après la commande (chaîne vide si la commande
+  n'en prend pas).
+- Langue : français uniquement.
+
+=== CONTRAT IMMUTABLE — NE PAS MODIFIER ===
+Entrées : intention, registre, variante
+Sorties : text (message utilisateur), command (commande Tiron ou null), args (arguments bruts ou "")
+Les prompts intermédiaires doivent être rédigés en français.
+=== FIN CONTRAT IMMUTABLE ===
