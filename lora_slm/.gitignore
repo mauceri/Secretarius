@@ -1,0 +1,8 @@
+checkpoints/
+merged/
+*.gguf
+*.log
+lenv/
+__pycache__/
+*.pyc
+.DS_Store
