@@ -29,7 +29,7 @@ import logging
 from typing import List
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM
 from peft import PeftModel
 
 # Logger simple vers stdout + fichier
@@ -61,8 +61,14 @@ def merge_lora(base: str, lora: str, out: str, dtype: str = "float16") -> None:
     log.info(f"[merge] Sauvegarde dans {out}")
     os.makedirs(out, exist_ok=True)
     merged.save_pretrained(out)
-    tok = AutoTokenizer.from_pretrained(base, use_fast=True, local_files_only=True)
-    tok.save_pretrained(out)
+    # On copie les fichiers tokenizer de la base tels quels : les re-sérialiser
+    # via AutoTokenizer change `tokenizer_class` (ex. 'GPT2Tokenizer' ->
+    # 'TokenizersBackend' selon la version transformers), ce que le convertisseur
+    # llama.cpp ne reconnaît pas et bascule alors sur SentencePiece (absent).
+    import shutil
+    for fname in os.listdir(base):
+        if fname.startswith("tokenizer") or fname in ("special_tokens_map.json", "added_tokens.json"):
+            shutil.copy2(os.path.join(base, fname), os.path.join(out, fname))
     log.info("[merge] Terminé.")
 
 

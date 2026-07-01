@@ -4,8 +4,10 @@
 torch==2.5.1
 torchvision==0.20.1
 torchaudio==2.5.1
-transformers>=4.40.0
+transformers>=4.46,<5
 peft>=0.10.0
 datasets>=2.18.0
 accelerate>=0.29.0
+sentencepiece
+mistral_common
 pytest>=7.0.0
