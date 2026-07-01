@@ -15,6 +15,7 @@ ALIASES = {
     "gemma4":    "euria/google/gemma-4-31B-it",
     "nemotron3": "euria/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8",
     "deepseek":  "deepseek/deepseek-chat",
+    "slm":       "tiron-llm/tiron-router",
 }
 
 def main():
