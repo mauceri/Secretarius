@@ -70,8 +70,11 @@ def _build_signature(prompt_text: str):
 def generate_one(predict, intention: str, registre: str, variante: str) -> dict:
     result = predict(intention=intention, registre=registre, variante=variante)
     cmd = result.command if result.command and result.command.lower() not in ("null", "none") else None
+    args = result.args.strip()
+    if args in ('""', "''"):
+        args = ""
     return {"text": result.text, "intention": intention, "registre": registre,
-            "variante": variante, "action": {"command": cmd, "args": result.args}}
+            "variante": variante, "action": {"command": cmd, "args": args}}
 
 
 def main(argv=None) -> int:

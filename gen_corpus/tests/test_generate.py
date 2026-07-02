@@ -35,6 +35,18 @@ def test_generate_one_null_command():
     assert entry["action"]["command"] is None
 
 
+def test_generate_one_normalizes_literal_empty_quotes():
+    from generate_corpus import generate_one
+    mock_result = MagicMock()
+    mock_result.text = "état wiki ?"
+    mock_result.command = "/wikistatus"
+    mock_result.args = '""'
+    mock_predict = MagicMock(return_value=mock_result)
+
+    entry = generate_one(mock_predict, "wiki_status", "abrégé", "sans_args")
+    assert entry["action"]["args"] == ""
+
+
 def test_convert_entry_chatML():
     from to_lora_format import convert_entry, SYSTEM_PROMPT
     entry = {"text": "garde ce lien", "intention": "wiki_capture",
