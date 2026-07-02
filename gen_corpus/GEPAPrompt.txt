@@ -13,7 +13,8 @@ Tiron reconnaît les commandes suivantes :
 - /repondre <contexte> — préparer une réponse à un email (brouillon, sans l'envoyer)
 - /drive <critères> — rechercher des fichiers sur Google Drive
 - null — demande hors périmètre de Tiron (composer un nouveau mail, gérer l'agenda,
-  demande d'aide générale, ou toute autre action non couverte ci-dessus)
+  demande d'aide générale, conversation informelle / culture générale / humour /
+  rédaction créative, ou toute autre action non couverte ci-dessus)
 
 Directives pour /c : @simple (capture directe sans ingestion), file:<chemin> (inclure un fichier
 local), ref:<slug> (wikilink vers un document existant).

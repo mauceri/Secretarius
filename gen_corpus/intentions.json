@@ -9,5 +9,5 @@
   {"intention": "gog_inbox",      "command": "/inbox",      "variantes": ["sans_args","avec_nombre"]},
   {"intention": "gog_reply",      "command": "/repondre",   "variantes": ["avec_contexte"]},
   {"intention": "gog_drive",      "command": "/drive",      "variantes": ["recherche"]},
-  {"intention": "out_of_scope",   "command": null,          "variantes": ["action_impossible","envoi_mail_nouveau","agenda","aide_generale"]}
+  {"intention": "out_of_scope",   "command": null,          "variantes": ["action_impossible","envoi_mail_nouveau","agenda","aide_generale","conversation_libre"]}
 ]
