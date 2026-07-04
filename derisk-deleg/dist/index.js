@@ -1,9 +1,30 @@
 import { Type } from "typebox";
 import { definePluginEntry } from "openclaw/plugin-sdk/core";
 import { parseReply } from "./parse.js";
+import { commandToAction } from "./dispatch.js";
 import { readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync, copyFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+const ROUTER_URL = "http://127.0.0.1:8999/route";
+async function callRouter(message) {
+    try {
+        const resp = await fetch(ROUTER_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message }),
+            signal: AbortSignal.timeout(30000),
+        });
+        if (!resp.ok)
+            return { status: "unavailable" };
+        const data = await resp.json();
+        return data.status === "ok"
+            ? { status: "ok", command: data.command, args: data.args ?? "" }
+            : { status: "no_match" };
+    }
+    catch {
+        return { status: "unavailable" };
+    }
+}
 // Outils d'orchestration déterministes : une commande -> un outil -> délégation
 // à l'agent wiki via api.runtime.subagent, avec le message "op: <op> | <arg>"
 // construit par le code (routage ET contrat d'op déterministes).
@@ -377,7 +398,51 @@ export default definePluginEntry({
                     reply: { text: `Brouillon abandonné (était destiné à ${dest}). Rien n'a été envoyé.` },
                 };
             }
-            return; // pas pour nous
+            // Routage déterministe via le service Tiron : tout message qui n'est
+            // pas déjà /confirm, /annuler, ou un retour OAuth.
+            const routed = await callRouter(text);
+            if (routed.status === "unavailable") {
+                return { handled: true, reply: { text: "Routeur local indisponible, réessayez dans un instant." } };
+            }
+            if (routed.status === "no_match") {
+                return {
+                    handled: true,
+                    reply: { text: "Je n'ai pas identifié de commande (essayez /q <question>, /c <url>...)." },
+                };
+            }
+            const action = commandToAction(routed.command);
+            if (action === null) {
+                return {
+                    handled: true,
+                    reply: { text: "Je n'ai pas identifié de commande (essayez /q <question>, /c <url>...)." },
+                };
+            }
+            if (action.kind === "wiki") {
+                const out = await delegateWiki(api, action.op, routed.args);
+                return { handled: true, reply: { text: out.slice(0, 1800) } };
+            }
+            if (action.kind === "scout") {
+                const out = await delegateScout(api, routed.args.trim());
+                return { handled: true, reply: { text: out.slice(0, 1800) } };
+            }
+            if (action.kind === "gog") {
+                const out = await delegateGog(api, action.op, routed.args);
+                return { handled: true, reply: { text: out.slice(0, 1800) } };
+            }
+            // action.kind === "gog-reply" : réutilise EXACTEMENT la logique de mise
+            // en attente existante (parseReply + pending), jamais de délégation
+            // directe — /repondre est la seule commande sensible atteignable ici.
+            const parsed = parseReply(routed.args);
+            if (!parsed) {
+                return { handled: true, reply: { text: "Usage: /repondre <id> <texte>" } };
+            }
+            pending = { kind: "reply", messageId: parsed.messageId, body: parsed.body, ts: Date.now() };
+            return {
+                handled: true,
+                reply: {
+                    text: `📧 Brouillon de réponse prêt (non envoyé) :\n• En réponse à : ${parsed.messageId}\n• Corps : ${parsed.body}\n\nTapez /confirm pour envoyer (valable 10 min), ou /annuler pour abandonner.`,
+                },
+            };
         });
         // Garde-fou déterministe : un `gog` d'écriture sensible (send/delete/share/…)
         // ne peut s'exécuter QUE dans l'agent gog (atteint uniquement via /confirm).
