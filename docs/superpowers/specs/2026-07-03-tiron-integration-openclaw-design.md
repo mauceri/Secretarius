@@ -3,10 +3,28 @@
 ## Objectif
 
 Câbler dans OpenClaw, sur sanroque, le routeur SLM validé en prototype
-(`router_3way.py` + `prototype_tiron_v3.py`, scratchpad session 2026-06-30/07-02) :
-classification BGE-M3 à 3 centroïdes (wiki / gog / hors_perimetre) → hot-swap
-d'adaptateur LoRA sur phi-4-mini → extraction JSON `{command, args}` → dispatch
-réel vers les sous-agents existants (wiki, gog, scout).
+(`router_3way.py` + `prototype_tiron_v3.py`, scratchpad session 2026-06-30/07-02),
+**révisé le 2026-07-04** vers un adaptateur unique (voir décision ci-dessous) :
+extraction JSON `{command, args}` par un adaptateur LoRA unique sur phi-4-mini,
+classification BGE-M3 à 3 centroïdes (wiki / gog / hors_perimetre) conservée
+uniquement comme portail de confiance sur gog, dispatch réel vers les
+sous-agents existants (wiki, gog, scout).
+
+**Décision 2026-07-04 — adaptateur unique, pas de hot-swap.** Le tout premier
+test compilé validé (« adaptateur routeur », mémoire
+`reference_context_economy_research`) couvrait déjà tout le périmètre en un
+seul adaptateur et atteignait 94,5%. Le découpage ultérieur en 2 adaptateurs
+de domaine (wiki/gog) n'était pas motivé par l'exactitude mais par la
+sécurité (seuil de confiance asymétrique sur gog). On revient donc à **un
+adaptateur unique** (tous les commandes wiki+gog+null), ce qui supprime le
+hot-swap (`/lora-adapters` scale 0/1) et l'appel réseau qui l'accompagnait —
+en gardant le classifieur BGE-M3, mais repositionné en **contrôle a
+posteriori** sur la commande produite par l'adaptateur, pas en sélecteur
+d'adaptateur en amont (détail au composant 2). Argument additionnel de
+l'utilisateur pour accepter ce ré-entraînement : la partie logicielle/
+conceptuelle (corpus, méthodologie, design du routeur, intégration
+`derisk-deleg`) se réinvestira de toute façon dans un futur chantier
+hyperréseau — l'adaptateur unique n'est pas vu comme un investissement figé.
 
 ## Contexte déjà tranché (2026-07-03)
 
@@ -37,7 +55,8 @@ before_agent_reply (derisk-deleg, étendu)
       │
       └─ autre message → POST service routeur /route {message}
                                 │
-                                ├─ {command, args, destination} reconnu
+                                ├─ {command, args} reconnu (portail de
+                                │   confiance gog passé si applicable)
                                 │     → dispatch (delegateWiki / delegateGog /
                                 │       delegateScout, ou mise en attente pour
                                 │       /repondre) → handled:true
@@ -55,10 +74,13 @@ before_agent_reply (derisk-deleg, étendu)
 ### 1. Service llama-server (reconfiguration)
 
 `slm-llama_cpp.service` charge actuellement `tiron-router-Q6_K.gguf` (ancienne
-architecture mono-adaptateur, abandonnée). À reconfigurer pour charger la base
-phi-4-mini + les deux adaptateurs LoRA du 2026-06-30 (wiki, gog), préchargés
-via `--lora-init-without-apply`, exposant `/lora-adapters` et
-`/v1/chat/completions` comme l'attend déjà `prototype_tiron_v3.py`.
+architecture mono-adaptateur, abandonnée — modèle différent de celui visé
+ici). À reconfigurer pour charger la base phi-4-mini + **un seul** adaptateur
+LoRA, entraîné sur le corpus combiné wiki+gog+null (à ré-entraîner : les
+adaptateurs du 2026-06-30 sont scindés par domaine, donc obsolètes pour cette
+architecture révisée). Pas besoin de `--lora-init-without-apply` ni de
+hot-swap : l'unique adaptateur est chargé actif en permanence
+(`--lora <fichier>`), exposant simplement `/v1/chat/completions`.
 
 **Binaire : `build-rocm/bin/llama-server`, pas `build/bin/llama-server`.**
 Le service actuellement configuré pointe vers `build/bin/llama-server`, qui
@@ -94,11 +116,23 @@ listé comme officiellement supporté.
 ### 2. Service routeur Python (nouveau)
 
 Service HTTP persistant, un seul endpoint `POST /route {message}`. Charge
-BGE-M3 une fois au démarrage et enveloppe telle quelle la logique déjà validée
-(`router_3way.py` pour la classification, la logique hot-swap/appel de
-`prototype_tiron_v3.py` pour l'extraction). Retourne :
-- `{"status": "ok", "command": "/cmd", "args": "...", "destination": "wiki"|"gog"}`
-- `{"status": "no_match"}` si la commande extraite n'est dans aucun ensemble connu
+BGE-M3 une fois au démarrage. Pour chaque message :
+1. Appelle l'adaptateur unique (`/v1/chat/completions`, system prompt minimal
+   de routage) → `{"command", "args"}`.
+2. Calcule en parallèle la classification BGE-M3 à 3 centroïdes
+   (`router_3way.py`, inchangée : les 3 centroïdes restent nécessaires au
+   calcul même si un seul sert de portail — cf. constat du 2026-07-02, retirer
+   le centroïde hors_perimetre fait bondir les faux accepts gog de 1 à 18).
+3. Si la `command` renvoyée par l'adaptateur appartient à l'ensemble gog
+   (`/chercher /connecter /inbox /drive /repondre`) : n'accepte que si le
+   softmax sur gog est l'argmax **et** ≥ `SEUIL_GOG` (0,50) — sinon traite
+   comme non reconnu. Si la `command` est une commande wiki/`/source` :
+   aucun contrôle de confiance (déjà jugé sans conséquence grave).
+
+Retourne :
+- `{"status": "ok", "command": "/cmd", "args": "..."}`
+- `{"status": "no_match"}` si la commande extraite n'est dans aucun ensemble
+  connu, ou si une commande gog n'a pas passé le portail de confiance
 
 Nouveau service systemd `--user`, à côté de `slm-llama_cpp.service`.
 
@@ -114,7 +148,7 @@ outils existants (pas de nouvelle logique de délégation) :
 | `/q` | `delegateWiki(api, "query", args)` | |
 | `/ingest` | `delegateWiki(api, "ingest", "")` | |
 | `/wikistatus` | `delegateWiki(api, "status", "")` | |
-| `/source` | `delegateScout(api, url)` | **cible scout, pas wiki** — le routeur classe `/source` dans le domaine « wiki » pour le choix d'adaptateur, mais l'exécution diverge de la classification |
+| `/source` | `delegateScout(api, url)` | **cible scout, pas wiki** — l'adaptateur unique produit `/source` comme n'importe quelle commande, seul le dispatch d'exécution diffère |
 | `/chercher` | `delegateGog(api, "search", args)` | |
 | `/connecter` | `delegateGog(api, "auth_start", "")` + flux `pendingAuth` existant | |
 | `/inbox` | `delegateGog(api, "inbox", "")` | |
@@ -125,8 +159,9 @@ Comportements de repli, tous déterministes, sans appel LLM supplémentaire et
 sans repli cloud (cohérent avec le principe déjà posé pour `tiron-llm` :
 « pas de fallback automatique vers DeepSeek », `2026-05-29-tiron-llm-local-design.md`) :
 - **Commande non reconnue** (JSON invalide, `command` hors des ensembles
-  connus, ou `hors_perimetre` dont l'adaptateur wiki n'a pas produit de
-  commande valide) : « Je n'ai pas identifié de commande (essayez `/q
+  connus, message hors-périmètre pour lequel l'adaptateur unique n'a pas
+  produit de commande valide, ou commande gog n'ayant pas passé le portail de
+  confiance) : « Je n'ai pas identifié de commande (essayez `/q
   <question>`, `/c <url>`...) ».
 - **Service routeur ou llama-server indisponible** : « Routeur local
   indisponible, réessayez dans un instant ».
