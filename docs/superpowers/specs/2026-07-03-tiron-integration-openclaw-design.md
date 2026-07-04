@@ -60,6 +60,23 @@ phi-4-mini + les deux adaptateurs LoRA du 2026-06-30 (wiki, gog), préchargés
 via `--lora-init-without-apply`, exposant `/lora-adapters` et
 `/v1/chat/completions` comme l'attend déjà `prototype_tiron_v3.py`.
 
+**Binaire : `build-rocm/bin/llama-server`, pas `build/bin/llama-server`.**
+Le service actuellement configuré pointe vers `build/bin/llama-server`, qui
+n'est lié à aucune bibliothèque ROCm/HIP (vérifié par `ldd` le 2026-07-04) —
+`-ngl`/`HSA_OVERRIDE_GFX_VERSION` y sont inertes, tout tourne CPU. Le binaire
+`build-rocm/bin/llama-server` (lié `libggml-hip.so`/`librocblas`/`libamdhip64`)
+donne un gain mesuré ce jour, même modèle (`Phi-4-mini-instruct-Q6_K.gguf`),
+même prompt (4609 tokens) : **151,2 s CPU vs 36,9 s ROCm (`-ngl 99`,
+`HSA_OVERRIDE_GFX_VERSION=10.3.0`) → ~4,1×**. Extrapolé au prompt de
+production historique (~11 286 tokens, doc 2026-06-02) : ~6 min CPU → ~90 s
+ROCm. Le service reconfiguré doit donc pointer `build-rocm/bin/llama-server`,
+pas `build/bin/llama-server`.
+
+Note matériel (corrige `CLAUDE.md` machine, obsolète) : l'iGPU réel est un
+`gfx1035` (Radeon 680M, RDNA2, Ryzen 9 6900HX), pas un gfx900/Vega —
+`HSA_OVERRIDE_GFX_VERSION=10.3.0` est le contournement pour un gfx1035 non
+listé comme officiellement supporté.
+
 ### 2. Service routeur Python (nouveau)
 
 Service HTTP persistant, un seul endpoint `POST /route {message}`. Charge
