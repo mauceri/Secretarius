@@ -9,12 +9,23 @@ EVAL_PATH = "/home/mauceric/Secretarius/gen_corpus/corpus_lora_eval.jsonl"
 SYSTEM_ROUTE = ('Routeur de commandes Tiron. Pour chaque message, répondre '
                 'uniquement avec un objet JSON : {"command": "/commande" ou '
                 'null, "args": "arguments bruts ou chaîne vide"}.')
+# Grammaire de sortie : force un JSON conforme (cf. router_service/server.py,
+# même schéma) — élimine le texte parasite après un JSON par ailleurs correct.
+COMMAND_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "command": {"type": ["string", "null"]},
+        "args": {"type": "string"},
+    },
+    "required": ["command", "args"],
+}
 
 
 def call_llm(base_url, msg, max_tokens=60):
     body = {"messages": [{"role": "system", "content": SYSTEM_ROUTE},
                          {"role": "user", "content": msg}],
-            "max_tokens": max_tokens, "temperature": 0}
+            "max_tokens": max_tokens, "temperature": 0,
+            "json_schema": COMMAND_SCHEMA}
     req = urllib.request.Request(base_url + "/v1/chat/completions",
                                  data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json"})

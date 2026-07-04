@@ -14,6 +14,17 @@ LLAMA_BASE = os.environ.get("TIRON_LLAMA_BASE", "http://127.0.0.1:8998")
 SYSTEM_ROUTE = ('Routeur de commandes Tiron. Pour chaque message, répondre '
                 'uniquement avec un objet JSON : {"command": "/commande" ou '
                 'null, "args": "arguments bruts ou chaîne vide"}.')
+# Grammaire de sortie : force un JSON conforme, élimine le texte parasite
+# (ex. "}]" en trop) que le modèle ajoutait parfois après un JSON par ailleurs
+# correct (constaté 2026-07-04, cf. rapport d'éval).
+COMMAND_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "command": {"type": ["string", "null"]},
+        "args": {"type": "string"},
+    },
+    "required": ["command", "args"],
+}
 
 _gate = None  # chargé au démarrage (Step 5)
 
@@ -21,7 +32,8 @@ _gate = None  # chargé au démarrage (Step 5)
 def call_adapter(message: str):
     body = {"messages": [{"role": "system", "content": SYSTEM_ROUTE},
                          {"role": "user", "content": message}],
-            "max_tokens": 60, "temperature": 0}
+            "max_tokens": 60, "temperature": 0,
+            "json_schema": COMMAND_SCHEMA}
     req = urllib.request.Request(LLAMA_BASE + "/v1/chat/completions",
                                  data=json.dumps(body).encode(),
                                  headers={"Content-Type": "application/json"})
