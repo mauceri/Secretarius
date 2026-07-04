@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Évalue un adaptateur LoRA unique sur corpus_lora_eval.jsonl : lance
-llama-server avec l'adaptateur donné, interroge chaque exemple, compare la
-commande extraite à la vérité terrain."""
-import argparse, json, subprocess, sys, time, urllib.request
+"""Évalue un adaptateur LoRA unique sur corpus_lora_eval.jsonl : se connecte
+à un llama-server déjà démarré avec l'adaptateur donné, interroge chaque
+exemple, compare la commande extraite à la vérité terrain."""
+import argparse, json, sys, time, urllib.request
 
 EVAL_PATH = "/home/mauceric/Secretarius/gen_corpus/corpus_lora_eval.jsonl"
 SYSTEM_ROUTE = ('Routeur de commandes Tiron. Pour chaque message, répondre '
