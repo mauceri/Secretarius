@@ -65,12 +65,26 @@ Le service actuellement configuré pointe vers `build/bin/llama-server`, qui
 n'est lié à aucune bibliothèque ROCm/HIP (vérifié par `ldd` le 2026-07-04) —
 `-ngl`/`HSA_OVERRIDE_GFX_VERSION` y sont inertes, tout tourne CPU. Le binaire
 `build-rocm/bin/llama-server` (lié `libggml-hip.so`/`librocblas`/`libamdhip64`)
-donne un gain mesuré ce jour, même modèle (`Phi-4-mini-instruct-Q6_K.gguf`),
-même prompt (4609 tokens) : **151,2 s CPU vs 36,9 s ROCm (`-ngl 99`,
-`HSA_OVERRIDE_GFX_VERSION=10.3.0`) → ~4,1×**. Extrapolé au prompt de
-production historique (~11 286 tokens, doc 2026-06-02) : ~6 min CPU → ~90 s
-ROCm. Le service reconfiguré doit donc pointer `build-rocm/bin/llama-server`,
-pas `build/bin/llama-server`.
+donne un gain mesuré ce jour, même modèle (`Phi-4-mini-instruct-Q6_K.gguf`).
+
+Trois mesures, du moins au plus représentatif du tour réel du routeur :
+- **Gros prefill isolé** (4609 tokens, `max_tokens=5`) : 151,2 s CPU vs 36,9 s
+  ROCm (`-ngl 99`) → ~4,1×. Meilleur cas (calcul massivement parallélisable),
+  pas représentatif à lui seul.
+- **Decode isolé** (prompt court, 200 tokens de sortie) : 13,5 tok/s CPU vs
+  **11,2 tok/s ROCm — le GPU est ici plus lent** (lot de taille 1, peu de
+  parallélisme, surcoût de lancement de noyau HIP probable).
+- **Gabarit réel du routeur** (771 tokens de prompt + ~23 tokens de JSON en
+  sortie, proche de la taille visée après compilation LoRA) : **23,63 s CPU
+  vs 7,2 s ROCm → ~3,3×**. Le prefill (encore trois à quatre fois plus rapide
+  en ROCm à cette taille) domine toujours le temps total ; le désavantage du
+  decode ne pèse que 1-2 s sur les deux, donc le gain global reste proche du
+  cas gros-prefill malgré le decode plus lent en ROCm.
+
+Conclusion : passer à `build-rocm/bin/llama-server` reste un gain net et
+mesuré (~3,3×) sur le gabarit représentatif du tour de routeur, malgré un
+decode individuellement moins bon sur ROCm. Le service reconfiguré doit donc
+pointer `build-rocm/bin/llama-server`, pas `build/bin/llama-server`.
 
 Note matériel (corrige `CLAUDE.md` machine, obsolète) : l'iGPU réel est un
 `gfx1035` (Radeon 680M, RDNA2, Ryzen 9 6900HX), pas un gfx900/Vega —
