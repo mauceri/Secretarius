@@ -328,6 +328,6 @@
    ]
   }
  },
- "plugins": { "allow": [], "entries": { "derisk-deleg": { "enabled": true } } },
+ "plugins": { "allow": [], "entries": { "derisk-deleg": { "enabled": true, "hooks": { "allowConversationAccess": true } } } },
  "skills": { "install": { "nodeManager": "npm" } }
 }
