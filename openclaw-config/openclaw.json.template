@@ -304,7 +304,7 @@
    },
    "execApprovals": {
     "enabled": true,
-    "approvers": ["220537738"]
+    "approvers": [220537738]
    }
   }
  },
@@ -336,6 +336,6 @@
    ]
   }
  },
- "plugins": { "allow": [], "entries": {} },
+ "plugins": { "allow": [], "entries": { "derisk-deleg": { "enabled": true } } },
  "skills": { "install": { "nodeManager": "npm" } }
 }
