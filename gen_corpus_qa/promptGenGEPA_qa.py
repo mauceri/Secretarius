@@ -24,7 +24,7 @@ REFUS_MARQUEURS = ("ne figure pas", "ne précise pas", "n'est pas dans", "pas da
 
 
 def _ressemble_refus(answer: str) -> bool:
-    a = answer.lower()
+    a = answer.replace("'", "'").lower()
     return any(m in a for m in REFUS_MARQUEURS)
 
 

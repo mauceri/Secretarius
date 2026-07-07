@@ -29,7 +29,7 @@ REFUS_MARQUEURS = ("ne figure pas", "ne précise pas", "n'est pas dans", "pas da
 
 
 def _ressemble_refus(text: str) -> bool:
-    t = text.lower()
+    t = text.replace("’", "'").lower()
     return any(m in t for m in REFUS_MARQUEURS)
 
 
@@ -122,13 +122,17 @@ def judge_score(document: str, question: str, answer: str) -> int:
 
 
 def run_condition(rows, infer_fn) -> dict:
-    scores = []
+    scores, scores_refus, scores_non_refus = [], [], []
     for r in rows:
         p = parse_eval_row(r)
         answer = infer_fn(p["document"], p["question"])
         js = judge_score(p["document"], p["question"], answer)
-        scores.append(js / 5.0)
-    return {"note_moyenne": aggregate(scores), "n": len(scores)}
+        s = js / 5.0
+        scores.append(s)
+        (scores_refus if p["is_refus"] else scores_non_refus).append(s)
+    return {"note_moyenne": aggregate(scores), "n": len(scores),
+            "note_refus": aggregate(scores_refus), "n_refus": len(scores_refus),
+            "note_non_refus": aggregate(scores_non_refus), "n_non_refus": len(scores_non_refus)}
 
 
 def main():
@@ -155,9 +159,15 @@ def main():
         nu = run_condition(rows, lambda d, q: infer_peft(model, tok, d, q, use_adapter=False))
         ad = run_condition(rows, lambda d, q: infer_peft(model, tok, d, q, use_adapter=True))
 
-    print(f"=== NU       : {nu['note_moyenne']:.3f} (n={nu['n']}) ===")
-    print(f"=== ADAPTÉ   : {ad['note_moyenne']:.3f} (n={ad['n']}) ===")
-    print(f"=== DELTA    : {ad['note_moyenne']-nu['note_moyenne']:+.3f} ===")
+    def _ligne(label, d):
+        return (f"=== {label:8} : global {d['note_moyenne']:.3f} (n={d['n']}) | "
+                f"refus {d['note_refus']:.3f} (n={d['n_refus']}) | "
+                f"non-refus {d['note_non_refus']:.3f} (n={d['n_non_refus']}) ===")
+    print(_ligne("NU", nu))
+    print(_ligne("ADAPTÉ", ad))
+    print(f"=== DELTA global : {ad['note_moyenne']-nu['note_moyenne']:+.3f} | "
+          f"refus {ad['note_refus']-nu['note_refus']:+.3f} | "
+          f"non-refus {ad['note_non_refus']-nu['note_non_refus']:+.3f} ===")
 
 
 if __name__ == "__main__":
