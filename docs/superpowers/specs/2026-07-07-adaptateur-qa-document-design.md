@@ -111,6 +111,26 @@ sur l'ancrage et le refus hors-document. Si l'écart est marginal, on documente
 et on s'arrête (l'intégration ne se justifie pas) — c'est le point de décision
 prévu.
 
+### Deux environnements de test de l'adaptateur
+
+L'adaptateur doit être testable par deux voies, utiles à la fois pour le
+confort d'itération et comme contrôle croisé (une divergence entre les deux
+signalerait un problème de conversion GGUF — panne déjà rencontrée, cf. mémoire
+[[project_lora_slm_session_20260630]]) :
+
+1. **Jupyter (transformers + peft)** : charge le checkpoint PEFT **directement**
+   (sans conversion GGUF), phi-4-mini de base + adaptateur monté en Python.
+   Permet d'itérer et d'inspecter les réponses avant même l'étape de conversion,
+   et sert de référence « fidèle » du comportement de l'adaptateur.
+2. **Serveur llama.cpp (GGUF + `--lora`)** : le GGUF converti servi par
+   `build-rocm/bin/llama-server`, interrogé par HTTP — c'est l'environnement de
+   production réel (ROCm, mesure de vitesse représentative). Réutilise le patron
+   de `gen_corpus/eval_adapter.py` (paramètre `--base-url`).
+
+Le harnais d'évaluation A/B doit pouvoir cibler l'une ou l'autre voie, afin que
+le même jeu de test puisse être passé dans les deux et que les résultats soient
+comparés.
+
 ## Ce qui est hors périmètre (chantiers suivants, non traités ici)
 
 - Intégration OpenClaw : détection « question générale » côté routeur, sélection
