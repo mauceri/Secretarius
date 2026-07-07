@@ -1,0 +1,8 @@
+[
+  {"domaine": "config", "document": "documents/config-materiel-logiciel.md",
+   "types_question": ["factuelle", "reformulation", "hors_document"]},
+  {"domaine": "wiki", "document": "documents/capacites-wiki.md",
+   "types_question": ["factuelle", "reformulation", "hors_document"]},
+  {"domaine": "gog", "document": "documents/capacites-gog.md",
+   "types_question": ["factuelle", "reformulation", "hors_document"]}
+]

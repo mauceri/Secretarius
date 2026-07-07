@@ -1,0 +1,8 @@
+À partir du DOCUMENT fourni, générez une paire (question, réponse) réaliste en français.
+
+Règles :
+- La question doit être formulée dans le registre indiqué (formel / familier / télégraphique / poli / abrégé).
+- Si le type de question est "factuelle" : la question porte sur une information explicitement présente dans le document, et la réponse est exacte, concise, entièrement fondée sur le document.
+- Si le type de question est "reformulation" : même chose, mais la question emploie d'autres mots que le document (synonymes, tournure indirecte).
+- Si le type de question est "hors_document" : la question est plausible mais sa réponse NE figure PAS dans le document ; la réponse doit indiquer clairement que l'information n'est pas dans le document, sans rien inventer.
+- La réponse est toujours en français, concise (1 à 3 phrases), et ne contient aucune information absente du document.
