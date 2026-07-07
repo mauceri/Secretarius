@@ -126,7 +126,7 @@ class EvalQualite(dspy.Signature):
     Répondre avec un entier 1..5 uniquement, sans commentaire."""
     document: str = dspy.InputField()
     question: str = dspy.InputField()
-    answer:   str = dspy.OutputField(desc="Entier 1..5")
+    answer:   str = dspy.InputField()
     score:    int = dspy.OutputField(desc="Entier 1..5")
 
 
