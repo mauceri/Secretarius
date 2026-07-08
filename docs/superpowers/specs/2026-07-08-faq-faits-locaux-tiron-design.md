@@ -32,16 +32,17 @@ qui reste fiable quelle que soit la dispersion des faits.
    effet de bord, bénin : le watcher `server.py:203` (rglob récursif) déclenchera un
    rechargement de l'index `wiki/` à chaque édition (mêmes pages, ~30 s).
 2. **Format** : markdown structuré, une entrée par fait. Un ou plusieurs titres `##`
-   = formulations de la question (embarquées) ; le corps = la réponse injectée.
+   = formulations de la question (embarquées) ; le corps = la réponse renvoyée verbatim.
 3. **Détection** : single-vector nearest-neighbor. Un vecteur BGE-M3 par question
    connue (modèle déjà chargé dans `router_service`) ; pour un message, `max` cosinus
    sur toutes les questions ; `≥ SEUIL_FAQ` → question de faits, entrée matchée connue.
 4. **Ordre** : **FAQ d'abord**. Pour un message en langage naturel (sans `/`), la
    FAQ est consultée avant le routage commandes. Les commandes explicites `/…` ne
    sont jamais interceptées.
-5. **Réponse** : phi-4 **nu** (adaptateur à scale 0 **par requête** sur le port
-   prod 8998, sans toucher l'état global) + injection de **la seule entrée matchée**
-   (contourne le plafond `-c 2048`).
+5. **Réponse** : le corps de l'entrée matchée est renvoyé **verbatim**, **sans
+   aucun appel LLM**. L'utilisateur a déjà rédigé la réponse voulue ; la repasser
+   dans phi-4 serait redondant. Instantané, déterministe, zéro hallucination, aucune
+   charge iGPU.
 6. **Sous le seuil** : « Je n'ai pas cette information. »
 7. **Install** : seed `faits/faits.md` copié **seulement s'il n'existe pas**
    (non-clobber).
@@ -73,8 +74,8 @@ plus proche d'un message.
 - `parse_faq(text) -> list[Entry]` où `Entry = {questions: list[str], answer: str}`.
   **Garde-fou par-entrée** : une entrée dont le corps dépasse `FAQ_MAX_ENTREE`
   caractères (défaut 2000, très au-dessus d'un fait normal) est **écartée avec un
-  avertissement** dans les logs — évite qu'une entrée pathologiquement longue
-  déborde silencieusement le contexte `-c 2048` et produise une réponse tronquée.
+  avertissement** dans les logs — évite qu'une entrée pathologiquement longue soit
+  tronquée silencieusement à l'affichage (le hook `derisk-deleg` coupe à 1800 car.).
 - `class FaqIndex(embed_fn, path, seuil)` :
   - construit à l'init : parse + embarque toutes les questions (via `embed_fn`,
     = `GogGate._embed`, même BGE-M3, pas de second modèle) ; stocke une matrice
@@ -86,31 +87,22 @@ plus proche d'un message.
 - Fichier absent ou vide → index vide, `lookup` renvoie toujours `None` (dégradation
   silencieuse, jamais d'exception qui casserait le routage).
 
-### 2. Réponse phi-4 nu — inférence à lora par-requête
-
-`router_service` gagne une fonction d'inférence qui envoie
-`"lora": [{"id": 0, "scale": 0}]` **dans le corps de la requête** vers le
-`/v1/chat/completions` de 8998 (confirmé accepté par le build ROCm en place).
-**Ne pas** utiliser `set_lora_scale` (POST `/lora-adapters`, état global) : cela
-casserait le routage concurrent. Le contexte injecté = la question + le corps de
-l'entrée matchée uniquement.
-
-### 3. `router_service/server.py:route_message` (modifié)
+### 2. `router_service/server.py:route_message` (modifié)
 
 ```python
 def route_message(message):
     if not message.lstrip().startswith("/"):
         entry = _faq.lookup(message)
         if entry is not None:
-            return {"status": "answer", "reply": _answer(message, entry)}
+            return {"status": "answer", "reply": entry["answer"]}
     # ... routage commandes existant, INCHANGÉ ...
 ```
 
 `_faq` (FaqIndex) est construit au démarrage à côté de `GogGate`, en réutilisant
 `_gate._embed` comme `embed_fn`. Nouveau statut de sortie : `{"status": "answer",
-"reply": <texte>}`.
+"reply": <corps verbatim de l'entrée>}`. Aucun appel LLM.
 
-### 4. `derisk-deleg/src/index.ts` (modifié)
+### 3. `derisk-deleg/src/index.ts` (modifié)
 
 - `callRouter` : propager le champ `reply` quand `status === "answer"`.
 - Hook `before_agent_reply` : si `routed.status === "answer"` → répondre
@@ -119,7 +111,7 @@ def route_message(message):
   (essayez /q pour le wiki). » (couvre le cas « sous le seuil FAQ **et** aucune
   commande »).
 
-### 5. `install.sh` (modifié)
+### 4. `install.sh` (modifié)
 
 Créer `~/Documents/Arbath/Wiki_LM/faits/` et y copier le seed
 **uniquement s'il n'existe pas** (non-clobber). Source du seed dans le dépôt :
@@ -137,8 +129,8 @@ message ── derisk-deleg hook ── POST /route (8999)
                           ┌───────────┴───────────┐
               max-sim ≥ seuil                 max-sim < seuil
                     │                               │
-        phi-4 nu (scale 0 par-req)        routage commandes existant
-        + entrée matchée injectée          (adaptateur + portail gog)
+        corps de l'entrée verbatim        routage commandes existant
+        (aucun appel LLM)                  (adaptateur + portail gog)
                     │                               │
         {status:"answer", reply}         wiki/gog/scout  ou  no_match
                     │                               │
@@ -150,8 +142,8 @@ message ── derisk-deleg hook ── POST /route (8999)
 - Routeur (8999) indisponible → message existant « Routeur local indisponible ».
 - `faits.md` absent/vide → `lookup` renvoie `None`, on retombe sur le routage
   commandes (aucune régression).
-- Erreur d'inférence phi-4 (timeout, crash 8998) → renvoyer un message d'échec
-  explicite, ne jamais lever d'exception non capturée dans `route_message`.
+- `faits.md` mal formé (parse) → `parse_faq` ignore les lignes invalides et les
+  entrées sans corps ; jamais d'exception non capturée dans `route_message`.
 
 ## Tests
 
@@ -160,10 +152,10 @@ message ── derisk-deleg hook ── POST /route (8999)
   renvoie `None` ; rechargement sur changement de mtime. (BGE-M3 réel ou embeddings
   injectés selon le pattern des tests existants du routeur.)
 - `route_message` : commande explicite `/…` **court-circuite** la FAQ ; message
-  libre proche d'une entrée → `status:"answer"` ; message libre non couvert →
-  chemin routage commandes inchangé.
-- Inférence : la requête envoyée contient bien `lora:[{id:0,scale:0}]` (mock HTTP).
-- `derisk-deleg` : `status:"answer"` → `reply` relayé tel quel (test TS existant).
+  libre proche d'une entrée → `status:"answer"` avec le corps verbatim ; message
+  libre non couvert → chemin routage commandes inchangé.
+- `derisk-deleg` : `status:"answer"` → `reply` relayé tel quel (typecheck `tsc` +
+  `plugin:validate` ; le hook n'est pas testé unitairement dans ce dépôt).
 
 ## Déploiement (sanroque, prod `~/.openclaw`)
 
@@ -179,12 +171,9 @@ message ── derisk-deleg hook ── POST /route (8999)
 
 - `SEUIL_FAQ` (départ 0.6) est un seul hyperparamètre à **revalider sur de vrais
   messages Telegram**, réglable par `FAQ_SEUIL` sans redéploiement.
-- Chaque message libre proche d'une entrée déclenche une génération phi-4 (quelques
-  secondes + charge iGPU) ; le seuil borne cela aux vraies correspondances.
-- Bug de stabilité connu du `llama-server` ROCm sous charge — risque déjà accepté.
-- **Taille de la FAQ** : pas de plafond dur (seule l'entrée matchée est injectée,
-  donc le mur `-c 2048` ne concerne que la taille d'une entrée, bornée par le
-  garde-fou ci-dessus). À très grand N (plusieurs milliers d'entrées), le
+- **Taille de la FAQ** : pas de plafond dur. La réponse verbatim est coupée à
+  1800 caractères à l'affichage (hook `derisk-deleg`) ; le garde-fou par-entrée
+  écarte en amont toute entrée dépassant `FAQ_MAX_ENTREE`. À très grand N (plusieurs milliers d'entrées), le
   ré-embarquement déclenché à chaque édition devient perceptible (secondes) —
   optimisable plus tard par embarquement incrémental. YAGNI pour l'instant.
 - Le centroïde `secretarius` validé est **superseded** par ce design pour
