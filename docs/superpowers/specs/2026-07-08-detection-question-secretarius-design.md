@@ -37,9 +37,42 @@ jamais la **réponse**.
 
 1. **Détection = extension du GogGate BGE-M3** (classifieur par centroïdes déjà
    en place dans `router_service/router.py`), avec un 4ᵉ centroïde
-   `secretarius`. **Aucun réentraînement LoRA.** On mesure d'abord ; le
-   réentraînement de l'adaptateur routeur n'est envisagé que si le centroïde
-   échoue (option de repli, chantier distinct).
+   `secretarius`. **Aucun réentraînement LoRA.** On mesure d'abord, avec le
+   mécanisme le moins cher, et on n'escalade qu'en cas d'échec mesuré (voir
+   « Échelle d'escalade » ci-dessous).
+
+### Pourquoi le centroïde BGE-M3 plutôt qu'un classifieur entraîné
+
+- **Il existe déjà** : le `GogGate` est déjà un classifieur par centroïdes
+  BGE-M3 en production (portail de confiance gog). Ajouter `secretarius` = une
+  ligne de plus dans sa matrice de centroïdes, pas un nouveau composant à
+  entraîner, servir et maintenir (modification chirurgicale).
+- **Coût quasi nul** : un centroïde se calcule en secondes de CPU (moyennes
+  d'embeddings), sans données étiquetées volumineuses ni GPU ni contention avec
+  la prod — à opposer aux 12h GPU du chantier QA précédent.
+- **BGE-M3 est taillé pour ça** : modèle d'embedding multilingue (1024 dim)
+  entraîné pour la similarité sémantique ; la séparation par plus proche
+  centroïde est son cas d'usage naturel, et il est déjà chargé en mémoire.
+- **Compromis assumé** : le centroïde est le classifieur le plus simple — il
+  suppose des classes séparables par une frontière linéaire en cosinus. Un
+  modèle entraîné apprendrait une frontière plus fine. Si la distinction
+  commande/question est subtile, le centroïde peut ne pas suffire — d'où le
+  risque n°1 et le « mesurer d'abord ».
+
+### Échelle d'escalade (du moins cher au plus cher)
+
+Le repli n'est pas binaire. En cas d'échec mesuré, on monte d'un cran à la fois :
+
+1. **Centroïde BGE-M3** (coût ~nul) — ce qu'on teste dans ce chantier.
+2. **Classifieur léger sur embeddings BGE-M3** (régression logistique ou petit
+   MLP entraîné sur les embeddings déjà calculés) — pas de GPU, quelques
+   secondes CPU, quelques centaines d'exemples ; apprend une vraie frontière de
+   décision au lieu de comparer à une moyenne. Repli intermédiaire privilégié.
+3. **Réentraînement de l'adaptateur LoRA routeur** (~12h GPU, services prod à
+   l'arrêt) — dernier recours, seulement si les deux échelons précédents
+   échouent.
+
+Chaque montée d'échelon est un chantier distinct, décidé au vu de la mesure.
 2. **Réponse = appel déterministe** à phi-4 **nu** : llama-server 8998 avec le
    scale de l'adaptateur routeur mis à **0**, et le document Secretarius
    (~617 tokens) injecté en contexte. Réutilise le hot-swap par requête validé
@@ -147,9 +180,10 @@ Script produisant `RESULTATS.md` avec :
   < ~2-3 % de commandes wiki/gog reclassées `secretarius`).
 - **Réponse** : réponses correctes et ancrées sur l'échantillon (référence : le
   0.82 déjà mesuré en QA).
-- **Si la détection échoue nettement** → stop, on documente, et le
-  réentraînement de l'adaptateur routeur devient l'option de repli (chantier
-  distinct). Si les deux critères passent → feu vert pour le chantier
+- **Si la détection échoue nettement** → stop, on documente, et on monte d'un
+  cran sur l'échelle d'escalade (classifieur léger sur embeddings, puis en
+  dernier recours réentraînement de l'adaptateur routeur) — chaque cran étant un
+  chantier distinct. Si les deux critères passent → feu vert pour le chantier
   d'intégration OpenClaw.
 
 ## Tests
@@ -178,8 +212,8 @@ Script produisant `RESULTATS.md` avec :
 
 - Intégration OpenClaw : insertion de la branche `secretarius` dans
   `route_message`, dispatch dans `derisk-deleg`, déploiement, test Telegram E2E.
-- Réentraînement de l'adaptateur routeur (option de repli si le centroïde
-  échoue).
+- Montées sur l'échelle d'escalade (classifieur léger sur embeddings, puis
+  réentraînement de l'adaptateur routeur) si le centroïde échoue.
 - Extension du document Secretarius à d'autres sujets (comptabilité, légal…).
 
 ## Artefacts réutilisés (chantier QA précédent)
