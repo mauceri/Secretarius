@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from router_service.router import GogGate, WIKI_CMDS, GOG_CMDS
+from router_service.faq import FaqIndex, FAQ_PATH
 
 LLAMA_BASE = os.environ.get("TIRON_LLAMA_BASE", "http://127.0.0.1:8998")
 SYSTEM_ROUTE = ('Routeur de commandes Tiron. Pour chaque message, répondre '
@@ -27,6 +28,7 @@ COMMAND_SCHEMA = {
 }
 
 _gate = None  # chargé au démarrage (Step 5)
+_faq = None   # FaqIndex, chargé au démarrage
 
 
 def call_adapter(message: str):
@@ -44,6 +46,10 @@ def call_adapter(message: str):
 
 
 def route_message(message: str) -> dict:
+    if _faq is not None and not message.lstrip().startswith("/"):
+        entry = _faq.lookup(message)
+        if entry is not None:
+            return {"status": "answer", "reply": entry["answer"]}
     try:
         command, args = call_adapter(message)
     except Exception:
@@ -79,9 +85,11 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    global _gate
+    global _gate, _faq
     print("Chargement BGE-M3...", flush=True)
     _gate = GogGate()
+    _faq = FaqIndex(_gate._embed)
+    print(f"FAQ chargée ({FAQ_PATH})", flush=True)
     print("Prêt, écoute sur :8999", flush=True)
     ThreadingHTTPServer(("127.0.0.1", 8999), Handler).serve_forever()
 

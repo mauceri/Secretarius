@@ -1,6 +1,7 @@
 import os
 import torch
 from router_service.faq import parse_faq, FaqIndex
+from router_service import server as router_server
 
 
 def _stub_embed(texts):
@@ -86,3 +87,29 @@ def test_reload_sur_mtime(tmp_path):
     p.write_text("## wiki ?\nnouvelle", encoding="utf-8")
     os.utime(p, (p.stat().st_atime, p.stat().st_mtime + 10))
     assert idx.lookup("le wiki")["answer"] == "nouvelle"
+
+
+def _install_faq(tmp_path):
+    p = tmp_path / "faits.md"
+    p.write_text("## Le perroquet de Mme Michu ?\nCoco.", encoding="utf-8")
+    router_server._faq = FaqIndex(_stub_embed, path=p, seuil=0.6)
+
+
+def test_route_faq_dabord(tmp_path):
+    _install_faq(tmp_path)
+    r = router_server.route_message("parle-moi du perroquet")
+    assert r == {"status": "answer", "reply": "Coco."}
+
+
+def test_route_slash_court_circuite_faq(tmp_path):
+    _install_faq(tmp_path)
+    # commence par '/' -> FAQ ignorée ; l'adaptateur (8998) est injoignable en
+    # test -> call_adapter lève -> no_match. On vérifie surtout : jamais "answer".
+    r = router_server.route_message("/perroquet")
+    assert r["status"] != "answer"
+
+
+def test_route_sans_match_retombe_routage(tmp_path):
+    _install_faq(tmp_path)
+    r = router_server.route_message("cherche un truc inconnu xyz")
+    assert r["status"] != "answer"
