@@ -6,7 +6,7 @@ Ne modifie pas router_service/router.py."""
 import torch
 from router_service.router import GogGate
 
-SEUIL_SECRETARIUS = 0.5
+SEUIL_SECRETARIUS = 0.35  # calibré par balayage (T6) : rappel 0.72, 0 commande volée
 
 
 class SecretariusClassifier:
