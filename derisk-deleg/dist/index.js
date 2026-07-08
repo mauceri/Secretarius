@@ -17,6 +17,8 @@ async function callRouter(message) {
         if (!resp.ok)
             return { status: "unavailable" };
         const data = await resp.json();
+        if (data.status === "answer")
+            return { status: "answer", reply: data.reply ?? "" };
         return data.status === "ok"
             ? { status: "ok", command: data.command, args: data.args ?? "" }
             : { status: "no_match" };
@@ -404,10 +406,13 @@ export default definePluginEntry({
             if (routed.status === "unavailable") {
                 return { handled: true, reply: { text: "Routeur local indisponible, réessayez dans un instant." } };
             }
+            if (routed.status === "answer") {
+                return { handled: true, reply: { text: routed.reply.slice(0, 1800) } };
+            }
             if (routed.status === "no_match") {
                 return {
                     handled: true,
-                    reply: { text: "Je n'ai pas identifié de commande (essayez /q <question>, /c <url>...)." },
+                    reply: { text: "Je n'ai pas cette information (essayez /q <question>, /c <url>...)." },
                 };
             }
             const action = commandToAction(routed.command);
