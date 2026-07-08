@@ -71,6 +71,10 @@ Responsabilité unique : charger `faits.md`, l'embarquer, et retrouver l'entrée
 plus proche d'un message.
 
 - `parse_faq(text) -> list[Entry]` où `Entry = {questions: list[str], answer: str}`.
+  **Garde-fou par-entrée** : une entrée dont le corps dépasse `FAQ_MAX_ENTREE`
+  caractères (défaut 2000, très au-dessus d'un fait normal) est **écartée avec un
+  avertissement** dans les logs — évite qu'une entrée pathologiquement longue
+  déborde silencieusement le contexte `-c 2048` et produise une réponse tronquée.
 - `class FaqIndex(embed_fn, path, seuil)` :
   - construit à l'init : parse + embarque toutes les questions (via `embed_fn`,
     = `GogGate._embed`, même BGE-M3, pas de second modèle) ; stocke une matrice
@@ -117,10 +121,12 @@ def route_message(message):
 
 ### 5. `install.sh` (modifié)
 
-Créer `~/Documents/Arbath/Wiki_LM/faits/` et y copier un seed `faits.md`
-**uniquement s'il n'existe pas**. Le seed contient quelques entrées représentatives
-sur Secretarius (commandes wiki/gog principales, config machine), dérivées des
-documents existants `gen_corpus_qa/documents/`, au format `##`-entrées.
+Créer `~/Documents/Arbath/Wiki_LM/faits/` et y copier le seed
+**uniquement s'il n'existe pas** (non-clobber). Source du seed dans le dépôt :
+`amorçage/faits.md` (versionné) → cible live éditable :
+`~/Documents/Arbath/Wiki_LM/faits/faits.md`. Le seed contient des entrées
+représentatives sur Secretarius (commandes wiki/gog, config machine), au format
+`##`-entrées.
 
 ## Flux (message en langage naturel, sans slash)
 
@@ -176,5 +182,10 @@ message ── derisk-deleg hook ── POST /route (8999)
 - Chaque message libre proche d'une entrée déclenche une génération phi-4 (quelques
   secondes + charge iGPU) ; le seuil borne cela aux vraies correspondances.
 - Bug de stabilité connu du `llama-server` ROCm sous charge — risque déjà accepté.
+- **Taille de la FAQ** : pas de plafond dur (seule l'entrée matchée est injectée,
+  donc le mur `-c 2048` ne concerne que la taille d'une entrée, bornée par le
+  garde-fou ci-dessus). À très grand N (plusieurs milliers d'entrées), le
+  ré-embarquement déclenché à chaque édition devient perceptible (secondes) —
+  optimisable plus tard par embarquement incrémental. YAGNI pour l'instant.
 - Le centroïde `secretarius` validé est **superseded** par ce design pour
   l'intégration ; son code de validation reste en place, non branché.
