@@ -208,6 +208,18 @@ else
   info "Wiki_LM/.env : WIKI_PATH mis à jour (${WIKI_PATH})"
 fi
 
+# Étape 4b — Amorçage de la FAQ de faits (non-clobber : jamais écrasé, même --force)
+FAITS_SRC="${SECRETARIUS_ROOT}/amorçage/faits.md"
+FAITS_DIR="${WIKI_PATH}/faits"
+FAITS_DEST="${FAITS_DIR}/faits.md"
+if [[ ! -f "$FAITS_DEST" ]]; then
+  mkdir -p "$FAITS_DIR"
+  cp "$FAITS_SRC" "$FAITS_DEST"
+  info "FAQ de faits amorcée (${FAITS_DEST})"
+else
+  info "FAQ de faits déjà présente, conservée (${FAITS_DEST})"
+fi
+
 # Étape 5 — Dépendances Python (venv)
 info "Installation des dépendances Python..."
 WIKI_LM_PATH="${SECRETARIUS_ROOT}/Wiki_LM"
