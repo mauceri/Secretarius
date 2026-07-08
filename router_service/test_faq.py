@@ -1,7 +1,15 @@
 import os
 import torch
+import pytest
 from router_service.faq import parse_faq, FaqIndex
 from router_service import server as router_server
+
+
+@pytest.fixture(autouse=True)
+def _reset_faq():
+    """Fixture autouse pour resetup _faq = None après chaque test (isolation)."""
+    yield
+    router_server._faq = None
 
 
 def _stub_embed(texts):
@@ -112,4 +120,14 @@ def test_route_slash_court_circuite_faq(tmp_path):
 def test_route_sans_match_retombe_routage(tmp_path):
     _install_faq(tmp_path)
     r = router_server.route_message("cherche un truc inconnu xyz")
+    assert r["status"] != "answer"
+
+
+def test_route_faq_erreur_ne_crashe_pas(tmp_path, monkeypatch):
+    """Fix 1 TDD : lookup qui lève ne doit pas crasher route_message."""
+    _install_faq(tmp_path)
+    def boom(_msg):
+        raise RuntimeError("embed cassé")
+    monkeypatch.setattr(router_server._faq, "lookup", boom)
+    r = router_server.route_message("parle-moi du perroquet")
     assert r["status"] != "answer"

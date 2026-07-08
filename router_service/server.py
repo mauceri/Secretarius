@@ -47,7 +47,10 @@ def call_adapter(message: str):
 
 def route_message(message: str) -> dict:
     if _faq is not None and not message.lstrip().startswith("/"):
-        entry = _faq.lookup(message)
+        try:
+            entry = _faq.lookup(message)
+        except Exception:
+            entry = None
         if entry is not None:
             return {"status": "answer", "reply": entry["answer"]}
     try:
