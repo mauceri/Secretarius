@@ -5,6 +5,7 @@ d'un message (single-vector nearest-neighbor sur BGE-M3). Réponse = corps
 verbatim de l'entrée, aucun appel LLM."""
 import os
 from pathlib import Path
+import torch
 
 FAQ_PATH = Path(os.environ.get(
     "FAQ_PATH", str(Path.home() / "Documents/Arbath/Wiki_LM/faits/faits.md")))
@@ -45,3 +46,46 @@ def parse_faq(text: str) -> list[dict]:
             body.append(line)
     flush()
     return entries
+
+
+class FaqIndex:
+    def __init__(self, embed_fn, path=FAQ_PATH, seuil=SEUIL_FAQ):
+        self._embed_fn = embed_fn
+        self._path = Path(path)
+        self._seuil = seuil
+        self._mtime = None
+        self._qmat = None       # torch.Tensor [N_questions, D] ou None
+        self._entry_of = []     # entrée correspondant à chaque question
+        self._reload()
+
+    def _current_mtime(self):
+        try:
+            return self._path.stat().st_mtime
+        except OSError:
+            return None
+
+    def _reload(self):
+        self._mtime = self._current_mtime()
+        if self._mtime is None:
+            self._qmat, self._entry_of = None, []
+            return
+        entries = parse_faq(self._path.read_text(encoding="utf-8"))
+        questions, entry_of = [], []
+        for e in entries:
+            for q in e["questions"]:
+                questions.append(q)
+                entry_of.append(e)
+        self._entry_of = entry_of
+        self._qmat = self._embed_fn(questions) if questions else None
+
+    def lookup(self, message: str):
+        if self._current_mtime() != self._mtime:
+            self._reload()
+        if self._qmat is None:
+            return None
+        e = self._embed_fn([message])                 # [1, D], normalisé
+        sims = (e @ self._qmat.T).squeeze(0)          # [N_questions]
+        idx = int(sims.argmax())
+        if float(sims[idx]) >= self._seuil:
+            return self._entry_of[idx]
+        return None

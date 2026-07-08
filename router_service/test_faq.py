@@ -1,4 +1,26 @@
-from router_service.faq import parse_faq
+import os
+import torch
+from router_service.faq import parse_faq, FaqIndex
+
+
+def _stub_embed(texts):
+    # embeddings one-hot par mot-clé (déjà normalisés)
+    vecs = []
+    for t in texts:
+        tl = t.lower()
+        if "perroquet" in tl:
+            vecs.append([1.0, 0.0, 0.0])
+        elif "wiki" in tl:
+            vecs.append([0.0, 1.0, 0.0])
+        else:
+            vecs.append([0.0, 0.0, 1.0])
+    return torch.tensor(vecs)
+
+
+def _ecrire(tmp_path, contenu):
+    p = tmp_path / "faits.md"
+    p.write_text(contenu, encoding="utf-8")
+    return p
 
 
 def test_entree_simple():
@@ -38,3 +60,29 @@ def test_garde_fou_entree_trop_longue(capsys):
     long = "x" * (FAQ_MAX_ENTREE + 1)
     assert parse_faq(f"## Q ?\n{long}") == []
     assert "ignorée" in capsys.readouterr().out
+
+
+def test_lookup_match(tmp_path):
+    p = _ecrire(tmp_path, "## Le perroquet de Mme Michu ?\nCoco.")
+    idx = FaqIndex(_stub_embed, path=p, seuil=0.6)
+    assert idx.lookup("parle-moi du perroquet")["answer"] == "Coco."
+
+
+def test_lookup_sous_seuil(tmp_path):
+    p = _ecrire(tmp_path, "## Le perroquet ?\nCoco.")
+    idx = FaqIndex(_stub_embed, path=p, seuil=0.6)
+    assert idx.lookup("quelle météo aujourd'hui") is None
+
+
+def test_lookup_fichier_absent(tmp_path):
+    idx = FaqIndex(_stub_embed, path=tmp_path / "absent.md", seuil=0.6)
+    assert idx.lookup("le perroquet") is None
+
+
+def test_reload_sur_mtime(tmp_path):
+    p = _ecrire(tmp_path, "## wiki ?\nancienne")
+    idx = FaqIndex(_stub_embed, path=p, seuil=0.6)
+    assert idx.lookup("le wiki")["answer"] == "ancienne"
+    p.write_text("## wiki ?\nnouvelle", encoding="utf-8")
+    os.utime(p, (p.stat().st_atime, p.stat().st_mtime + 10))
+    assert idx.lookup("le wiki")["answer"] == "nouvelle"
