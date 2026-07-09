@@ -44,11 +44,15 @@ changement.
   fondée sur embeddings + position est « le meilleur des mondes » : robuste, pas de
   graphe O(n²) lourd requis, exploite l'encodeur déjà en place.
 - **phi-4 produit du JSON contraint, pas du markdown.** phi-4-mini est faible sur
-  l'adhérence au format (YAML/sections). Il émet donc `{"resume": str,
-  "concepts": [str], "entites": [str]}` via `json_schema` (comme le routeur Tiron),
-  et **le code assemble `src-<slug>.md` de façon déterministe**. On sépare le
-  *contenu* (phi-4) du *format* (code fiable). Le titre, la date, l'URL, la catégorie
-  viennent des **métadonnées** (déterministes), pas de phi-4.
+  l'adhérence au format (YAML/sections). Il émet donc, via `json_schema` (comme le
+  routeur Tiron), `{"resume": str, "points_cles": [str], "concepts": [str],
+  "entites": [str], "tags": [str]}` — les cinq champs que le format de page réclame
+  (Résumé, Points clés, section Concepts/entités, tags du frontmatter). **Le code
+  assemble `src-<slug>.md` de façon déterministe** à partir de ce JSON. On sépare le
+  *contenu* (phi-4) du *format* (code fiable). Le titre, la date, la catégorie et la
+  section « Liens internes suggérés » (fixée à « Aucun » en v1) viennent du
+  code/métadonnées, pas de phi-4. Le `_kb_context` actuel (contexte de recherche
+  injecté dans le prompt) est **abandonné en v1** pour préserver le budget.
 - **Contexte figé à 2048.** On ne touche pas au `-c 2048` du serveur 8998 (il sert le
   routeur interactif). Budget : ~150 tk d'instructions + ~300 tk de sortie ⇒
   **~1600 tk (~6000 caractères) pour les passages sélectionnés**. La sélection
