@@ -29,16 +29,16 @@ def clean_text(raw: str) -> str:
 
 def _ensure_punkt() -> None:
     try:
-        nltk.data.find("tokenizers/punkt")
+        nltk.data.find("tokenizers/punkt_tab")
     except LookupError:
-        nltk.download("punkt", quiet=True)
+        nltk.download("punkt_tab", quiet=True)
 
 
 def split_sentences(text: str) -> list[str]:
     _ensure_punkt()
     try:
         sents = nltk.sent_tokenize(text, language="french")
-    except Exception:
+    except LookupError:
         sents = nltk.sent_tokenize(text)
     return [s.strip() for s in sents if s and s.strip()]
 
