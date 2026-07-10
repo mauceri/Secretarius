@@ -675,7 +675,6 @@ class Ingestor:
         self.today = _today()
         self._wiki_lookup = WikiLookup(wiki_path)
         self._kb_dir = _DEFAULT_KB_DIR
-        self._embed_model = None  # chargé à la première utilisation
 
     # ------------------------------------------------------------------
     # Public API

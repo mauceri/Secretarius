@@ -69,7 +69,7 @@ def _bge_m3_embed(sentences: list[str]) -> np.ndarray:
                               normalize_embeddings=True).astype(np.float32)
 
 
-def select_central_passages(text: str, budget_chars: int = 6000,
+def select_central_passages(text: str, budget_chars: int = 4000,
                             embed_fn: Optional[Callable[[list[str]], np.ndarray]] = None) -> str:
     cleaned = clean_text(text)
     if len(cleaned) <= budget_chars:

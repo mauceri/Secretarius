@@ -33,7 +33,7 @@ def generate_page_content(passages: str, base_url: str = PHI4_BASE) -> dict:
     body = {
         "messages": [{"role": "system", "content": _SYSTEM},
                      {"role": "user", "content": user}],
-        "max_tokens": 600, "temperature": 0,
+        "max_tokens": 450, "temperature": 0,
         "lora": [{"id": 0, "scale": 0}],   # phi-4 nu, par-requête (ne touche pas l'état global)
         "json_schema": _SCHEMA,
     }
