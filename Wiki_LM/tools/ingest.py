@@ -36,7 +36,8 @@ import hashlib
 import frontmatter
 
 from llm import LLM
-from kb_query import kb_query
+from central_passages import select_central_passages
+from page_phi4 import generate_page_content, assemble_source_page
 from wiki_lookup import WikiLookup
 from wiki_paths import CONTENT_SUBDIRS, CLUSTERING_SUBDIR, iter_pages, slug_to_path
 
@@ -298,13 +299,6 @@ def _read_pdf(path: Path) -> str:
     return text
 
 
-def _truncate(text: str, max_chars: int = 12_000) -> str:
-    """Tronque le texte source pour ne pas dépasser le contexte du LLM."""
-    if len(text) <= max_chars:
-        return text
-    return text[:max_chars] + f"\n\n[… texte tronqué à {max_chars} caractères …]"
-
-
 def _file_hash(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as f:
@@ -481,52 +475,6 @@ Conventions de liens internes (OBLIGATOIRE) :
 - Exemples corrects : [[c-memex]], [[e-vannevar-bush]], [[src-as-we-may-think]]
 - Exemples INTERDITS : [[Memex]], [[Vannevar Bush]], [[mémex]]
 - Ne pas inventer de liens vers des pages qui n'existent pas encore"""
-
-
-_PROMPT_SOURCE_PAGE = """\
-Voici le contenu d'une source à intégrer dans le wiki.
-
-Source : {source_name}
-Date d'ingestion : {today}
-{required_tags_line}{kb_context_line}---
-{content}
----
-
-Produis une page wiki au format Markdown strict :
-
-```yaml
----
-title: <titre complet de la source>
-category: source
-tags: [<3 à 6 tags pertinents>]
-created: {today}
-sources: []
----
-```
-
-# <Titre>
-
-## Résumé
-
-<3 à 5 paragraphes résumant les idées principales>
-
-## Points clés
-
-- <point 1>
-- <point 2>
-- …
-
-## Concepts et entités mentionnés
-
-Liste les concepts abstraits et entités (personnes, outils, organisations) \
-importants, un par ligne, au format :
-- concept: <nom du concept>
-- entité: <nom de l'entité>
-
-## Liens internes suggérés
-
-<Liens wiki [[slug]] vers des pages existantes si pertinent, sinon "Aucun">
-"""
 
 
 _WIKI_ANCHOR_RE = re.compile(
@@ -1179,45 +1127,12 @@ class Ingestor:
             f"À réingérer manuellement si le document devient accessible.\n"
         )
 
-    def _kb_context(self, content: str) -> str:
-        """Retourne une ligne de contexte thématique depuis la base de connaissance, ou ''."""
-        if not self._kb_dir.exists():
-            return ""
-        try:
-            from sentence_transformers import SentenceTransformer
-            import numpy as np
-            if self._embed_model is None:
-                print("[ingest] Chargement du modèle BGE-M3 pour kb_query…")
-                self._embed_model = SentenceTransformer("BAAI/bge-m3")
-            vec = self._embed_model.encode(
-                content[:2000], normalize_embeddings=True
-            ).astype(np.float32)
-            axes = kb_query(vec, self._kb_dir, top_k=3)
-            if not axes:
-                return ""
-            lines = ", ".join(f"{a['title']} ({a['score']:.2f})" for a in axes)
-            return f"Axes thématiques proches : {lines}\n"
-        except Exception:
-            return ""
-
     def _generate_source_page(
         self, content: str, source_name: str, extra_tags: list[str] | None = None
     ) -> str:
-        required_tags_line = ""
-        if extra_tags:
-            tags_str = ", ".join(extra_tags)
-            required_tags_line = f"Tags requis (à inclure dans le frontmatter) : {tags_str}\n"
-        kb_context_line = self._kb_context(content)
-        if kb_context_line:
-            kb_context_line += "\n"
-        prompt = _PROMPT_SOURCE_PAGE.format(
-            source_name=source_name,
-            today=self.today,
-            content=_truncate(content),
-            required_tags_line=required_tags_line,
-            kb_context_line=kb_context_line,
-        )
-        return self.llm.complete(prompt, system=_SYSTEM_INGEST, max_tokens=3000)
+        passages = select_central_passages(content)
+        data = generate_page_content(passages)
+        return assemble_source_page(source_name, self.today, data, list(extra_tags or []))
 
     def _load_tag_variants(self) -> tuple[dict[str, str], set[str]]:
         """Retourne ({variante: canonique}, {canoniques}) depuis tags_dict.json.

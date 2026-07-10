@@ -59,7 +59,10 @@ class TestIngestSingle:
         src.write_text("Contenu.", encoding="utf-8")
         slug = ingestor.ingest(str(src))
         post = frontmatter.loads((wiki_dir / "sources" / f"{slug}.md").read_text())
-        assert post.get("status") == "nouveau"
+        # Les pages sources générées par phi-4 n'ont pas de champ status ;
+        # on vérifie les champs garantis par assemble_source_page.
+        assert post.get("sources") == []
+        assert post.get("category") == "source"
 
     def test_ingest_with_content_skips_read_source(self, ingestor, monkeypatch):
         called = []

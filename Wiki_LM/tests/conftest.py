@@ -144,10 +144,22 @@ def wiki_root(tmp_path: Path, wiki_dir: Path, raw_dir: Path) -> Path:
 
 
 @pytest.fixture
-def ingestor(wiki_root: Path, raw_dir: Path, mock_llm: MockLLM):
+def ingestor(wiki_root: Path, raw_dir: Path, mock_llm: MockLLM, monkeypatch):
     """Ingestor configuré avec MockLLM et raw_dir temporaire."""
+    import ingest as _ingest
     from ingest import Ingestor
     from wiki_lookup import WikiLookup
+
+    # _generate_source_page passe désormais par phi-4 ; on mocke pour les tests
+    monkeypatch.setattr(_ingest, "select_central_passages", lambda text, **k: "passages de test")
+    monkeypatch.setattr(_ingest, "generate_page_content", lambda passages, **k: {
+        "resume": "Contenu de test pour la suite de tests automatisés.",
+        "points_cles": ["Point 1", "Point 2"],
+        "concepts": ["zettelkasten"],
+        "entites": ["Vannevar Bush"],
+        "tags": ["test", "wiki"],
+    })
+
     wl = WikiLookup(wiki_root, zim_dir=wiki_root / "zim")  # ZIM dir vide → pas de ZIM réel
     ing = Ingestor(wiki_root, llm=mock_llm, raw_path=raw_dir)
     ing._wiki_lookup = wl
