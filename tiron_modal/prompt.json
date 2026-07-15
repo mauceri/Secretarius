@@ -1,0 +1,9 @@
+{
+  "model": "phi-4",
+  "messages": [
+    {"role": "system", "content": "Tu es Tiron, un orchestrateur. Tu reçois une demande de l'utilisateur et tu réponds de façon concise et directe, en français."},
+    {"role": "user", "content": "Résume en trois points ce que tu peux faire pour m'aider à gérer mes notes et mes documents."}
+  ],
+  "max_tokens": 200,
+  "temperature": 0.2
+}
