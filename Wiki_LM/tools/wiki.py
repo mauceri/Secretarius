@@ -77,8 +77,11 @@ def op_capture(text: str) -> dict:
     raw.mkdir(parents=True, exist_ok=True)
     created = []
     if urls:
-        created.extend(capture_urls(urls, raw, tags=tags or None))
-    if note or refs:
+        # texte + URL → un seul .url embarquant la note (combiné à l'ingestion)
+        created.extend(capture_urls(urls, raw, tags=tags or None, note=note or None))
+        if refs:
+            created.append(capture_comment("", raw, tags=None, refs=refs))
+    elif note or refs:
         created.append(capture_comment(note, raw, tags=tags or None, refs=refs or None))
     return {"files": [p.name for p in created if p is not None]}
 

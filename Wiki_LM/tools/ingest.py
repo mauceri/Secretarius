@@ -318,6 +318,31 @@ def _extract_url_from_file(path: Path) -> str:
     return ""
 
 
+def _parse_note_from_url_file(path: Path) -> str:
+    """Lit la note optionnelle d'un .url : tout ce qui suit le marqueur 'note:'."""
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    for i, line in enumerate(lines):
+        if line.startswith("note:"):
+            first = line[len("note:"):].strip()
+            parts = ([first] if first else []) + lines[i + 1:]
+            return "\n".join(parts).strip()
+    return ""
+
+
+def _prepend_note(page_md: str, note: str) -> str:
+    """Insère la note en préambule, après le frontmatter, avant le contenu généré."""
+    note = note.strip()
+    if not note:
+        return page_md
+    block = f"## Note\n\n{note}\n\n"
+    if page_md.startswith("---\n"):
+        end = page_md.find("\n---\n", 3)
+        if end != -1:
+            cut = end + len("\n---\n")
+            return page_md[:cut] + "\n" + block + page_md[cut:].lstrip("\n")
+    return block + page_md
+
+
 def _dedup_files(files: list[Path]) -> list[Path]:
     """Déduplique une liste de fichiers par contenu.
 
@@ -895,7 +920,8 @@ class Ingestor:
                         self._mark_ingested(path.name, slug="", file_hash=_file_hash(path))
                         continue
                     user_tags = self._parse_raw_tags(path)
-                    slug = self.ingest(url, max_concepts=max_concepts, extra_tags=user_tags or None, rename_raw=False)
+                    note = _parse_note_from_url_file(path)
+                    slug = self.ingest(url, max_concepts=max_concepts, extra_tags=user_tags or None, rename_raw=False, note=note)
                 else:
                     user_tags = self._parse_raw_tags(path)
                     slug = self.ingest(str(path), max_concepts=max_concepts, extra_tags=user_tags or None, rename_raw=False)
@@ -964,6 +990,7 @@ class Ingestor:
         max_concepts: int = 5,
         extra_tags: list[str] | None = None,
         rename_raw: bool = True,
+        note: str = "",
     ) -> str:
         """Ingère une source et retourne le slug de la page créée."""
         print(f"[ingest] Lecture de la source : {source}")
@@ -1024,6 +1051,8 @@ class Ingestor:
 
         if source_url:
             source_page_md = _inject_url(source_page_md, source_url)
+        if note:
+            source_page_md = _prepend_note(source_page_md, note)
         self._write_wiki_page(src_slug, source_page_md)
 
         # 3. Extraire concepts et entités

@@ -33,12 +33,15 @@ def test_bootstrap_keeps_existing_api_key(monkeypatch, tmp_path):
 def test_capture_url_with_tags(monkeypatch, tmp_path):
     wiki = _wiki(monkeypatch, tmp_path)
     out = wiki.op_capture("#a #b https://example.com note libre")
-    assert "files" in out and len(out["files"]) >= 1
-    url_files = [f for f in out["files"] if f.endswith(".url")]
-    assert url_files, out
-    content = (tmp_path / "raw" / url_files[0]).read_text()
+    # texte + URL → un seul .url combiné (note embarquée, pas de .md séparé)
+    assert len(out["files"]) == 1
+    fname = out["files"][0]
+    assert fname.endswith(".url")
+    content = (tmp_path / "raw" / fname).read_text()
     assert "https://example.com" in content
     assert "tags: a, b" in content
+    assert "note libre" in content
+    assert not list((tmp_path / "raw").glob("*.md"))
 
 
 def test_query_returns_synthesis(monkeypatch, tmp_path):

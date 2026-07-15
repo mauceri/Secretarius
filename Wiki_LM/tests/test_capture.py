@@ -64,6 +64,23 @@ class TestCaptureUrls:
         files = capture_urls(["https://arxiv.org/abs/1234"], tmp_path)
         assert "arxiv" in files[0].name
 
+    def test_url_with_note(self, tmp_path):
+        files = capture_urls(["https://example.com/page"], tmp_path, note="Ceci est une note")
+        assert len(files) == 1
+        content = files[0].read_text(encoding="utf-8")
+        assert "https://example.com/page" in content
+        assert "Ceci est une note" in content
+
+    def test_url_with_multiline_note(self, tmp_path):
+        files = capture_urls(["https://example.com/x"], tmp_path, note="Ligne 1\nLigne 2")
+        content = files[0].read_text(encoding="utf-8")
+        assert "Ligne 1" in content and "Ligne 2" in content
+
+    def test_note_on_first_of_multiple(self, tmp_path):
+        files = capture_urls(["https://a.com", "https://b.com"], tmp_path, note="Ma note")
+        assert "Ma note" in files[0].read_text(encoding="utf-8")
+        assert "Ma note" not in files[1].read_text(encoding="utf-8")
+
 
 class TestCaptureComment:
     def test_creates_md_file(self, tmp_path):

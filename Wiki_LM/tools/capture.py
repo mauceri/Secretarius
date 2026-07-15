@@ -146,7 +146,8 @@ def _normalize_tags(raw_tags: list[str], kb_dir: Path = _DEFAULT_KB_DIR) -> list
 # Fonctions de capture
 # ---------------------------------------------------------------------------
 
-def capture_urls(urls: list[str], raw: Path, tags: list[str] | None = None) -> list[Path]:
+def capture_urls(urls: list[str], raw: Path, tags: list[str] | None = None,
+                 note: str | None = None) -> list[Path]:
     ts = timestamp()
     existing = _existing_urls(raw)
     created = []
@@ -164,6 +165,8 @@ def capture_urls(urls: list[str], raw: Path, tags: list[str] | None = None) -> l
         content = url + "\n"
         if tags:
             content += f"tags: {', '.join(tags)}\n"
+        if note and not created:            # note attachée au premier .url créé
+            content += f"note: {note}\n"
         path.write_text(content, encoding="utf-8")
         created.append(path)
     return created

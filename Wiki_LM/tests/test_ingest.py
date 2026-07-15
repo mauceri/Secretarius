@@ -323,3 +323,32 @@ class TestSaveRawNoDuplicate:
         # Ingestion directe (pas depuis raw/) : on conserve l'archive immuable
         ingestor._save_raw("https://example.com/page2", "contenu", "src-example2", from_raw=False)
         assert (ingestor.raw_dir / "src-example2.url").exists()
+
+
+def test_parse_note_from_url_file(tmp_path):
+    from ingest import _parse_note_from_url_file
+    p = tmp_path / "x.url"
+    p.write_text("https://example.com\ntags: a, b\nnote: Ligne 1\nLigne 2\n", encoding="utf-8")
+    assert _parse_note_from_url_file(p) == "Ligne 1\nLigne 2"
+
+
+def test_parse_note_absent(tmp_path):
+    from ingest import _parse_note_from_url_file
+    p = tmp_path / "x.url"
+    p.write_text("https://example.com\ntags: a\n", encoding="utf-8")
+    assert _parse_note_from_url_file(p) == ""
+
+
+def test_prepend_note_before_summary():
+    from ingest import _prepend_note
+    page = "---\ntitle: T\n---\n\n# T\n\n## Résumé\n\nabc\n"
+    out = _prepend_note(page, "Ma note")
+    assert out.startswith("---")
+    assert "Ma note" in out
+    assert out.index("Ma note") < out.index("## Résumé")
+
+
+def test_prepend_note_empty_noop():
+    from ingest import _prepend_note
+    page = "# T\n\ncontenu\n"
+    assert _prepend_note(page, "") == page
