@@ -8,7 +8,6 @@ import re
 from typing import Callable, Optional
 
 import numpy as np
-import nltk
 
 _MULTI_NL_RE = re.compile(r"\n{3,}")
 _MULTI_SP_RE = re.compile(r"[ \t]{2,}")
@@ -28,6 +27,7 @@ def clean_text(raw: str) -> str:
 
 
 def _ensure_punkt() -> None:
+    import nltk
     try:
         nltk.data.find("tokenizers/punkt_tab")
     except LookupError:
@@ -35,6 +35,7 @@ def _ensure_punkt() -> None:
 
 
 def split_sentences(text: str) -> list[str]:
+    import nltk
     _ensure_punkt()
     try:
         sents = nltk.sent_tokenize(text, language="french")
