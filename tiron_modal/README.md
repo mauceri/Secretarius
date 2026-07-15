@@ -31,9 +31,17 @@ python3 tiron_modal/bench.py "$MODAL_URL" -n 6            # Modal (1re = froid)
 
 ## Résultats de mesure
 
-(rempli après les runs)
+Mesuré à chaud le 2026-07-15 via les `timings` renvoyés par llama.cpp
+(prompt de `prompt.json`, 56 tk in / 44 tk out).
 
-| Cible        | TTFT froid | TTFT chaud | tok/s chaud | coût chaud/req |
-|--------------|-----------:|-----------:|------------:|---------------:|
-| iGPU local   |          — |            |             |             — |
-| Modal L4     |            |            |             |                |
+| Cible        | TTFT froid                | prompt eval | génération  | latence totale |
+|--------------|---------------------------|------------:|------------:|---------------:|
+| Modal L4     | cold start (boot + 3 Go)* |  252 tok/s  | **63,8 tok/s** |   ~0,9 s |
+| iGPU local   | —                         | (à mesurer) | (à mesurer) |    (à mesurer) |
+
+\* Cold start non chronométré précisément (endpoint renvoie `503 Loading model`
+pendant le chargement des 3 Go depuis le Volume).
+
+Reste : baseline locale (`python3 tiron_modal/bench.py http://127.0.0.1:8998 -n 6`,
+hors-ligne, sans crédit Modal) pour comparer, et coût/requête réel (selon le temps
+d'allumage GPU — scale-to-zero après 5 min).
