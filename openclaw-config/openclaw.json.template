@@ -81,7 +81,8 @@
     ]
    },
    "tiron-llm": {
-    "baseUrl": "http://127.0.0.1:8998/v1",
+    "baseUrl": "${TIRON_LLM_URL}/v1",
+    "apiKey": "${TIRON_LLM_KEY}",
     "api": "openai-completions",
     "models": [
      {
