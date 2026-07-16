@@ -24,7 +24,7 @@ export async function execWikiSandbox(
   argv: string[],
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   try {
-    const config = api?.runtime?.config;
+    const config = api?.config ?? api?.runtime?.config?.current?.();
     const ctx = await resolveSandboxContext({
       config,
       sessionKey: WIKI_SANDBOX_SESSION_KEY,
