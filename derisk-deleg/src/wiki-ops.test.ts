@@ -62,4 +62,9 @@ describe("runWikiOp", () => {
     const out = await runWikiOp(null, "status", "", async () => ({ code: 0, stdout: "pas du json", stderr: "" }));
     expect(out).toContain("Erreur wiki");
   });
+  it("ignore les lignes de diagnostic avant le JSON (JSON = dernière ligne)", async () => {
+    const stdout = '[query] Embeddings absents — mode BM25 uniquement. Lancez embed.py.\n{"synthesis": "# GPU TEE", "references": []}';
+    const out = await runWikiOp(null, "query", "tee gpu", async () => ({ code: 0, stdout, stderr: "" }));
+    expect(out).toBe("# GPU TEE");
+  });
 });

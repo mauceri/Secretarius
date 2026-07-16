@@ -70,9 +70,14 @@ export async function runWikiOp(
   if (arg) argv.push(arg);
   const { code, stdout, stderr } = await exec(api, argv);
   if (code !== 0) return `Erreur wiki : ${(stderr || stdout || "échec").slice(0, 500)}`;
+  // wiki.py imprime parfois des lignes de diagnostic avant le JSON (ex. query :
+  // « [query] Embeddings absents… ») ; le résultat JSON est toujours la DERNIÈRE
+  // ligne non vide (un seul print(json.dumps(...)) final, sur une ligne).
+  const lines = stdout.split("\n").map((l) => l.trim()).filter(Boolean);
+  const lastLine = lines.length ? lines[lines.length - 1] : "";
   let json: any;
   try {
-    json = JSON.parse(stdout.trim());
+    json = JSON.parse(lastLine);
   } catch {
     return `Erreur wiki : sortie inattendue (${stdout.slice(0, 200)})`;
   }
