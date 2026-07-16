@@ -1,3 +1,65 @@
+// ASSOMPTION SDK (à vérifier live) : resolveSandboxContext n'est PAS exporté
+// par "openclaw/plugin-sdk/sandbox" (absent de son .d.ts / .js malgré le brief) ;
+// il l'est en revanche par "openclaw/plugin-sdk/agent-harness-runtime"
+// (confirmé dans node_modules/openclaw/dist/plugin-sdk/agent-harness-runtime.d.ts
+// et présent dans le "exports" map de openclaw/package.json).
+import { resolveSandboxContext } from "openclaw/plugin-sdk/agent-harness-runtime";
+
+// Session stable -> le backend sandbox réutilise le même conteneur entre appels.
+const WIKI_SANDBOX_SESSION_KEY = "agent:wiki:subagent:ops";
+const WIKI_SANDBOX_TIMEOUT_MS = 120000;
+
+// Exécute argv (ex. ["python3","/wiki-tools/wiki.py","status"]) dans le sandbox
+// wiki via le SDK OpenClaw. Ne lève jamais : sandbox indisponible -> code 1.
+//
+// SandboxBackendCommandParams n'accepte pas d'argv direct : { script: string,
+// args?: string[] }. `script` est passé à `sh -c` et `args` devient $1, $2, ...
+// (cf. runDockerSandboxShellCommand : docker exec -i <container> sh -c
+// <script> openclaw-sandbox-fs <args...>). On construit donc script comme une
+// suite de références positionnelles ("$1" "$2" ...) et on passe argv tel
+// quel en args, ce qui exécute argv[0] avec argv[1..] comme arguments, sans
+// interpolation de texte dans le script (pas d'injection shell).
+export async function execWikiSandbox(
+  api: any,
+  argv: string[],
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  try {
+    const config = api?.runtime?.config;
+    const ctx = await resolveSandboxContext({
+      config,
+      sessionKey: WIKI_SANDBOX_SESSION_KEY,
+    });
+    if (!ctx || !ctx.enabled || !ctx.backend) {
+      return { code: 1, stdout: "", stderr: "sandbox wiki indisponible" };
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), WIKI_SANDBOX_TIMEOUT_MS);
+    try {
+      const script = argv.map((_, i) => `"$${i + 1}"`).join(" ");
+      const res = await ctx.backend.runShellCommand({
+        script,
+        args: argv,
+        allowFailure: true,
+        signal: controller.signal,
+      });
+      return {
+        code: res.code,
+        stdout: res.stdout?.toString("utf8") ?? "",
+        stderr: res.stderr?.toString("utf8") ?? "",
+      };
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (err) {
+    return {
+      code: 1,
+      stdout: "",
+      stderr: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 // Formatage déterministe du JSON de wiki.py en message utilisateur.
 // Aucune invention : sur erreur, on surface le texte de wiki.py verbatim.
 export function formatWikiResult(op: string, json: any): string {
