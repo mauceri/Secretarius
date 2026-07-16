@@ -12,6 +12,7 @@ from router_service.router import GogGate, WIKI_CMDS, GOG_CMDS
 from router_service.faq import FaqIndex, FAQ_PATH
 
 LLAMA_BASE = os.environ.get("TIRON_LLAMA_BASE", "http://127.0.0.1:8998")
+LLAMA_KEY = os.environ.get("TIRON_LLAMA_KEY", "")
 SYSTEM_ROUTE = ('Routeur de commandes Tiron. Pour chaque message, répondre '
                 'uniquement avec un objet JSON : {"command": "/commande" ou '
                 'null, "args": "arguments bruts ou chaîne vide"}.')
@@ -36,9 +37,12 @@ def call_adapter(message: str):
                          {"role": "user", "content": message}],
             "max_tokens": 60, "temperature": 0,
             "json_schema": COMMAND_SCHEMA}
+    headers = {"Content-Type": "application/json"}
+    if LLAMA_KEY:
+        headers["Authorization"] = "Bearer " + LLAMA_KEY
     req = urllib.request.Request(LLAMA_BASE + "/v1/chat/completions",
                                  data=json.dumps(body).encode(),
-                                 headers={"Content-Type": "application/json"})
+                                 headers=headers)
     d = json.load(urllib.request.urlopen(req, timeout=30))
     raw = d["choices"][0]["message"]["content"].strip()
     parsed = json.loads(raw)

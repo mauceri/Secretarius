@@ -39,3 +39,52 @@ def test_route_endpoint_end_to_end():
         assert resp["status"] in ("ok", "no_match")
     finally:
         httpd.shutdown()
+
+
+def _start_stub(received):
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class Stub(BaseHTTPRequestHandler):
+        def do_POST(self):
+            received["auth"] = self.headers.get("Authorization")
+            self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            payload = json.dumps({"choices": [{"message": {
+                "content": '{"command": null, "args": ""}'}}]}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def log_message(self, fmt, *args):
+            pass
+
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), Stub)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    return httpd
+
+
+def test_call_adapter_sends_bearer_when_key_set(monkeypatch):
+    received = {}
+    httpd = _start_stub(received)
+    try:
+        monkeypatch.setattr(router_server, "LLAMA_BASE",
+                            f"http://127.0.0.1:{httpd.server_address[1]}")
+        monkeypatch.setattr(router_server, "LLAMA_KEY", "secret123")
+        router_server.call_adapter("bonjour")
+        assert received["auth"] == "Bearer secret123"
+    finally:
+        httpd.shutdown()
+
+
+def test_call_adapter_no_header_without_key(monkeypatch):
+    received = {}
+    httpd = _start_stub(received)
+    try:
+        monkeypatch.setattr(router_server, "LLAMA_BASE",
+                            f"http://127.0.0.1:{httpd.server_address[1]}")
+        monkeypatch.setattr(router_server, "LLAMA_KEY", "")
+        router_server.call_adapter("bonjour")
+        assert received["auth"] is None
+    finally:
+        httpd.shutdown()
