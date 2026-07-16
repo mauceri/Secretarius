@@ -49,7 +49,24 @@ def call_adapter(message: str):
     return parsed.get("command"), parsed.get("args", "")
 
 
+# Commandes qui exigent un argument : un appel sans argument est une erreur
+# d'usage, pas une capture/requête vide à déléguer.
+NEEDS_ARG = {"/c", "/q", "/source", "/chercher", "/repondre"}
+
+
 def route_message(message: str) -> dict:
+    # Commande explicite (l'utilisateur a tapé /c, /q, …) : honorée telle quelle,
+    # jamais soumise au SLM. Le routeur ne classe que le texte libre ; re-classer
+    # une commande explicite ne peut que la corrompre (ex. /c pris pour /source).
+    stripped = message.strip()
+    if stripped.startswith("/"):
+        parts = stripped.split(None, 1)
+        cmd = parts[0]
+        if cmd in WIKI_CMDS or cmd in GOG_CMDS:
+            args = parts[1] if len(parts) > 1 else ""
+            if cmd in NEEDS_ARG and not args.strip():
+                return {"status": "answer", "reply": f"Usage : {cmd} <argument>"}
+            return {"status": "ok", "command": cmd, "args": args}
     if _faq is not None and not message.lstrip().startswith("/"):
         try:
             entry = _faq.lookup(message)

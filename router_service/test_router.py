@@ -88,3 +88,46 @@ def test_call_adapter_no_header_without_key(monkeypatch):
         assert received["auth"] is None
     finally:
         httpd.shutdown()
+
+
+def test_explicit_command_bypasses_slm(monkeypatch):
+    # Une commande tapée en toutes lettres est honorée telle quelle, sans jamais
+    # être soumise à phi-4 (qui, ici, la classerait à tort en /source).
+    called = {"n": 0}
+
+    def boom(msg):
+        called["n"] += 1
+        return ("/source", msg)
+
+    monkeypatch.setattr(router_server, "call_adapter", boom)
+    r = router_server.route_message(
+        "/c #TEE Serveur de GPU TEE https://phala.com/x")
+    assert r == {"status": "ok", "command": "/c",
+                 "args": "#TEE Serveur de GPU TEE https://phala.com/x"}
+    assert called["n"] == 0
+
+
+def test_explicit_gog_command_bypasses_slm(monkeypatch):
+    monkeypatch.setattr(router_server, "call_adapter",
+                        lambda m: (_ for _ in ()).throw(AssertionError("SLM appelé")))
+    r = router_server.route_message("/inbox")
+    assert r == {"status": "ok", "command": "/inbox", "args": ""}
+
+
+def test_explicit_command_empty_required_arg_returns_usage(monkeypatch):
+    monkeypatch.setattr(router_server, "call_adapter", lambda m: ("/ingest", ""))
+    r = router_server.route_message("/c")
+    assert r["status"] == "answer"
+    assert "/c" in r["reply"]
+
+
+def test_unknown_slash_command_still_reaches_slm(monkeypatch):
+    called = {"n": 0}
+
+    def fake(msg):
+        called["n"] += 1
+        return (None, "")
+
+    monkeypatch.setattr(router_server, "call_adapter", fake)
+    router_server.route_message("/inconnu bla")
+    assert called["n"] == 1
