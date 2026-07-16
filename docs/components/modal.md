@@ -66,8 +66,10 @@ chmod 600 ~/.openclaw/secrets/tiron-llm-key
 
 La même valeur est recopiée côté consommateurs : `apiKey` du provider
 `tiron-llm` (openclaw.json), `TIRON_LLAMA_KEY` (routeur),
-`TIRON_LLM_KEY` (installation). Rotation : régénérer la valeur, recréer le
-Secret, redéployer, mettre à jour les consommateurs.
+`TIRON_LLM_KEY` (installation, qui **devient** l'`apiKey` du provider —
+distinct de `TIRON_LLAMA_KEY` du routeur ; les deux noms ne diffèrent que par
+`LLM`/`LLAMA`). Rotation : régénérer la valeur, recréer le Secret, redéployer,
+mettre à jour les consommateurs.
 
 ## Basculer le cerveau de Tiron
 
@@ -92,10 +94,13 @@ Aller (local → Modal) :
    EOF
    systemctl --user daemon-reload
    ```
+   Ce fichier contient la clé en clair sur le disque (hors dépôt, mais non
+   chiffré) — à supprimer au retour au local.
 4. `systemctl --user restart tiron-router openclaw-gateway`
 
-Retour (Modal → local) : `baseUrl` = `http://127.0.0.1:8998/v1`, retirer
-`apiKey`, sync `.bak` ; supprimer le drop-in (`rm …/modal.conf`,
+Retour (Modal → local) : `baseUrl` = `http://127.0.0.1:8998/v1`, remettre
+`apiKey` = `local` (valeur inerte des installations locales) ou retirer le
+champ, sync `.bak` ; supprimer le drop-in (`rm …/modal.conf`,
 `daemon-reload`) ; mêmes restarts ; optionnel `modal app stop tiron-llm-modal`.
 
 Attention : `tiron-router.service` a `Requires=slm-llama_cpp.service` — ne pas
