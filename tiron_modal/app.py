@@ -38,6 +38,7 @@ def diag():
     image=image,
     gpu=GPU,
     volumes={MODELS_DIR: vol},
+    secrets=[modal.Secret.from_name("tiron-llm-api-key")],
     timeout=3600,
     scaledown_window=300,
 )
@@ -46,6 +47,7 @@ def serve():
     launch = (
         "export LD_LIBRARY_PATH=/app:${LD_LIBRARY_PATH:-}; "
         f"exec /app/llama-server --model {BASE} --lora {LORA} "
-        f"--host 0.0.0.0 --port {PORT} -c {CTX} -ngl 999"
+        f"--host 0.0.0.0 --port {PORT} -c {CTX} -ngl 999 "
+        '--api-key "$LLAMA_API_KEY"'
     )
     subprocess.Popen(["sh", "-c", launch])
