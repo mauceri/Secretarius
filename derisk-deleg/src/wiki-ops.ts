@@ -87,7 +87,7 @@ export async function runWikiOp(
 // Formatage déterministe du JSON de wiki.py en message utilisateur.
 // Aucune invention : sur erreur, on surface le texte de wiki.py verbatim.
 export function formatWikiResult(op: string, json: any): string {
-  if (json && typeof json.error === "string") return json.error;
+  if (json && typeof json.error === "string" && json.error.trim()) return json.error;
   if (json && json.status === "error") return json.reason ?? json.error ?? "Erreur wiki.";
 
   switch (op) {
@@ -120,6 +120,9 @@ export function formatWikiResult(op: string, json: any): string {
       return tags.length ? `Tags : ${tags.join(", ")}.` : "Aucun tag.";
     }
     case "kb_update":
+      // op_kb_update est synchrone (status "ok" = mise à jour faite) ; on gère
+      // aussi "launched" au cas où on brancherait le worker async, sans sur-claim.
+      if (json?.status === "launched") return "Mise à jour de la base lancée en arrière-plan.";
       return "Base de connaissances mise à jour.";
     default:
       return "Réponse wiki vide ou inattendue.";

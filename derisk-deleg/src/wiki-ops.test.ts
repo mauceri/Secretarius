@@ -30,10 +30,16 @@ describe("formatWikiResult", () => {
   it("tags : joint la liste", () => {
     expect(formatWikiResult("tags", { tags: ["gpu", "tee"] })).toBe("Tags : gpu, tee.");
   });
-  it("kb_update : succès et erreur", () => {
-    expect(formatWikiResult("kb_update", { status: "done" })).toBe("Base de connaissances mise à jour.");
+  it("kb_update : succès (status ok), async (launched) et erreur", () => {
+    expect(formatWikiResult("kb_update", { status: "ok", clustering: "c1" }))
+      .toBe("Base de connaissances mise à jour.");
+    expect(formatWikiResult("kb_update", { status: "launched" }))
+      .toBe("Mise à jour de la base lancée en arrière-plan.");
     expect(formatWikiResult("kb_update", { status: "error", reason: "clusterings/ introuvable" }))
       .toBe("clusterings/ introuvable");
+  });
+  it("erreur vide → ne renvoie pas un message vide (retombe sur l'op)", () => {
+    expect(formatWikiResult("query", { error: "", synthesis: "# X" })).toBe("# X");
   });
   it("erreur générique inconnue → message par défaut", () => {
     expect(formatWikiResult("query", {})).toBe("Réponse wiki vide ou inattendue.");
