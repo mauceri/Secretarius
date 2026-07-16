@@ -1,4 +1,4 @@
-import json, os, subprocess, textwrap
+import json, os, subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -54,6 +54,7 @@ def test_switch_sanroque_no_key(tmp_path):
     assert prov["baseUrl"] == "http://100.100.126.7:8998/v1"
     assert prov["apiKey"] == "local"  # clé vide -> "local" (inerte)
     assert "TIRON_LLAMA_BASE=http://100.100.126.7:8998" in renv.read_text()
+    assert "TIRON_LLAMA_KEY=\n" in renv.read_text() or renv.read_text().rstrip().endswith("TIRON_LLAMA_KEY=")
 
 
 def test_unknown_brain_touches_nothing(tmp_path):

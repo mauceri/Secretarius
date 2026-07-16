@@ -43,7 +43,14 @@ PY
 # 2. routeur : maj des 2 vars, préserve le reste (WIKI_PATH…)
 touch "$ROUTER_ENV"
 _set() {  # fichier clé valeur
-  if grep -q "^$2=" "$1"; then sed -i "s|^$2=.*|$2=$3|" "$1"; else echo "$2=$3" >> "$1"; fi
+  local f="$1" k="$2" v="$3" tmp
+  tmp="$(mktemp)"
+  awk -v k="$k" -v v="$v" '
+    $0 ~ "^" k "=" { print k "=" v; done=1; next }
+    { print }
+    END { if (!done) print k "=" v }
+  ' "$f" > "$tmp"
+  mv "$tmp" "$f"
 }
 _set "$ROUTER_ENV" TIRON_LLAMA_BASE "$URL"
 _set "$ROUTER_ENV" TIRON_LLAMA_KEY "$KEY"
