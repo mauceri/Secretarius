@@ -60,6 +60,25 @@ export async function execWikiSandbox(
   }
 }
 
+type Exec = (api: any, argv: string[]) => Promise<{ code: number; stdout: string; stderr: string }>;
+
+// Compose execWikiSandbox : construit argv, exécute, parse JSON, formate ou renvoie erreur.
+export async function runWikiOp(
+  api: any, op: string, arg: string, exec: Exec = execWikiSandbox,
+): Promise<string> {
+  const argv = ["python3", "/wiki-tools/wiki.py", op];
+  if (arg) argv.push(arg);
+  const { code, stdout, stderr } = await exec(api, argv);
+  if (code !== 0) return `Erreur wiki : ${(stderr || stdout || "échec").slice(0, 500)}`;
+  let json: any;
+  try {
+    json = JSON.parse(stdout.trim());
+  } catch {
+    return `Erreur wiki : sortie inattendue (${stdout.slice(0, 200)})`;
+  }
+  return formatWikiResult(op, json);
+}
+
 // Formatage déterministe du JSON de wiki.py en message utilisateur.
 // Aucune invention : sur erreur, on surface le texte de wiki.py verbatim.
 export function formatWikiResult(op: string, json: any): string {

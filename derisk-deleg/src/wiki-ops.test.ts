@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatWikiResult } from "./wiki-ops.js";
+import { formatWikiResult, runWikiOp } from "./wiki-ops.js";
 
 describe("formatWikiResult", () => {
   it("query : renvoie la synthèse verbatim", () => {
@@ -37,5 +37,29 @@ describe("formatWikiResult", () => {
   });
   it("erreur générique inconnue → message par défaut", () => {
     expect(formatWikiResult("query", {})).toBe("Réponse wiki vide ou inattendue.");
+  });
+});
+
+describe("runWikiOp", () => {
+  const okExec = (stdout: string) => async () => ({ code: 0, stdout, stderr: "" });
+
+  it("parse le JSON et formate", async () => {
+    const out = await runWikiOp(null, "query", "tee gpu",
+      okExec('{"synthesis": "# GPU TEE", "references": []}'));
+    expect(out).toBe("# GPU TEE");
+  });
+  it("passe op et arg à l'exec", async () => {
+    let seen: string[] = [];
+    const exec = async (_api: any, argv: string[]) => { seen = argv; return { code: 0, stdout: '{"files":["a.url"]}', stderr: "" }; };
+    await runWikiOp(null, "capture", "#x https://e.com", exec);
+    expect(seen).toEqual(["python3", "/wiki-tools/wiki.py", "capture", "#x https://e.com"]);
+  });
+  it("exit non nul → message d'erreur déterministe", async () => {
+    const out = await runWikiOp(null, "status", "", async () => ({ code: 1, stdout: "", stderr: "boom" }));
+    expect(out).toBe("Erreur wiki : boom");
+  });
+  it("stdout non-JSON → message d'erreur déterministe", async () => {
+    const out = await runWikiOp(null, "status", "", async () => ({ code: 0, stdout: "pas du json", stderr: "" }));
+    expect(out).toContain("Erreur wiki");
   });
 });
