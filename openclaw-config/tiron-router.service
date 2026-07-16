@@ -1,0 +1,14 @@
+[Unit]
+Description=Tiron router service (BGE-M3 gate + dispatch)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Secretarius
+EnvironmentFile=%h/.openclaw/tiron-router.env
+ExecStart=%h/Secretarius/Wiki_LM/.venv/bin/python -m router_service.server
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

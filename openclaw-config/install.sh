@@ -6,6 +6,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../install.conf"
 
 OBSIDIAN_PATH="${OBSIDIAN_PATH:-$HOME/Documents/Obsidian}"
+# WIKI_PATH n'est calculé dans install.sh (racine) qu'APRÈS l'appel à ce script —
+# on reprend ici la même formule pour que tiron-router.env soit correct.
+WIKI_PATH="${WIKI_PATH:-${OBSIDIAN_PATH}/Wiki_LM}"
 ASSISTANT_NAME="${ASSISTANT_NAME:-Tiron}"
 LLM_BACKEND="${LLM_BACKEND:-deepseek}"
 FORCE="${FORCE:-false}"
@@ -275,6 +278,33 @@ if [[ -x "${HOME}/Secretarius/Wiki_LM/.venv/bin/python3" && -f "${HOME}/Secretar
   systemctl --user enable wiki-lm-server.service 2>/dev/null && \
     info "wiki-lm-server.service activé au boot" || \
     warn "Activation de wiki-lm-server.service échouée"
+fi
+
+# Routeur Tiron (tiron-router) — versionné, câblé au cerveau via tiron-router.env.
+ROUTER_DST="${SYSTEMD_USER_DIR}/tiron-router.service"
+cp "${SCRIPT_DIR}/tiron-router.service" "$ROUTER_DST"
+# Env du routeur : endpoint LLM initial (depuis TIRON_LLM_URL/KEY) + WIKI_PATH (FAQ).
+cat > "${HOME}/.openclaw/tiron-router.env" <<EOF
+TIRON_LLAMA_BASE=${TIRON_LLM_URL}
+TIRON_LLAMA_KEY=${TIRON_LLM_KEY}
+WIKI_PATH=${WIKI_PATH}
+EOF
+# Registre des cerveaux (éditable) — non écrasé s'il existe.
+if [[ ! -f "${HOME}/.openclaw/brains.env" ]]; then
+  cat > "${HOME}/.openclaw/brains.env" <<EOF
+BRAIN_SANROQUE_URL=http://100.100.126.7:8998
+BRAIN_SANROQUE_KEY=
+BRAIN_MODAL_URL=${BRAIN_MODAL_URL:-}
+BRAIN_MODAL_KEY_FILE=${HOME}/.openclaw/secrets/tiron-llm-key
+WIKI_PATH=${WIKI_PATH}
+EOF
+fi
+if [[ -x "${HOME}/Secretarius/Wiki_LM/.venv/bin/python" ]]; then
+  systemctl --user daemon-reload 2>/dev/null || true
+  systemctl --user enable tiron-router.service 2>/dev/null && \
+    info "tiron-router.service activé" || warn "Activation de tiron-router.service échouée"
+else
+  warn "venv Wiki_LM absent — tiron-router non activé (relancer après le venv)"
 fi
 
 # Timer Wiki_LM embeddings : recalcul incrémental périodique (+ reload du serveur).
