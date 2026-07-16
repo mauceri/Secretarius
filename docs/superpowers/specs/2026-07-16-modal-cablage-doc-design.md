@@ -100,6 +100,12 @@ Usage, Notes). Contenu :
   le chargement, 1er message peut échouer, astuce curl de réveil), tarif L4
   (~0,80 $/h facturé à l'usage), mesures du 2026-07-15 (252 tok/s prompt,
   63,8 tok/s génération, ~0,9 s/req à chaud).
+- **Clé API** : secret partagé arbitraire (pas émis par Modal) — génération
+  (`openssl rand -hex 32`), stockage serveur
+  (`modal secret create tiron-llm-api-key LLAMA_API_KEY=<valeur>`), recopie
+  côté consommateurs (`apiKey` du provider, `TIRON_LLAMA_KEY` du routeur,
+  `TIRON_LLM_KEY` à l'installation), rotation (régénérer, recréer le Secret,
+  redéployer, mettre à jour les consommateurs).
 - **Confidentialité** : TLS + api-key = transport et accès protégés ; les
   prompts sont traités en clair dans l'infrastructure Modal ; règle d'usage :
   pas de contenu sensible quand le cerveau est sur Modal.
