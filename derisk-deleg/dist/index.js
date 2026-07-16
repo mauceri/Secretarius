@@ -2,6 +2,7 @@ import { Type } from "typebox";
 import { definePluginEntry } from "openclaw/plugin-sdk/core";
 import { parseReply } from "./parse.js";
 import { commandToAction } from "./dispatch.js";
+import { runWikiOp } from "./wiki-ops.js";
 import { readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync, copyFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -74,10 +75,6 @@ async function runAndRead(api, sessionKey, message) {
 function uniq() {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
-// Wiki : message "op: <op> | <arg>" vers l'agent wiki.
-function delegateWiki(api, op, arg) {
-    return runAndRead(api, `agent:wiki:subagent:cmd-${op}-${uniq()}`, `op: ${op} | ${arg}`.trimEnd());
-}
 // Scout : message "url: <url>" vers l'agent scout (lecture externe anti-injection).
 function delegateScout(api, url) {
     return runAndRead(api, `agent:scout:subagent:cmd-source-${uniq()}`, `url: ${url}`);
@@ -125,7 +122,7 @@ export default definePluginEntry({
                         arg += ` ref:${dest}`;
                     }
                 }
-                const out = await delegateWiki(api, "capture", arg);
+                const out = await runWikiOp(api, "capture", arg);
                 return { content: [{ type: "text", text: out.slice(0, 1800) }] };
             },
         });
@@ -136,7 +133,7 @@ export default definePluginEntry({
                 command: Type.Optional(Type.String({ description: "Unused." })),
             }),
             async execute(_id, _params) {
-                const out = await delegateWiki(api, "status", "");
+                const out = await runWikiOp(api, "status", "");
                 return { content: [{ type: "text", text: out.slice(0, 1800) }] };
             },
         });
@@ -147,7 +144,7 @@ export default definePluginEntry({
                 command: Type.Optional(Type.String({ description: "Unused." })),
             }),
             async execute(_id, _params) {
-                const out = await delegateWiki(api, "ingest", "");
+                const out = await runWikiOp(api, "ingest", "");
                 return { content: [{ type: "text", text: out.slice(0, 1800) }] };
             },
         });
@@ -159,7 +156,7 @@ export default definePluginEntry({
             }),
             async execute(_id, params) {
                 const arg = (params?.command ?? "").trim();
-                const out = await delegateWiki(api, "query", arg);
+                const out = await runWikiOp(api, "query", arg);
                 return { content: [{ type: "text", text: out.slice(0, 1800) }] };
             },
         });
@@ -168,7 +165,7 @@ export default definePluginEntry({
             description: "Liste les tags du wiki (délègue 'op: tags' à l'agent wiki).",
             parameters: Type.Object({ command: Type.Optional(Type.String({ description: "Inutilisé." })) }),
             async execute(_id, _params) {
-                const out = await delegateWiki(api, "tags", "");
+                const out = await runWikiOp(api, "tags", "");
                 return { content: [{ type: "text", text: out.slice(0, 1800) }] };
             },
         });
@@ -177,7 +174,7 @@ export default definePluginEntry({
             description: "Met à jour le KB depuis le dernier clustering (délègue 'op: kb_update' à l'agent wiki ; async).",
             parameters: Type.Object({ command: Type.Optional(Type.String({ description: "Inutilisé." })) }),
             async execute(_id, _params) {
-                const out = await delegateWiki(api, "kb_update", "");
+                const out = await runWikiOp(api, "kb_update", "");
                 return { content: [{ type: "text", text: out.slice(0, 1800) }] };
             },
         });
@@ -423,7 +420,7 @@ export default definePluginEntry({
                 };
             }
             if (action.kind === "wiki") {
-                const out = await delegateWiki(api, action.op, routed.args);
+                const out = await runWikiOp(api, action.op, routed.args);
                 return { handled: true, reply: { text: out.slice(0, 1800) } };
             }
             if (action.kind === "scout") {
