@@ -234,6 +234,36 @@ else
   WARNINGS+=("impossible de créer le venv Python\n    sudo apt install python3-venv\n    Puis relancer install.sh")
 fi
 
+# Étape 5a — Plugin derisk-deleg : copie automatique (dist committé à jour).
+PLUGIN_SRC="${SECRETARIUS_ROOT}/derisk-deleg"
+PLUGIN_DST="${OPENCLAW_PATH}/extensions/derisk-deleg"
+if [[ -d "${PLUGIN_SRC}/dist" ]]; then
+  mkdir -p "$PLUGIN_DST"
+  cp -r "${PLUGIN_SRC}/dist" "${PLUGIN_SRC}/node_modules" \
+        "${PLUGIN_SRC}/openclaw.plugin.json" "${PLUGIN_SRC}/package.json" "$PLUGIN_DST/" 2>/dev/null \
+    && info "plugin derisk-deleg copié ✓" \
+    || WARNINGS+=("copie du plugin derisk-deleg échouée\n    voir ${PLUGIN_SRC}")
+else
+  WARNINGS+=("derisk-deleg/dist absent — construire le plugin (npm run build) avant l'install")
+fi
+
+# Étape 5b — Images sandbox (gog/tiron/wiki). Échec = WARNING, non bloquant.
+# Contexte de build = racine du dépôt : Dockerfile.gog et Dockerfile.wiki
+# copient des fichiers hors openclaw-config/ (gog-bin, Wiki_LM/requirements.txt).
+OPENCLAW_CONFIG_PATH="${SECRETARIUS_ROOT}/openclaw-config"
+if command -v docker &>/dev/null && docker ps &>/dev/null 2>&1; then
+  for img in gog tiron wiki; do
+    DF="${OPENCLAW_CONFIG_PATH}/Dockerfile.${img}"
+    if docker build -q -f "$DF" -t "secretarius-${img}:latest" "${SECRETARIUS_ROOT}" &>/dev/null; then
+      info "image secretarius-${img}:latest ✓"
+    else
+      WARNINGS+=("build image secretarius-${img} échoué\n    docker build -f ${DF} -t secretarius-${img}:latest ${SECRETARIUS_ROOT}")
+    fi
+  done
+else
+  WARNINGS+=("docker inaccessible — images sandbox non construites (gog/tiron/wiki)")
+fi
+
 # Vérification google-auth si Gmail configuré
 if [[ -n "${GMAIL_CLIENT_ID:-}" ]]; then
   if ! python3 -c "import google.auth" 2>/dev/null; then
@@ -291,19 +321,14 @@ if ! grep -q "^TELEGRAM_BOT_TOKEN=.\+" "${OPENCLAW_PATH}/gateway.systemd.env" 2>
   fi
 fi
 
-echo "  2. Copier le plugin derisk-deleg :"
-echo "       SRC=${SECRETARIUS_ROOT}/derisk-deleg"
-echo "       DST=${OPENCLAW_PATH}/extensions/derisk-deleg"
-echo "       mkdir -p \"\$DST\" && cp -r \"\$SRC/dist\" \"\$SRC/node_modules\" \"\$SRC/openclaw.plugin.json\" \"\$SRC/package.json\" \"\$DST/\""
-echo ""
-echo "  3. Démarrer les services :"
+echo "  2. Démarrer les services :"
 echo "       cd ${SECRETARIUS_ROOT} && ./start.sh"
 echo ""
-echo "  4. Appairer Telegram (première fois) : envoyer /start au bot, puis :"
+echo "  3. Appairer Telegram (première fois) : envoyer /start au bot, puis :"
 echo "       openclaw pairing approve telegram <CODE>"
 echo "       ./start.sh   # redémarrer pour prendre en compte le pairing"
 echo ""
-echo "  5. Tester Wiki_LM :"
+echo "  4. Tester Wiki_LM :"
 echo "       cd ${WIKI_LM_PATH} && .venv/bin/python -m pytest tests/"
 
 # Si docker inaccessible, rappeler la correction avant Milvus
