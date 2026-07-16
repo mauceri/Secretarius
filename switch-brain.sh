@@ -17,7 +17,7 @@ source "$BRAINS_ENV"
 
 url_var="BRAIN_${UP}_URL"; key_var="BRAIN_${UP}_KEY"; keyfile_var="BRAIN_${UP}_KEY_FILE"
 URL="${!url_var:-}"
-[ -n "$URL" ] || { echo "Cerveau inconnu : $NAME" >&2; usage; }
+[ -n "$URL" ] || { echo "Cerveau '$NAME' : URL absente de brains.env (BRAIN_${UP}_URL)" >&2; usage; }
 KEY="${!key_var:-}"
 KEYFILE="${!keyfile_var:-}"
 if [ -z "$KEY" ] && [ -n "$KEYFILE" ]; then

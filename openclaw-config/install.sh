@@ -283,12 +283,17 @@ fi
 # Routeur Tiron (tiron-router) — versionné, câblé au cerveau via tiron-router.env.
 ROUTER_DST="${SYSTEMD_USER_DIR}/tiron-router.service"
 cp "${SCRIPT_DIR}/tiron-router.service" "$ROUTER_DST"
-# Env du routeur : endpoint LLM initial (depuis TIRON_LLM_URL/KEY) + WIKI_PATH (FAQ).
-cat > "${HOME}/.openclaw/tiron-router.env" <<EOF
+# Env du routeur : endpoint LLM initial (depuis TIRON_LLM_URL/KEY) + FAQ_PATH.
+# Non écrasé s'il existe déjà (préserve un cerveau choisi via switch-brain).
+if [[ ! -f "${HOME}/.openclaw/tiron-router.env" ]]; then
+  cat > "${HOME}/.openclaw/tiron-router.env" <<EOF
 TIRON_LLAMA_BASE=${TIRON_LLM_URL}
 TIRON_LLAMA_KEY=${TIRON_LLM_KEY}
-WIKI_PATH=${WIKI_PATH}
+FAQ_PATH=${WIKI_PATH}/faits/faits.md
 EOF
+else
+  info "tiron-router.env déjà présent — conservé (cerveau actif préservé)"
+fi
 # Registre des cerveaux (éditable) — non écrasé s'il existe.
 if [[ ! -f "${HOME}/.openclaw/brains.env" ]]; then
   cat > "${HOME}/.openclaw/brains.env" <<EOF
@@ -296,7 +301,6 @@ BRAIN_SANROQUE_URL=http://100.100.126.7:8998
 BRAIN_SANROQUE_KEY=
 BRAIN_MODAL_URL=${BRAIN_MODAL_URL:-}
 BRAIN_MODAL_KEY_FILE=${HOME}/.openclaw/secrets/tiron-llm-key
-WIKI_PATH=${WIKI_PATH}
 EOF
 fi
 if [[ -x "${HOME}/Secretarius/Wiki_LM/.venv/bin/python" ]]; then

@@ -330,6 +330,10 @@ echo "       ./start.sh   # redémarrer pour prendre en compte le pairing"
 echo ""
 echo "  4. Tester Wiki_LM :"
 echo "       cd ${WIKI_LM_PATH} && .venv/bin/python -m pytest tests/"
+echo ""
+echo "  5. Cerveau Tiron actif : défini par TIRON_LLM_URL à l'installation."
+echo "       Pour basculer : ./switch-brain.sh <sanroque|modal>"
+echo "       (URLs éditables dans ~/.openclaw/brains.env)"
 
 # Si docker inaccessible, rappeler la correction avant Milvus
 if [[ "$DOCKER_OK" != true ]]; then
