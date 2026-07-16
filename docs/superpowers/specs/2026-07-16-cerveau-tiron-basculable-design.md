@@ -148,6 +148,13 @@ symétrique vers `100.100.126.7:8998`.
 - Purge des conteneurs sandbox orphelins (nettoyage ponctuel séparé).
 - Le service `slm-llama_cpp` (llama local sanroque) reste hors dépôt/hors install
   (spécifique sanroque ; santiago vise un endpoint distant).
+- **Concurrence sur wiki partagé** : sanroque et santiago partagent **déjà** le même
+  vault Obsidian synchronisé (un seul coffre). Le verrou d'ingestion
+  (`.ingest_state.json`) est **local à chaque machine** et ne coordonne pas entre
+  elles → deux ingestions simultanées sur les deux machines pourraient se marcher
+  dessus. Géré par **discipline** (une seule ingestion à la fois, sur une seule
+  machine) ; les lectures (`/q`) et captures (`/c`) restent sûres. **Non traité dans
+  ce chantier** (accepté par l'utilisateur 2026-07-16).
 
 ## Point à confirmer au plan
 
