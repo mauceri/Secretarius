@@ -982,7 +982,8 @@ class Ingestor:
                 self._mark_ingested(path.name, slug=slug, file_hash=_file_hash(path))
             except Exception as e:
                 print(f"[ingest] ERREUR sur {path.name} : {e}")
-                self._mark_ingested(path.name, slug="", file_hash=_file_hash(path))
+                # Pas de _mark_ingested : un échec (souvent transitoire — fetch/LLM
+                # momentanément KO) laisse le fichier en attente pour un réessai.
 
         return slugs
 

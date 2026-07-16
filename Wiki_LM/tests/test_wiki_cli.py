@@ -111,21 +111,45 @@ def test_ingest_nothing_to_do(monkeypatch, tmp_path):
     assert wiki.op_ingest() == {"status": "nothing_to_do", "queued": 0}
 
 
-def test_ingest_ready_without_launching(monkeypatch, tmp_path):
-    # op_ingest = pré-vérification seule : ne lance rien, ne pose pas le verrou.
-    # Le lancement du worker en arrière-plan est fait par l'agent (exec background).
+def test_ingest_launches_detached_worker(monkeypatch, tmp_path):
+    # op_ingest lance le worker détaché lui-même (un seul exec synchrone côté agent).
     wiki = _wiki(monkeypatch, tmp_path)
     (tmp_path / "raw" / "x.url").write_text("https://example.com\n")
+    spawned = {"n": 0}
+    monkeypatch.setattr(wiki, "_spawn_detached_worker",
+                        lambda: spawned.__setitem__("n", spawned["n"] + 1), raising=False)
     out = wiki.op_ingest()
-    assert out == {"status": "ready", "queued": 1}
-    assert wiki._read_state()["running"] is False
+    assert out == {"status": "launched", "queued": 1}
+    assert spawned["n"] == 1
 
 
-def test_ingest_already_running(monkeypatch, tmp_path):
+def test_ingest_already_running_does_not_launch(monkeypatch, tmp_path):
+    from datetime import datetime, timezone
     wiki = _wiki(monkeypatch, tmp_path)
     (tmp_path / "raw" / "x.url").write_text("https://example.com\n")
-    wiki._write_state({"running": True, "last_run": None})
+    wiki._write_state({"running": True,
+                       "started_at": datetime.now(timezone.utc).isoformat(),
+                       "last_run": None})
+    spawned = {"n": 0}
+    monkeypatch.setattr(wiki, "_spawn_detached_worker",
+                        lambda: spawned.__setitem__("n", spawned["n"] + 1), raising=False)
     assert wiki.op_ingest() == {"status": "already_running", "queued": 1}
+    assert spawned["n"] == 0
+
+
+def test_ingest_stale_lock_relaunches(monkeypatch, tmp_path):
+    # Un verrou running vieux (worker tué) est considéré périmé -> on relance.
+    from datetime import datetime, timezone, timedelta
+    wiki = _wiki(monkeypatch, tmp_path)
+    (tmp_path / "raw" / "x.url").write_text("https://example.com\n")
+    old = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+    wiki._write_state({"running": True, "started_at": old, "last_run": None})
+    spawned = {"n": 0}
+    monkeypatch.setattr(wiki, "_spawn_detached_worker",
+                        lambda: spawned.__setitem__("n", spawned["n"] + 1), raising=False)
+    out = wiki.op_ingest()
+    assert out == {"status": "launched", "queued": 1}
+    assert spawned["n"] == 1
 
 
 def test_ingest_worker_skips_when_already_running(monkeypatch, tmp_path):

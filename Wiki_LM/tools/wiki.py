@@ -7,6 +7,7 @@ Sortie : JSON sur stdout ; code retour 0 (erreurs encodées dans le JSON).
 import json
 import os
 import re
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -114,6 +115,38 @@ def _write_state(state: dict) -> None:
     _state_path().write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
 
 
+# Un verrou running plus vieux que ce délai est considéré périmé (worker tué avant
+# d'avoir libéré le verrou) et n'empêche plus un nouveau lancement.
+_STALE_AFTER_SEC = 1800
+
+
+def _worker_running() -> bool:
+    """True seulement si un worker tourne ET que son verrou n'est pas périmé."""
+    state = _read_state()
+    if not state.get("running"):
+        return False
+    started = state.get("started_at")
+    if started:
+        try:
+            age = (datetime.now(timezone.utc) - datetime.fromisoformat(started)).total_seconds()
+            if age > _STALE_AFTER_SEC:
+                return False
+        except Exception:
+            pass
+    return True
+
+
+def _spawn_detached_worker() -> None:
+    """Lance _ingest_worker en processus pleinement détaché (start_new_session), pour
+    qu'il survive au nettoyage de l'outil exec d'OpenClaw (qui tue le groupe de l'exec)."""
+    log = open(_wiki_root() / ".ingest_worker.log", "ab")
+    subprocess.Popen(
+        [sys.executable, str(Path(__file__).resolve()), "_ingest_worker"],
+        stdin=subprocess.DEVNULL, stdout=log, stderr=log,
+        start_new_session=True,
+    )
+
+
 def _pending_files(raw: Path) -> list[str]:
     if not raw.exists():
         return []
@@ -145,15 +178,15 @@ def op_status() -> dict:
 
 
 def op_ingest() -> dict:
-    # Pré-vérification seule. Le worker (_ingest_worker) est lancé en arrière-plan
-    # par l'agent via exec(background:true) — l'auto-détache (subprocess.Popen) ne
-    # survit pas au nettoyage de l'outil exec d'OpenClaw.
+    # Lance le worker détaché lui-même : un seul exec synchrone côté agent, pas de
+    # dépendance au background:true d'OpenClaw (qui ne survit pas au nettoyage).
     pending = _pending_files(_raw_dir())
     if not pending:
         return {"status": "nothing_to_do", "queued": 0}
-    if _read_state().get("running"):
+    if _worker_running():
         return {"status": "already_running", "queued": len(pending)}
-    return {"status": "ready", "queued": len(pending)}
+    _spawn_detached_worker()
+    return {"status": "launched", "queued": len(pending)}
 
 
 def _do_ingest() -> dict:
@@ -169,9 +202,9 @@ def _do_ingest() -> dict:
 
 
 def op_ingest_worker() -> dict:
-    # Lancé en arrière-plan par l'agent. Auto-gardé : pose le verrou running au
-    # début, traite le batch (synchrone en interne), libère le verrou à la fin.
-    if _read_state().get("running"):
+    # Lancé détaché par op_ingest. Auto-gardé : pose le verrou running au début,
+    # traite le batch (synchrone en interne), libère le verrou à la fin.
+    if _worker_running():
         return {"status": "already_running"}
     _write_state({
         "running": True,

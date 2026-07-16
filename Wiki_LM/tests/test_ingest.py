@@ -349,3 +349,16 @@ def test_prepend_note_empty_noop():
     from ingest import _prepend_note
     page = "# T\n\ncontenu\n"
     assert _prepend_note(page, "") == page
+
+
+def test_errored_file_not_marked_for_retry(ingestor, raw_dir):
+    # Un échec transitoire ne doit PAS marquer le fichier ingéré : il reste en
+    # attente pour un réessai (sinon un phi-4/Euria momentanément KO = skip permanent).
+    (raw_dir / "a.txt").write_text("contenu", encoding="utf-8")
+
+    def boom(*a, **k):
+        raise RuntimeError("échec transitoire")
+
+    ingestor.ingest = boom
+    ingestor.ingest_raw_dir()
+    assert "a.txt" not in ingestor._load_manifest()
