@@ -3,6 +3,9 @@
 Spec : `docs/superpowers/specs/2026-07-15-tiron-modal-deploiement-design.md`
 Plan : `docs/superpowers/plans/2026-07-15-tiron-modal-deploiement.md`
 
+Fiche d'exploitation : `docs/components/modal.md` (deploy/stop, bascule du
+cerveau Tiron, clé API, nouveau LLM).
+
 Sert phi-4-mini + l'adaptateur `tiron-unified` (mêmes GGUFs qu'en local, llama.cpp
 compilé CUDA, tag `b6257`) sur un GPU Modal L4, endpoint OpenAI-compatible.
 
