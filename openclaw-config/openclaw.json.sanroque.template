@@ -153,7 +153,7 @@
       "dangerouslyAllowExternalBindSources": true,
       "binds": [
        "${HOME}/Secretarius/Wiki_LM/tools:/wiki-tools:ro",
-       "${HOME}/Documents/Arbath/Wiki_LM:/Wiki_LM:rw",
+       "${OBSIDIAN_PATH}/Wiki_LM:/Wiki_LM:rw",
        "${HOME}/${OPENCLAW_DIR}/secrets/euria-key:/run/euria-key:ro",
        "${HOME}/Secretarius/Wiki_LM/zim:/zim:ro"
       ],
