@@ -4,13 +4,19 @@
 de confiance sur les commandes gog (l'extraction de commande se fait par
 l'adaptateur unique, pas par ce module)."""
 import json
+import os
+from pathlib import Path
 import torch
 import torch.nn.functional as F
 
 WIKI_CMDS = {"/c", "/q", "/ingest", "/source", "/wikistatus"}
 GOG_CMDS = {"/chercher", "/connecter", "/inbox", "/drive", "/repondre"}
-TRAIN_FULL = "/home/mauceric/Secretarius/gen_corpus/corpus_lora_train.jsonl"
-RAW_CORPUS = "/home/mauceric/Secretarius/gen_corpus/corpus.jsonl"
+# Corpus des centroïdes : relatif au dépôt (router.py est dans router_service/),
+# surchargeable par GEN_CORPUS_DIR. Plus de chemin machine en dur.
+_GEN_CORPUS = Path(os.environ.get(
+    "GEN_CORPUS_DIR", Path(__file__).resolve().parent.parent / "gen_corpus"))
+TRAIN_FULL = str(_GEN_CORPUS / "corpus_lora_train.jsonl")
+RAW_CORPUS = str(_GEN_CORPUS / "corpus.jsonl")
 NULL_VARIANTES = {"action_impossible", "aide_generale"}
 T_SOFTMAX = 0.05
 SEUIL_GOG = 0.50
