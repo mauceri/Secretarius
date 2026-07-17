@@ -51,10 +51,32 @@ Plugin derisk-deleg : fournit gog_* et wiki_* aux agents ; intercepte /confirm e
 
 ## Prérequis
 
+- **Node.js ≥ 22.22.3** (ou 24.x, ou 25.x) — via NVM. OpenClaw **refuse de démarrer**
+  en dessous : le gateway boucle sur `Node.js >=22.22.3 … is required (current: vX)`.
 - openclaw, installé dans votre Node (NVM) avec `npm install -g openclaw`.
   **Ne pas utiliser l'installeur `curl … install-cli.sh`** : il place openclaw dans
   `~/.openclaw`, qui est le répertoire de config de Secretarius → l'uninstall
   supprimerait openclaw avec.
+  > **Piège Node + systemd — nvm ne suffit pas.** Le service gateway lance openclaw
+  > via `#!/usr/bin/env node`, qui résout `node` par le **PATH système**
+  > (`/usr/bin/node`) — **jamais** par nvm (nvm ne modifie que les shells interactifs,
+  > pas les services systemd). Si le **Node système** est trop vieux, le gateway boucle
+  > sur l'erreur `Node.js … required` **quoi que fasse nvm** (`nvm install/use/alias`
+  > n'y changent rien). Vérifier le vrai coupable : `/usr/bin/node --version`.
+  > Deux corrections fiables :
+  > 1. **Mettre le Node système à niveau** (le plus propre) : installer Node ≥ 22.22.3
+  >    en système (NodeSource : `curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash - && sudo apt install -y nodejs`), puis `/usr/bin/node --version` doit être valide.
+  > 2. **Forcer un Node explicite dans le service** (sans toucher au système) via un
+  >    drop-in — utile si le Node valide n'est qu'en nvm :
+  >    ```bash
+  >    NODE=~/.nvm/versions/node/v24.18.0/bin/node        # une version >= 22.22.3 installée
+  >    OC=~/.nvm/versions/node/v24.18.0/bin/openclaw
+  >    mkdir -p ~/.config/systemd/user/openclaw-gateway.service.d
+  >    printf '[Service]\nExecStart=\nExecStart=%s %s gateway run\n' "$NODE" "$OC" \
+  >      > ~/.config/systemd/user/openclaw-gateway.service.d/node.conf
+  >    systemctl --user daemon-reload && systemctl --user restart openclaw-gateway
+  >    ```
+  >    (openclaw doit être installé sous ce Node : `nvm use 24 && npm install -g openclaw`.)
 - Docker 24+
 - Python 3.10+ (pour Wiki_LM)
 - `envsubst` : `apt install gettext`
@@ -96,6 +118,10 @@ GOG_ACCOUNT=<adresse gmail>
 
 **4. Construire les images Docker**
 
+> `install.sh` (étape 5) **construit désormais les trois images automatiquement**.
+> Les commandes ci-dessous ne sont un repli que si l'install signale un échec de build
+> (WARNING) — par exemple si Docker n'était pas encore accessible.
+
 ```bash
 docker build -f openclaw-config/Dockerfile.tiron -t secretarius-tiron:latest .
 docker build -f openclaw-config/Dockerfile.wiki  -t secretarius-wiki:latest  .
@@ -110,11 +136,27 @@ docker build -f openclaw-config/Dockerfile.gog   -t secretarius-gog:latest   .
 ./install.sh --env-file ~/.config/secrets.env
 ```
 
-Répondre aux 4 questions (coffre Obsidian, nom de l'assistant, LLM, chemin OpenClaw). `install.sh` génère `~/.openclaw`, écrit un jeton de gateway cohérent, installe la commande `openclaw`, puis démarre le gateway.
+Répondre aux 4 questions (coffre Obsidian, nom de l'assistant, LLM, chemin OpenClaw). `install.sh` génère `~/.openclaw`, écrit un jeton de gateway cohérent, installe la commande `openclaw`, construit les 3 images, copie le plugin, installe le routeur `tiron-router`, puis démarre le gateway.
 
 → attendu : `Installation terminée` et `token gateway réconcilié`.
 
+> **Cerveau distant (VPS sans GPU, ex. santiago).** Le « cerveau » de Tiron — le
+> modèle qui alimente le provider `tiron-llm` et le routeur de commandes — est local
+> par défaut (`http://127.0.0.1:8998`). Pour le servir ailleurs (Modal, ou le llama de
+> sanroque via Tailscale), passez l'URL et la clé à l'install :
+> ```bash
+> TIRON_LLM_URL=https://<user>--tiron-llm-modal-serve.modal.run \
+> TIRON_LLM_KEY=<clé Secret Modal> \
+> BRAIN_MODAL_URL=https://<user>--tiron-llm-modal-serve.modal.run \
+> ./install.sh --env-file ~/.config/secrets.env
+> ```
+> Voir `docs/components/modal.md` (déployer l'app Modal) et la section
+> [Basculer le cerveau](#basculer-le-cerveau-de-tiron-local--modal).
+
 **6. Copier le plugin derisk-deleg**
+
+> `install.sh` (étape 5) **copie désormais le plugin automatiquement**. Les commandes
+> ci-dessous ne sont un repli que si l'install signale un échec (WARNING).
 
 `openclaw plugins install .` échoue avec NVM ; on copie les fichiers (déjà construits dans le dépôt) :
 
@@ -284,6 +326,37 @@ L'agent `scout` utilise toujours DeepSeek (`deepseek-chat`) — non modifiable v
 
 ---
 
+## Basculer le cerveau de Tiron (local ↔ Modal)
+
+Distinct de `switch-model` (qui change le modèle **de conversation** de l'agent main) :
+`switch-brain` change l'**endpoint du « cerveau »** — le modèle qui alimente le
+provider `tiron-llm` et le routeur de commandes `tiron-router`. Utile quand une
+machine n'a pas de GPU (VPS) et doit servir ce cerveau ailleurs.
+
+Deux consommateurs sont repointés d'un coup (le provider dans `openclaw.json` **et**
+le routeur via `~/.openclaw/tiron-router.env`), puis les services redémarrent :
+
+```bash
+./switch-brain.sh modal       # cerveau sur Modal
+./switch-brain.sh sanroque    # cerveau = llama de sanroque (via Tailscale)
+```
+
+Les cibles nommées vivent dans **`~/.openclaw/brains.env`** (posé par `install.sh`,
+éditable) :
+
+```
+BRAIN_SANROQUE_URL=http://100.100.126.7:8998        # IP Tailscale de sanroque
+BRAIN_SANROQUE_KEY=
+BRAIN_MODAL_URL=https://<user>--tiron-llm-modal-serve.modal.run
+BRAIN_MODAL_KEY_FILE=~/.openclaw/secrets/tiron-llm-key
+```
+
+Prérequis pour la cible `modal` : l'app Modal déployée et la clé présente dans le
+fichier `BRAIN_MODAL_KEY_FILE`. Déploiement de l'app, arrêt, coûts, chargement d'un
+autre LLM : voir **`docs/components/modal.md`**.
+
+---
+
 ## Mise à jour
 
 ```bash
@@ -303,6 +376,7 @@ bash install.sh
 ```
 Secretarius/
 ├── install.sh, start.sh                # installation / démarrage (racine)
+├── switch-brain.sh                     # bascule le cerveau LLM (local ↔ Modal)
 ├── gog-connect.sh                      # (ré)autorisation Google de l'agent gog (shell)
 ├── openclaw-config/
 │   ├── INSTALL.md                      # Procédure d'installation détaillée
@@ -311,6 +385,7 @@ Secretarius/
 │   ├── openclaw.json.template          # Configuration OpenClaw (4 agents + plugin)
 │   ├── gateway.systemd.env.template
 │   ├── openclaw-gateway.service        # Service systemd user
+│   ├── tiron-router.service            # Service routeur de commandes (BGE-M3)
 │   ├── Dockerfile.tiron                # Sandbox agent principal
 │   ├── Dockerfile.wiki                 # Sandbox agent wiki
 │   ├── Dockerfile.gog                  # Sandbox agent gog
