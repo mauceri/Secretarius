@@ -123,7 +123,7 @@ export default definePluginEntry({
                     }
                 }
                 const out = await runWikiOp(api, "capture", arg);
-                return { content: [{ type: "text", text: out.slice(0, 1800) }] };
+                return { content: [{ type: "text", text: out.slice(0, 4000) }] };
             },
         });
         api.registerTool({
@@ -134,7 +134,7 @@ export default definePluginEntry({
             }),
             async execute(_id, _params) {
                 const out = await runWikiOp(api, "status", "");
-                return { content: [{ type: "text", text: out.slice(0, 1800) }] };
+                return { content: [{ type: "text", text: out.slice(0, 4000) }] };
             },
         });
         api.registerTool({
@@ -145,7 +145,7 @@ export default definePluginEntry({
             }),
             async execute(_id, _params) {
                 const out = await runWikiOp(api, "ingest", "");
-                return { content: [{ type: "text", text: out.slice(0, 1800) }] };
+                return { content: [{ type: "text", text: out.slice(0, 4000) }] };
             },
         });
         api.registerTool({
@@ -157,7 +157,7 @@ export default definePluginEntry({
             async execute(_id, params) {
                 const arg = (params?.command ?? "").trim();
                 const out = await runWikiOp(api, "query", arg);
-                return { content: [{ type: "text", text: out.slice(0, 1800) }] };
+                return { content: [{ type: "text", text: out.slice(0, 4000) }] };
             },
         });
         api.registerTool({
@@ -166,7 +166,7 @@ export default definePluginEntry({
             parameters: Type.Object({ command: Type.Optional(Type.String({ description: "Inutilisé." })) }),
             async execute(_id, _params) {
                 const out = await runWikiOp(api, "tags", "");
-                return { content: [{ type: "text", text: out.slice(0, 1800) }] };
+                return { content: [{ type: "text", text: out.slice(0, 4000) }] };
             },
         });
         api.registerTool({
@@ -175,7 +175,7 @@ export default definePluginEntry({
             parameters: Type.Object({ command: Type.Optional(Type.String({ description: "Inutilisé." })) }),
             async execute(_id, _params) {
                 const out = await runWikiOp(api, "kb_update", "");
-                return { content: [{ type: "text", text: out.slice(0, 1800) }] };
+                return { content: [{ type: "text", text: out.slice(0, 4000) }] };
             },
         });
         api.registerTool({
@@ -190,7 +190,7 @@ export default definePluginEntry({
                     return { content: [{ type: "text", text: "Usage: /source <url>" }] };
                 }
                 const out = await delegateScout(api, url);
-                return { content: [{ type: "text", text: out.slice(0, 1800) }] };
+                return { content: [{ type: "text", text: out.slice(0, 4000) }] };
             },
         });
         api.registerTool({
@@ -204,7 +204,7 @@ export default definePluginEntry({
                 const out = q
                     ? await delegateGog(api, "search", q)
                     : await delegateGog(api, "inbox", "");
-                return { content: [{ type: "text", text: out.slice(0, 1800) }] };
+                return { content: [{ type: "text", text: out.slice(0, 4000) }] };
             },
         });
         api.registerTool({
@@ -218,7 +218,7 @@ export default definePluginEntry({
                 if (!q)
                     return { content: [{ type: "text", text: "Usage: /chercher <requête>" }] };
                 const out = await delegateGog(api, "search", q);
-                return { content: [{ type: "text", text: out.slice(0, 1800) }] };
+                return { content: [{ type: "text", text: out.slice(0, 4000) }] };
             },
         });
         api.registerTool({
@@ -232,7 +232,7 @@ export default definePluginEntry({
                 if (!id)
                     return { content: [{ type: "text", text: "Usage: /lire <id>" }] };
                 const out = await delegateGog(api, "get", id);
-                return { content: [{ type: "text", text: out.slice(0, 1800) }] };
+                return { content: [{ type: "text", text: out.slice(0, 4000) }] };
             },
         });
         api.registerTool({
@@ -246,7 +246,7 @@ export default definePluginEntry({
                 if (!q)
                     return { content: [{ type: "text", text: "Usage: /drive <requête>" }] };
                 const out = await delegateGog(api, "drive_search", q);
-                return { content: [{ type: "text", text: out.slice(0, 1800) }] };
+                return { content: [{ type: "text", text: out.slice(0, 4000) }] };
             },
         });
         // gog_send : PRÉPARE un brouillon d'email (n'envoie PAS). main compose puis
@@ -384,7 +384,7 @@ export default definePluginEntry({
                 const out = p.kind === "send"
                     ? await delegateGog(api, "send", `to=${p.to}; subject=${p.subject}; body=${p.body}`)
                     : await delegateGog(api, "reply", `id=${p.messageId}; body=${p.body}`);
-                return { handled: true, reply: { text: out.slice(0, 1800) } };
+                return { handled: true, reply: { text: out.slice(0, 4000) } };
             }
             if (cmd === "/annuler") {
                 if (!pending) {
@@ -404,7 +404,7 @@ export default definePluginEntry({
                 return { handled: true, reply: { text: "Routeur local indisponible, réessayez dans un instant." } };
             }
             if (routed.status === "answer") {
-                return { handled: true, reply: { text: routed.reply.slice(0, 1800) } };
+                return { handled: true, reply: { text: routed.reply.slice(0, 4000) } };
             }
             if (routed.status === "no_match") {
                 return {
@@ -421,15 +421,15 @@ export default definePluginEntry({
             }
             if (action.kind === "wiki") {
                 const out = await runWikiOp(api, action.op, routed.args);
-                return { handled: true, reply: { text: out.slice(0, 1800) } };
+                return { handled: true, reply: { text: out.slice(0, 4000) } };
             }
             if (action.kind === "scout") {
                 const out = await delegateScout(api, routed.args.trim());
-                return { handled: true, reply: { text: out.slice(0, 1800) } };
+                return { handled: true, reply: { text: out.slice(0, 4000) } };
             }
             if (action.kind === "gog") {
                 const out = await delegateGog(api, action.op, routed.args);
-                return { handled: true, reply: { text: out.slice(0, 1800) } };
+                return { handled: true, reply: { text: out.slice(0, 4000) } };
             }
             // action.kind === "gog-reply" : réutilise EXACTEMENT la logique de mise
             // en attente existante (parseReply + pending), jamais de délégation
