@@ -3,7 +3,8 @@
 # Usage: ./uninstall_openclaw.sh [--force] [--openclaw-path PATH] [--help]
 #
 # Supprime :
-#   - Le service systemd openclaw-gateway.service
+#   - Les services systemd openclaw-gateway.service et tiron-router.service
+#   - Les conteneurs sandbox Docker (openclaw-sbx-*)
 #   - Le répertoire de configuration OpenClaw (~/.openclaw par défaut)
 #   - Le fichier Wiki_LM/.env généré
 #
@@ -79,7 +80,7 @@ fi
 # 1 — Arrêter et désactiver les services
 SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
 
-for svc in openclaw-gateway; do
+for svc in openclaw-gateway tiron-router; do
   if systemctl --user is-active "${svc}.service" &>/dev/null 2>&1; then
     info "Arrêt de ${svc}..."
     systemctl --user stop "${svc}.service" || warn "Impossible d'arrêter ${svc}"
@@ -96,6 +97,21 @@ for svc in openclaw-gateway; do
   fi
 done
 systemctl --user daemon-reload 2>/dev/null || true
+
+# 1b — Supprimer les conteneurs sandbox Docker. Le gateway les crée (scope session)
+# mais NE les détruit PAS à l'arrêt → sans ça ils restent « Up » indéfiniment et
+# tiennent des fichiers root dans le workspace. On les retire une fois le gateway
+# arrêté (sinon il pourrait les recréer).
+if command -v docker &>/dev/null && docker ps &>/dev/null 2>&1; then
+  _sbx="$(docker ps -aq --filter name=openclaw-sbx 2>/dev/null)"
+  if [[ -n "$_sbx" ]]; then
+    info "Suppression des conteneurs sandbox openclaw..."
+    docker rm -f $_sbx >/dev/null 2>&1 && info "Conteneurs sandbox supprimés" \
+      || warn "Suppression de certains conteneurs sandbox échouée"
+  else
+    info "Aucun conteneur sandbox openclaw — ignoré"
+  fi
+fi
 
 # Binaires/wrappers déposés dans ~/.local/bin par install.sh.
 # IMPORTANT : retirer le wrapper openclaw, sinon il survit à la désinstallation et

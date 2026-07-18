@@ -114,9 +114,16 @@ fi
 
 # openclaw.json
 TARGET="${OPENCLAW_PATH}/openclaw.json"
-if [[ -f "$TARGET" && "$FORCE" != "true" ]]; then
+# Un openclaw.json présent mais SANS clé "agents" n'est pas le nôtre (typiquement
+# écrit par l'onboarding openclaw). Le conserver fait échouer l'auth par agent et
+# plante plus bas sur KeyError 'agents' → on le régénère même sans --force.
+_has_agents() { python3 -c 'import json,sys; sys.exit(0 if "agents" in json.load(open(sys.argv[1])) else 1)' "$1" 2>/dev/null; }
+if [[ -f "$TARGET" && "$FORCE" != "true" ]] && _has_agents "$TARGET"; then
   info "openclaw.json existe déjà — ignoré (utilisez --force pour écraser)"
 else
+  if [[ -f "$TARGET" && "$FORCE" != "true" ]]; then
+    warn "openclaw.json présent mais sans agents (config d'onboarding) — régénération"
+  fi
   export HOME HOSTNAME OBSIDIAN_PATH ASSISTANT_NAME OPENCLAW_GATEWAY_TOKEN EURIA_API_KEY EURIA_PRODUCT_ID OPENCLAW_DIR OPENCLAW_PORT GOG_ACCOUNT TIRON_LLM_URL TIRON_LLM_KEY
   envsubst '${HOME} ${HOSTNAME} ${OBSIDIAN_PATH} ${ASSISTANT_NAME} ${OPENCLAW_GATEWAY_TOKEN} ${EURIA_API_KEY} ${EURIA_PRODUCT_ID} ${OPENCLAW_DIR} ${OPENCLAW_PORT} ${GOG_ACCOUNT} ${TIRON_LLM_URL} ${TIRON_LLM_KEY}' \
     < "${SCRIPT_DIR}/openclaw.json.template" > "$TARGET"
@@ -285,7 +292,7 @@ ROUTER_DST="${SYSTEMD_USER_DIR}/tiron-router.service"
 cp "${SCRIPT_DIR}/tiron-router.service" "$ROUTER_DST"
 # Env du routeur : endpoint LLM initial (depuis TIRON_LLM_URL/KEY) + FAQ_PATH.
 # Non écrasé s'il existe déjà (préserve un cerveau choisi via switch-brain).
-if [[ ! -f "${HOME}/.openclaw/tiron-router.env" ]]; then
+if [[ ! -f "${HOME}/.openclaw/tiron-router.env" || "$FORCE" == "true" ]]; then
   cat > "${HOME}/.openclaw/tiron-router.env" <<EOF
 TIRON_LLAMA_BASE=${TIRON_LLM_URL}
 TIRON_LLAMA_KEY=${TIRON_LLM_KEY}
@@ -294,8 +301,8 @@ EOF
 else
   info "tiron-router.env déjà présent — conservé (cerveau actif préservé)"
 fi
-# Registre des cerveaux (éditable) — non écrasé s'il existe.
-if [[ ! -f "${HOME}/.openclaw/brains.env" ]]; then
+# Registre des cerveaux (éditable) — non écrasé s'il existe, sauf --force.
+if [[ ! -f "${HOME}/.openclaw/brains.env" || "$FORCE" == "true" ]]; then
   cat > "${HOME}/.openclaw/brains.env" <<EOF
 BRAIN_SANROQUE_URL=http://100.100.126.7:8998
 BRAIN_SANROQUE_KEY=
