@@ -77,7 +77,20 @@ Plugin derisk-deleg : fournit gog_* et wiki_* aux agents ; intercepte /confirm e
   >    systemctl --user daemon-reload && systemctl --user restart openclaw-gateway
   >    ```
   >    (openclaw doit être installé sous ce Node : `nvm use 24 && npm install -g openclaw`.)
-- Docker 24+
+- Docker 24+ — avec **~40 Go d'espace libre** pour ses images (l'image `wiki`
+  embarque BGE-M3 et pèse ~16 Go). `install.sh` construit l'image de base
+  `openclaw-sandbox:bookworm-slim` si elle manque, puis les 3 images secretarius.
+  > **VPS au disque juste.** Si `/` est trop petit, déplacez le data-root de
+  > Docker sur un volume dédié **avant** l'install, sinon le build de `wiki`
+  > remplit le disque :
+  > ```bash
+  > sudo systemctl stop docker docker.socket
+  > sudo rsync -aP /var/lib/docker/ /mnt/<volume>/docker/
+  > echo '{ "data-root": "/mnt/<volume>/docker" }' | sudo tee /etc/docker/daemon.json
+  > sudo mv /var/lib/docker /var/lib/docker.old && sudo systemctl start docker
+  > docker info | grep "Docker Root Dir"   # vérifier, puis: sudo rm -rf /var/lib/docker.old
+  > ```
+  > Vérifiez que le volume est dans `/etc/fstab` (option `nofail`) pour survivre au reboot.
 - Python 3.10+ (pour Wiki_LM)
 - `envsubst` : `apt install gettext`
 - `gog-bin` : binaire [gogcli](https://gogcli.sh/) (CLI Google Workspace) — télécharger le binaire Linux depuis [github.com/openclaw/gogcli](https://github.com/openclaw/gogcli/releases), renommer en `gog-bin` et placer à la racine du dépôt ; ou copier depuis une machine déjà configurée via `scp`
