@@ -1,0 +1,17 @@
+# openclaw-sandbox:bookworm-slim — image de base des sandbox OpenClaw.
+# OpenClaw (>= 2026.7) ne la construit plus automatiquement et ne la livre pas
+# dans le paquet npm : sur une machine neuve elle est absente et les images
+# secretarius-* (FROM openclaw-sandbox:bookworm-slim) échouent. On la reproduit
+# ici à l'identique de l'image officielle (debian:bookworm-slim + user sandbox
+# + bash/ca-certificates/curl/git/jq/python3/ripgrep) pour que l'install soit
+# autonome. install.sh la construit si elle manque, avant les images secretarius.
+FROM debian:bookworm-slim
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+     bash ca-certificates curl git jq python3 ripgrep \
+  && rm -rf /var/lib/apt/lists/*
+RUN useradd --create-home --shell /bin/bash sandbox
+USER sandbox
+WORKDIR /home/sandbox
+CMD ["sleep", "infinity"]

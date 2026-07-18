@@ -252,6 +252,18 @@ fi
 # copient des fichiers hors openclaw-config/ (gog-bin, Wiki_LM/requirements.txt).
 OPENCLAW_CONFIG_PATH="${SECRETARIUS_ROOT}/openclaw-config"
 if command -v docker &>/dev/null && docker ps &>/dev/null 2>&1; then
+  # Image de base openclaw-sandbox:bookworm-slim : openclaw (>= 2026.7) ne la
+  # construit plus et ne la livre pas dans le npm. Absente = les 3 builds
+  # FROM openclaw-sandbox:bookworm-slim échouent. On la (re)construit si besoin.
+  if ! docker image inspect openclaw-sandbox:bookworm-slim &>/dev/null; then
+    info "Image de base openclaw-sandbox:bookworm-slim absente — construction..."
+    if docker build -q -f "${OPENCLAW_CONFIG_PATH}/Dockerfile.sandbox-base" \
+         -t openclaw-sandbox:bookworm-slim "${OPENCLAW_CONFIG_PATH}" &>/dev/null; then
+      info "image openclaw-sandbox:bookworm-slim ✓"
+    else
+      WARNINGS+=("build image de base openclaw-sandbox:bookworm-slim échoué\n    docker build -f ${OPENCLAW_CONFIG_PATH}/Dockerfile.sandbox-base -t openclaw-sandbox:bookworm-slim ${OPENCLAW_CONFIG_PATH}")
+    fi
+  fi
   for img in gog tiron wiki; do
     DF="${OPENCLAW_CONFIG_PATH}/Dockerfile.${img}"
     if docker build -q -f "$DF" -t "secretarius-${img}:latest" "${SECRETARIUS_ROOT}" &>/dev/null; then
