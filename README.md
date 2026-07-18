@@ -1,4 +1,4 @@
-# Secretarius `v0.2.0`
+# Secretarius `v0.4.0`
 
 **Secretarius est une configuration sécurisée d'[OpenClaw](https://openclaw.dev) pour individus et petites structures**, enrichie d'une base de connaissances personnelle.
 
