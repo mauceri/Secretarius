@@ -554,6 +554,25 @@ importants, un par ligne, au format :
 """
 
 
+_PROMPT_NOTE_ITEMS = """\
+Voici une note personnelle. Tu ne dois PAS la résumer ni la reformuler : \
+son texte sera conservé tel quel. Tu dois seulement l'analyser pour en extraire \
+un titre court et les concepts/entités mentionnés (pour créer des liens wiki).
+
+Note :
+---
+{content}
+---
+
+Réponds EXACTEMENT dans ce format, rien d'autre :
+TITRE: <titre court résumant le sujet de la note>
+- concept: <nom d'un concept abstrait mentionné>
+- entité: <nom d'une entité mentionnée (personne, outil, organisation)>
+
+Une ligne par concept/entité. S'il n'y en a aucun, n'écris que la ligne TITRE.
+"""
+
+
 _WIKI_ANCHOR_RE = re.compile(
     r"\n*R[eé]f[eé]rence Wikipedia\b.*",
     re.DOTALL | re.IGNORECASE,
@@ -977,7 +996,10 @@ class Ingestor:
                     slug = self.ingest(url, max_concepts=max_concepts, extra_tags=user_tags or None, rename_raw=False, note=note)
                 else:
                     user_tags = self._parse_raw_tags(path)
-                    slug = self.ingest(str(path), max_concepts=max_concepts, extra_tags=user_tags or None, rename_raw=False)
+                    # .md = note en texte libre → page verbatim (pas de résumé) ;
+                    # .pdf/.txt/.html = document → résumé conservé.
+                    is_note = path.suffix.lower() == ".md"
+                    slug = self.ingest(str(path), max_concepts=max_concepts, extra_tags=user_tags or None, rename_raw=False, local_note=is_note)
                 slugs.append(slug)
                 self._mark_ingested(path.name, slug=slug, file_hash=_file_hash(path))
             except Exception as e:
@@ -1045,6 +1067,7 @@ class Ingestor:
         extra_tags: list[str] | None = None,
         rename_raw: bool = True,
         note: str = "",
+        local_note: bool = False,
     ) -> str:
         """Ingère une source et retourne le slug de la page créée."""
         print(f"[ingest] Lecture de la source : {source}")
@@ -1082,8 +1105,12 @@ class Ingestor:
             print(f"[ingest] Stub créé → wiki/{src_slug}.md")
             return src_slug
 
-        print("[ingest] Génération de la page source…")
-        source_page_md = self._generate_source_page(content, title, extra_tags=extra_tags)
+        if local_note:
+            print("[ingest] Note locale → page verbatim (pas de résumé)…")
+            source_page_md = self._generate_note_page(content, title, extra_tags=extra_tags)
+        else:
+            print("[ingest] Génération de la page source…")
+            source_page_md = self._generate_source_page(content, title, extra_tags=extra_tags)
         source_page_md = _parse_frontmatter_block(source_page_md)
         if extra_tags:
             source_page_md = _merge_tags(source_page_md, extra_tags)
@@ -1248,6 +1275,45 @@ class Ingestor:
             kb_context_line=kb_context_line,
         )
         return self.llm.complete(prompt, system=_SYSTEM_INGEST, max_tokens=3000)
+
+    def _generate_note_page(
+        self, content: str, source_name: str, extra_tags: list[str] | None = None
+    ) -> str:
+        """Page d'une note en texte libre : texte VERBATIM + liens, sans résumé.
+
+        Le LLM ne sert qu'à extraire un titre et la liste des concepts/entités
+        (pour le linking en aval) ; le corps de la page reste le texte tel quel.
+        """
+        raw = self.llm.complete(
+            _PROMPT_NOTE_ITEMS.format(content=_truncate(content)),
+            system=_SYSTEM_INGEST,
+            max_tokens=600,
+        )
+        title = source_name
+        item_lines: list[str] = []
+        for line in raw.splitlines():
+            stripped = line.strip()
+            if stripped.upper().startswith("TITRE:"):
+                candidate = stripped.split(":", 1)[1].strip()
+                if candidate:
+                    title = candidate
+            elif re.match(r"^-\s*(concept|entit[eé])\s*:", stripped, re.IGNORECASE):
+                item_lines.append(stripped)
+        items_block = "\n".join(item_lines) if item_lines else "Aucun"
+        tags_str = ", ".join(extra_tags or [])
+        return (
+            "---\n"
+            f"title: {title}\n"
+            "category: source\n"
+            f"tags: [{tags_str}]\n"
+            f"created: {self.today}\n"
+            "sources: []\n"
+            "---\n\n"
+            f"# {title}\n\n"
+            f"{content.strip()}\n\n"
+            "## Concepts et entités mentionnés\n\n"
+            f"{items_block}\n"
+        )
 
     def _load_tag_variants(self) -> tuple[dict[str, str], set[str]]:
         """Retourne ({variante: canonique}, {canoniques}) depuis tags_dict.json.

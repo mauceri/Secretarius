@@ -99,6 +99,8 @@ class MockLLM:
         if "entité" in prompt.lower() and "enrichis" in prompt.lower():
             name = _extract_name(prompt, "entité")
             return _ENTITY_PAGE.format(name=name)
+        if "note personnelle" in prompt.lower():
+            return "TITRE: Ma note de test\n- concept: zettelkasten\n- entité: Vannevar Bush\n"
         return _SOURCE_PAGE
 
 

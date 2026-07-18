@@ -362,3 +362,39 @@ def test_errored_file_not_marked_for_retry(ingestor, raw_dir):
     ingestor.ingest = boom
     ingestor.ingest_raw_dir()
     assert "a.txt" not in ingestor._load_manifest()
+
+
+class TestIngestLocalNote:
+    """Bug 1 : une note en texte libre (.md) reste verbatim + liens, sans résumé."""
+
+    def test_note_page_verbatim_no_resume(self, ingestor, wiki_dir, tmp_path):
+        note = tmp_path / "note.md"
+        texte = "Ceci est ma note perso sur le zettelkasten de Vannevar Bush."
+        note.write_text(texte, encoding="utf-8")
+        slug = ingestor.ingest(str(note), local_note=True)
+        page = (wiki_dir / "sources" / f"{slug}.md").read_text()
+        assert texte in page                                  # texte conservé tel quel
+        assert "## Résumé" not in page                        # pas de résumé généré
+        assert "## Points clés" not in page
+        assert "## Concepts et entités mentionnés" in page    # liens conservés
+
+    def test_note_creates_entity_link(self, ingestor, wiki_dir, tmp_path):
+        note = tmp_path / "note.md"
+        note.write_text("Note sur Vannevar Bush.", encoding="utf-8")
+        ingestor.ingest(str(note), local_note=True)
+        assert (wiki_dir / "entités" / "e-vannevar-bush.md").exists()
+
+    def test_non_note_source_still_summarized(self, ingestor, wiki_dir, tmp_path):
+        src = tmp_path / "doc.txt"
+        src.write_text("Un document à résumer.", encoding="utf-8")
+        slug = ingestor.ingest(str(src))                      # local_note=False par défaut
+        page = (wiki_dir / "sources" / f"{slug}.md").read_text()
+        assert "## Résumé" in page
+
+    def test_md_dispatched_as_note(self, ingestor, wiki_dir, raw_dir):
+        (raw_dir / "note.md").write_text(
+            "Note libre mentionnant Vannevar Bush.", encoding="utf-8")
+        ingestor.ingest_raw_dir()
+        pages = list((wiki_dir / "sources").glob("src-*.md"))
+        assert pages, "aucune page source créée"
+        assert "## Résumé" not in pages[0].read_text()
