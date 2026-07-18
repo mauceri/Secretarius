@@ -296,6 +296,17 @@ if systemctl --user daemon-reload &>/dev/null 2>&1 && command -v openclaw &>/dev
   else
     info "openclaw-gateway activé (démarrera après renseignement des secrets)"
   fi
+  # tiron-router : activer + DÉMARRER. Son activation dans openclaw-config/install.sh
+  # est prématurée (elle teste le venv, créé plus haut dans CE script) ; on le fait
+  # ici, venv présent. enable --now, sinon le routeur reste éteint jusqu'au reboot
+  # → le plugin répond « Routeur local indisponible ».
+  if [[ -x "${SECRETARIUS_ROOT}/Wiki_LM/.venv/bin/python" ]]; then
+    systemctl --user enable --now tiron-router.service 2>/dev/null \
+      && info "tiron-router démarré ✓" \
+      || WARNINGS+=("tiron-router non démarré\n    systemctl --user enable --now tiron-router.service")
+  else
+    WARNINGS+=("venv absent — tiron-router non démarré\n    après le venv : systemctl --user enable --now tiron-router.service")
+  fi
 fi
 
 # Résumé

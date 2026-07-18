@@ -310,13 +310,10 @@ BRAIN_MODAL_URL=${BRAIN_MODAL_URL:-}
 BRAIN_MODAL_KEY_FILE=${HOME}/.openclaw/secrets/tiron-llm-key
 EOF
 fi
-if [[ -x "${HOME}/Secretarius/Wiki_LM/.venv/bin/python" ]]; then
-  systemctl --user daemon-reload 2>/dev/null || true
-  systemctl --user enable tiron-router.service 2>/dev/null && \
-    info "tiron-router.service activé" || warn "Activation de tiron-router.service échouée"
-else
-  warn "venv Wiki_LM absent — tiron-router non activé (relancer après le venv)"
-fi
+# Le service tiron-router est copié ci-dessus ; son activation + démarrage
+# (enable --now) est faite par le top-level install.sh APRÈS la création du venv
+# (ici le venv n'existe pas encore, l'activation serait sautée à tort).
+systemctl --user daemon-reload 2>/dev/null || true
 
 # Timer Wiki_LM embeddings : recalcul incrémental périodique (+ reload du serveur).
 for _wl in wiki-lm-embed.service wiki-lm-embed.timer; do
