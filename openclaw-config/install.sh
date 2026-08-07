@@ -381,6 +381,25 @@ mkdir -p "${OPENCLAW_PATH}/workspace-scout/tasks/pending" \
 mkdir -p "${OPENCLAW_PATH}/workspace/.gog-config"
 info "Répertoires scout (tasks/results) et .gog-config créés"
 
+# scout-watcher : surveille workspace-scout/tasks/pending, pré-fetch les URLs
+# (curl côté watcher, pas d'exec dans scout) et signale scout via tasks/done.
+mkdir -p "${HOME}/.local/bin"
+cp "${SCRIPT_DIR}/scout-watcher" "${HOME}/.local/bin/scout-watcher"
+cp "${SCRIPT_DIR}/scout_process.py" "${HOME}/.local/bin/scout_process.py"
+chmod +x "${HOME}/.local/bin/scout-watcher" "${HOME}/.local/bin/scout_process.py"
+info "scout-watcher et scout_process.py installés dans ${HOME}/.local/bin"
+SCOUT_SVC_DST="${SYSTEMD_USER_DIR}/openclaw-scout.service"
+if [[ -f "$SCOUT_SVC_DST" && "$FORCE" != "true" ]]; then
+  info "openclaw-scout.service existe déjà — ignoré"
+else
+  cp "${SCRIPT_DIR}/openclaw-scout.service" "$SCOUT_SVC_DST"
+  info "openclaw-scout.service installé dans ${SYSTEMD_USER_DIR}"
+fi
+systemctl --user daemon-reload 2>/dev/null || true
+systemctl --user enable openclaw-scout.service 2>/dev/null && \
+  info "openclaw-scout.service activé au boot" || \
+  warn "Activation de openclaw-scout.service échouée"
+
 # Finalisation
 _gw_svc_final="openclaw-gateway.service"
 systemctl --user daemon-reload 2>/dev/null || true

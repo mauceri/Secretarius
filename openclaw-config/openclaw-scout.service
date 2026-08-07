@@ -1,0 +1,16 @@
+[Unit]
+Description=OpenClaw Scout Watcher
+After=openclaw-gateway.service
+Wants=openclaw-gateway.service
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.openclaw/gateway.systemd.env
+ExecStart=%h/.local/bin/scout-watcher
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
