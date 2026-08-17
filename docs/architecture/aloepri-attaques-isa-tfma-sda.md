@@ -1,7 +1,7 @@
 # Comprendre ISA, TFMA et SDA — les attaques contre AloePri
 
 > Document d'accompagnement de
-> `docs/superpowers/specs/2026-08-17-aloepri-poc-sans-attention-design.md`.
+> `docs/superpowers/specs/2026-08-17-aloepri-poc-complet-design.md`.
 > Écrit pour comprendre *pourquoi* le POC est scopé comme il l'est, sans
 > prérequis en cryptographie. Source : arXiv 2603.01499v2.
 >
@@ -233,13 +233,15 @@ l'information réellement sensible.
 
 ## Ce que ça implique pour le POC en cours
 
-Le POC scopé (`2026-08-17-aloepri-poc-sans-attention-design.md`) se limite
-volontairement à l'embedding/unembedding et au FFN, sans attention — sans
-rotation non plus. Il ne protège donc, tel quel, ni contre TFMA/SDA (pas de
-rotation) ni avec certitude contre ISA (pas d'attention, et rotation non
-implémentée). Ce n'est pas un problème pour ce que le POC mesure (mécanique,
-qualité, vitesse), mais c'est la raison pour laquelle il n'est présenté nulle
-part comme une solution de confidentialité utilisable en l'état.
+**Mise à jour (2026-08-17)** : à la lumière de cette analyse, le scope du POC
+a changé. La version initiale se limitait volontairement à
+l'embedding/unembedding et au FFN, sans attention — mais puisque le canal
+non protégé par cette combinaison est précisément celui qui porte l'essentiel
+du risque pour le cas d'usage motivant (confidentialité d'une requête isolée,
+menace ISA), ce scope réduit aurait mesuré une mécanique fonctionnelle sans
+répondre à la question qui compte. Le POC construit désormais le schéma
+complet (embedding + FFN + attention) dès le départ — voir
+`docs/superpowers/specs/2026-08-17-aloepri-poc-complet-design.md`.
 
 Si le POC est concluant sur qualité et vitesse, la suite pour protéger le cas
 d'usage « question isolée confidentielle » (ISA) est **l'obfuscation
