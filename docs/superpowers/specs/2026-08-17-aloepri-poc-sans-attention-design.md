@@ -39,14 +39,15 @@ logiciel).
    embedding/unembedding à une attaque par fréquence de tokens (TFMA/SDA-style).
 
 **Critère de décision** : si qualité et vitesse sont concluantes, la suite
-(hors périmètre de ce POC) reste à trancher entre l'obfuscation d'attention
-(protection mesurée par le papier contre ISA, coût de dev plus élevé) et la
-rotation de clé/permutation (protection candidate mais non quantifiée contre
-ISA — correction du 2026-08-17, voir doc complémentaire : ISA est une
-attaque « training-based », une rotation pourrait invalider le modèle
-d'inversion entraîné par l'attaquant, à condition de tourner plus vite qu'il
-ne peut recalibrer, coût inconnu à ce stade). Pertinent pour le cas d'usage
-motivant : confidentialité d'une question posée à l'IA, indépendamment de la
+(hors périmètre de ce POC) est d'investir dans l'obfuscation d'attention.
+Citation du papier (voir doc complémentaire, correction du 2026-08-17) : les
+scores d'attention « ne sont pas obfusqués par les matrices clés » — la
+rotation de la permutation/des clés d'embedding n'a donc pas de prise sur ce
+canal, contrairement à une hypothèse intermédiaire un temps retenue puis
+infirmée. La rotation reste pertinente pour la menace TFMA/SDA (trafic
+accumulé), mais pas pour ISA (requête isolée) — deux menaces distinctes, pas
+substituables l'une à l'autre. Pertinent pour le cas d'usage motivant :
+confidentialité d'une question posée à l'IA, indépendamment de la
 confidentialité des documents sous-jacents.
 
 ## Portée
