@@ -114,20 +114,27 @@ l'embedding (bruit, matrices clés) ne le touchent pas du tout, parce que le
 problème n'est pas dans l'embedding, il est dans la façon dont l'attention
 laisse transparaître les relations entre tokens.
 
-**Ce qu'on ne sait pas avec certitude** (honnêteté sur les limites de cette
-lecture) : le papier ne précise pas si ce taux de 87 % nécessite d'observer
-plusieurs requêtes ou s'il s'obtient dès une seule. Le nom de l'attaque
-(« état interne », pas « fréquence dans le temps ») et la nature du signal
-exploité (une structure présente dans *chaque* inférence individuelle, pas une
-statistique qui s'accumule) suggèrent fortement que **ça marche dès une seule
-requête** — mais ce n'est pas explicitement confirmé dans ce que nous avons pu
-extraire du papier.
+**Correction (2026-08-17)** : une version précédente de ce document affirmait
+que ISA fonctionnait « dès une seule requête, sans rien d'autre » et qu'aucune
+rotation ne pouvait donc s'en protéger. C'était trop catégorique — objection
+justifiée en relecture. Le papier qualifie ISA de **« training-based
+inversion »** (même famille que IMA, Inversion Model Attack) : ce n'est pas
+une lecture directe d'une requête inconnue, mais un **modèle d'inversion
+entraîné au préalable** par l'attaquant, probablement en envoyant lui-même des
+requêtes-sondes de contenu connu au service qu'il opère, pour calibrer la
+correspondance (état interne observé) → (texte). Une fois ce modèle entraîné,
+il peut être appliqué à de nouvelles requêtes, potentiellement rapidement.
 
-**Conséquence pratique** : si c'est bien le cas, **aucune fréquence de
-rotation ne protège contre ISA**. Rotation ou pas, chaque requête individuelle
-expose sa propre structure interne à l'opérateur, dans l'instant où elle est
-traitée. La rotation réduit le trafic *accumulé* sous une clé — elle ne réduit
-en rien ce qu'une seule requête révèle en elle-même.
+**Conséquence corrigée** : une rotation de la permutation/des clés invaliderait
+ce modèle d'inversion entraîné sur l'ancienne configuration — la rotation
+**pourrait** donc offrir une protection contre ISA, contrairement à ce
+qu'affirmait la version précédente. Ce qui reste incertain (non résolu par ce
+que nous avons pu extraire du papier — méthode détaillée et référence [10]
+non accessibles) : le volume de requêtes-sondes nécessaire pour entraîner ce
+modèle d'inversion, et donc la fréquence de rotation qu'il faudrait pour
+rester devant l'attaquant. C'est la même question ouverte que pour TFMA/SDA
+(« quel volume avant que l'attaque devienne efficace »), appliquée à un signal
+différent (états internes entraînés plutôt que fréquence de tokens).
 
 ## Pourquoi cette distinction compte pour Secretarius
 
@@ -138,28 +145,37 @@ Deux cas d'usage bien différents :
    et rotation + permutation embedding (sans attention) pourrait suffire.
 
 2. **Protéger le contenu d'une question précise, posée une fois**, contre
-   l'opérateur du serveur qui la traite → ISA est la menace pertinente, et
-   *seule* l'obfuscation de l'attention semble en protéger, d'après le
-   Tableau 4.
+   l'opérateur du serveur qui la traite → ISA est la menace pertinente.
+   L'obfuscation de l'attention est la seule protection **mesurée** par le
+   papier (0 % au Tableau 4). La rotation est une protection **candidate**
+   mais non quantifiée : elle invaliderait le modèle d'inversion entraîné par
+   l'attaquant, à condition de tourner plus vite qu'il ne peut le
+   recalibrer — coût de calibration inconnu à ce stade (cf. correction
+   ci-dessus).
 
 C'est le deuxième cas qui correspond à la remarque de l'avocat d'affaires :
 les documents sont de toute façon déjà dans le cloud (peu de valeur ajoutée à
 les protéger davantage), mais **la question posée à l'IA à leur sujet** est
-l'information réellement sensible — et c'est une requête individuelle, pas un
-flux qu'on peut diluer par rotation.
+l'information réellement sensible.
 
 ## Ce que ça implique pour le POC en cours
 
 Le POC scopé (`2026-08-17-aloepri-poc-sans-attention-design.md`) se limite
-volontairement à l'embedding/unembedding et au FFN, sans attention — il ne
-protège donc *a priori* pas contre ISA, seulement (potentiellement) contre
-TFMA/SDA. Ce n'est pas un problème pour ce qu'il mesure (mécanique, qualité,
-vitesse), mais c'est la raison pour laquelle il n'est présenté nulle part
-comme une solution de confidentialité utilisable en l'état. Si le POC est
-concluant sur qualité et vitesse, l'étape suivante (l'obfuscation d'attention)
-n'est pas un raffinement optionnel : c'est la pièce qui manque pour répondre
-au vrai besoin (confidentialité d'une requête isolée), pas une amélioration
-marginale d'un schéma déjà utilisable.
+volontairement à l'embedding/unembedding et au FFN, sans attention — sans
+rotation non plus. Il ne protège donc, tel quel, ni contre TFMA/SDA (pas de
+rotation) ni avec certitude contre ISA (pas d'attention, et rotation non
+implémentée). Ce n'est pas un problème pour ce que le POC mesure (mécanique,
+qualité, vitesse), mais c'est la raison pour laquelle il n'est présenté nulle
+part comme une solution de confidentialité utilisable en l'état.
+
+Si le POC est concluant sur qualité et vitesse, deux chemins restent ouverts
+pour la suite, pas un seul : **l'obfuscation d'attention** (protection
+mesurée par le papier, coût de développement plus élevé) et **la rotation de
+clé/permutation** (protection non quantifiée mais potentiellement moins
+coûteuse à construire, à condition de caractériser d'abord le coût de
+calibration de l'attaquant contre ISA/IMA — extension possible de l'Étape 0).
+Le choix entre les deux (ou leur combinaison) reste à trancher une fois ces
+inconnues réduites, pas figé par ce document.
 
 ## VMA et IA — mentionnées pour être complet
 
