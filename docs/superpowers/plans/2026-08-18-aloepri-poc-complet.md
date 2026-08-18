@@ -31,8 +31,24 @@ RunPod (Pod GPU RTX A5000, Community Cloud).
   page 9, permutation inter-tête texte page 9 (section « Inter-head
   Permutation »).
 - Hyperparamètres de départ (Table 10 du papier) : `α_e = 1.0`, `α_h = 0.2`,
-  `λ = 0.3`, `h (expansion) = 128`, `β (fenêtre max BlockPerm) = 8`,
-  `γ = 1e³`.
+  `λ = 0.3`, `β (fenêtre max BlockPerm) = 8`, `γ = 1e³`.
+- **`h (expansion) = 0` pour tout ce POC — déviation assumée du papier
+  (Table 10 utilise h=128).** Revu le 2026-08-18 (voir
+  `docs/superpowers/specs/2026-08-17-aloepri-poc-complet-design.md`,
+  section « Décision h=0 ») après lecture directe de la section 5.4
+  (Accuracy Analysis, p.10-11) : avec h>0, les matrices clés P̂/Q̂ sont
+  rectangulaires `(d, d+2h)`/`(d+2h, d)`, et le papier confirme que TOUT le
+  réseau (embedding, attention, FFN, RMSNorm) opère alors dans l'espace
+  élargi `d+2h` — une reproduction fidèle demanderait de redimensionner
+  chaque couche du modèle (au-delà d'une simple chirurgie de poids sur les
+  tenseurs existants de Qwen2.5-7B). Avec `h=0`, `E`/`F`/`C`/`D` dégénèrent
+  (largeur 0) et `P̂=B·Z` reste carrée `(d,d)` — cohérent avec ce que Task
+  3/7 supposent déjà. Le mécanisme qui ferme spécifiquement le trou ISA
+  (Tableau 4 : 87,14%→0%) est la permutation tête/bloc de l'attention, pas
+  l'expansion — indépendant de `h`. Inconnue assumée : `h=0` n'est testé
+  nulle part dans le papier (h=128 partout dans leurs expériences), donc
+  une éventuelle propriété de sécurité formelle liée à `h>0` (section 6,
+  Rényi-metric DP — non explorée) pourrait être perdue ; non caractérisé.
 - Tests unitaires rapides (pas de réseau, pas de GPU, pas de téléchargement
   du modèle 7B) séparés des scripts d'expérience réels (qui téléchargent le
   tokenizer/modèle/corpus et peuvent être lents) — les seconds ne sont pas
@@ -550,11 +566,42 @@ git commit -m "feat(aloepri): obfuscation embedding/unembedding (bruit+permutati
 
 ### Task 4: Obfuscation FFN (permutation + scaling, SwiGLU-aware)
 
+**Note de scope (2026-08-18)** — le papier (§5.2.4, page 10) obfusque le FFN
+avec `W̃_gate = Q̂_gate·W_gate·Ẑ_ffn`, `W̃_up = Q̂_up·W_up·Ĥ_ffn·Ẑ_ffn`,
+`W̃_down = Ẑ_ffn⁻¹·Ĥ_ffn⁻¹·W_down·P̂_down` — où `Q̂_gate`/`Q̂_up`/`P̂_down`
+transforment l'axe `hidden_size` (pas l'axe intermédiaire). Ces matrices n'ont
+de sens que si l'état résiduel qui circule **entre les couches** reste dans un
+espace transformé cohérent tout du long du réseau (le `P̂` global mentionné en
+§5.4 : `φ^attn_X(x) = xP̂`, `ψ^embed_Y(y) = yP̂`, le même symbole `P̂` réutilisé
+à travers embedding→attention→FFN→tête) — un chaînage cohérent sur ~28 couches
+de décodeur, une deuxième couche de complexité au-delà de la correction `h=0`
+déjà actée.
+
+**Deuxième simplification assumée pour ce POC** : pas de chaînage inter-couches.
+Chaque couche (embedding, FFN, attention) est obfusquée et vérifiée
+**indépendamment** — entrée réelle → sortie réelle identique pour cette couche
+précise (le test de round-trip de chaque tâche est l'garant), sans transformer
+la frontière `hidden_size` entre couches. Cette tâche reste donc **permutation
++ scaling sur l'axe intermédiaire uniquement** (implémentation ci-dessous,
+inchangée), sans `Q̂_gate`/`Q̂_up`/`P̂_down` sur l'axe `hidden_size` — ces
+matrices n'apportent rien sans le chaînage qu'elles sont censées servir.
+
+Conséquence assumée, à ne pas perdre de vue : ce POC n'obfusque donc que les
+calculs *internes* à chaque couche prise isolément (ce qu'un examen des poids
+ou des activations intermédiaires d'une couche donnée révélerait), pas la
+totalité du flux résiduel comme le fait le schéma « covariant » complet du
+papier (théorèmes de composition, §5.4/§6 — non reproduits ici). C'est
+cohérent avec la portée déjà réduite par `h=0` : sans elle, `Q̂_gate` etc.
+seraient de toute façon rectangulaires et le problème de dimension reviendrait
+par la bande.
+
 **Files:**
 - Create: `aloepri_poc/ffn_obfuscation.py`
 - Test: `aloepri_poc/tests/test_ffn_obfuscation.py`
 
 **Interfaces:**
+- Consumes: `key_matrix.init_key_matrix`, `key_matrix.key_mat_gen`,
+  `key_matrix.inv_key_mat_gen` (Task 2), appelées avec `h=0`.
 - Produces: `obfuscate_ffn_layer(gate_proj: torch.Tensor, up_proj: torch.Tensor, down_proj: torch.Tensor, seed: int) -> ObfuscatedFFN`
   (dataclass : `gate_proj_obf, up_proj_obf, down_proj_obf`). Poids au format
   HF (`gate_proj`/`up_proj`: shape `(intermediate_size, hidden_size)`,
@@ -1033,9 +1080,9 @@ def obfuscate_attention_layer(
         z_block = block_perm(beta, gamma, zeta, m_blocks, seed=seed * 1000 + h + 2)
         z_block_full = torch.kron(z_block, torch.eye(2))  # étend au niveau des dimensions (pas des paires)
 
-        base_q = init_key_matrix(d_head, 16, 0.3, rng_np)
+        base_q = init_key_matrix(d_head, 0, 0.3, rng_np)
         q_hat_q = torch.tensor(key_mat_gen(base_q), dtype=w_q.dtype)
-        base_o = init_key_matrix(d_head, 16, 0.3, rng_np)
+        base_o = init_key_matrix(d_head, 0, 0.3, rng_np)
         p_hat_o = torch.tensor(key_mat_gen(base_o), dtype=w_o.dtype)
 
         # W̃_q = Q̂_q · W_q · R̂_qk · Ĥ_qk · Ẑ_block   (transforme les d_head lignes de sortie)
@@ -1051,7 +1098,7 @@ def obfuscate_attention_layer(
         z_block = block_perm(beta, gamma, zeta, m_blocks, seed=seed * 1000 + 100 + kv + 2)
         z_block_full = torch.kron(z_block, torch.eye(2))
 
-        base_k = init_key_matrix(d_head, 16, 0.3, rng_np)
+        base_k = init_key_matrix(d_head, 0, 0.3, rng_np)
         q_hat_k = torch.tensor(key_mat_gen(base_k), dtype=w_k.dtype)
 
         u_vo = torch.tensor(
