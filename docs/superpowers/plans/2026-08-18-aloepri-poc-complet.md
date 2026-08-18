@@ -452,7 +452,7 @@ def test_obfuscated_embedding_round_trip_preserves_output_up_to_noise():
     w_head = torch.randn(vocab_size, d)
 
     result = obfuscate_embedding(
-        w_embed, w_head, alpha_e=0.0, alpha_h=0.0, lam=0.3, h=32, seed=0
+        w_embed, w_head, alpha_e=0.0, alpha_h=0.0, lam=0.3, h=0, seed=0
     )
 
     assert result.w_embed_obf.shape == w_embed.shape
@@ -472,7 +472,7 @@ def test_permutation_is_a_bijection_over_the_vocabulary():
     w_embed = torch.randn(vocab_size, d)
     w_head = torch.randn(vocab_size, d)
     result = obfuscate_embedding(
-        w_embed, w_head, alpha_e=1.0, alpha_h=0.2, lam=0.3, h=16, seed=1
+        w_embed, w_head, alpha_e=1.0, alpha_h=0.2, lam=0.3, h=0, seed=1
     )
     assert sorted(result.permutation.values()) == list(range(vocab_size))
     assert sorted(result.unpermute.values()) == list(range(vocab_size))
