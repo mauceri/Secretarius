@@ -49,8 +49,12 @@ def init_key_matrix(d: int, h: int, lam: float, rng: np.random.Generator) -> Key
     E2 = rng.normal(scale=np.sqrt(1.0 / d), size=(half_h, h))
     E = E1 @ E2
 
-    F1 = rng.normal(scale=np.sqrt(1.0 / h), size=(h, half_h))
-    F2 = rng.normal(scale=np.sqrt(1.0 / h), size=(half_h, d))
+    # h=0 (POC-wide simplification, see plan) collapses F1/F2 to empty
+    # arrays; guard the scale division so it doesn't ZeroDivisionError on a
+    # value that no sampled element will ever use.
+    f_scale = np.sqrt(1.0 / h) if h > 0 else 0.0
+    F1 = rng.normal(scale=f_scale, size=(h, half_h))
+    F2 = rng.normal(scale=f_scale, size=(half_h, d))
     F = F1 @ F2
 
     Z = _random_orthogonal(d + 2 * h, rng)

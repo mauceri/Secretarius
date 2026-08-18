@@ -12,11 +12,15 @@ from key_matrix import init_key_matrix, key_mat_gen, inv_key_mat_gen
 # (seed, d, h) cases: the original case, a couple more seeds on it, and two
 # "tight bottleneck" shapes where h/2 is close to (or equal to) d, which is
 # where a null-space construction is most likely to run out of room.
+# h=0 is the POC-wide simplification (see plan) that Task 3 depends on;
+# it used to crash with ZeroDivisionError (F1/F2's scale = sqrt(1/h)) before
+# that was fixed alongside Task 3 discovering the dependency was broken.
 INVARIANT_CASES = [
     (0, 16, 128),
     (7, 16, 128),
     (3, 32, 64),   # h/2 == d
     (5, 16, 32),   # h/2 == d
+    (0, 16, 0),    # h=0: E/F/C/D degenerate to width 0, P_hat/Q_hat -> (d, d)
 ]
 
 
