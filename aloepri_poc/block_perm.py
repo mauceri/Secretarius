@@ -31,9 +31,23 @@ Deux points sont laissés implicites par le pseudo-code publié :
   ici par une fenêtre singleton pour que BlockDiag soit bien
   (m_blocks, m_blocks).
 
-`gamma` est déclaré dans la signature de l'Algorithme 2 (« window sampling
-parameter ») mais n'apparaît nulle part dans le corps de la fonction publiée :
-il est accepté pour rester conforme à l'interface, sans effet ici.
+Ambiguïté levée — `gamma` en température du softmax. `γ` est déclaré dans la
+signature de l'Algorithme 2 (« window sampling parameter ») et réglé comme un
+vrai hyperparamètre dans le papier (« β = 8 and γ = 1e3 by default », colonne γ
+du tableau 10, annexe D.2), mais n'apparaît nulle part dans le corps publié
+(lignes 10-19). Il est interprété ici comme température multiplicative du
+softmax de la ligne 14. Justification empirique — espérance de la taille de
+fenêtre mesurée (m_blocks=64, β=8, ζ=1e4) :
+
+    formule telle qu'imprimée : E[w] = 4.01 / 4.44 / 4.50 / 4.50  (t = 1/8/32/56)
+    avec γ en température (1e3) : E[w] = 1.00 / 1.00 / 4.44 / 4.50
+
+Sans γ le profil est plat (tirage quasi uniforme sur [1,β] partout), ce qui
+contredit l'intention annoncée dans le texte ; avec γ à sa valeur par défaut on
+retrouve exactement le comportement décrit (singletons en haute fréquence,
+fenêtres larges aux grands indices). Les invariants structurels sont
+indépendants de ce choix : la matrice reste une permutation valide pour tout
+γ > 0.
 """
 import torch
 
@@ -49,8 +63,8 @@ def block_perm(beta, gamma, zeta, m_blocks, seed):
     t = 1  # ligne 10
     while t < m_blocks:  # ligne 12
         c = min(beta, m_blocks - t)  # ligne 13
-        # ligne 14 : {ζ_{t+i} - ζ_t | 1 ≤ i ≤ c}
-        u = torch.softmax(zeta_i[t:t + c] - zeta_i[t - 1], dim=0)
+        # ligne 14 : {ζ_{t+i} - ζ_t | 1 ≤ i ≤ c}, γ en température (cf. docstring)
+        u = torch.softmax(gamma * (zeta_i[t:t + c] - zeta_i[t - 1]), dim=0)
         # ligne 15 : w ∈ [1, c] tiré selon u
         w = int(torch.multinomial(u, 1, generator=gen).item()) + 1
         # ligne 16 : permutation uniforme de S_w
