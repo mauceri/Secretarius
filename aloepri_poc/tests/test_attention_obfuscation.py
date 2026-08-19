@@ -76,17 +76,17 @@ def test_round_trip_holds_for_mha_mqa_and_other_seeds():
     principal ci-dessus est donc aveugle à ce point précis ; celui-ci ne l'est
     pas (cf. l'assertion de régime plus bas)."""
     hidden_size, num_heads, d_head, seq_len = 64, 8, 32, 6
+    beta, gamma, zeta = 8, 1e3, 1e3  # partagés avec l'assertion de régime
 
     # régime discriminant : au moins une partie des tirages BlockPerm doit
     # contenir un cycle de longueur ≥ 3, sinon ce test ne vaudrait pas mieux
     # que le précédent.
+    def _z(s):
+        return block_perm(beta, gamma, zeta, d_head // 2, seed=s)
+
     non_involutive = sum(
         bool(
-            torch.linalg.matrix_norm(
-                block_perm(8, 1e3, 1e3, d_head // 2, seed=s) @ block_perm(8, 1e3, 1e3, d_head // 2, seed=s)
-                - torch.eye(d_head // 2)
-            )
-            > 1e-6
+            torch.linalg.matrix_norm(_z(s) @ _z(s) - torch.eye(d_head // 2)) > 1e-6
         )
         for s in range(20)
     )
@@ -105,7 +105,7 @@ def test_round_trip_holds_for_mha_mqa_and_other_seeds():
             obf = obfuscate_attention_layer(
                 w_q, w_k, w_v, w_o,
                 num_heads=num_heads, num_kv_heads=num_kv_heads, d_head=d_head,
-                beta=8, gamma=1e3, zeta=1e3, seed=seed,
+                beta=beta, gamma=gamma, zeta=zeta, seed=seed,
             )
             got = naive_gqa_attention(
                 x, obf.w_q_obf, obf.w_k_obf, obf.w_v_obf, obf.w_o_obf,
@@ -123,6 +123,14 @@ def _row_space_projector(m):
     return basis @ basis.T
 
 
+def _recovered_factor(clear_head, obf_head):
+    """Facteur intra-tête A tel que `obf_head = Aᵀ · clear_head`.
+
+    Récupérable sans connaître les clés dès que `hidden > d_head` : les lignes
+    de `clear_head` sont alors libres, donc A est déterminé exactement."""
+    return torch.linalg.lstsq(clear_head.T, obf_head.T).solution
+
+
 def test_heads_are_actually_permuted_and_transformed():
     """Le round-trip seul ne distingue pas une implémentation qui ne ferait
     rien : il passerait aussi avec l'identité. Ce test vérifie que les poids
@@ -136,7 +144,14 @@ def test_heads_are_actually_permuted_and_transformed():
     les clés — et vérifier que les têtes Q suivent bien leur groupe K/V (sans
     quoi le calcul serait faux, ce que le round-trip attraperait, mais aussi
     qu'elles sont bien déplacées, ce qu'il n'attraperait pas)."""
-    hidden_size, num_heads, num_kv_heads, d_head = 64, 8, 2, 8
+    # d_head=32 (m_blocks=16) et non 8 : à 4 blocs seulement, tous d'indice
+    # « haute fréquence », BlockPerm ne tire que des fenêtres singleton et
+    # rend l'identité — Ẑ_block n'obfusquerait alors rien du tout et
+    # l'assertion correspondante ci-dessous serait invérifiable.
+    # num_kv_heads=4 (et non 2) pour que τ_kv = identité ne soit pas un simple
+    # pile ou face : l'assertion « τ_kv permute vraiment » aurait une chance
+    # sur deux d'être vide avec 2 têtes K/V.
+    hidden_size, num_heads, num_kv_heads, d_head = 64, 8, 4, 32
     group_size = num_heads // num_kv_heads
     w_q, w_k, w_v, w_o, _ = _random_layer(
         hidden_size, num_heads, num_kv_heads, d_head, 4, seed=7
@@ -169,6 +184,7 @@ def test_heads_are_actually_permuted_and_transformed():
 
     tau_kv = match(w_k, obf.w_k_obf, num_kv_heads)
     assert sorted(tau_kv) == list(range(num_kv_heads))
+    assert tau_kv != list(range(num_kv_heads)), "les têtes K/V ne sont pas permutées"
     assert match(w_v, obf.w_v_obf, num_kv_heads) == tau_kv, "K et V doivent suivre τ_kv"
 
     sigma = match(w_q, obf.w_q_obf, num_heads)
@@ -178,3 +194,74 @@ def test_heads_are_actually_permuted_and_transformed():
         assert dst // group_size == tau_kv[h // group_size], (
             "une tête Q a changé de groupe sans suivre sa tête K/V"
         )
+
+    # τ_group : réordonnancement des têtes Q À L'INTÉRIEUR du groupe. Sans
+    # cette assertion, τ_group dégénéré en identité passerait inaperçu, le
+    # déplacement des groupes par τ_kv suffisant à rendre `sigma` non trivial.
+    # Le papier ne tire qu'un seul τ_group ~ S_{m/m_kv}, donc le même
+    # réordonnancement doit valoir pour tous les groupes.
+    intra_groupe = [
+        [sigma[g * group_size + p] % group_size for p in range(group_size)]
+        for g in range(num_kv_heads)
+    ]
+    assert all(w == intra_groupe[0] for w in intra_groupe), (
+        "τ_group devrait être unique pour tous les groupes"
+    )
+    assert intra_groupe[0] != list(range(group_size)), (
+        "τ_group ne réordonne pas les têtes Q du groupe"
+    )
+
+    # Aucun facteur intra-tête ne doit dégénérer en identité : chaque tête
+    # déplacée doit AUSSI être transformée. Les `allclose` globaux ci-dessus ne
+    # le garantissent pas (ils sont satisfaits dès que la permutation bouge
+    # quelque chose) ; avec Û_vo = I, par exemple, le round-trip reste vert à
+    # 6.6e-07 près.
+    for clear, obfusc, mapping, n_heads in (
+        (w_q, obf.w_q_obf, sigma, num_heads),
+        (w_k, obf.w_k_obf, tau_kv, num_kv_heads),
+        (w_v, obf.w_v_obf, tau_kv, num_kv_heads),
+    ):
+        clear_heads = clear.view(n_heads, d_head, -1)
+        obf_heads = obfusc.view(n_heads, d_head, -1)
+        for src, dst in enumerate(mapping):
+            assert not torch.allclose(obf_heads[dst], clear_heads[src], atol=1e-6), (
+                f"tête {src} déplacée en {dst} mais laissée telle quelle"
+            )
+
+    # R̂_qk effectivement appliquée. Ĥ (diagonale) et Ẑ (permutation de paires)
+    # ne laissent qu'UN coefficient non nul par ligne du facteur intra-tête ;
+    # seule la rotation R̂ en met deux, en mélangeant les deux dimensions de
+    # chaque paire RoPE. Sans cette vérification, R̂ = I passerait tout le
+    # reste (round-trip vert à 1.6e-05 près).
+    hors_bloc = torch.ones(d_head, d_head)  # masque : hors des blocs 2×2 diagonaux
+    for i in range(d_head // 2):
+        hors_bloc[2 * i:2 * i + 2, 2 * i:2 * i + 2] = 0
+    z_deplace_un_bloc = False
+
+    for clear, obfusc, mapping, n_heads in (
+        (w_q, obf.w_q_obf, sigma, num_heads),
+        (w_k, obf.w_k_obf, tau_kv, num_kv_heads),
+    ):
+        clear_heads = clear.view(n_heads, d_head, -1)
+        obf_heads = obfusc.view(n_heads, d_head, -1)
+        for src, dst in enumerate(mapping):
+            factor = _recovered_factor(clear_heads[src], obf_heads[dst])
+            nnz_par_ligne = (factor.abs() > 1e-6).sum(dim=1)
+            assert int(nnz_par_ligne.min()) >= 2, (
+                "le facteur intra-tête ne mélange pas les paires RoPE : R̂_qk "
+                "est-elle dégénérée en identité ?"
+            )
+            # Ĥ_qk : sans elle le facteur serait R̂·Ẑ, donc orthogonal.
+            ecart_orthogonal = torch.linalg.matrix_norm(
+                factor.T @ factor - torch.eye(d_head)
+            )
+            assert float(ecart_orthogonal) > 1e-3, (
+                "facteur intra-tête orthogonal : Ĥ_qk est-elle dégénérée en "
+                "identité ?"
+            )
+            # Ẑ_block : s'il permute réellement des paires, le facteur a des
+            # coefficients hors des blocs 2×2 diagonaux. Un tirage peut rendre
+            # l'identité, d'où la vérification globale (au moins un groupe).
+            z_deplace_un_bloc |= bool((factor * hors_bloc).abs().max() > 1e-6)
+
+    assert z_deplace_un_bloc, "Ẑ_block ne permute aucune paire RoPE"

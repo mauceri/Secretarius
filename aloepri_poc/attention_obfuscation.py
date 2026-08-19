@@ -69,14 +69,29 @@ en float32), sinon Task 9 mesurera un bruit numérique et non la dégradation
 propre à l'obfuscation.
 
 RoPE — ce module produit une reparamétrisation EXACTE de l'attention sans RoPE
-(ce que vérifie le test). Avec RoPE, R̂_qk (rotations 2D par paire) et Ĥ_qk
-(scalaire par paire) commutent avec la rotation RoPE et restent exacts ;
-Ẑ_block, lui, permute les fréquences à l'intérieur de sa fenêtre : c'est
-l'approximation revendiquée par le papier (« shuffling the RoPE's 2×2 blocks …
-within a limited window exerts minimal impact on model accuracy »). Deuxième
-réserve pour Task 8/9 : ce découpage en paires suppose la convention RoPE
-entrelacée (2i, 2i+1) du papier, alors que l'implémentation HF de Qwen2 utilise
-la convention en demi-vecteurs (i, i+d_head/2) — à vérifier là-bas.
+(ce que vérifie le test). Les trois facteurs Q/K sont construits dans la
+convention RoPE **entrelacée** du papier, où la paire tournée est (2i, 2i+1).
+Dans cette convention : R̂_qk (rotation 2D dans le plan de la paire) et Ĥ_qk
+(scalaire s_i I₂ sur la paire) commutent exactement avec la rotation RoPE et
+restent donc exacts ; seul Ẑ_block, qui permute les fréquences à l'intérieur de
+sa fenêtre, introduit une approximation — celle que le papier revendique
+(« shuffling the RoPE's 2×2 blocks … within a limited window exerts minimal
+impact on model accuracy »).
+
+RÉSERVE POUR TASK 8/9 — l'implémentation HF de Qwen2 n'utilise PAS cette
+convention : `rotate_half` apparie (i, i + d_head/2). Sous cette convention,
+**les trois facteurs sont faux, pas seulement R̂** :
+- R̂ tourne le plan (2i, 2i+1), qui n'est pas un plan RoPE : elle ne commute
+  plus avec la rotation RoPE ;
+- Ĥ, diagonale, ne commute avec RoPE que si D[i] = D[i + d_head/2] ; or Ĥ est
+  construite constante par paire (2i, 2i+1), donc cette égalité est fausse ;
+- Ẑ permute des paires (2i, 2i+1) qui ne sont pas des paires RoPE du tout :
+  il ne s'agit même plus du mélange de fréquences borné par une fenêtre décrit
+  par le papier.
+Remède pour Task 8 (à implémenter là-bas, hors périmètre de cette tâche) :
+conjuguer les facteurs par la permutation π entrelacé↔demi-vecteurs, c.-à-d.
+utiliser πAπᵀ et πBπᵀ. L'invariance est préservée par construction, puisque
+(πAπᵀ)(πBπᵀ)ᵀ = π A Bᵀ πᵀ = π πᵀ = I.
 """
 from dataclasses import dataclass
 import random
@@ -138,9 +153,13 @@ def obfuscate_attention_layer(
         a_q = (r_hat @ h_hat @ z_block).to(w_q.dtype)  # ligne 7
         b_k = (r_hat @ h_hat_inv @ z_block).to(w_k.dtype)  # ligne 6, cf. point 2
 
-        # ligne 4 : Û_vo ~ N(0, 1/d_head), inversible presque sûrement
-        u_vo = torch.randn(d_head, d_head, generator=gen, dtype=w_v.dtype) / d_head**0.5
-        u_vo_inv = torch.linalg.inv(u_vo)
+        # ligne 4 : Û_vo ~ N(0, 1/d_head), inversible presque sûrement.
+        # Tirage et inversion en float32 puis cast : torch.linalg.inv refuse
+        # bfloat16, et inverser en basse précision dégraderait encore le
+        # conditionnement (cf. avertissement en tête de module).
+        u_vo_f32 = torch.randn(d_head, d_head, generator=gen) / d_head**0.5
+        u_vo = u_vo_f32.to(w_v.dtype)
+        u_vo_inv = torch.linalg.inv(u_vo_f32).to(w_o.dtype)
 
         dst_g = tau_kv[g]
         k_obf[dst_g] = b_k.T @ k_heads[g]
