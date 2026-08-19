@@ -1,4 +1,21 @@
-"""Obfuscation embedding/unembedding : bruit + permutation + matrices clés (papier §5.2.2)."""
+"""Obfuscation embedding/unembedding : bruit + permutation + matrices clés (papier §5.2.2).
+
+`apply_key_matrices` — les matrices clés P̂_embed/Q̂_head agissent sur la
+frontière `hidden_size`. Dans le schéma complet du papier (§5.4), c'est le même
+changement de base P̂ qui traverse TOUTES les couches : x̃ = x·P̂ à la sortie de
+l'embedding, chaque couche transformée en conséquence, puis Q̂ = P̂⁻¹ absorbé
+dans l'unembedding. Ce POC a explicitement renoncé à ce chaînage (cf. la
+décision « h=0 » du design et le point 3 de `attention_obfuscation.py`) : les
+couches de décodeur ne sont PAS transformées sur cette frontière. Y appliquer
+quand même P̂_embed livrerait au bloc 0 un état caché x·P̂ que plus rien ne
+compense, et Q̂_head multiplierait un état caché jamais passé dans P̂ — le
+modèle assemblé produirait du bruit.
+
+`apply_key_matrices=False` (ce que `model_transform` utilise) ne garde donc que
+le bruit et la permutation de vocabulaire, exactement comme l'attention ne
+garde que ses facteurs intra-couche. Le défaut reste `True` pour préserver la
+lecture littérale du papier vérifiée par les tests de la Task 3.
+"""
 from dataclasses import dataclass
 import random
 
@@ -16,7 +33,8 @@ class ObfuscatedEmbedding:
     unpermute: dict  # token permuté -> token clair
 
 
-def obfuscate_embedding(w_embed, w_head, alpha_e, alpha_h, lam, h, seed):
+def obfuscate_embedding(w_embed, w_head, alpha_e, alpha_h, lam, h, seed,
+                        apply_key_matrices=True):
     vocab_size, d = w_embed.shape
     assert w_head.shape == (vocab_size, d)
 
@@ -45,12 +63,16 @@ def obfuscate_embedding(w_embed, w_head, alpha_e, alpha_h, lam, h, seed):
     # brouillon initial.
     inv_perm_index = torch.tensor([unpermute[i] for i in range(vocab_size)])
 
-    # matrices clés (Algorithme 1) — une paire pour l'embedding, une pour le head
-    base_embed = init_key_matrix(d, h, lam, rng_np)
-    p_hat_embed = torch.tensor(key_mat_gen(base_embed), dtype=w_embed.dtype)
+    if apply_key_matrices:
+        # matrices clés (Algorithme 1) — une paire pour l'embedding, une pour le head
+        base_embed = init_key_matrix(d, h, lam, rng_np)
+        p_hat_embed = torch.tensor(key_mat_gen(base_embed), dtype=w_embed.dtype)
 
-    base_head = init_key_matrix(d, h, lam, rng_np)
-    q_hat_head = torch.tensor(inv_key_mat_gen(base_head), dtype=w_head.dtype)
+        base_head = init_key_matrix(d, h, lam, rng_np)
+        q_hat_head = torch.tensor(inv_key_mat_gen(base_head), dtype=w_head.dtype)
+    else:  # cf. docstring du module
+        p_hat_embed = torch.eye(d, dtype=w_embed.dtype)
+        q_hat_head = torch.eye(d, dtype=w_head.dtype)
 
     # W̃_embed = Π · W*_embed · P̂_embed
     w_embed_permuted_rows = w_embed_star[inv_perm_index]

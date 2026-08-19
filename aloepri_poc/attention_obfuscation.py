@@ -56,17 +56,27 @@ Trois points ont dû être tranchés pour que la reparamétrisation soit exacte.
 Ce qui reste (R̂_qk, Ĥ_qk, Ẑ_block, Û_vo, τ_kv, τ_group) s'annule intégralement
 à l'intérieur de la couche : la sortie de l'attention est inchangée.
 
-Conditionnement de Û_vo — AVERTISSEMENT pour Task 8/9. La ligne 4 est suivie
-telle quelle (Û_vo ~ N(0, 1/d_head)), mais une gaussienne carrée est parfois
-très mal conditionnée : à d_head=128, une graine sur six a produit un
-||W̃_o||_max de 1249 pour un ||W_o||_max d'origine de 0,45 (×2700). La
-reparamétrisation reste exacte en float32 (erreur relative ~1e-3), mais en
-bfloat16 — le dtype que le serveur de Task 9 utilise — la sortie de la couche
-est détruite : erreur relative mesurée de 3,7 (367 %) sur cette graine, et
-encore 6 % sur une graine ordinaire. À traiter dans Task 8 (par exemple en
-retirant un Û_vo dont le conditionnement dépasse un seuil, ou en obfusquant
-en float32), sinon Task 9 mesurera un bruit numérique et non la dégradation
-propre à l'obfuscation.
+Conditionnement de Û_vo — DÉVIATION ASSUMÉE (décidée en Task 8). La ligne 4
+du papier tire Û_vo ~ N(0, 1/d_head), mais une gaussienne carrée est souvent
+très mal conditionnée : à d_head=128, une graine sur six produisait un
+||W̃_o||_max de 1249 pour un ||W_o||_max d'origine de 0,45 (×2700), ce qui
+détruit la sortie en bfloat16 (erreur relative mesurée jusqu'à 367 %) — le
+dtype dans lequel le modèle est servi. Û_vo est donc tiré **orthogonal**
+(Haar sur O(d_head), via QR d'une gaussienne + correction de signe) au lieu de
+gaussien : c'est un affaiblissement du tirage (O(n) au lieu de GL(n)) mais
+l'algèbre n'exige que Û_vo·Û_vo⁻¹ = I, la matrice reste un mélange dense et
+aléatoire de la dimension de tête, et son conditionnement vaut exactement 1 —
+donc aucune amplification des poids, et Û_vo⁻¹ = Û_voᵀ (exact, pas d'inversion
+numérique). Sans cela, Task 9 mesurerait du bruit numérique et l'attribuerait
+à l'obfuscation.
+
+Biais q/k/v — Qwen2 met `bias=True` sur q_proj/k_proj/v_proj (contrairement à
+Llama). Le biais s'ajoute APRÈS la projection, donc il doit subir exactement le
+même facteur droit que le poids (q = x·W_qᵀ + b_q doit devenir (x·W_qᵀ + b_q)·A)
+et suivre la même permutation inter-tête. Les paramètres `b_q`/`b_k`/`b_v` sont
+optionnels (None pour une architecture sans biais) ; o_proj n'a pas de biais
+dans Qwen2, et en aurait-il un qu'il ne serait pas concerné (Û_vo⁻¹ s'applique
+à gauche, sur la dimension de tête, pas sur la sortie).
 
 RoPE — ce module produit une reparamétrisation EXACTE de l'attention sans RoPE
 (ce que vérifie le test). Les trois facteurs Q/K sont construits dans la
@@ -78,9 +88,9 @@ sa fenêtre, introduit une approximation — celle que le papier revendique
 (« shuffling the RoPE's 2×2 blocks … within a limited window exerts minimal
 impact on model accuracy »).
 
-RÉSERVE POUR TASK 8/9 — l'implémentation HF de Qwen2 n'utilise PAS cette
-convention : `rotate_half` apparie (i, i + d_head/2). Sous cette convention,
-**les trois facteurs sont faux, pas seulement R̂** :
+L'implémentation HF de Qwen2 n'utilise PAS cette convention : `rotate_half`
+apparie (i, i + d_head/2). Sous cette convention, **les trois facteurs sont
+faux, pas seulement R̂** :
 - R̂ tourne le plan (2i, 2i+1), qui n'est pas un plan RoPE : elle ne commute
   plus avec la rotation RoPE ;
 - Ĥ, diagonale, ne commute avec RoPE que si D[i] = D[i + d_head/2] ; or Ĥ est
@@ -88,10 +98,17 @@ convention : `rotate_half` apparie (i, i + d_head/2). Sous cette convention,
 - Ẑ permute des paires (2i, 2i+1) qui ne sont pas des paires RoPE du tout :
   il ne s'agit même plus du mélange de fréquences borné par une fenêtre décrit
   par le papier.
-Remède pour Task 8 (à implémenter là-bas, hors périmètre de cette tâche) :
-conjuguer les facteurs par la permutation π entrelacé↔demi-vecteurs, c.-à-d.
-utiliser πAπᵀ et πBπᵀ. L'invariance est préservée par construction, puisque
-(πAπᵀ)(πBπᵀ)ᵀ = π A Bᵀ πᵀ = π πᵀ = I.
+
+D'où le paramètre `rope_layout` (résolu en Task 8) :
+- `"interleaved"` (défaut) : convention littérale du papier ;
+- `"half"` : convention HF/Qwen2. Les facteurs sont alors conjugués par la
+  permutation π entrelacé↔demi-vecteurs (πAπᵀ), ce qui les rend structurés
+  selon les paires (i, i+d_head/2). L'invariance est préservée par
+  construction, puisque (πAπᵀ)(πBπᵀ)ᵀ = π A Bᵀ πᵀ = π πᵀ = I, et R̂/Ĥ
+  redeviennent exactement commutantes avec la rotation RoPE de HF (vérifié
+  dans `tests/test_model_transform.py`). Ẑ reste, lui, l'approximation
+  revendiquée par le papier — mesurée à 12-35 % d'erreur relative sur les
+  scores à d_head=128, β=8, γ=1e3.
 """
 from dataclasses import dataclass
 import random
@@ -108,11 +125,32 @@ class ObfuscatedAttention:
     w_k_obf: torch.Tensor
     w_v_obf: torch.Tensor
     w_o_obf: torch.Tensor
+    b_q_obf: torch.Tensor = None
+    b_k_obf: torch.Tensor = None
+    b_v_obf: torch.Tensor = None
+
+
+def _pi_conjugate(a, d_head):
+    """πAπᵀ, où π réindexe les paires entrelacées (2i, 2i+1) en paires
+    demi-vecteurs (i, i + d_head/2) — la convention `rotate_half` de HF."""
+    idx = torch.cat([torch.arange(0, d_head, 2), torch.arange(1, d_head, 2)])
+    return a[idx][:, idx]
+
+
+def _random_orthogonal(n, gen):
+    """Tirage Haar-uniforme sur O(n) : QR d'une gaussienne + correction de
+    signe (sans quoi la loi n'est pas uniforme)."""
+    q, r = torch.linalg.qr(torch.randn(n, n, generator=gen))
+    sign = torch.sign(torch.diagonal(r))
+    sign[sign == 0] = 1.0
+    return q * sign
 
 
 def obfuscate_attention_layer(
-    w_q, w_k, w_v, w_o, num_heads, num_kv_heads, d_head, beta, gamma, zeta, seed
+    w_q, w_k, w_v, w_o, num_heads, num_kv_heads, d_head, beta, gamma, zeta, seed,
+    b_q=None, b_k=None, b_v=None, rope_layout="interleaved",
 ):
+    assert rope_layout in ("interleaved", "half"), rope_layout
     hidden_size = w_q.shape[1]
     assert w_q.shape == (num_heads * d_head, hidden_size)
     assert w_k.shape == (num_kv_heads * d_head, hidden_size)
@@ -135,6 +173,17 @@ def obfuscate_attention_layer(
     v_obf = torch.zeros_like(v_heads)
     o_obf = torch.zeros_like(o_heads)
 
+    # Biais (Qwen2 : bias=True sur q/k/v) — même facteur, même permutation.
+    bias_heads = {}
+    bias_obf = {}
+    for name, b, n in (("q", b_q, num_heads), ("k", b_k, num_kv_heads),
+                       ("v", b_v, num_kv_heads)):
+        if b is None:
+            continue
+        assert b.shape == (n * d_head,), (name, b.shape)
+        bias_heads[name] = b.view(n, d_head)
+        bias_obf[name] = torch.zeros_like(bias_heads[name])
+
     # Permutation inter-tête : τ_kv déplace les têtes K/V (et donc les groupes
     # Q/O correspondants, sinon une tête Q n'attendrait plus la bonne tête K),
     # τ_group réordonne les têtes Q/O à l'intérieur de chaque groupe.
@@ -150,29 +199,42 @@ def obfuscate_attention_layer(
         z_block = torch.kron(z_pairs, torch.eye(2))  # paires -> dimensions
 
         h_hat_inv = torch.diag(1.0 / torch.diagonal(h_hat))
-        a_q = (r_hat @ h_hat @ z_block).to(w_q.dtype)  # ligne 7
-        b_k = (r_hat @ h_hat_inv @ z_block).to(w_k.dtype)  # ligne 6, cf. point 2
+        a_q_f32 = r_hat @ h_hat @ z_block  # ligne 7
+        b_k_f32 = r_hat @ h_hat_inv @ z_block  # ligne 6, cf. point 2
+        if rope_layout == "half":
+            a_q_f32 = _pi_conjugate(a_q_f32, d_head)
+            b_k_f32 = _pi_conjugate(b_k_f32, d_head)
+        a_q = a_q_f32.to(w_q.dtype)
+        b_k_mat = b_k_f32.to(w_k.dtype)
 
-        # ligne 4 : Û_vo ~ N(0, 1/d_head), inversible presque sûrement.
-        # Tirage et inversion en float32 puis cast : torch.linalg.inv refuse
-        # bfloat16, et inverser en basse précision dégraderait encore le
-        # conditionnement (cf. avertissement en tête de module).
-        u_vo_f32 = torch.randn(d_head, d_head, generator=gen) / d_head**0.5
+        # ligne 4 : le papier tire Û_vo ~ N(0, 1/d_head) ; ici orthogonale, cf.
+        # « Conditionnement de Û_vo » en tête de module. Tirage en float32 puis
+        # cast : bfloat16 dégraderait le tirage lui-même.
+        u_vo_f32 = _random_orthogonal(d_head, gen)
         u_vo = u_vo_f32.to(w_v.dtype)
-        u_vo_inv = torch.linalg.inv(u_vo_f32).to(w_o.dtype)
+        u_vo_inv = u_vo_f32.T.to(w_o.dtype)  # orthogonale : inverse = transposée
 
         dst_g = tau_kv[g]
-        k_obf[dst_g] = b_k.T @ k_heads[g]
+        k_obf[dst_g] = b_k_mat.T @ k_heads[g]
         v_obf[dst_g] = u_vo.T @ v_heads[g]
+        if "k" in bias_obf:
+            bias_obf["k"][dst_g] = b_k_mat.T @ bias_heads["k"][g]
+        if "v" in bias_obf:
+            bias_obf["v"][dst_g] = u_vo.T @ bias_heads["v"][g]
         for p in range(group_size):
             src_h = g * group_size + p
             dst_h = dst_g * group_size + tau_group[p]
             q_obf[dst_h] = a_q.T @ q_heads[src_h]
             o_obf[:, dst_h, :] = o_heads[:, src_h, :] @ u_vo_inv.T
+            if "q" in bias_obf:
+                bias_obf["q"][dst_h] = a_q.T @ bias_heads["q"][src_h]
 
     return ObfuscatedAttention(
         q_obf.reshape(num_heads * d_head, hidden_size),
         k_obf.reshape(num_kv_heads * d_head, hidden_size),
         v_obf.reshape(num_kv_heads * d_head, hidden_size),
         o_obf.reshape(hidden_size, num_heads * d_head),
+        b_q_obf=None if "q" not in bias_obf else bias_obf["q"].reshape(-1),
+        b_k_obf=None if "k" not in bias_obf else bias_obf["k"].reshape(-1),
+        b_v_obf=None if "v" not in bias_obf else bias_obf["v"].reshape(-1),
     )
