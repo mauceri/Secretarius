@@ -35,7 +35,7 @@ def test_key_matrices_are_exact_inverses(seed, d, h):
 
     # Algorithm 1 (arXiv 2603.01499v2, p.8): P_hat = [B C E] Z is d x (d+2h),
     # Q_hat = Z^T [B^-1; F; D] is (d+2h) x d. Their product is the d x d
-    # identity; the factors themselves are not square. See task-2-report.md.
+    # identity; the factors themselves are not square.
     assert p_hat.shape == (d, d + 2 * h)
     assert q_hat.shape == (d + 2 * h, d)
     np.testing.assert_allclose(p_hat @ q_hat, np.eye(d), atol=1e-5)

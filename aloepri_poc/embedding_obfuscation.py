@@ -64,9 +64,7 @@ def obfuscate_embedding(w_embed, w_head, alpha_e, alpha_h, lam, h, seed,
     # données du token clair `unpermute[p]` — c'est ce token-là que le
     # serveur doit reconnaître quand le client lui envoie l'ID permuté `p`.
     # D'où l'indexation par `unpermute` (== Π du papier), pas par
-    # `permutation` (== Π⁻¹) : cf. task-3-report.md pour la dérivation et
-    # la vérification numérique qui a débusqué le sens inverse dans le
-    # brouillon initial.
+    # `permutation` (== Π⁻¹).
     inv_perm_index = torch.tensor([unpermute[i] for i in range(vocab_size)])
 
     if apply_key_matrices:

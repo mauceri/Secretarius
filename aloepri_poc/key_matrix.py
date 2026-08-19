@@ -1,8 +1,8 @@
 """Algorithm 1 (Key Matrix Generation) from AloePri (arXiv 2603.01499v2, p.8).
 
-See task-2-report.md for the discrepancy between the task brief's
-transcription and the primary source PDF, and the derivation that
-resolves it.
+Note: P̂ and Q̂ have shapes (d, d+2h) and (d+2h, d) respectively, not (d, d)
+as initially transcribed. Shapes derived from dimensional analysis of the
+algorithm and verified against the primary source.
 """
 
 from dataclasses import dataclass

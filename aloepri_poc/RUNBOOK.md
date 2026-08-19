@@ -81,15 +81,14 @@ python3 model_transform.py --model Qwen/Qwen2.5-7B-Instruct \
 
 ### 4b. Run de contrôle β=1 (Ẑ_block = identité)
 
-**Pourquoi.** Task 8 a mesuré (`task-8-report.md` §3) que Ẑ_block, seule
-approximation non exacte du pipeline d'attention, coûte **1,4 % à 6 %**
-d'erreur relative sur les scores d'attention avec ζ=1e3 (défaut), et **12 % à
-35 %** avec ζ=rope_theta=1e6 — l'écart le plus large identifié dans toute la
-Task 8. β=1 force Ẑ_block = identité (plus de mélange de fréquences RoPE) :
-un run à β=1 sépare donc « la reparamétrisation est-elle correcte ? » de
-« combien coûte l'approximation Ẑ_block ? ». Si la qualité (§6) est mauvaise
-sur le run principal (4a) mais bonne à β=1, la cause est isolée : Ẑ_block, pas
-un bug de reparamétrisation.
+**Pourquoi.** Ẑ_block est la seule approximation non exacte du pipeline
+d'attention ; elle coûte **1,4 % à 6 %** d'erreur relative sur les scores
+d'attention avec ζ=1e3 (défaut), et **12 % à 35 %** avec ζ=rope_theta=1e6.
+β=1 force Ẑ_block = identité (plus de mélange de fréquences RoPE) : un run à
+β=1 sépare donc « la reparamétrisation est-elle correcte ? » de « combien
+coûte l'approximation Ẑ_block ? ». Si la qualité (§6) est mauvaise sur le run
+principal (4a) mais bonne à β=1, la cause est isolée : Ẑ_block, pas un bug de
+reparamétrisation.
 
 ```bash
 python3 model_transform.py --model Qwen/Qwen2.5-7B-Instruct \

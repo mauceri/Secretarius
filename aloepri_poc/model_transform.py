@@ -219,7 +219,7 @@ if __name__ == "__main__":
     parser.add_argument("--beta", type=int, default=8)
     # ζ sert à calculer les fréquences RoPE dont BlockPerm déduit la largeur de
     # ses fenêtres. Le défaut du plan (1e3) ne coïncide PAS avec le rope_theta de
-    # Qwen2.5-7B (1e6) ; l'arbitrage est ouvert (cf. task-8-report.md §8.3),
+    # Qwen2.5-7B (1e6) ; ce choix affecte les performances (mesures dans Task 8),
     # d'où le réglage en ligne de commande.
     parser.add_argument("--zeta", type=float, default=1e3)
     parser.add_argument("--keys", default="obfuscation_keys.json",
