@@ -15,7 +15,7 @@ import argparse
 import os
 from pathlib import Path
 
-from ingest import Ingestor, _extract_url_from_file
+from ingest import Ingestor, _extract_url_from_file, _parse_note_from_url_file
 
 _DEFAULT_WIKI = Path.home() / "Documents" / "Arbath" / "Wiki_LM"
 _DEFAULT_RAW = Path.home() / "Documents" / "Arbath" / "Wiki_LM" / "raw"
@@ -34,7 +34,9 @@ def retry_all(ingestor: Ingestor, raw_dir: Path, dry_run: bool) -> list[dict]:
             continue
 
         try:
-            slug = ingestor.ingest(url)
+            user_tags = ingestor._parse_raw_tags(error_file)
+            note = _parse_note_from_url_file(error_file)
+            slug = ingestor.ingest(url, extra_tags=user_tags or None, rename_raw=False, note=note)
             entry["status"] = "ingested"
             entry["slug"] = slug
             error_file.unlink()
