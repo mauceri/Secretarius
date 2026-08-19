@@ -831,6 +831,7 @@ class Ingestor:
         - Les pages c-/e- qui la référencent :
             - Si sources: devient vide → poubelle/
             - Sinon → retire le slug de sources: + status: à-réviser
+        - index.md, tags.md et log.md sont mis à jour en conséquence.
 
         Retourne la liste des slugs mis en poubelle ou marqués à-réviser.
         """
@@ -839,7 +840,6 @@ class Ingestor:
         poubelle_dir = self.wiki_dir / "poubelle"
         affected = []
 
-        # Slugs des src supprimées
         deleted_slugs: set[str] = set()
         for filename, meta in manifest.items():
             if filename in actual_files:
@@ -865,7 +865,19 @@ class Ingestor:
         if not deleted_slugs:
             return affected
 
-        # Mettre à jour les pages c-/e- qui référencent ces slugs
+        affected.extend(self._cascade_deleted_slugs(deleted_slugs, dry_run))
+        self._finalize_deletions(affected, dry_run)
+        return affected
+
+    def _cascade_deleted_slugs(self, deleted_slugs: set[str], dry_run: bool = False) -> list[str]:
+        """Répercute la suppression de deleted_slugs sur les pages c-/e- qui les référencent.
+
+        Retourne la liste des slugs de pages c-/e- affectées (poubelle ou à-réviser).
+        N'écrit pas index.md/tags.md/log.md — voir _finalize_deletions.
+        """
+        poubelle_dir = self.wiki_dir / "poubelle"
+        affected = []
+
         for page in iter_pages(self.wiki_dir, subdirs=["concepts", "entités"]):
             try:
                 content = page.read_text(encoding="utf-8")
@@ -880,15 +892,13 @@ class Ingestor:
                 sources = [sources]
             remaining = [s for s in sources if s not in deleted_slugs]
             if len(remaining) == len(sources):
-                continue  # pas affecté
+                continue
 
             if not remaining:
-                # Plus aucune source → poubelle
                 self._trash_page(page, poubelle_dir, dry_run)
                 affected.append(page.stem)
                 print(f"[ingest] {'[dry]' if dry_run else '[trash]'} {page.stem} → poubelle/ (plus de sources)")
             else:
-                # Sources partiellement supprimées → marquer à-réviser
                 if not dry_run:
                     post["sources"] = remaining
                     post["status"] = "à-réviser"
@@ -898,6 +908,47 @@ class Ingestor:
                 print(f"[ingest] {'[dry]' if dry_run else '[réviser]'} {page.stem} : "
                       f"retrait {removed}, status → à-réviser")
 
+        return affected
+
+    def _remove_from_index(self, slug: str) -> None:
+        """Retire la ligne du slug dans index.md, si présente."""
+        index_path = self.wiki_dir / "index.md"
+        if not index_path.exists():
+            return
+        text = index_path.read_text(encoding="utf-8")
+        pattern = re.compile(rf"^- \[\[{re.escape(slug)}\]\].*\n?", re.MULTILINE)
+        new_text = pattern.sub("", text)
+        if new_text != text:
+            index_path.write_text(new_text, encoding="utf-8")
+
+    def _finalize_deletions(self, affected: list[str], dry_run: bool = False) -> None:
+        """Met à jour index.md, tags.md et log.md pour les slugs affectés.
+
+        Partagé par _sync_deletions et _trash_page_full — seul point qui écrit
+        ces trois fichiers pour une opération de dé-ingestion.
+        """
+        if dry_run or not affected:
+            return
+        for slug in affected:
+            self._remove_from_index(slug)
+        self._rebuild_tags_index()
+        for slug in affected:
+            self._append_log("dé-ingestion", slug)
+
+    def _trash_page_full(self, slug: str, dry_run: bool = False) -> list[str]:
+        """Retrait manuel et délibéré d'une page précise (sans exiger que son
+        fichier raw/ ait disparu). Déclenche la même cascade que _sync_deletions.
+
+        Lève FileNotFoundError si le slug n'existe pas.
+        """
+        page = slug_to_path(self.wiki_dir, slug)
+        if not page.exists():
+            raise FileNotFoundError(f"Page introuvable pour le slug {slug!r}")
+
+        poubelle_dir = self.wiki_dir / "poubelle"
+        self._trash_page(page, poubelle_dir, dry_run)
+        affected = [slug] + self._cascade_deleted_slugs({slug}, dry_run)
+        self._finalize_deletions(affected, dry_run)
         return affected
 
     def _reset_wiki(self) -> None:
