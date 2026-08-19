@@ -22,6 +22,11 @@ class TestCleanTags:
         result = clean_tags(["documentation", "secretarius", "openclaw"])
         assert result == ["documentation", "secretarius", "openclaw"]
 
+    def test_flattens_nested_list_and_deduplicates(self):
+        """Branche isinstance(tag, list) : listes imbriquées (malformation YAML)."""
+        result = clean_tags([["tailscale"], "[tailscale]"])
+        assert result == ["tailscale"]
+
 
 class TestFixPages:
     def test_fixes_corrupted_page_on_disk(self, wiki_dir: Path):
@@ -64,3 +69,20 @@ class TestFixPages:
         fixed = fix_pages(wiki_dir, apply=True)
 
         assert "src-clean" not in fixed
+
+    def test_fixes_corrupted_nested_list_tags_on_disk(self, wiki_dir: Path):
+        """Branche isinstance(tag, list) : listes imbriquées (malformation YAML)."""
+        page = wiki_dir / "sources" / "src-nested.md"
+        # YAML qui parse en [['tailscale'], '[tailscale]']
+        page.write_text(
+            "---\ntitle: Nested\ncategory: source\n"
+            "tags:\n- - tailscale\n- '[tailscale]'\n"
+            "created: 2026-01-01\nsources: []\n---\n\n# Nested\n",
+            encoding="utf-8",
+        )
+
+        fixed = fix_pages(wiki_dir, apply=True)
+
+        assert "src-nested" in fixed
+        post = frontmatter.load(page)
+        assert post["tags"] == ["tailscale"]
