@@ -94,6 +94,35 @@ class TestFinalizeDeletions:
         index = (wiki_dir / "index.md").read_text(encoding="utf-8")
         assert "src-orphan" in index  # inchangé
 
+    def test_keeps_a_reviser_page_in_index_but_removes_trashed(self, ingestor, wiki_dir: Path):
+        """Cas mixte : une page c-/e- qui perd seulement UNE partie de ses sources
+        reste sur disque en status: à-réviser et doit rester dans l'index, tandis
+        qu'une page qui perd toutes ses sources est mise en poubelle et retirée."""
+        _write_page(wiki_dir, "sources", "src-a")
+        _write_page(wiki_dir, "sources", "src-b")
+        _write_page(wiki_dir, "sources", "src-c")
+        _write_page(wiki_dir, "concepts", "c-multi", sources=["src-a", "src-b"])
+        _write_page(wiki_dir, "concepts", "c-single", sources=["src-c"])
+        (wiki_dir / "index.md").write_text(
+            "# Index\n\n"
+            "- [[c-multi]] | concept | Multi\n"
+            "- [[c-single]] | concept | Single\n",
+            encoding="utf-8",
+        )
+
+        affected = ingestor._cascade_deleted_slugs({"src-a", "src-c"}, dry_run=False)
+        ingestor._finalize_deletions(affected, dry_run=False)
+
+        assert (wiki_dir / "concepts" / "c-multi.md").exists()
+        post = frontmatter.loads((wiki_dir / "concepts" / "c-multi.md").read_text(encoding="utf-8"))
+        assert post.get("status") == "à-réviser"
+        assert not (wiki_dir / "concepts" / "c-single.md").exists()
+        assert (wiki_dir / "poubelle" / "c-single.md").exists()
+
+        index = (wiki_dir / "index.md").read_text(encoding="utf-8")
+        assert "c-multi" in index  # toujours valide sur disque, doit rester
+        assert "c-single" not in index  # réellement mis en poubelle
+
 
 class TestManualRemove:
     def test_trash_page_full_removes_slug_everywhere(self, ingestor, wiki_dir: Path):

@@ -930,6 +930,9 @@ class Ingestor:
         if dry_run or not affected:
             return
         for slug in affected:
+            if slug_to_path(self.wiki_dir, slug).exists():
+                # Page toujours sur disque (à-réviser) : reste dans l'index.
+                continue
             self._remove_from_index(slug)
         self._rebuild_tags_index()
         for slug in affected:
