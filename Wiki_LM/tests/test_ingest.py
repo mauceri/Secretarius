@@ -398,3 +398,25 @@ class TestIngestLocalNote:
         pages = list((wiki_dir / "sources").glob("src-*.md"))
         assert pages, "aucune page source créée"
         assert "## Résumé" not in pages[0].read_text()
+
+
+class TestParseRawTags:
+    def test_plain_comma_separated(self, tmp_path: Path):
+        from ingest import Ingestor
+        f = tmp_path / "raw.url"
+        f.write_text("https://example.com\ntags: documentation, secretarius\n", encoding="utf-8")
+        assert Ingestor._parse_raw_tags(f) == ["documentation", "secretarius"]
+
+    def test_bracket_wrapped_list_style(self, tmp_path: Path):
+        """Régression : tags: [a, b] ne doit plus produire ['[a', 'b]']."""
+        from ingest import Ingestor
+        f = tmp_path / "raw.url"
+        f.write_text("https://example.com\ntags: [documentation, secretarius]\n", encoding="utf-8")
+        assert Ingestor._parse_raw_tags(f) == ["documentation", "secretarius"]
+
+    def test_single_bracket_wrapped_tag(self, tmp_path: Path):
+        """Régression : tags: [christianisme] (un seul tag, entre crochets)."""
+        from ingest import Ingestor
+        f = tmp_path / "raw.url"
+        f.write_text("https://example.com\ntags: [christianisme]\n", encoding="utf-8")
+        assert Ingestor._parse_raw_tags(f) == ["christianisme"]

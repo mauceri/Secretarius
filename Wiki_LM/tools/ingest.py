@@ -1077,11 +1077,15 @@ class Ingestor:
 
     @staticmethod
     def _parse_raw_tags(path: Path) -> list[str]:
-        """Lit la ligne `tags: tag1, tag2` d'un fichier raw si présente."""
+        """Lit la ligne `tags: tag1, tag2` d'un fichier raw si présente.
+
+        Tolère aussi le style liste `tags: [tag1, tag2]`.
+        """
         for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
             line = line.strip()
             if line.lower().startswith("tags:"):
                 raw = line[5:].strip()
+                raw = raw.strip("[]")
                 return [t.strip() for t in raw.split(",") if t.strip()]
         return []
 
