@@ -191,3 +191,37 @@ pipeline complet est validé).
   scope élargi (plus d'itérations de debug attendues sur l'attention) — pas
   bloquant, mais à budgéter en conséquence (quelques dizaines d'heures Pod
   plutôt que quelques heures).
+
+## Décision h=0 (2026-08-18)
+
+Découverte en cours d'implémentation (Task 2 du plan) : avec `h>0`, les
+matrices clés de l'Algorithme 1 sont rectangulaires `(d, d+2h)`/`(d+2h, d)`,
+et la section 5.4 du papier (Accuracy Analysis, lue directement p.10-11)
+confirme que tout le réseau obfusqué (embedding, attention, FFN, RMSNorm)
+opère alors dans cet espace élargi `d+2h` de bout en bout — une reproduction
+fidèle demanderait de redimensionner chaque couche de Qwen2.5-7B, pas
+seulement de transformer les poids en place sur les tenseurs existants.
+
+**Décision (recommandation Claude, acceptée par l'utilisateur) : `h=0` pour
+tout ce POC.** Avec `h=0`, les matrices clés dégénèrent proprement en
+matrices carrées `(d,d)`, cohérentes avec la chirurgie de poids déjà prévue.
+Le mécanisme qui protège spécifiquement contre ISA (Tableau 4 : 87,14%→0%)
+est la permutation tête/bloc de l'attention, indépendante de `h` — cette
+protection reste donc intacte. Coût assumé : `h=0` n'est testé nulle part
+dans le papier (h=128 dans toutes leurs expériences, Table 10), donc une
+éventuelle propriété de sécurité formelle liée à l'expansion (section 6,
+Rényi-metric DP, non explorée dans ce projet) pourrait être perdue —
+inconnue non caractérisée, assumée pour rester dans la portée d'un POC.
+
+**Deuxième simplification, découverte en corrigeant Task 4** : le schéma
+complet du papier chaîne un même changement de base à travers *toutes* les
+couches (le `P̂` global de la section 5.4 : `φ^attn_X(x)=xP̂`,
+`ψ^embed_Y(y)=yP̂`, même symbole d'une couche à l'autre) — un chaînage
+cohérent sur ~28 couches de décodeur. Ce POC ne le reproduit pas : chaque
+couche (embedding, FFN, attention) est obfusquée et vérifiée **de façon
+indépendante** (entrée réelle → sortie réelle identique pour cette couche
+précise), sans transformer la frontière `hidden_size` entre couches.
+Conséquence assumée : ce POC obfusque les calculs *internes* à chaque couche
+prise isolément, pas la totalité du flux résiduel comme le schéma
+« covariant » complet du papier — les théorèmes de composition et garanties
+formelles de bout en bout (§5.4/§6) ne sont pas reproduits ici.
