@@ -41,11 +41,17 @@ def obfuscate_embedding(w_embed, w_head, alpha_e, alpha_h, lam, h, seed,
     rng_np = np.random.default_rng(seed)
     rng_py = random.Random(seed)
 
-    # bruit gaussien : W* = W + alpha * bruit
+    # Bruit gaussien : W* = W + alpha · σ(W) · bruit.
+    # §5.2.2 « Noise Addition » : « The client samples noise matrices
+    # E_embed ~ N(0, σ_e² I_n ⊗ I_d) et E_head ~ N(0, σ_h² I_d ⊗ I_n), where
+    # σ_e, σ_h are the standard deviation of W_e, W_h ». α est donc un
+    # coefficient RELATIF à l'écart-type de la matrice obfusquée, pas une
+    # amplitude absolue : à α_e = 1.0 (défaut du papier) le bruit a la même
+    # dispersion que le poids, quelle que soit l'échelle du modèle.
     noise_e = torch.randn(w_embed.shape, generator=torch.Generator().manual_seed(seed))
     noise_h = torch.randn(w_head.shape, generator=torch.Generator().manual_seed(seed + 1))
-    w_embed_star = w_embed + alpha_e * noise_e
-    w_head_star = w_head + alpha_h * noise_h
+    w_embed_star = w_embed + alpha_e * w_embed.std() * noise_e
+    w_head_star = w_head + alpha_h * w_head.std() * noise_h
 
     # permutation secrète du vocabulaire
     clear_ids = list(range(vocab_size))
@@ -70,19 +76,16 @@ def obfuscate_embedding(w_embed, w_head, alpha_e, alpha_h, lam, h, seed,
 
         base_head = init_key_matrix(d, h, lam, rng_np)
         q_hat_head = torch.tensor(inv_key_mat_gen(base_head), dtype=w_head.dtype)
-    else:  # cf. docstring du module
-        p_hat_embed = torch.eye(d, dtype=w_embed.dtype)
-        q_hat_head = torch.eye(d, dtype=w_head.dtype)
 
-    # W̃_embed = Π · W*_embed · P̂_embed
-    w_embed_permuted_rows = w_embed_star[inv_perm_index]
-    w_embed_obf = w_embed_permuted_rows @ p_hat_embed
+        # W̃_embed = Π · W*_embed · P̂_embed
+        w_embed_star = w_embed_star @ p_hat_embed
+        # W̃_head = Q̂_head · W*_head · Πᵀ
+        # (la sélection de lignes et la multiplication par la matrice clé
+        # commutent : l'une agit sur l'axe vocab, l'autre sur l'axe d — l'ordre
+        # n'a pas d'importance mathématiquement.)
+        w_head_star = w_head_star @ q_hat_head.T
 
-    # W̃_head = Q̂_head · W*_head · Πᵀ
-    # (la sélection de lignes et la multiplication par la matrice clé
-    # commutent : l'une agit sur l'axe vocab, l'autre sur l'axe d — l'ordre
-    # n'a pas d'importance mathématiquement.)
-    w_head_transformed = w_head_star @ q_hat_head.T
-    w_head_obf = w_head_transformed[inv_perm_index]
+    w_embed_obf = w_embed_star[inv_perm_index]
+    w_head_obf = w_head_star[inv_perm_index]
 
     return ObfuscatedEmbedding(w_embed_obf, w_head_obf, permutation, unpermute)

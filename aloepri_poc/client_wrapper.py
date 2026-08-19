@@ -10,8 +10,12 @@ eux aussi dans l'espace permuté, d'où le `unpermute` au retour.
 
 class ClientCodec:
     def __init__(self, permutation, unpermute, tokenizer):
-        self.permutation = permutation
-        self.unpermute = unpermute
+        # JSON transforme les clés d'objet en chaînes : les tables relues depuis
+        # `obfuscation_keys.json` arrivent avec des clés `str`, et un `encode()`
+        # lèverait KeyError. La coercition est faite ici, une fois, plutôt que
+        # laissée à chaque appelant.
+        self.permutation = {int(k): int(v) for k, v in permutation.items()}
+        self.unpermute = {int(k): int(v) for k, v in unpermute.items()}
         self.tokenizer = tokenizer
 
     def encode(self, text):

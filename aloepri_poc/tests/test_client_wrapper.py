@@ -1,10 +1,13 @@
+import json
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
 from client_wrapper import ClientCodec
+from model_transform import ObfuscationKeys
 
 
 class FakeTokenizer:
@@ -41,3 +44,21 @@ def test_codec_uses_the_permutation_in_the_same_direction_as_the_model():
 
     assert codec.encode("ab") == [ord("a") + 1, ord("b") + 1]
     assert codec.decode([ord("a") + 1, ord("b") + 1]) == "ab"
+
+
+def test_codec_works_on_keys_relues_depuis_le_json_sur_disque(tmp_path):
+    """Chemin réel de la Task 9 : `transform_model` sérialise les clés en JSON,
+    le client les relit. JSON convertit toute clé d'objet en chaîne, donc les
+    tables reviennent avec des clés `str` — `encode()` levait KeyError. Ce test
+    passe par un vrai `json.dump`/`json.load`, pas par un dictionnaire construit
+    en mémoire, sinon il ne verrait pas le problème."""
+    permutation = {i: (i + 1) % 256 for i in range(256)}
+    keys = ObfuscationKeys(permutation, {v: k for k, v in permutation.items()}, seed=0)
+
+    chemin = tmp_path / "obfuscation_keys.json"
+    chemin.write_text(json.dumps(asdict(keys)))
+    relu = json.loads(chemin.read_text())
+
+    codec = ClientCodec(relu["vocab_permutation"], relu["vocab_unpermute"], FakeTokenizer())
+    assert codec.decode(codec.encode("bonjour")) == "bonjour"
+    assert codec.encode("a") == [ord("a") + 1]

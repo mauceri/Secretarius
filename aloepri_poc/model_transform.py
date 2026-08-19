@@ -36,6 +36,7 @@ cf. la docstring de `embedding_obfuscation.py`.
 """
 import argparse
 import json
+import warnings
 from dataclasses import dataclass, asdict
 
 import torch
@@ -56,6 +57,29 @@ class ObfuscationKeys:
 def _write(param, value):
     """Écrit un tenseur float32 dans un paramètre en préservant son dtype."""
     param.data.copy_(value.to(param.dtype))
+
+
+_TOKEN_ID_FIELDS = ("bos_token_id", "eos_token_id", "pad_token_id", "decoder_start_token_id")
+
+
+def _remap_token_ids(holder, permutation):
+    """Réécrit les IDs spéciaux d'un config/generation_config dans l'espace permuté.
+
+    Le modèle obfusqué ÉMET des IDs permutés : un `eos_token_id` resté en clair
+    ne serait jamais produit (generate() ne s'arrêterait donc jamais) tandis que
+    l'ID clair de l'EOS serait, lui, émis à la place d'un token banal — arrêt
+    prématuré sur du texte quelconque. Ces champs voyagent avec le modèle via
+    `save_pretrained`, donc ils doivent suivre la permutation."""
+    if holder is None:
+        return
+    for field in _TOKEN_ID_FIELDS:
+        value = getattr(holder, field, None)
+        if value is None:
+            continue
+        if isinstance(value, (list, tuple)):
+            setattr(holder, field, [permutation[int(v)] for v in value])
+        else:
+            setattr(holder, field, permutation[int(value)])
 
 
 def obfuscate_model_in_place(model, config, seed, alpha_e=1.0, alpha_h=0.2,
@@ -86,13 +110,21 @@ def obfuscate_model_in_place(model, config, seed, alpha_e=1.0, alpha_h=0.2,
 
     w_embed = model.get_input_embeddings().weight.data.float()
     w_head = model.get_output_embeddings().weight.data.float()
-    # Le bruit d'embedding est la seule dégradation NON compensée du POC : α est
-    # une amplitude absolue (papier, Table 10 : α_e = 1.0) alors que les
-    # coefficients d'embedding d'un modèle réel sont petits. Ce rapport dit donc
-    # d'emblée si le modèle obfusqué a une chance de fonctionner (cf. --alpha-e).
-    rms = max(float(w_embed.pow(2).mean().sqrt()), 1e-12)
-    print(f"[obfuscation] RMS embedding = {rms:.4f}, alpha_e = {alpha_e} "
-          f"-> rapport bruit/signal = {alpha_e / rms:.1f}")
+    # Le bruit d'embedding est la seule dégradation NON compensée du POC. α est
+    # un coefficient RELATIF à σ(W) (papier §5.2.2), donc le rapport bruit/signal
+    # vaut α par construction : à α_e = 1.0 (défaut du papier) le bruit a la même
+    # dispersion que le poids. On trace les σ effectifs, et on avertit seulement
+    # si le bruit DOMINE le signal — ce que le défaut du papier ne fait pas.
+    print(f"[obfuscation] σ(embed) = {float(w_embed.std()):.4f}, "
+          f"σ(head) = {float(w_head.std()):.4f} ; bruit relatif "
+          f"alpha_e = {alpha_e}, alpha_h = {alpha_h}")
+    if max(alpha_e, alpha_h) > 1.0:
+        warnings.warn(
+            f"bruit d'embedding supérieur au signal (alpha_e={alpha_e}, "
+            f"alpha_h={alpha_h} > 1) : la qualité mesurée ensuite sera dominée "
+            "par ce bruit, pas par la reparamétrisation.",
+            stacklevel=2,
+        )
     emb = obfuscate_embedding(
         w_embed, w_head, alpha_e, alpha_h, lam, h=0, seed=seed,
         apply_key_matrices=False,
@@ -140,11 +172,22 @@ def obfuscate_model_in_place(model, config, seed, alpha_e=1.0, alpha_h=0.2,
         _write(mlp.up_proj.weight, obf_ffn.up_proj_obf)
         _write(mlp.down_proj.weight, obf_ffn.down_proj_obf)
 
+    # IDs spéciaux : ils sont sauvegardés avec le modèle et doivent donc vivre
+    # dans le même espace que ce que le modèle émet, c.-à-d. l'espace permuté.
+    _remap_token_ids(model.config, emb.permutation)
+    _remap_token_ids(getattr(model, "generation_config", None), emb.permutation)
+
     return ObfuscationKeys(emb.permutation, emb.unpermute, seed)
 
 
 def transform_model(model_name, output_dir, seed, alpha_e=1.0, alpha_h=0.2,
-                    lam=0.3, beta=8, gamma=1e3, zeta=1e3):
+                    lam=0.3, beta=8, gamma=1e3, zeta=1e3,
+                    keys_path="obfuscation_keys.json"):
+    """Charge, obfusque et sauvegarde le modèle ; écrit les clés dans `keys_path`.
+
+    Le répertoire `output_dir` part sur le serveur ; `keys_path` reste côté
+    client — c'est le secret du POC, il ne doit jamais être copié sur le Pod.
+    """
     config = AutoConfig.from_pretrained(model_name)
     model = AutoModelForCausalLM.from_pretrained(model_name, dtype=torch.bfloat16)
 
@@ -154,8 +197,7 @@ def transform_model(model_name, output_dir, seed, alpha_e=1.0, alpha_h=0.2,
     )
 
     model.save_pretrained(output_dir)
-    # Les clés ne partent PAS avec le modèle : elles restent côté client.
-    with open("obfuscation_keys.json", "w") as f:
+    with open(keys_path, "w") as f:
         json.dump(asdict(keys), f)
     return keys
 
@@ -175,6 +217,15 @@ if __name__ == "__main__":
     # de contrôle : il sépare « la reparamétrisation est-elle juste ? » de
     # « combien coûte l'approximation revendiquée par le papier ? ».
     parser.add_argument("--beta", type=int, default=8)
+    # ζ sert à calculer les fréquences RoPE dont BlockPerm déduit la largeur de
+    # ses fenêtres. Le défaut du plan (1e3) ne coïncide PAS avec le rope_theta de
+    # Qwen2.5-7B (1e6) ; l'arbitrage est ouvert (cf. task-8-report.md §8.3),
+    # d'où le réglage en ligne de commande.
+    parser.add_argument("--zeta", type=float, default=1e3)
+    parser.add_argument("--keys", default="obfuscation_keys.json",
+                        help="où écrire les clés côté client (à NE PAS copier "
+                             "sur le serveur)")
     args = parser.parse_args()
     transform_model(args.model, args.output, args.seed,
-                    alpha_e=args.alpha_e, alpha_h=args.alpha_h, beta=args.beta)
+                    alpha_e=args.alpha_e, alpha_h=args.alpha_h, beta=args.beta,
+                    zeta=args.zeta, keys_path=args.keys)

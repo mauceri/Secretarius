@@ -154,6 +154,9 @@ def _tiny_model(seed=0, tie_word_embeddings=False):
         num_hidden_layers=2, num_attention_heads=4, num_key_value_heads=2,
         max_position_embeddings=64, rope_theta=1e6,
         tie_word_embeddings=tie_word_embeddings,
+        # dans le vocabulaire du modèle jouet (les défauts de Qwen2Config sont
+        # ceux du vrai modèle, ~151k, hors des 64 lignes d'ici)
+        bos_token_id=62, eos_token_id=63, pad_token_id=None,
     )
     model = Qwen2ForCausalLM(config).eval()
     # `_init_weights` de HF met les biais à zéro : des biais nuls rendraient
@@ -196,6 +199,27 @@ def test_tiny_qwen2_logits_are_preserved_up_to_the_vocabulary_permutation(
     # colonne `permutation[t]` des logits obfusqués == colonne `t` des logits clairs
     columns = torch.tensor([keys.vocab_permutation[t] for t in range(config.vocab_size)])
     torch.testing.assert_close(obfuscated[..., columns], baseline, atol=1e-4, rtol=1e-3)
+
+
+def test_special_token_ids_are_remapped_into_the_permuted_space(tmp_path):
+    """Le modèle obfusqué ÉMET des IDs permutés. Un `eos_token_id` laissé en
+    clair ne serait donc jamais produit — `generate()` ne s'arrêterait jamais —
+    et l'ID clair de l'EOS serait émis à la place d'un token banal, provoquant
+    un arrêt prématuré. Le test passe par un vrai `save_pretrained` /
+    `from_pretrained` : ce sont les fichiers livrés au serveur qui comptent, pas
+    l'objet en mémoire."""
+    model, config = _tiny_model()
+    bos_clair, eos_clair = config.bos_token_id, config.eos_token_id
+
+    keys = obfuscate_model_in_place(model, config, seed=3, alpha_e=0.0, alpha_h=0.0, beta=1)
+    model.save_pretrained(tmp_path)
+    relu = Qwen2ForCausalLM.from_pretrained(tmp_path)
+
+    assert relu.config.eos_token_id == keys.vocab_permutation[eos_clair]
+    assert relu.config.bos_token_id == keys.vocab_permutation[bos_clair]
+    assert relu.config.eos_token_id != eos_clair  # la permutation bouge cet ID
+    assert relu.generation_config.eos_token_id == keys.vocab_permutation[eos_clair]
+    assert relu.config.pad_token_id is None  # un champ absent le reste
 
 
 def test_tiny_qwen2_weights_actually_changed():

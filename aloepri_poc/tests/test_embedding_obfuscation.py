@@ -42,6 +42,37 @@ def test_permutation_is_a_bijection_over_the_vocabulary():
     assert sorted(result.unpermute.values()) == list(range(vocab_size))
 
 
+def test_noise_amplitude_is_relative_to_the_standard_deviation_of_the_weights():
+    """§5.2.2 : « E_embed ~ N(0, σ_e² …), where σ_e, σ_h are the standard
+    deviation of W_e, W_h ». α est donc un coefficient RELATIF. Sans le facteur
+    σ(W), α_e = 1.0 ajouterait un bruit d'écart-type 1 à une table dont les
+    coefficients valent ~0,02 — un rapport bruit/signal de 50 au lieu de 1, qui
+    détruirait le modèle. Ce test échoue si le facteur σ disparaît."""
+    torch.manual_seed(3)
+    vocab_size, d = 400, 32
+    echelle_embed, echelle_head = 0.02, 0.5  # deux échelles distinctes
+    w_embed = torch.randn(vocab_size, d) * echelle_embed
+    w_head = torch.randn(vocab_size, d) * echelle_head
+
+    alpha_e, alpha_h = 1.0, 0.2
+    result = obfuscate_embedding(
+        w_embed, w_head, alpha_e=alpha_e, alpha_h=alpha_h, lam=0.3, h=0, seed=3,
+        apply_key_matrices=False,  # pour isoler le bruit de la permutation
+    )
+
+    for w_clear, w_obf, alpha in (
+        (w_embed, result.w_embed_obf, alpha_e),
+        (w_head, result.w_head_obf, alpha_h),
+    ):
+        reordonne = torch.stack([w_obf[result.permutation[t]] for t in range(vocab_size)])
+        bruit = reordonne - w_clear
+        attendu = alpha * float(w_clear.std())
+        assert abs(float(bruit.std()) - attendu) < 0.1 * attendu, (
+            f"écart-type du bruit = {float(bruit.std()):.4f}, attendu ~{attendu:.4f} "
+            "(α doit être relatif à σ(W), cf. §5.2.2)"
+        )
+
+
 def test_embedding_obfuscation_is_a_single_consistent_linear_reparametrization():
     """Round-trip test with teeth: `result.unpermute[result.permutation[t]] ==
     t` (the brief's own test) is a tautology of any dict built as the
