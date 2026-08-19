@@ -6,8 +6,14 @@ Le pipeline d'ingestion Wiki_LM a accumulé quatre défauts distincts au fil du 
 identifiés en mémoire projet et confirmés par exploration directe du dépôt et des
 données réelles (`~/Documents/Arbath/Wiki_LM`) le 2026-08-18 :
 
-1. **Traçabilité des sources** — la plupart des pages `src-` n'enregistrent pas l'URL
-   d'origine dans leur frontmatter (`sources: []`).
+1. **Traçabilité des sources** — plus de la moitié des pages `src-` n'ont pas l'URL
+   d'origine dans leur frontmatter (`lien_source:` absent — **pas** `sources:`, un champ
+   distinct qui sert aux références croisées entre pages, sans rapport avec la
+   traçabilité). Un script dédié existe déjà (`patch_lien_source.py`) mais il est
+   **cassé depuis la migration de structure** : il cherche les pages dans `wiki/*.md`
+   au lieu de `wiki/sources/*.md` (0 correspondance, échec silencieux), et son chemin
+   `raw/` par défaut pointe vers un dossier qui n'existe pas
+   (`~/Secretarius/Wiki_LM/raw/` au lieu de `~/Documents/Arbath/Wiki_LM/raw/`).
 2. **Dé-ingestion incomplète** — le retrait automatique d'une page (`_sync_deletions`
    dans `ingest.py`) ne met pas à jour `index.md`, `tags.md` ni `log.md`, et il n'existe
    aucune commande pour retirer une page à la demande.
@@ -19,10 +25,14 @@ données réelles (`~/Documents/Arbath/Wiki_LM`) le 2026-08-18 :
 
 ## Chiffres réels (vérifiés, pas estimés)
 
-- `wiki/sources/` (dossier vivant) : **87 pages `src-`**, dont **79** avec `sources: []`.
-- Sur ces 79 : **46 récupérables** (le manifeste `.ingested` connaît le fichier `raw/`
-  d'origine et ce fichier existe encore), **6** tracées dans le manifeste mais le fichier
-  `raw/` a disparu, **27** sans aucune trace (ni manifeste, ni fichier).
+- `wiki/sources/` (dossier vivant) : **87 pages `src-`**, dont **34** ont déjà
+  `lien_source:` rempli et **53** ne l'ont pas.
+- Sur ces 53 (chiffres obtenus en rejouant la logique réelle de `patch_lien_source.py`
+  avec les bons chemins, pas une estimation) : **3 récupérables automatiquement**
+  (le manifeste `.ingested` connaît le fichier `raw/` d'origine et ce fichier contient
+  une URL extractable), **27** ont une entrée manifeste et un fichier `raw/` présent
+  mais celui-ci ne contient aucune URL (notes texte manuelles, pas des captures d'URL),
+  **23** sans aucune trace (ni manifeste, ni fichier).
 - `wiki_signets_05_2026/` (1892 pages) est un dossier **legacy figé depuis le 12 mai 2026**
   (aucun fichier modifié depuis), probablement l'état d'avant la migration effectuée par
   `migrate_wiki_structure.py`. **Hors périmètre de ce chantier** — à vérifier séparément
@@ -41,14 +51,19 @@ Chaque script : `--dry-run` par défaut (affiche les changements sans écrire),
 `--apply` pour écrire réellement. Avant toute écriture réelle, sauvegarde légère
 (liste des fichiers touchés + leur contenu avant modification, pas un dump complet).
 
-### 1. `fix_missing_sources.py`
+### 1. Corriger `patch_lien_source.py` (pas un nouveau script)
 
-- Parcourt les 87 pages de `wiki/sources/` (y compris les 8 déjà remplies, au cas où
-  leur valeur serait incomplète).
-- Pour chaque page : cherche une correspondance dans `.ingested` (manifeste TSV
-  `filename\tslug\thash`). Si trouvée et le fichier `raw/` existe → lit l'URL (première
-  ligne du fichier `.url`) et l'écrit dans `sources:`.
-- Pour les pages sans correspondance récupérable (jusqu'à 33) : les liste dans
+- Corriger le chemin des pages : `wiki_dir.glob("src-*.md")` → chercher dans
+  `wiki_dir / "sources"` (structure actuelle post-migration).
+- Corriger `_DEFAULT_RAW` : `~/Secretarius/Wiki_LM/raw` (inexistant) →
+  `~/Documents/Arbath/Wiki_LM/raw` (chemin réel, cohérent avec `WIKI_PATH`).
+- Assouplir le filtre d'extraction : actuellement seuls les fichiers `raw/` au suffixe
+  `.url` sont essayés ; tenter l'extraction sur tout fichier `raw/` associé (gain marginal
+  mais gratuit, +1 page vérifié).
+- Lancer en `--dry-run` puis `--apply` une fois vérifié → répare les 3 pages
+  automatiquement récupérables.
+- Pour les 50 pages restantes (27 sans URL extractable + 23 sans trace) : nouveau
+  script `list_unsourced_pages.py` qui les liste dans
   `Wiki_LM/tools/urls_a_rechercher.md` — un tableau par page avec titre, tags, et les
   deux premières phrases du résumé, extraction déterministe depuis le frontmatter/contenu
   existant (pas d'appel LLM, pas de recherche web automatique — décision explicite pour
