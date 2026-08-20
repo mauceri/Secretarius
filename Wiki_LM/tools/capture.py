@@ -111,6 +111,13 @@ def _parse_hashtags(text: str) -> tuple[list[str], str]:
     return tags, remaining
 
 
+def _parse_simple_directive(text: str) -> tuple[bool, str]:
+    """Détecte le jeton @simple. Retourne (présent, texte_restant)."""
+    found = bool(re.search(r"@simple\b", text, flags=re.IGNORECASE))
+    remaining = re.sub(r"@simple\b\s*", "", text, flags=re.IGNORECASE).strip()
+    return found, remaining
+
+
 def _normalize_tags(raw_tags: list[str], kb_dir: Path = _DEFAULT_KB_DIR) -> list[str]:
     """Normalise les tags bruts contre les tags canoniques. Best-effort silencieux."""
     if not raw_tags:

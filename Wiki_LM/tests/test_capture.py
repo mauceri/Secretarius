@@ -4,7 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from capture import capture_urls, capture_comment, capture_file, _normalize_url
+from capture import (
+    capture_urls, capture_comment, capture_file, _normalize_url,
+    _parse_simple_directive,
+)
 
 
 class TestNormalizeUrl:
@@ -28,6 +31,39 @@ class TestNormalizeUrl:
         norm = _normalize_url(url)
         assert "triedRedirect" not in norm
         assert "inbox" not in norm
+
+
+class TestParseSimpleDirective:
+    def test_detects_and_strips(self):
+        found, remaining = _parse_simple_directive("@simple https://example.com")
+        assert found is True
+        assert "@simple" not in remaining
+        assert remaining == "https://example.com"
+
+    def test_absent(self):
+        found, remaining = _parse_simple_directive("https://example.com")
+        assert found is False
+        assert remaining == "https://example.com"
+
+    def test_case_insensitive(self):
+        found, remaining = _parse_simple_directive("@SIMPLE https://example.com")
+        assert found is True
+        assert remaining == "https://example.com"
+
+    def test_not_matched_without_at(self):
+        found, remaining = _parse_simple_directive("simple sans arobase")
+        assert found is False
+        assert remaining == "simple sans arobase"
+
+    def test_not_matched_as_substring(self):
+        found, remaining = _parse_simple_directive("@simplement écrit")
+        assert found is False
+        assert remaining == "@simplement écrit"
+
+    def test_directive_in_middle(self):
+        found, remaining = _parse_simple_directive("capture @simple ce texte")
+        assert found is True
+        assert remaining == "capture ce texte"
 
 
 class TestCaptureUrls:
