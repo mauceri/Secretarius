@@ -161,6 +161,21 @@ export default definePluginEntry({
             },
         });
         api.registerTool({
+            name: "wiki_search",
+            description: "Recherche brute BM25 dans le wiki, sans synthèse LLM (délègue 'op: search' à l'agent wiki).",
+            parameters: Type.Object({
+                command: Type.Optional(Type.String({ description: "Raw args: mots-clés de recherche." })),
+            }),
+            async execute(_id, params) {
+                const arg = (params?.command ?? "").trim();
+                if (!arg) {
+                    return { content: [{ type: "text", text: "Usage: /r <mots-clés>" }] };
+                }
+                const out = await runWikiOp(api, "search", arg);
+                return { content: [{ type: "text", text: out.slice(0, 4000) }] };
+            },
+        });
+        api.registerTool({
             name: "wiki_tags",
             description: "Liste les tags du wiki (délègue 'op: tags' à l'agent wiki).",
             parameters: Type.Object({ command: Type.Optional(Type.String({ description: "Inutilisé." })) }),

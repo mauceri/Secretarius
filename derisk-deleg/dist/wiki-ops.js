@@ -116,6 +116,14 @@ export function formatWikiResult(op, json) {
             const tags = Array.isArray(json?.tags) ? json.tags : [];
             return tags.length ? `Tags : ${tags.join(", ")}.` : "Aucun tag.";
         }
+        case "search": {
+            const results = Array.isArray(json?.results) ? json.results : [];
+            if (!results.length)
+                return "Aucun résultat.";
+            return results
+                .map((r, i) => `${i + 1}. ${r.title}\n   ${r.excerpt}`)
+                .join("\n\n");
+        }
         case "kb_update":
             // op_kb_update est synchrone (status "ok" = mise à jour faite) ; on gère
             // aussi "launched" au cas où on brancherait le worker async, sans sur-claim.
