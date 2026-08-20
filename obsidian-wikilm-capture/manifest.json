@@ -1,0 +1,9 @@
+{
+  "id": "wikilm-capture",
+  "name": "Wiki_LM Capture",
+  "version": "0.1.0",
+  "minAppVersion": "1.4.0",
+  "description": "Capture la note courante dans la file raw/ de Wiki_LM.",
+  "author": "Christian Mauceri",
+  "isDesktopOnly": false
+}

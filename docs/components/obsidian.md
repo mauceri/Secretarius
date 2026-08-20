@@ -105,6 +105,40 @@ Le template appelle le serveur `wiki-lm-server` (port 5051, voir
 - « Aucune information » sur un document récent : normalement résolu par
   l'auto-reload du serveur ; sinon forcer `curl -X POST http://sanroque:5051/reload`.
 
+## Plugin de capture Wiki_LM
+
+Capturer la note actuellement ouverte dans la file `raw/` de Wiki_LM (équivalent
+de `/c`, sans quitter Obsidian), depuis desktop ou mobile. Source :
+`obsidian-wikilm-capture/` (projet TypeScript séparé, à la racine du dépôt).
+
+### Prérequis
+
+- Service `wiki-lm-server` actif sur sanroque (le plugin appelle le nouvel
+  endpoint `POST /capture`, voir `docs/components/wiki-lm.md`).
+- L'appareil Obsidian atteint `sanroque:5051` (réseau local ou Tailscale).
+
+### Installation
+
+1. `cd obsidian-wikilm-capture && npm install && npm run build` — produit
+   `main.js` à côté de `manifest.json`.
+2. Copier `manifest.json` et `main.js` dans
+   `<coffre>/.obsidian/plugins/wikilm-capture/`.
+3. Dans Obsidian : Paramètres → Modules communautaires → activer
+   « Wiki_LM Capture ».
+4. Dans les réglages du plugin, renseigner l'URL du serveur (ex.
+   `http://sanroque:5051`).
+
+### Utilisation
+
+1. Ouvrir la note à capturer.
+2. Cliquer l'icône dans la barre latérale, ou lancer la commande
+   « Capturer la note courante dans Wiki_LM » (Ctrl/Cmd-P).
+3. Si la note commence par un titre `# Résumé` ou `# Summary`, cette section
+   est capturée intégralement ; sinon, les 200 premiers caractères de la note
+   sont utilisés comme aperçu.
+4. Une notification confirme la capture ; la note est marquée
+   `wiki_capture: <date>` dans son frontmatter.
+
 ## Archivage du coffre
 
 Il est fortement recommandé d'archiver régulièrement le coffre :
