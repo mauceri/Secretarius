@@ -399,6 +399,31 @@ class TestIngestLocalNote:
         assert pages, "aucune page source créée"
         assert "## Résumé" not in pages[0].read_text()
 
+    def test_url_marked_simple_passes_local_note_true(self, ingestor, raw_dir):
+        (raw_dir / "test.url").write_text(
+            "https://example.com\nsimple: true\n", encoding="utf-8")
+        captured = {}
+
+        def fake_ingest(source, **kwargs):
+            captured.update(kwargs)
+            return "src-test"
+
+        ingestor.ingest = fake_ingest
+        ingestor.ingest_raw_dir()
+        assert captured.get("local_note") is True
+
+    def test_url_without_marker_passes_local_note_false(self, ingestor, raw_dir):
+        (raw_dir / "test.url").write_text("https://example.com\n", encoding="utf-8")
+        captured = {}
+
+        def fake_ingest(source, **kwargs):
+            captured.update(kwargs)
+            return "src-test"
+
+        ingestor.ingest = fake_ingest
+        ingestor.ingest_raw_dir()
+        assert captured.get("local_note") is False
+
 
 class TestParseRawTags:
     def test_plain_comma_separated(self, tmp_path: Path):

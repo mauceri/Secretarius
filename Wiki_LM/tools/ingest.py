@@ -1046,8 +1046,9 @@ class Ingestor:
                         self._mark_ingested(path.name, slug="", file_hash=_file_hash(path))
                         continue
                     user_tags = self._parse_raw_tags(path)
+                    simple = self._parse_raw_simple(path)
                     note = _parse_note_from_url_file(path)
-                    slug = self.ingest(url, max_concepts=max_concepts, extra_tags=user_tags or None, rename_raw=False, note=note)
+                    slug = self.ingest(url, max_concepts=max_concepts, extra_tags=user_tags or None, rename_raw=False, note=note, local_note=simple)
                 else:
                     user_tags = self._parse_raw_tags(path)
                     # .md = note en texte libre → page verbatim (pas de résumé) ;
