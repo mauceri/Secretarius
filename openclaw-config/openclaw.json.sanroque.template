@@ -134,7 +134,7 @@
      "sandbox": {
       "tools": {
        "allow": ["read", "sessions_list", "sessions_spawn", "sessions_yield", "group:runtime"],
-       "deny": ["wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read", "gog_inbox", "gog_send", "gog_connect_start", "gog_search", "gog_get", "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update"]
+       "deny": ["wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read", "gog_inbox", "gog_send", "gog_connect_start", "gog_search", "gog_get", "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update", "wiki_search"]
       }
      }
     },
@@ -180,7 +180,7 @@
        "deny": [
         "wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read",
         "gog_inbox", "gog_send", "gog_connect_start", "gog_search", "gog_get",
-        "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update"
+        "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update", "wiki_search"
        ]
       }
      }
@@ -200,7 +200,7 @@
        "deny": [
         "wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read",
         "gog_inbox", "gog_send", "gog_connect_start", "gog_search", "gog_get",
-        "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update"
+        "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update", "wiki_search"
        ]
       }
      }
@@ -237,7 +237,7 @@
        "deny": [
         "wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read",
         "gog_inbox", "gog_send", "gog_connect_start", "gog_search", "gog_get",
-        "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update"
+        "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update", "wiki_search"
        ]
       }
      }
@@ -262,7 +262,7 @@
      "gog", "read", "sessions_list", "sessions_spawn", "sessions_yield", "group:runtime",
      "wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read",
      "gog_inbox", "gog_send", "gog_connect_start", "gog_search", "gog_get",
-     "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update"
+     "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update", "wiki_search"
     ],
     "deny": [
      "browser", "canvas", "nodes", "cron",

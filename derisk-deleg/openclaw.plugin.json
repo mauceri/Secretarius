@@ -26,7 +26,8 @@
       "gog_drive_search",
       "gog_reply",
       "wiki_tags",
-      "wiki_kb_update"
+      "wiki_kb_update",
+      "wiki_search"
     ]
   }
 }
