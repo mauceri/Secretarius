@@ -1092,6 +1092,15 @@ class Ingestor:
                 return [t.strip() for t in raw.split(",") if t.strip()]
         return []
 
+    @staticmethod
+    def _parse_raw_simple(path: Path) -> bool:
+        """Lit la ligne `simple: true` d'un fichier raw si présente."""
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if line.lower().startswith("simple:"):
+                return line[len("simple:"):].strip().lower() == "true"
+        return False
+
     def ingest_batch(self, url_file: str | Path, max_concepts: int = 5) -> list[str]:
         """Ingère toutes les URLs listées dans un fichier texte.
 

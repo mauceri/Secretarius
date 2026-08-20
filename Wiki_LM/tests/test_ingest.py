@@ -420,3 +420,29 @@ class TestParseRawTags:
         f = tmp_path / "raw.url"
         f.write_text("https://example.com\ntags: [christianisme]\n", encoding="utf-8")
         assert Ingestor._parse_raw_tags(f) == ["christianisme"]
+
+
+class TestParseRawSimple:
+    def test_true_when_marker_present(self, tmp_path: Path):
+        from ingest import Ingestor
+        f = tmp_path / "test.url"
+        f.write_text("https://example.com\nsimple: true\n", encoding="utf-8")
+        assert Ingestor._parse_raw_simple(f) is True
+
+    def test_false_when_absent(self, tmp_path: Path):
+        from ingest import Ingestor
+        f = tmp_path / "test.url"
+        f.write_text("https://example.com\n", encoding="utf-8")
+        assert Ingestor._parse_raw_simple(f) is False
+
+    def test_false_when_value_false(self, tmp_path: Path):
+        from ingest import Ingestor
+        f = tmp_path / "test.url"
+        f.write_text("https://example.com\nsimple: false\n", encoding="utf-8")
+        assert Ingestor._parse_raw_simple(f) is False
+
+    def test_case_insensitive(self, tmp_path: Path):
+        from ingest import Ingestor
+        f = tmp_path / "test.url"
+        f.write_text("https://example.com\nSimple: True\n", encoding="utf-8")
+        assert Ingestor._parse_raw_simple(f) is True
