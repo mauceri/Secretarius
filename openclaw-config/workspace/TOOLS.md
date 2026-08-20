@@ -41,6 +41,7 @@ Les appeler directement comme n'importe quel outil — **ne pas** les exécuter 
 | `wiki_capture(text)` | Capture URLs et notes dans `raw/` |
 | `wiki_ingest()` | Ingère les `.url` en attente (fetch → injection-guard → wiki) |
 | `wiki_query(question)` | Interroge le wiki, retourne synthèse + sources |
+| `wiki_search(question)` | Recherche BM25 brute (titres + extraits), sans synthèse LLM |
 | `wiki_tags()` | Liste les tags disponibles |
 | `wiki_ingest_status()` | Nombre de fichiers en attente et fichiers bloqués |
 | `wiki_kb_update()` | Met à jour la base de connaissance |

@@ -67,7 +67,7 @@ openclaw-gateway  (port 18789, service systemd user)
             fournit : gog_send, gog_inbox, gog_get, gog_search, gog_reply,
                       gog_drive_search, gog_connect_start,
                       wiki_capture, wiki_ingest, wiki_status, wiki_query,
-                      wiki_kb_update, wiki_tags, source_read
+                      wiki_search, wiki_kb_update, wiki_tags, source_read
             intercepte : /confirm, /annuler  (flux d'envoi email)
 ```
 
@@ -89,7 +89,7 @@ docker build -f openclaw-config/Dockerfile.gog   -t secretarius-gog:latest   .
 
 ### Skills (commandes déterministes)
 
-15 skills dans `~/.openclaw/workspace/skills/` — chacun a `command-dispatch: tool` (aucune décision LLM) :
+16 skills dans `~/.openclaw/workspace/skills/` — chacun a `command-dispatch: tool` (aucune décision LLM) :
 
 | Commande | Outil plugin |
 |----------|-------------|
@@ -102,6 +102,7 @@ docker build -f openclaw-config/Dockerfile.gog   -t secretarius-gog:latest   .
 | `/c` | `wiki_capture` |
 | `/ingest` | `wiki_ingest` |
 | `/q` | `wiki_query` |
+| `/r` | `wiki_search` |
 | `/wikistatus` | `wiki_status` |
 | `/kbupdate` | `wiki_kb_update` |
 | `/tags` | `wiki_tags` |
