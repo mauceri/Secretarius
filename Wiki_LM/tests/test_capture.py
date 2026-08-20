@@ -6,8 +6,17 @@ import pytest
 
 from capture import (
     capture_urls, capture_comment, capture_file, _normalize_url,
-    _parse_simple_directive,
+    _parse_simple_directive, raw_dir,
 )
+
+
+class TestRawDir:
+    def test_uses_env_var_and_creates_dir(self, tmp_path, monkeypatch):
+        target = tmp_path / "raw_env"
+        monkeypatch.setenv("WIKI_RAW_PATH", str(target))
+        result = raw_dir()
+        assert result == target
+        assert target.is_dir()
 
 
 class TestNormalizeUrl:

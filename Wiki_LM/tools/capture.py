@@ -37,6 +37,13 @@ _DEFAULT_KB_DIR = Path(os.environ.get("WIKI_PATH", str(Path.home() / "Documents"
 _TAG_NORMALIZE_THRESHOLD = 0.85
 
 
+def raw_dir() -> Path:
+    """Résout et crée le dossier raw/ (WIKI_RAW_PATH ou défaut)."""
+    d = Path(os.environ.get("WIKI_RAW_PATH", str(RAW_DEFAULT))).expanduser()
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
 # ---------------------------------------------------------------------------
 # Utilitaires
 # ---------------------------------------------------------------------------
@@ -258,9 +265,7 @@ def capture_file(src: Path, raw: Path, comment: str = "",
 # ---------------------------------------------------------------------------
 
 def main() -> None:
-    import os
-    raw = Path(os.environ.get("WIKI_RAW_PATH", str(RAW_DEFAULT))).expanduser()
-    raw.mkdir(parents=True, exist_ok=True)
+    raw = raw_dir()
 
     argv = sys.argv[1:]
 
