@@ -117,6 +117,14 @@ class TestCaptureUrls:
         assert "Ma note" in files[0].read_text(encoding="utf-8")
         assert "Ma note" not in files[1].read_text(encoding="utf-8")
 
+    def test_simple_flag_written(self, tmp_path):
+        files = capture_urls(["https://example.com"], tmp_path, simple=True)
+        assert "simple: true" in files[0].read_text()
+
+    def test_simple_flag_absent_by_default(self, tmp_path):
+        files = capture_urls(["https://example.com"], tmp_path)
+        assert "simple:" not in files[0].read_text()
+
 
 class TestCaptureComment:
     def test_creates_md_file(self, tmp_path):

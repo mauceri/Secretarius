@@ -154,7 +154,7 @@ def _normalize_tags(raw_tags: list[str], kb_dir: Path = _DEFAULT_KB_DIR) -> list
 # ---------------------------------------------------------------------------
 
 def capture_urls(urls: list[str], raw: Path, tags: list[str] | None = None,
-                 note: str | None = None) -> list[Path]:
+                 note: str | None = None, simple: bool = False) -> list[Path]:
     ts = timestamp()
     existing = _existing_urls(raw)
     created = []
@@ -170,6 +170,8 @@ def capture_urls(urls: list[str], raw: Path, tags: list[str] | None = None,
         fname = f"{ts}{suffix}-{domain_slug}.url"
         path = raw / fname
         content = url + "\n"
+        if simple:
+            content += "simple: true\n"
         if tags:
             content += f"tags: {', '.join(tags)}\n"
         if note and not created:            # note attachée au premier .url créé
@@ -287,6 +289,7 @@ def main() -> None:
               file=sys.stderr)
         sys.exit(1)
 
+    simple, args = _parse_simple_directive(args)
     tags_raw, args_clean = _parse_hashtags(args)
     tags = _normalize_tags(tags_raw)
 
@@ -299,7 +302,7 @@ def main() -> None:
         path = capture_mixed(text, urls, raw, tags)
         print(f"Note → {path.name}")
     elif urls:
-        created = capture_urls(urls, raw, tags)
+        created = capture_urls(urls, raw, tags, simple=simple)
         for p in created:
             print(f"URL  → {p.name}")
     else:
