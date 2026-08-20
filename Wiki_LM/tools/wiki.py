@@ -30,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from capture import _parse_hashtags, capture_urls, capture_comment, slugify, timestamp, _write_note
 from ingest import Ingestor
 from query import WikiQuery
+from search import WikiSearch
 from kb_tags import collect_tags
 from kb_update import update_kb, _DEFAULT_EMBED_DIR, _DEFAULT_KB_DIR
 
@@ -95,6 +96,11 @@ def op_query(question: str) -> dict:
         return {"synthesis": result.text, "references": result.references}
     except Exception as exc:
         return {"error": str(exc)}
+
+
+def op_search(question: str) -> dict:
+    results = WikiSearch(_wiki_root()).search(question, top_k=5)
+    return {"results": [{"title": r.title, "excerpt": r.excerpt} for r in results]}
 
 
 def _state_path() -> Path:
@@ -272,6 +278,8 @@ def main(argv: list[str]) -> dict:
         return op_status()
     if op == "query":
         return op_query(arg)
+    if op == "search":
+        return op_search(arg)
     if op == "tags":
         return op_tags()
     if op == "kb_update":

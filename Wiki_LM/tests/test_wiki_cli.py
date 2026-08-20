@@ -81,6 +81,59 @@ def test_query_empty_kb(monkeypatch, tmp_path):
     assert "error" in wiki.op_query("q")
 
 
+def test_search_returns_results(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+
+    class _R:
+        def __init__(self, title, excerpt):
+            self.title = title
+            self.excerpt = excerpt
+
+    class _S:
+        def __init__(self, *a, **k):
+            pass
+
+        def search(self, q, top_k=5):
+            return [_R("Titre A", "extrait A"), _R("Titre B", "extrait B")]
+
+    monkeypatch.setattr(wiki, "WikiSearch", _S)
+    out = wiki.op_search("mots-clés")
+    assert out == {"results": [
+        {"title": "Titre A", "excerpt": "extrait A"},
+        {"title": "Titre B", "excerpt": "extrait B"},
+    ]}
+
+
+def test_search_no_results(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+
+    class _S:
+        def __init__(self, *a, **k):
+            pass
+
+        def search(self, q, top_k=5):
+            return []
+
+    monkeypatch.setattr(wiki, "WikiSearch", _S)
+    out = wiki.op_search("mots-clés")
+    assert out == {"results": []}
+
+
+def test_main_search_dispatch(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+
+    class _S:
+        def __init__(self, *a, **k):
+            pass
+
+        def search(self, q, top_k=5):
+            return []
+
+    monkeypatch.setattr(wiki, "WikiSearch", _S)
+    out = wiki.main(["search", "mots-clés"])
+    assert "results" in out
+
+
 def test_status_empty(monkeypatch, tmp_path):
     wiki = _wiki(monkeypatch, tmp_path)
     out = wiki.op_status()
