@@ -119,6 +119,18 @@ def test_search_no_results(monkeypatch, tmp_path):
     assert out == {"results": []}
 
 
+def test_search_exception_returns_error(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+
+    class _S:
+        def __init__(self, *a, **k):
+            raise FileNotFoundError("wiki/ introuvable")
+
+    monkeypatch.setattr(wiki, "WikiSearch", _S)
+    out = wiki.op_search("mots-clés")
+    assert "error" in out
+
+
 def test_main_search_dispatch(monkeypatch, tmp_path):
     wiki = _wiki(monkeypatch, tmp_path)
 

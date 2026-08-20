@@ -99,8 +99,11 @@ def op_query(question: str) -> dict:
 
 
 def op_search(question: str) -> dict:
-    results = WikiSearch(_wiki_root()).search(question, top_k=5)
-    return {"results": [{"title": r.title, "excerpt": r.excerpt} for r in results]}
+    try:
+        results = WikiSearch(_wiki_root()).search(question, top_k=5)
+        return {"results": [{"title": r.title, "excerpt": r.excerpt} for r in results]}
+    except Exception as exc:
+        return {"error": str(exc)}
 
 
 def _state_path() -> Path:
