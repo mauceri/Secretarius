@@ -30,6 +30,15 @@ describe("formatWikiResult", () => {
   it("tags : joint la liste", () => {
     expect(formatWikiResult("tags", { tags: ["gpu", "tee"] })).toBe("Tags : gpu, tee.");
   });
+  it("search : liste numérotée titre + extrait", () => {
+    expect(formatWikiResult("search", { results: [
+      { title: "Titre A", excerpt: "extrait A" },
+      { title: "Titre B", excerpt: "extrait B" },
+    ] })).toBe("1. Titre A\n   extrait A\n\n2. Titre B\n   extrait B");
+  });
+  it("search : liste vide", () => {
+    expect(formatWikiResult("search", { results: [] })).toBe("Aucun résultat.");
+  });
   it("kb_update : succès (status ok), async (launched) et erreur", () => {
     expect(formatWikiResult("kb_update", { status: "ok", clustering: "c1" }))
       .toBe("Base de connaissances mise à jour.");
