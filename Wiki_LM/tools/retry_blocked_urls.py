@@ -35,8 +35,9 @@ def retry_all(ingestor: Ingestor, raw_dir: Path, dry_run: bool) -> list[dict]:
 
         try:
             user_tags = ingestor._parse_raw_tags(error_file)
+            simple = ingestor._parse_raw_simple(error_file)
             note = _parse_note_from_url_file(error_file)
-            slug = ingestor.ingest(url, extra_tags=user_tags or None, rename_raw=False, note=note)
+            slug = ingestor.ingest(url, extra_tags=user_tags or None, rename_raw=False, note=note, local_note=simple)
             entry["status"] = "ingested"
             entry["slug"] = slug
             error_file.unlink()

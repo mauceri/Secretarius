@@ -83,3 +83,21 @@ def test_dry_run_does_not_call_ingest(ingestor, raw_dir: Path, monkeypatch):
     retry_all(ingestor, raw_dir, dry_run=True)
 
     assert called == []
+
+
+def test_retries_forwards_simple_flag(ingestor, raw_dir: Path, monkeypatch):
+    (raw_dir / "20260101-000000-example-com.url.error").write_text(
+        "https://example.com/article\nsimple: true\n", encoding="utf-8"
+    )
+
+    calls = []
+
+    def fake_ingest(self, source, **kwargs):
+        calls.append(kwargs)
+        return "src-article"
+
+    monkeypatch.setattr(type(ingestor), "ingest", fake_ingest)
+
+    retry_all(ingestor, raw_dir, dry_run=False)
+
+    assert calls[0]["local_note"] is True
