@@ -9,6 +9,10 @@ Endpoint :
     Body  : {"question": "...", "top_k": 5, "save": false, "mode": "hybrid"}
     Reply : {"text": "...", "references": [...], "saved_slug": ""}
 
+    POST /capture
+    Body  : {"text": "...", "tags": ["..."]}
+    Reply : {"status": "ok", "filename": "..."}
+
     GET /health
     Reply : {"status": "ok", "pages": <n>}
 """
@@ -28,6 +32,7 @@ from flask import Flask, jsonify, request
 from llm import LLM
 from query import WikiQuery
 from cluster import run_clustering
+from capture import capture_comment, _normalize_tags, raw_dir
 
 app = Flask(__name__)
 _wq: WikiQuery | None = None
@@ -65,6 +70,18 @@ def handle_query():
         "references": result.references,
         "saved_slug": result.saved_slug,
     })
+
+
+@app.post("/capture")
+def handle_capture():
+    data = request.get_json(silent=True) or {}
+    text = str(data.get("text", "")).strip()
+    if not text:
+        return jsonify({"error": "Paramètre 'text' manquant"}), 400
+    tags_raw = [str(t) for t in (data.get("tags") or [])]
+    tags = _normalize_tags(tags_raw) if tags_raw else []
+    path = capture_comment(text, raw_dir(), tags=tags or None)
+    return jsonify({"status": "ok", "filename": path.name})
 
 
 @app.get("/health")
