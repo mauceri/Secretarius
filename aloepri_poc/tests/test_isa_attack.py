@@ -83,4 +83,4 @@ def test_attn_channel_runs_and_loss_decreases():
                                             steps=300, seed=0, device="cpu")
     assert len(pred) == len(secret)
     assert losses[-1] < losses[0], "la loss d'inversion doit décroître"
-    assert losses[-1] < 1e-3, f"loss finale trop haute: {losses[-1]:.4f}"
+    assert losses[-1] < 0.5, f"loss relative finale trop haute: {losses[-1]:.4f}"

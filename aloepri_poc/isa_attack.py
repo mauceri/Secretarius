@@ -46,7 +46,7 @@ def capture_state(model, embeds, layer, channel="hidden"):
     else:
         kw["output_attentions"] = True
     with torch.no_grad():
-        out = model(inputs_embeds=embeds.unsqueeze(0), **kw)
+        out = model(inputs_embeds=embeds.to(model.dtype).unsqueeze(0), **kw)
     if channel == "hidden":
         state = out.hidden_states[layer][0]          # (T, hidden)
     else:
@@ -62,9 +62,19 @@ def _soft_embeds(logits, embed_table, tau):
 
 def attack_model(model, embed_table, target_state, seq_len, channel,
                  layer, steps=500, lr=0.05, tau_start=3.0, tau_end=0.1,
-                 tau_steps=400, seed=0, device="cuda"):
+                 tau_steps=None, phase2_steps=200, seed=0, device="cuda"):
     """Descente de gradient sur des logits par position pour inverser l'état
-    capturé `target_state`. Retourne (ids_récupérés (seq_len,), pertes)."""
+    capturé `target_state`. Retourne (ids_récupérés (seq_len,), pertes).
+
+    Deux phases (méthode du papier arXiv 2507.16372) :
+    - phase 1 : optimisation douce avec recuit de température (3 → 0,1) ;
+    - phase 2 : ré-initialisation des logits près de l'argmax de la phase 1
+      + optimisation à température basse — corrige les choix discrets figés
+      prématurément par le recuit.
+
+    La perte est RELATIVE (MSE / variance de la cible) : les états cachés
+    d'un vrai LLM ont des amplitudes de plusieurs ordres de grandeur, une MSE
+    brute écraserait le gradient."""
     torch.manual_seed(seed)
     random.seed(seed)
 
@@ -74,11 +84,11 @@ def attack_model(model, embed_table, target_state, seq_len, channel,
     with torch.no_grad():
         logits += 0.05 * torch.randn_like(logits)
 
-    opt = torch.optim.Adam([logits], lr=lr)
-    losses = []
-    for step in range(steps):
-        tau = max(tau_end, tau_start * (tau_end / tau_start)
-                  ** (step / max(1, tau_steps)))
+    target_var = target_state.float().pow(2).mean().item()
+    if tau_steps is None:
+        tau_steps = steps
+
+    def _forward_step(lr_opt, tau):
         embeds = _soft_embeds(logits, embed_table, tau).to(model.dtype)
         kw = {}
         if channel == "hidden":
@@ -90,11 +100,39 @@ def attack_model(model, embed_table, target_state, seq_len, channel,
             state = out.hidden_states[layer][0]
         else:
             state = out.attentions[layer][0]
-        loss = torch.nn.functional.mse_loss(state, target_state)
-        opt.zero_grad()
+        loss = torch.nn.functional.mse_loss(
+            state.float(), target_state.float()) / target_var
+        lr_opt.zero_grad()
         loss.backward()
-        opt.step()
-        losses.append(loss.item())
+        lr_opt.step()
+        return loss.item()
+
+    opt = torch.optim.Adam([logits], lr=lr)
+    losses = []
+    for step in range(steps):
+        tau = max(tau_end, tau_start * (tau_end / tau_start)
+                  ** (step / max(1, tau_steps)))
+        losses.append(_forward_step(opt, tau))
+        if step % 50 == 0:
+            print(f"  [isa] step {step}/{steps} loss {losses[-1]:.4f} "
+                  f"(rel.) tau {tau:.3f}", flush=True)
+
+    # --- phase 2 : affinage autour de l'argmax, température basse ---
+    if phase2_steps and phase2_steps > 0:
+        with torch.no_grad():
+            onehot = torch.zeros_like(logits)
+            onehot.scatter_(1, logits.argmax(-1, keepdim=True), 10.0)
+            logits.data.copy_(onehot + 0.01 * torch.randn_like(logits))
+        opt2 = torch.optim.Adam([logits], lr=lr * 0.5)
+        for step in range(phase2_steps):
+            losses.append(_forward_step(opt2, tau_end))
+            if step % 50 == 0:
+                print(f"  [isa] phase2 {step}/{phase2_steps} "
+                      f"loss {losses[-1]:.4f} (rel.)", flush=True)
+
+    with torch.no_grad():
+        ids = logits.argmax(dim=-1)
+    return ids, losses
 
     with torch.no_grad():
         ids = logits.argmax(dim=-1)
@@ -114,6 +152,9 @@ def run_channel_attack(model, token_ids, channel, layer, embed_table=None,
     pour l'obfusqué). Retourne (ids_récupérés, taux, pertes)."""
     if embed_table is None:
         embed_table = model.get_input_embeddings().weight
+    # la table doit être en float32 pour le matmul softmax(P) @ W (le modèle
+    # est en bf16) ; on n'a besoin que de la table, pas du reste du modèle
+    embed_table = embed_table.detach().float()
     true_ids = torch.tensor(token_ids, device=device)
     with torch.no_grad():
         true_embeds = embed_table[true_ids]

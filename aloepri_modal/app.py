@@ -277,8 +277,8 @@ def logits_compare():
 
 
 @app.function(
-    image=SERVE_IMAGE,
-    gpu=GPU_SERVE,
+    image=TRANSFORM_IMAGE,  # embarque /pkg/aloepri_poc (isa_attack)
+    gpu="A100-40GB",        # 16 Go de modèle + table fp32 + rétroprop > L4
     volumes={MODELS_DIR: models_vol},
     timeout=3600,
     scaledown_window=300,
@@ -299,6 +299,7 @@ def isa_attack(
     du prompt secret, en chaîne CSV — calculée CÔTÉ CLIENT avec les clés
     (jamais envoyées). La fonction renvoie les IDs récupérés ; la mesure du
     taux et la dépermutation se font côté client."""
+    import json
     import sys
 
     import torch
@@ -317,7 +318,7 @@ def isa_attack(
         model, ids, channel, layer, steps=steps, lr=lr, seed=seed,
         device="cuda",
     )
-    return {
+    result = {
         "channel": channel,
         "layer": layer,
         "steps": steps,
@@ -327,6 +328,8 @@ def isa_attack(
         "loss_debut": losses[0],
         "loss_fin": losses[-1],
     }
+    print("RESULTAT_ISA", json.dumps(result), flush=True)
+    return result
 
 
 @app.function(image=TRANSFORM_IMAGE, scaledown_window=60)
