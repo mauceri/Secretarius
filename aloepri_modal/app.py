@@ -276,6 +276,58 @@ def logits_compare():
         torch.cuda.empty_cache()
 
 
+@app.function(
+    image=SERVE_IMAGE,
+    gpu=GPU_SERVE,
+    volumes={MODELS_DIR: models_vol},
+    timeout=3600,
+    scaledown_window=300,
+)
+def isa_attack(
+    ids: list[int],
+    channel: str = "hidden",
+    layer: int = 18,
+    steps: int = 300,
+    lr: float = 0.05,
+    seed: int = 0,
+):
+    """Démonstration ISA par gradient (cf. `aloepri_poc/isa_attack.py`) sur le
+    modèle obfusqué RÉEL servi sur le Volume.
+
+    L'attaque n'utilise QUE les poids obfusqués (l'attaquant = opérateur du
+    serveur, sans clé). `ids` est l'entrée réelle du modèle — les IDs PERMUTÉS
+    du prompt secret — calculée CÔTÉ CLIENT avec les clés (jamais envoyées).
+    La fonction renvoie les IDs récupérés ; la mesure du taux et la
+    dépermutation se font côté client."""
+    import sys
+
+    import torch
+    from transformers import AutoModelForCausalLM
+
+    sys.path.insert(0, "/pkg/aloepri_poc")
+    from isa_attack import run_channel_attack
+
+    model_dir = os.path.join(MODELS_DIR, MODEL_SUBDIR)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_dir, dtype=torch.bfloat16,
+        attn_implementation="eager").cuda().eval()
+
+    pred, rate, losses = run_channel_attack(
+        model, ids, channel, layer, steps=steps, lr=lr, seed=seed,
+        device="cuda",
+    )
+    return {
+        "channel": channel,
+        "layer": layer,
+        "steps": steps,
+        "ids_envoyes_au_modele": len(ids),
+        "taux_recuperation_ids_modele": rate,
+        "ids_recuperes": pred.tolist(),
+        "loss_debut": losses[0],
+        "loss_fin": losses[-1],
+    }
+
+
 @app.function(image=TRANSFORM_IMAGE, scaledown_window=60)
 def poc_diag():
     """Diagnostic : où sont les fichiers du POC dans l'image ?"""
