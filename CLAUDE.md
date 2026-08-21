@@ -8,6 +8,8 @@
 
 ## Règles importantes
 
+- **Vouvoiement** : l'utilisateur préfère être vouvoyé — s'adresser à lui à la
+  deuxième personne du pluriel (« vous », « votre »), jamais en tutoiement.
 - Confirmation requise avant : `systemctl start/stop/enable/restart`,
   `docker compose up/down`, `git push`.
 - Le wiki (`WIKI_PATH`) est partagé entre sanroque et santiago via un unique coffre
