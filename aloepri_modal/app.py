@@ -284,7 +284,7 @@ def logits_compare():
     scaledown_window=300,
 )
 def isa_attack(
-    ids: list[int],
+    ids: str,
     channel: str = "hidden",
     layer: int = 18,
     steps: int = 300,
@@ -296,9 +296,9 @@ def isa_attack(
 
     L'attaque n'utilise QUE les poids obfusqués (l'attaquant = opérateur du
     serveur, sans clé). `ids` est l'entrée réelle du modèle — les IDs PERMUTÉS
-    du prompt secret — calculée CÔTÉ CLIENT avec les clés (jamais envoyées).
-    La fonction renvoie les IDs récupérés ; la mesure du taux et la
-    dépermutation se font côté client."""
+    du prompt secret, en chaîne CSV — calculée CÔTÉ CLIENT avec les clés
+    (jamais envoyées). La fonction renvoie les IDs récupérés ; la mesure du
+    taux et la dépermutation se font côté client."""
     import sys
 
     import torch
@@ -307,6 +307,7 @@ def isa_attack(
     sys.path.insert(0, "/pkg/aloepri_poc")
     from isa_attack import run_channel_attack
 
+    ids = [int(x) for x in ids.split(",")]
     model_dir = os.path.join(MODELS_DIR, MODEL_SUBDIR)
     model = AutoModelForCausalLM.from_pretrained(
         model_dir, dtype=torch.bfloat16,
