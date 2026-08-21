@@ -180,8 +180,8 @@ def test_multi_shard_output_equals_inplace(tmp_path):
                     if f.name.startswith("model-")
                     and f.name.endswith(".safetensors"))
     assert len(shards) > 1, "le test doit forcer plusieurs shards"
-    totals = {s.rsplit("-of-", 1)[1].split(".")[0] for s in shards}
-    assert totals == {str(len(shards))}, f"numérotation incohérente: {shards}"
+    totals = {int(s.rsplit("-of-", 1)[1].split(".")[0]) for s in shards}
+    assert totals == {len(shards)}, f"numérotation incohérente: {shards}"
     with open(out / "model.safetensors.index.json") as f:
         assert set(json.load(f)["weight_map"]) == set(model.state_dict())
 
