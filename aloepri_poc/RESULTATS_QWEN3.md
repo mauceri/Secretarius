@@ -45,6 +45,25 @@ GPU Modal (cf. `aloepri_modal/README.md`, §6) — le POC Qwen2.5 mesurait une
 perte de qualité moyenne de +19 % de perplexité avec un round-trip
 qualitativement correct (texte cohérent).
 
+### Déploiement réel sur Modal (2026-08-21, GPU L4)
+
+Endpoint : `https://mauceri--aloepri-qwen3-modal-serve.modal.run` (protégé
+par clé API Bearer, scale-to-zero après 5 min).
+
+- Modèle obfusqué sur le Volume `aloepri-models` (`/qwen3-8b-obf`, 14 shards),
+  produit par `modal run app.py::transform` (~2 min : téléchargement HF 25 s
+  au débit datacenter + transform CPU).
+- `/health` → 200. Sans clé / mauvaise clé → 401.
+- **Round-trip** (client local, greedy) :
+  - « Quelle est la capitale de la France ? » → « … La capitale de la France
+    est **Paris**. … » (cohérent, correct)
+  - « What is the capital of Japan? » → texte cohérent (répétitions greedy
+    habituelles de Qwen3-8B, aucun effet de l'obfuscation)
+- 4 correctifs nécessités par le déploiement réel (cf. commit `6078afe`) :
+  disque éphémère ≥ 512 GiB ; chemin d'import du POC ; `@modal.asgi_app()`
+  au lieu de `web_server` + uvicorn bloquant (303 sinon) ; auth par
+  `os.environ` (valeurs de Secret injectées en variables d'environnement).
+
 ## Artefacts (hors dépôt, à ne jamais committer)
 
 - `/home/cmauceri/deepseek-harness-ws/artifacts/obfuscated_qwen3_8b/` (16 Go)
