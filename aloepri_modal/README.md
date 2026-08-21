@@ -116,6 +116,29 @@ Vérifier MANUELLEMENT que la sortie est un texte français cohérent (le POC
 Qwen2.5 mesurait +19 % de perplexité moyenne — cf. `aloepri_poc/RESULTATS.md` ;
 le round-trip reste qualitativement correct).
 
+## 6bis. Endpoint texte→texte `/analyze`
+
+L'app expose aussi `POST /analyze` qui prend un prompt TEXTE et renvoie le
+résultat TEXTE (tokenize + permutation + génération + dépermutation côté
+serveur). Nécessite les clés sur le serveur — dérogation assumée pour ce
+test (`aloepri-keys` est monté sur `serve()`) :
+
+```bash
+curl -s -X POST "$URL/analyze" \
+    -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+    -d '{"prompt": "Quelle est la capitale de la France ?", "max_new_tokens": 300}'
+# → {"result": "La capitale de la France est Paris. 😊", "full": "…"}
+```
+
+**Réglages de décodage** (validés en grandeur nature, cf. `RESULTATS_QWEN3.md`) :
+le modèle servi est transformé avec **`--alpha-e 0.3 --beta 1`** (perturbation
+minimale : bruit d'embedding réduit + attention exacte sans approximation Ẑ)
+et `/analyze` utilise `enable_thinking=False` (réponse directe), greedy,
+`repetition_penalty=1.05` et bloque le token `<think>` — Qwen3-8B (modèle
+*thinking*) a tendance à ouvrir des traces de raisonnement qui bouclent
+sinon. Les clés sont inchangées (même seed, même vocabulaire : la permutation
+ne dépend pas de α_e/β).
+
 ## 7. Mesures qualité / vitesse (optionnel)
 
 Reprendre les scripts du POC sur le modèle obfusqué local (les clés ne sont

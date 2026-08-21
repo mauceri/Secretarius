@@ -64,6 +64,35 @@ par clé API Bearer, scale-to-zero après 5 min).
   au lieu de `web_server` + uvicorn bloquant (303 sinon) ; auth par
   `os.environ` (valeurs de Secret injectées en variables d'environnement).
 
+### Endpoint `/analyze` (prompt texte → résultat) et réglage qualité
+
+Qwen3-8B (non-Instruct) est un modèle **thinking** : avec la perturbation
+par défaut (α_e=1.0, β=8), le décodage ouvrait des traces `<think>` qui
+bouclaient (« (10 points)… », « Let me think… ») — comportement du modèle
+amplifié par le bruit (la baseline non obfusquée répond, elle, directement en
+mode non-thinking). Diagnostic : comparaison des logits baseline vs obfusqué
+sur le premier token → **argmax identique** (`<think>`), queue différente
+(distribution plate, perturbation) — l'obfuscation est fidèle, c'est le
+régime de décodage qui doit être adapté.
+
+Réglage retenu (validé en grandeur nature) : transformation **α_e=0.3,
+β=1** (bruit d'embedding réduit + attention exacte — mêmes clés, la
+permutation ne dépend pas de α_e/β) et `/analyze` en `enable_thinking=False`
++ greedy + `repetition_penalty=1.05` + blocage du token `<think>`. Résultats
+(obfusqué servi sur Modal) :
+
+| Prompt | Réponse |
+|---|---|
+| Quelle est la capitale de la France ? | « La capitale de la France est **Paris**. 😊 » |
+| What is 17 times 23 ? | « 17 × 23 = **391** » |
+| Write a haiku about the sea. | haïku 5-7-5 correct |
+| Donne une recette simple de crêpes. | recette complète et structurée |
+
+Compromis : α_e=0.3/β=1 est le réglage « qualité » (confidentialité moindre
+que le défaut du papier — bruit réduit, attention exacte) ; pour un test
+fonctionnel c'est le bon choix. Le levier reste α_e (le POC Qwen2.5 mesurait
++13,6 % de perplexité à α_e=0.5 vs +19,1 % à 1,0).
+
 ## Artefacts (hors dépôt, à ne jamais committer)
 
 - `/home/cmauceri/deepseek-harness-ws/artifacts/obfuscated_qwen3_8b/` (16 Go)
