@@ -94,7 +94,7 @@ def transform(
     `aloepri-keys` (jamais monté par `serve`). Retourne le chemin des clés et
     leur empreinte SHA-256 — à comparer côté client après téléchargement.
     """
-    sys.path.insert(0, "/pkg")
+    sys.path.insert(0, "/pkg/aloepri_poc")
     from transform_streaming import transform_streaming
 
     out_dir = os.path.join(MODELS_DIR, MODEL_SUBDIR)
@@ -126,14 +126,19 @@ def transform(
     timeout=3600,
     scaledown_window=300,
 )
-@modal.web_server(port=PORT, startup_timeout=600)
+@modal.asgi_app()
 def serve():
     """Serveur HTTP du modèle obfusqué (cf. `aloepri_poc/server.py`).
 
     Traite uniquement des IDs de tokens PERMUTÉS (aucun tokenizer, aucune
-    clé) : le client permute avant l'envoi et dépermute à la réception."""
+    clé) : le client permute avant l'envoi et dépermute à la réception.
+
+    `@modal.asgi_app()` : la fonction RETOURNE l'app FastAPI (le conteneur
+    est prêt dès qu'elle est retournée) — avec `@modal.web_server` il
+    faudrait lancer uvicorn en sous-processus et rendre la main (pattern
+    tiron), sinon la passerelle renvoie 303 tant que la fonction n'est pas
+    retournée."""
     import torch
-    import uvicorn
     from fastapi import FastAPI, Header, HTTPException
     from pydantic import BaseModel
     from transformers import AutoModelForCausalLM
@@ -153,10 +158,13 @@ def serve():
         output_ids: list[int]
 
     def _authorized(authorization: str | None) -> bool:
-        if API_SECRET is None:
+        # Les valeurs du Secret Modal sont injectées comme variables
+        # d'environnement dans le conteneur (pas de `.get()` sur l'objet
+        # Secret dans ce SDK). Pas de secret monté → pas d'authentification.
+        expected = os.environ.get("ALOEPRI_API_KEY")
+        if not expected:
             return True
-        expected = API_SECRET.get("ALOEPRI_API_KEY")
-        return bool(expected and authorization == f"Bearer {expected}")
+        return authorization == f"Bearer {expected}"
 
     @fastapi_app.get("/health")
     def health(authorization: str | None = Header(default=None)):
@@ -177,7 +185,29 @@ def serve():
             )
         return GenerateResponse(output_ids=output[0].tolist())
 
-    uvicorn.run(fastapi_app, host="0.0.0.0", port=PORT, log_level="warning")
+    return fastapi_app
+
+
+@app.function(image=TRANSFORM_IMAGE, scaledown_window=60)
+def poc_diag():
+    """Diagnostic : où sont les fichiers du POC dans l'image ?"""
+    import os
+    import subprocess
+    import sys as _sys
+    print("sys.path:", _sys.path)
+    print("ls /pkg/aloepri_poc:", os.listdir("/pkg/aloepri_poc"))
+    _sys.path.insert(0, "/pkg/aloepri_poc")
+    try:
+        import transform_streaming
+        print("import OK:", transform_streaming.__file__)
+    except Exception as e:
+        print("import FAILED:", type(e).__name__, e)
+    subprocess.run(
+        ["sh", "-c",
+         "echo '== find transform_streaming =='; "
+         "find / -name 'transform_streaming.py' 2>/dev/null"],
+        check=False,
+    )
 
 
 @app.function(volumes={MODELS_DIR: models_vol, KEYS_DIR: keys_vol},
