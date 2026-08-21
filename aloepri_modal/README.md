@@ -58,7 +58,12 @@ Modal ; ne JAMAIS les copier dans `aloepri-models`.
 
 Écrit le modèle sur le Volume `aloepri-models` (`/qwen3-8b-obf`) et les clés
 sur `aloepri-keys`. Récupérer ensuite les clés (cf. §3) puis SUPPRIMER le
-Volume des clés (`modal volume rm aloepri-keys -r` après téléchargement).
+Volume des clés après téléchargement :
+
+```bash
+~/modal-venv/bin/modal volume get aloepri-keys /obfuscation_keys.json ./obfuscation_keys.json
+~/modal-venv/bin/modal volume delete aloepri-keys
+```
 
 ## 3. Volumes + upload du modèle
 
@@ -148,7 +153,7 @@ python3 measure_speed.py --baseline Qwen/Qwen3-8B \
    (`aloepri_poc/.gitignore`), pas sur les Volumes de service, pas dans les
    logs Modal (le SHA-256 des clés est OK ; le fichier non).
 2. Si les clés ont transité par `aloepri-keys`, les télécharger puis
-   `~/modal-venv/bin/modal volume rm aloepri-keys -r`.
+   `~/modal-venv/bin/modal volume delete aloepri-keys`.
 3. Le modèle obfusqué SANS les clés ne permet pas de décoder les échanges —
    c'est le point du POC. Un serveur compromis expose les poids obfusqués et
    les IDs permutés, pas la permutation elle-même.
