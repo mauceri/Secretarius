@@ -1,5 +1,15 @@
 # RUNBOOK — déploiement RunPod, round-trip, mesures qualité/vitesse
 
+> **Portage vers un autre modèle (Qwen3-8B, etc.)** : ce RUNBOOK décrit le
+> déroulé historique sur Qwen2.5-7B-Instruct (RunPod). Avant de transformer
+> un autre modèle, lancer `check_arch.py` (vérifie les hypothèses : GQA,
+> head_dim, biais, q_norm/k_norm, vocabulaire) puis utiliser
+> `transform_streaming.py` (variante mémoire-léger, ~5 Go de pic, produit
+> bit-à-bit les mêmes poids) — cf. `aloepri_modal/README.md` pour le cas
+> Qwen3-8B servi sur Modal. Qwen3 a des normes de tête q_norm/k_norm :
+> `rope_scaling=off` y est automatique (le scaling diagonal Ĥ du papier ne
+> commute pas avec une RMSNorm de tête).
+
 Étapes manuelles de la Task 9 : louer un GPU, transformer le vrai
 Qwen2.5-7B-Instruct, vérifier le round-trip de bout en bout, mesurer la
 qualité et la vitesse de l'obfuscation, consigner les résultats. Le code

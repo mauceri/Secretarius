@@ -36,3 +36,7 @@ gog-bin
 
 # Config locale Claude Code
 .claude/
+
+# Clés d'obfuscation AloePri (secret client — ne jamais committer)
+aloepri_poc/obfuscation_keys.json
+aloepri_poc/keys_*.json

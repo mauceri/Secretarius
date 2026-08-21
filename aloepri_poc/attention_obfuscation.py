@@ -109,6 +109,28 @@ D'où le paramètre `rope_layout` (résolu en Task 8) :
   dans `tests/test_model_transform.py`). Ẑ reste, lui, l'approximation
   revendiquée par le papier — mesurée à 12-35 % d'erreur relative sur les
   scores à d_head=128, β=8, γ=1e3.
+
+`rope_scaling` et les normes de tête Qwen3 — DÉVIATION ASSUMÉE (résolue pour
+Qwen3, cf. `check_arch.py`). Qwen3 a introduit `q_norm`/`k_norm` : une RMSNorm
+par tête appliquée à q/k immédiatement APRÈS la projection, AVANT RoPE
+(`query_states = self.q_norm(self.q_proj(...))` dans `modeling_qwen3.py`).
+Qwen2.5 n'en a pas. La RMSNorm de tête est non linéaire en l'échelle du
+vecteur, donc elle ne commute avec un facteur A que si A préserve la norme
+(rms(x·A) = rms(x)), c.-à-d. si A est orthogonale :
+- R̂ (rotation 2D par paire) : orthogonale → commute exactement ;
+- Ẑ_block (permutation par blocs, orthogonale) → commute exactement ;
+- Ĥ (scaling diagonal par paire de fréquences) : **pas** orthogonale →
+  rms(x·Ĥ) ≠ rms(x) → la RMSNorm de tête casse la reparamétrisation.
+Avec Ĥ actif, le round-trip Qwen3 mesure une erreur de l'ordre de
+l'amplitude du signal (mesuré ~20 % sur le modèle jouet) au lieu de ~1e-5.
+`rope_scaling=False` remplace Ĥ par l'identité (tirage de la graine conservé
+pour que le flux aléatoire reste identique entre les deux régimes) : A = B =
+R̂·Ẑ reste orthogonale et le round-trip redevient exact. Le prix est la perte
+du scaling par fréquence — composante mineure du schéma, et de toute façon
+celle dont la commutation est structurellement impossible sous une RMSNorm
+de tête. Le défaut reste `True` (comportement historique Qwen2) ;
+`model_transform.py` choisit automatiquement `False` quand la couche expose
+`q_norm`/`k_norm`.
 """
 from dataclasses import dataclass
 import random
@@ -149,6 +171,7 @@ def _random_orthogonal(n, gen):
 def obfuscate_attention_layer(
     w_q, w_k, w_v, w_o, num_heads, num_kv_heads, d_head, beta, gamma, zeta, seed,
     b_q=None, b_k=None, b_v=None, rope_layout="interleaved",
+    rope_scaling=True,
 ):
     assert rope_layout in ("interleaved", "half"), rope_layout
     hidden_size = w_q.shape[1]
@@ -194,7 +217,11 @@ def obfuscate_attention_layer(
 
     for g in range(num_kv_heads):
         r_hat = sample_rope_rotation(d_head, seed=rng_py.randrange(2**31))
-        h_hat = sample_rope_scaling(d_head, seed=rng_py.randrange(2**31))
+        # La graine est tirée AVANT la décision pour que le flux aléatoire
+        # reste identique entre `rope_scaling=True/False` : la seule différence
+        # entre les deux régimes est le facteur Ĥ lui-même (cf. docstring).
+        h_seed = rng_py.randrange(2**31)
+        h_hat = sample_rope_scaling(d_head, seed=h_seed) if rope_scaling else torch.eye(d_head)
         z_pairs = block_perm(beta, gamma, zeta, m_blocks, seed=rng_py.randrange(2**31))
         z_block = torch.kron(z_pairs, torch.eye(2))  # paires -> dimensions
 

@@ -83,7 +83,8 @@ def _remap_token_ids(holder, permutation):
 
 
 def obfuscate_model_in_place(model, config, seed, alpha_e=1.0, alpha_h=0.2,
-                             lam=0.3, beta=8, gamma=1e3, zeta=1e3):
+                             lam=0.3, beta=8, gamma=1e3, zeta=1e3,
+                             rope_scaling=None):
     """Applique l'obfuscation aux poids d'un modèle déjà chargé.
 
     Séparé de `transform_model` pour être testable sur un Qwen2 miniature
@@ -93,6 +94,13 @@ def obfuscate_model_in_place(model, config, seed, alpha_e=1.0, alpha_h=0.2,
     rectangulaires (d, d+2h) et tout le réseau devrait être redimensionné —
     hors périmètre du POC (décision « h=0 » du design). De toute façon les
     matrices clés sont désactivées ici.
+
+    `rope_scaling` (None = auto) : les architectures avec `q_norm`/`k_norm`
+    (RMSNorm de tête avant RoPE, Qwen3) ne commutent pas avec le facteur
+    diagonal Ĥ du papier — seuls les facteurs orthogonaux (R̂, Ẑ) survivent à
+    une RMSNorm de tête. Auto = `False` quand la couche expose `q_norm`,
+    `True` sinon (Qwen2.5 et antérieurs). Voir la docstring de
+    `attention_obfuscation.py` et `check_arch.py`.
     """
     # Vérifications obligatoires (risques identifiés dans la spec).
     assert hasattr(config, "num_key_value_heads"), (
@@ -139,6 +147,14 @@ def obfuscate_model_in_place(model, config, seed, alpha_e=1.0, alpha_h=0.2,
 
     for i, layer in enumerate(model.model.layers):
         attn = layer.self_attn
+        # Qwen3 et suivants : q_norm/k_norm (RMSNorm de tête) entre la
+        # projection et RoPE → seul le régime sans Ĥ reste exact (cf.
+        # docstring d'`obfuscate_attention_layer`).
+        layer_rope_scaling = (rope_scaling if rope_scaling is not None
+                              else not hasattr(attn, "q_norm"))
+        if hasattr(attn, "q_norm"):
+            print(f"[obfuscation] couche {i} : q_norm/k_norm détectés, "
+                  f"rope_scaling = {layer_rope_scaling}")
         obf_attn = obfuscate_attention_layer(
             attn.q_proj.weight.data.float(), attn.k_proj.weight.data.float(),
             attn.v_proj.weight.data.float(), attn.o_proj.weight.data.float(),
@@ -150,8 +166,9 @@ def obfuscate_model_in_place(model, config, seed, alpha_e=1.0, alpha_h=0.2,
             b_q=None if attn.q_proj.bias is None else attn.q_proj.bias.data.float(),
             b_k=None if attn.k_proj.bias is None else attn.k_proj.bias.data.float(),
             b_v=None if attn.v_proj.bias is None else attn.v_proj.bias.data.float(),
-            # Qwen2 applique RoPE via `rotate_half` : paires (i, i+d_head/2).
+            # Qwen2/Qwen3 appliquent RoPE via `rotate_half` : paires (i, i+d_head/2).
             rope_layout="half",
+            rope_scaling=layer_rope_scaling,
         )
         _write(attn.q_proj.weight, obf_attn.w_q_obf)
         _write(attn.k_proj.weight, obf_attn.w_k_obf)
@@ -182,7 +199,7 @@ def obfuscate_model_in_place(model, config, seed, alpha_e=1.0, alpha_h=0.2,
 
 def transform_model(model_name, output_dir, seed, alpha_e=1.0, alpha_h=0.2,
                     lam=0.3, beta=8, gamma=1e3, zeta=1e3,
-                    keys_path="obfuscation_keys.json"):
+                    keys_path="obfuscation_keys.json", rope_scaling=None):
     """Charge, obfusque et sauvegarde le modèle ; écrit les clés dans `keys_path`.
 
     Le répertoire `output_dir` part sur le serveur ; `keys_path` reste côté
@@ -193,7 +210,7 @@ def transform_model(model_name, output_dir, seed, alpha_e=1.0, alpha_h=0.2,
 
     keys = obfuscate_model_in_place(
         model, config, seed, alpha_e=alpha_e, alpha_h=alpha_h, lam=lam,
-        beta=beta, gamma=gamma, zeta=zeta,
+        beta=beta, gamma=gamma, zeta=zeta, rope_scaling=rope_scaling,
     )
 
     model.save_pretrained(output_dir)
@@ -222,10 +239,20 @@ if __name__ == "__main__":
     # Qwen2.5-7B (1e6) ; ce choix affecte les performances (mesures dans Task 8),
     # d'où le réglage en ligne de commande.
     parser.add_argument("--zeta", type=float, default=1e3)
+    # Qwen3 (q_norm/k_norm) exige rope_scaling=off pour rester exact ; auto
+    # (défaut) détecte la présence de q_norm couche par couche.
+    parser.add_argument("--rope-scaling", choices=["auto", "on", "off"],
+                        default="auto",
+                        help="facteur de scaling RoPE Ĥ du papier : 'on' "
+                             "(Qwen2.5 et antérieurs), 'off' (architectures "
+                             "avec q_norm/k_norm type Qwen3), 'auto' (défaut : "
+                             "détection par couche)")
     parser.add_argument("--keys", default="obfuscation_keys.json",
                         help="où écrire les clés côté client (à NE PAS copier "
                              "sur le serveur)")
     args = parser.parse_args()
+    rope_scaling = None if args.rope_scaling == "auto" else args.rope_scaling == "on"
     transform_model(args.model, args.output, args.seed,
                     alpha_e=args.alpha_e, alpha_h=args.alpha_h, beta=args.beta,
-                    zeta=args.zeta, keys_path=args.keys)
+                    zeta=args.zeta, keys_path=args.keys,
+                    rope_scaling=rope_scaling)
