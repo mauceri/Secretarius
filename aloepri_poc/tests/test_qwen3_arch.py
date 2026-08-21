@@ -153,6 +153,50 @@ def test_tiny_qwen3_streaming_equals_inplace(tmp_path):
     assert set(wm) == set(sa)
 
 
+def test_multi_shard_output_equals_inplace(tmp_path):
+    """Le writer multi-shards (petit `shard_target_bytes` force plusieurs
+    fichiers) produit des shards correctement nommés `model-XXXXX-of-NNNNN`,
+    un index qui se charge, et des poids identiques au transform en place —
+    le découpage en shards ne doit rien changer aux valeurs."""
+    import json
+
+    torch.manual_seed(11)
+    config = Qwen3Config(
+        vocab_size=512, hidden_size=128, intermediate_size=384,
+        num_hidden_layers=4, num_attention_heads=8, num_key_value_heads=2,
+        head_dim=16, max_position_embeddings=128, rope_theta=1e6,
+        tie_word_embeddings=False, bos_token_id=500, eos_token_id=511,
+    )
+    src, out = tmp_path / "src", tmp_path / "out"
+    model = Qwen3ForCausalLM(config).eval().to(torch.bfloat16)
+    model.save_pretrained(src)
+
+    transform_streaming(str(src), str(out), seed=5, alpha_e=0.7, alpha_h=0.2,
+                        beta=8, gamma=1e3, zeta=1e3,
+                        keys_path=str(tmp_path / "k.json"),
+                        shard_target_bytes=300_000)
+
+    shards = sorted(f.name for f in out.iterdir()
+                    if f.name.startswith("model-")
+                    and f.name.endswith(".safetensors"))
+    assert len(shards) > 1, "le test doit forcer plusieurs shards"
+    totals = {s.rsplit("-of-", 1)[1].split(".")[0] for s in shards}
+    assert totals == {str(len(shards))}, f"numérotation incohérente: {shards}"
+    with open(out / "model.safetensors.index.json") as f:
+        assert set(json.load(f)["weight_map"]) == set(model.state_dict())
+
+    # référence in-place (même graine d'init → mêmes poids source)
+    torch.manual_seed(11)
+    model2 = Qwen3ForCausalLM(config).eval().to(torch.bfloat16)
+    obfuscate_model_in_place(model2, config, seed=5, alpha_e=0.7, alpha_h=0.2,
+                             beta=8, gamma=1e3, zeta=1e3)
+    loaded = AutoModelForCausalLM.from_pretrained(str(out),
+                                                  dtype=torch.bfloat16)
+    sa, sb = model2.state_dict(), loaded.state_dict()
+    differing = [k for k in sa if not torch.equal(sa[k], sb[k])]
+    assert not differing, f"tenseurs différents (multi-shard): {differing}"
+
+
 def test_embedding_chunked_matches_reference_math():
     """`obfuscate_embedding_chunked` reproduit la formule du POC
     (W* = W + α·σ(W)·bruit, lignes permutées par Π) — vérifié sur des valeurs
