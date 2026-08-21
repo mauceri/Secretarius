@@ -6,10 +6,13 @@ d'après le POC `aloepri_poc/` — méthode du papier
 [AloePri, arXiv 2603.01499](https://arxiv.org/pdf/2603.01499)) puis service
 HTTP sur un GPU Modal.
 
-**Posture de sécurité** : le serveur ne voit JAMAIS les clés. Il ne charge
-aucun tokenizer et ne sert que des IDs de tokens permutés ; la permutation du
-vocabulaire (`obfuscation_keys.json`) reste côté client. Le Volume
-`aloepri-keys` n'est monté que par `transform()`, jamais par `serve()`.
+**Posture de sécurité (strict)** : le serveur ne voit JAMAIS les clés. Il ne
+charge aucun tokenizer, ne reçoit que des **IDs de tokens permutés** (des
+nombres) et ne renvoie que des IDs permutés. La permutation du vocabulaire
+(`obfuscation_keys.json`) et le tokenizer restent exclusivement côté client —
+voir le codec (`aloepri_poc/client_wrapper.py`) et le proxy OpenAI-compatible
+local (§6bis). Le Volume `aloepri-keys` n'existe plus sur Modal (supprimé
+après récupération des clés).
 
 ## Prérequis
 
@@ -116,28 +119,48 @@ Vérifier MANUELLEMENT que la sortie est un texte français cohérent (le POC
 Qwen2.5 mesurait +19 % de perplexité moyenne — cf. `aloepri_poc/RESULTATS.md` ;
 le round-trip reste qualitativement correct).
 
-## 6bis. Endpoint texte→texte `/analyze`
+## 6bis. Interface OpenAI-compatible — mais côté CLIENT (proxy local)
 
-L'app expose aussi `POST /analyze` qui prend un prompt TEXTE et renvoie le
-résultat TEXTE (tokenize + permutation + génération + dépermutation côté
-serveur). Nécessite les clés sur le serveur — dérogation assumée pour ce
-test (`aloepri-keys` est monté sur `serve()`) :
+Modal ne sert que `/generate` (IDs permutés). Pour obtenir une interface
+`/v1/chat/completions` SANS mettre les clés sur le serveur, on lance un proxy
+local qui fait la permutation (tokenizer + clés restent sur votre machine) :
 
 ```bash
-curl -s -X POST "$URL/analyze" \
-    -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
-    -d '{"prompt": "Quelle est la capitale de la France ?", "max_new_tokens": 300}'
-# → {"result": "La capitale de la France est Paris. 😊", "full": "…"}
+python3 aloepri_modal/openai_proxy.py \
+    --keys /path/to/obfuscation_keys.json \
+    --url "$URL" \
+    --api-key "$(cat ~/.aloepri-api-key)" \
+    --port 8001
+# → http://127.0.0.1:8001/v1/chat/completions
 ```
+
+Puis, comme un vrai endpoint OpenAI :
+
+```bash
+curl http://127.0.0.1:8001/v1/chat/completions \
+    -H 'Content-Type: application/json' \
+    -d '{"model": "qwen3-8b-obf",
+         "messages": [{"role": "user", "content": "Quelle est la capitale de la France ?"}],
+         "max_tokens": 300}'
+# → {"object": "chat.completion", "choices": [{"message": {"content": "La capitale de la France est Paris. 😊"}}], "usage": {...}}
+```
+
+Ce que le proxy envoie à Modal, c'est uniquement `{"input_ids": […], …}` —
+des nombres. Les paramètres de décodage (repetition_penalty, bad_words_ids)
+sont des nombres opaques pour le serveur.
 
 **Réglages de décodage** (validés en grandeur nature, cf. `RESULTATS_QWEN3.md`) :
 le modèle servi est transformé avec **`--alpha-e 0.3 --beta 1`** (perturbation
 minimale : bruit d'embedding réduit + attention exacte sans approximation Ẑ)
-et `/analyze` utilise `enable_thinking=False` (réponse directe), greedy,
+et le proxy utilise `enable_thinking=False` (réponse directe), greedy,
 `repetition_penalty=1.05` et bloque le token `<think>` — Qwen3-8B (modèle
 *thinking*) a tendance à ouvrir des traces de raisonnement qui bouclent
 sinon. Les clés sont inchangées (même seed, même vocabulaire : la permutation
 ne dépend pas de α_e/β).
+
+> Historique : un endpoint serveur `/analyze` (texte→texte, clés montées) a
+> été testé puis RETIRÉ : il plaçait les moyens de désobfuscation sur le
+> serveur. La forme retenue est le proxy local ci-dessus — strict.
 
 ## 7. Mesures qualité / vitesse (optionnel)
 
@@ -173,10 +196,11 @@ python3 measure_speed.py --baseline Qwen/Qwen3-8B \
 ## Sécurité (à relire)
 
 1. `obfuscation_keys.json` = secret client. Pas dans le dépôt
-   (`aloepri_poc/.gitignore`), pas sur les Volumes de service, pas dans les
-   logs Modal (le SHA-256 des clés est OK ; le fichier non).
-2. Si les clés ont transité par `aloepri-keys`, les télécharger puis
-   `~/modal-venv/bin/modal volume delete aloepri-keys`.
+   (`aloepri_poc/.gitignore`), pas sur Modal (Volume `aloepri-keys` supprimé),
+   pas dans les logs Modal (le SHA-256 des clés est OK ; le fichier non).
+2. Le serveur (`/generate`) ne reçoit que des IDs permutés — aucun moyen de
+   désobfusquer côté serveur. Le proxy local (§6bis) porte le tokenizer + les
+   clés sur votre machine et n'envoie que des nombres à Modal.
 3. Le modèle obfusqué SANS les clés ne permet pas de décoder les échanges —
    c'est le point du POC. Un serveur compromis expose les poids obfusqués et
    les IDs permutés, pas la permutation elle-même.

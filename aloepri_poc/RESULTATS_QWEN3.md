@@ -66,6 +66,13 @@ par clé API Bearer, scale-to-zero après 5 min).
 
 ### Endpoint `/analyze` (prompt texte → résultat) et réglage qualité
 
+> **Évolution finale (posture stricte)** : l'endpoint serveur `/analyze`
+> (texte→texte, clés montées sur le serveur) a été testé puis RETIRÉ — il
+> plaçait les moyens de désobfuscation sur le serveur. La forme retenue :
+> Modal ne sert que `/generate` (IDs permutés, zéro clé) et l'interface
+> OpenAI-compatible est un **proxy local** (`aloepri_modal/openai_proxy.py`)
+> qui permute côté client. Le Volume `aloepri-keys` a été supprimé de Modal.
+
 Qwen3-8B (non-Instruct) est un modèle **thinking** : avec la perturbation
 par défaut (α_e=1.0, β=8), le décodage ouvrait des traces `<think>` qui
 bouclaient (« (10 points)… », « Let me think… ») — comportement du modèle

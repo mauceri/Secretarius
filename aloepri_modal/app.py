@@ -121,64 +121,50 @@ def transform(
 @app.function(
     image=SERVE_IMAGE,
     gpu=GPU_SERVE,
-    volumes={MODELS_DIR: models_vol, KEYS_DIR: keys_vol},
+    volumes={MODELS_DIR: models_vol},
     secrets=[API_SECRET] if API_SECRET else [],
     timeout=3600,
     scaledown_window=300,
 )
 @modal.asgi_app()
 def serve():
-    """Serveur HTTP du modèle obfusqué.
+    """Serveur HTTP du modèle obfusqué — posture STRICTE.
 
-    Deux endpoints :
-    - `/generate` : IDs de tokens PERMUTÉS en entrée/sortie (aucun tokenizer,
-      aucune clé — posture de sécurité du POC, cf. `aloepri_poc/server.py`) ;
-    - `/analyze` : prompt TEXTE → résultat TEXTE (tokenize + permutation +
-      génération + dépermutation + detokenize côté serveur). Nécessite les
-      clés sur le serveur : dérogation assumée pour ce test (cf.
-      `README.md`, « Posture de sécurité »), le Volume `aloepri-keys` n'est
-      monté que sur cette fonction.
+    Un seul endpoint, `POST /generate` : il reçoit des IDs de tokens PERMUTÉS
+    (des nombres) et renvoie des IDs PERMUTÉS. Aucun tokenizer, aucune clé,
+    aucun texte sur le serveur — la permutation du vocabulaire reste
+    exclusivement côté client (`aloepri_poc/client_wrapper.py`,
+    `aloepri_modal/openai_proxy.py`).
+
+    Les paramètres de décodage optionnels (`repetition_penalty`,
+    `bad_words_ids`) sont opaques pour le serveur : ce sont des nombres
+    fournis par le client pour piloter `generate()` sans rien révéler.
 
     `@modal.asgi_app()` : la fonction RETOURNE l'app FastAPI (le conteneur
     est prêt dès qu'elle est retournée) — avec `@modal.web_server` il
     faudrait lancer uvicorn en sous-processus et rendre la main (pattern
     tiron), sinon la passerelle renvoie 303 tant que la fonction n'est pas
     retournée."""
-    import json
     import torch
     from fastapi import FastAPI, Header, HTTPException
     from pydantic import BaseModel
-    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from transformers import AutoModelForCausalLM
 
     model_dir = os.path.join(MODELS_DIR, MODEL_SUBDIR)
     model = AutoModelForCausalLM.from_pretrained(
         model_dir, dtype=torch.bfloat16).cuda()
     model.eval()
 
-    tokenizer = AutoTokenizer.from_pretrained(SRC_MODEL)
-    with open(os.path.join(KEYS_DIR, KEYS_FILENAME)) as f:
-        _keys = json.load(f)
-    permutation = {int(k): int(v) for k, v in
-                   _keys["vocab_permutation"].items()}
-    unpermute = {int(k): int(v) for k, v in
-                 _keys["vocab_unpermute"].items()}
-
     fastapi_app = FastAPI()
 
     class GenerateRequest(BaseModel):
         input_ids: list[int]
         max_new_tokens: int = 100
+        repetition_penalty: float = 1.0
+        bad_words_ids: list[list[int]] | None = None
 
     class GenerateResponse(BaseModel):
         output_ids: list[int]
-
-    class AnalyzeRequest(BaseModel):
-        prompt: str
-        max_new_tokens: int = 512
-
-    class AnalyzeResponse(BaseModel):
-        result: str          # réponse finale (après </think> si présent)
-        full: str            # sortie complète décodée (pensée incluse)
 
     def _authorized(authorization: str | None) -> bool:
         # Les valeurs du Secret Modal sont injectées comme variables
@@ -201,54 +187,17 @@ def serve():
         if not _authorized(authorization):
             raise HTTPException(status_code=401, detail="unauthorized")
         input_tensor = torch.tensor([req.input_ids], device=model.device)
+        kwargs = {}
+        if req.repetition_penalty != 1.0:
+            kwargs["repetition_penalty"] = req.repetition_penalty
+        if req.bad_words_ids:
+            kwargs["bad_words_ids"] = req.bad_words_ids
         with torch.no_grad():
             output = model.generate(
                 input_tensor, max_new_tokens=req.max_new_tokens,
-                do_sample=False,
+                do_sample=False, **kwargs,
             )
         return GenerateResponse(output_ids=output[0].tolist())
-
-    @fastapi_app.post("/analyze", response_model=AnalyzeResponse)
-    def analyze(req: AnalyzeRequest,
-                authorization: str | None = Header(default=None)):
-        """Prompt texte → analyse par le LLM obfusqué → résultat texte.
-
-        Qwen3-8B est un modèle *instruct* : le prompt est passé par son chat
-        template (apply_chat_template), sinon les réponses dégénèrent."""
-        if not _authorized(authorization):
-            raise HTTPException(status_code=401, detail="unauthorized")
-        templated = tokenizer.apply_chat_template(
-            [{"role": "user", "content": req.prompt}],
-            tokenize=False, add_generation_prompt=True,
-            enable_thinking=False,  # réponse directe (régime validé sur la
-            # baseline avec une perturbation minimale : α_e=0.3, β=1)
-        )
-        clear_ids = tokenizer(templated)["input_ids"]
-        permuted = [permutation[i] for i in clear_ids]
-        input_tensor = torch.tensor([permuted], device=model.device)
-        # Le modèle base rouvre parfois une trace <think> (math, créatif) :
-        # on l'interdit pour garantir une réponse directe.
-        think_id = permutation[151667]  # <think> dans l'espace permuté
-        with torch.no_grad():
-            output = model.generate(
-                input_tensor, max_new_tokens=req.max_new_tokens,
-                do_sample=False,
-                repetition_penalty=1.05,  # anti-boucle léger
-                bad_words_ids=[[think_id]],
-            )
-        out_ids = output[0].tolist()
-        completion = out_ids[len(permuted):]
-        clear_completion = [unpermute[i] for i in completion]
-        full = tokenizer.decode(clear_completion, skip_special_tokens=True)
-        # Si la trace de pensée <think>…</think> est présente, la réponse
-        # finale est ce qui suit </think> (id clair 151668).
-        think_end = 151668  # </think>
-        if think_end in clear_completion:
-            after = clear_completion[clear_completion.index(think_end) + 1:]
-            result = tokenizer.decode(after, skip_special_tokens=True).strip()
-        else:
-            result = full
-        return AnalyzeResponse(result=result, full=full)
 
     return fastapi_app
 
