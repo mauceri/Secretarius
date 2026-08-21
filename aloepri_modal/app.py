@@ -35,7 +35,9 @@ KEYS_FILENAME = "obfuscation_keys.json"
 PORT = 8000
 GPU_SERVE = "L4"                       # 24 Go VRAM ; A100-40GB si contexte long
 TRANSFORM_MEMORY = 12288               # MiB garantis pour transform()
-TRANSFORM_EPHEMERAL_DISK = 50_000      # MiB : cache HF 16 Go + sortie 16 Go
+# Disque éphémère Modal : minimum 512 GiB (524288 MiB), jusqu'à 3 TiB. Le
+# cache HF (16 Go) + la sortie (16 Go) tiennent largement dans 512 GiB.
+TRANSFORM_EPHEMERAL_DISK = 524288
 
 _POC_DIR = os.path.join(os.path.dirname(__file__), "..", "aloepri_poc")
 
