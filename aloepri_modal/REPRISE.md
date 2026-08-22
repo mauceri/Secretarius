@@ -77,6 +77,11 @@ curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $(cat ~/.aloe
    l'obfusqué elle ne récupère que des ids permutés).
 4. **Attaque attention multi-couches** / autre fonction de perte (le canal
    attn diverge avec la méthode actuelle : 27,3 %).
+5. **Analyse LoRA** — obfusquer des adaptateurs LoRA et les adjoindre au base
+   obfusqué : faisable en principe (toutes les transformations sont linéaires)
+   — argumentation et conditions dans `aloepri_poc/CONCLUSION.md` §3 ; à
+   valider par un test sur modèle jouet (base obfusquée + adaptateur transformé
+   == base originale + adaptateur).
 5. Qualité/vitesse sur Qwen3 (mesures `measure_quality.py`/`measure_speed.py`,
    nécessitent une machine avec 16 Go+ de RAM ou un GPU).
 
