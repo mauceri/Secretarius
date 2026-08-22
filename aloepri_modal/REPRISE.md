@@ -12,7 +12,7 @@ et `aloepri_modal/README.md`. Dernière mise à jour : 2026-08-21 (commit
   auth Bearer (Secret `aloepri-api-key`). URL :
   `https://mauceri--aloepri-qwen3-modal-serve.modal.run`.
 - **Volume Modal** : `aloepri-models` (`/qwen3-8b-obf`, 14 shards, 16 Go).
-  Modèle transformé **α_e=0.3, β=1** (réglage « qualité »).
+  Modèle transformé **α_e=0.3, β=8** (réglage « qualité » + défense d'attention Ẑ restaurée le 2026-08-22).
 - **Local (cette machine)** : venv `/home/cmauceri/deepseek-harness-ws/venv`
   (torch CPU, transformers 5.15, modal 1.5.4) ; proxy OpenAI-compatible
   (port 8001) et serveur notebook (port 8002) — à redémarrer si besoin
@@ -24,7 +24,7 @@ et `aloepri_modal/README.md`. Dernière mise à jour : 2026-08-21 (commit
 | Artefact | Chemin | Version |
 |---|---|---|
 | Modèle obfusqué LOCAL | `artifacts/obfuscated_qwen3_8b/` (16 Go) | **α_e=1.0, β=8** (première transform) |
-| Modèle sur Volume Modal | `aloepri-models:/qwen3-8b-obf` | **α_e=0.3, β=1** (servi) |
+| Modèle sur Volume Modal | `aloepri-models:/qwen3-8b-obf` | **α_e=0.3, β=8** (servi) |
 | Clés (identiques partout) | `artifacts/obfuscation_keys.json` | seed 0 — la permutation ne dépend PAS de α_e/β |
 
 **Piège** : le modèle local et le modèle servi ne sont PAS la même version.
@@ -63,10 +63,9 @@ curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $(cat ~/.aloe
 
 ## 5. Prochaines étapes identifiées
 
-1. **Restaurer la défense d'attention** : re-transform **β=8** sur Modal
-   (`modal run app.py::transform --seed 0 --alpha-e 0.3 --beta 8` — ~2 min,
-   clés inchangées), puis re-mesurer l'attaque ISA canal attn (le β=1 actuel
-   désactive Ẑ, la protection qui fait passer le TTRSR à 0 % selon AloePri).
+1. ~~Restaurer la défense d'attention (β=8)~~ — **FAIT le 2026-08-22** :
+   modèle servi en α_e=0.3/β=8, attaque ISA re-mesurée (attn 27,3 % → 9,1 %,
+   hidden L1 95,5 % → 90,9 % — cf. `aloepri_poc/RESULTATS_ISA.md`).
 2. **Comparaison baseline vs obfusqué** en grandeur nature (l'attaque ISA sur
    la baseline récupérerait les ids CLAIRS — le texte fuirait ; sur
    l'obfusqué elle ne récupère que des ids permutés).

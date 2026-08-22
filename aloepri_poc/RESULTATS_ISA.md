@@ -32,13 +32,34 @@ client).
 5. **Résultat** : ids_récupérés = argmax(P) ; métrique = taux de
    correspondance avec les IDs réellement envoyés au modèle.
 
-## Résultats (prompt secret de 22 tokens, modèle α_e=0.3, β=1)
+## Résultats — β=1 (modèle servi initial, Ẑ_block = identité)
+
+Prompt secret de **22 tokens** (templaté non-thinking, IDs permutés) ;
+l'attaque n'utilise que les poids obfusqués — les clés ne servent qu'au
+harnais de mesure.
 
 | Canal | Couche | Taux de récupération des ids du modèle | Loss (rel.) |
 |---|---|---|---|
 | hidden | 1 (peu profonde) | **95,5 %** (21/22) | 0,020 |
 | hidden | 18 (profonde) | 4,5 % (1/22) | 0,093 |
 | attn | 0 | 27,3 % (6/22) | 1,05 (divergente) |
+
+## Résultats — β=8 (défense restaurée, 2026-08-22)
+
+| Canal | Couche | Taux de récupération des ids du modèle | Loss (rel.) |
+|---|---|---|---|
+| hidden | 1 (peu profonde) | **90,9 %** (20/22) | 0,044 |
+| attn | 0 | **9,1 %** (2/22) | 1,17 (divergente) |
+
+**Effet de la restauration** : la permutation de blocs Ẑ (β=8) fait chuter
+la récupération via attention d'un facteur ~3 (27,3 % → 9,1 %) et dégrade
+légèrement le canal hidden (95,5 % → 90,9 %, les états cachés héritant de la
+perturbation). Le canal hidden récupère toujours ~91 % des ids du modèle —
+mais ce sont les ids PERMUTÉS : sans la clé, aucun texte.
+
+(Modèle jouet Qwen3 miniature, même attaque : canal hidden 100 % baseline et
+obfusqué ; canal attn sous-déterminé — les taux d'attention ne suffisent pas
+à inverser les ids à cette échelle.)
 
 ## Interprétation
 
@@ -59,12 +80,10 @@ client).
    Tableau 4 d'AloePri (le bruit seul laisse 40 % de TTRSR ; ce sont les
    protections d'attention qui font tomber le taux à 0 %).
 
-4. **Conséquence sur notre modèle servi** : le réglage qualité retenu
-   (β=1 → Ẑ_block = identité) désactive la permutation de blocs d'attention,
-   la protection qui, selon AloePri, fait passer le TTRSR d'attention à 0 %.
-   Pour restaurer cette défense, il faut β>1 (Ẑ actif) — au prix d'un peu de
-   qualité (le POC Qwen2.5 mesurait +19,1 % de perplexité à β=8 vs +18,7 % à
-   β=1 : l'écart est faible).
+4. **Défense restaurée (2026-08-22)** : le modèle servi a été re-transformé
+   avec **β=8** (Ẑ_block actif) — la récupération via attention passe de
+   27,3 % à 9,1 %, au prix d'une qualité quasi inchangée (le POC Qwen2.5
+   mesurait +19,1 % de perplexité à β=8 vs +18,7 % à β=1 : ~0,4 pt).
 
 ## Ce qui n'est pas encore mesuré
 
@@ -73,7 +92,6 @@ client).
   il récupère des ids permutés). À faire pour quantifier précisément le
   « coût » de la défense.
 - Attaque attention multi-couches / autre loss (la méthode actuelle diverge).
-- Effet de β=8 (Ẑ actif) sur la récupération via attention.
 - TFMA/SDA et Attn-IA/Gate-IA (hors périmètre de cette session).
 
 ## Fichiers
