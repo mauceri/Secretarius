@@ -66,12 +66,18 @@ curl -s -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $(cat ~/.aloe
 1. ~~Restaurer la défense d'attention (β=8)~~ — **FAIT le 2026-08-22** :
    modèle servi en α_e=0.3/β=8, attaque ISA re-mesurée (attn 27,3 % → 9,1 %,
    hidden L1 95,5 % → 90,9 % — cf. `aloepri_poc/RESULTATS_ISA.md`).
-2. **Comparaison baseline vs obfusqué** en grandeur nature (l'attaque ISA sur
+2. **Matrices clés P̂/Q̂ (h>0) + chaînage inter-couches** — PROCHAINE GRANDE
+   ÉTAPE (choisie le 2026-08-22) : cible TTRSR hidden ≈ 0,82 % (Tableau 4
+   AloePri). Design et reprise :
+   `docs/superpowers/specs/2026-08-22-aloepri-matrices-cles-design.md`
+   (la brique `key_matrix.py` existe et P̂·Q̂=I est vérifié ; reste le
+   redimensionnement d+2h + le chaînage §5.4).
+3. **Comparaison baseline vs obfusqué** en grandeur nature (l'attaque ISA sur
    la baseline récupérerait les ids CLAIRS — le texte fuirait ; sur
    l'obfusqué elle ne récupère que des ids permutés).
-3. **Attaque attention multi-couches** / autre fonction de perte (le canal
+4. **Attaque attention multi-couches** / autre fonction de perte (le canal
    attn diverge avec la méthode actuelle : 27,3 %).
-4. Qualité/vitesse sur Qwen3 (mesures `measure_quality.py`/`measure_speed.py`,
+5. Qualité/vitesse sur Qwen3 (mesures `measure_quality.py`/`measure_speed.py`,
    nécessitent une machine avec 16 Go+ de RAM ou un GPU).
 
 ## 6. Pièges techniques déjà rencontrés (économise une session)
