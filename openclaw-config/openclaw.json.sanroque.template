@@ -97,8 +97,13 @@
    }
   }
  },
+ "bindings": [
+  { "agentId": "main", "match": { "channel": "telegram", "accountId": "default" } }
+ ],
  "agents": {
   "defaults": {
+   "systemAgent": { "agentId": "main" },
+   "heartbeat": { "every": "0m" },
    "model": {
     "primary": "euria/mistralai/Mistral-Small-4-119B-2603"
    },
@@ -328,6 +333,6 @@
    ]
   }
  },
- "plugins": { "allow": [], "entries": { "derisk-deleg": { "enabled": true, "hooks": { "allowConversationAccess": true } } } },
+ "plugins": { "allow": [], "entries": { "memory-core": { "config": { "dreaming": { "enabled": false } } }, "derisk-deleg": { "enabled": true, "hooks": { "allowConversationAccess": true } } } },
  "skills": { "install": { "nodeManager": "npm" } }
 }
