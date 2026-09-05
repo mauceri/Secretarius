@@ -109,7 +109,7 @@ Le template appelle le serveur `wiki-lm-server` (port 5051, voir
 
 Capturer la note actuellement ouverte dans la file `raw/` de Wiki_LM (équivalent
 de `/c`, sans quitter Obsidian), depuis desktop ou mobile. Source :
-`obsidian-wikilm-capture/` (projet TypeScript séparé, à la racine du dépôt).
+`Wiki_LM/obsidian-wikilm-capture/` (projet TypeScript séparé).
 
 ### Prérequis
 
@@ -119,7 +119,7 @@ de `/c`, sans quitter Obsidian), depuis desktop ou mobile. Source :
 
 ### Installation
 
-1. `cd obsidian-wikilm-capture && npm install && npm run build` — produit
+1. `cd Wiki_LM/obsidian-wikilm-capture && npm install && npm run build` — produit
    `main.js` à côté de `manifest.json`.
 2. Copier `manifest.json` et `main.js` dans
    `<coffre>/.obsidian/plugins/wikilm-capture/`.
