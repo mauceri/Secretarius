@@ -93,11 +93,19 @@ class _OllamaBackend:
         if system:
             messages = [{"role": "system", "content": system}] + messages
 
+        # think:false — sans lui, un modèle "thinking" (ex. Qwen3) consomme tout son
+        # budget de tokens à raisonner et ne produit jamais de contenu final.
+        options: dict = {"num_predict": max_tokens}
+        num_gpu = _env("OLLAMA_NUM_GPU")
+        if num_gpu:
+            options["num_gpu"] = int(num_gpu)
+
         payload = json.dumps({
             "model": self.model,
             "messages": messages,
             "stream": False,
-            "options": {"num_predict": max_tokens},
+            "think": False,
+            "options": options,
         }).encode()
 
         req = urllib.request.Request(
