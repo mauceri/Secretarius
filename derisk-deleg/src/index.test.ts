@@ -518,6 +518,88 @@ describe("before_agent_reply — routage via tiron-router", () => {
   });
 });
 
+describe("before_agent_reply — confirmation des écritures wiki routées", () => {
+  it("une écriture (/c → capture) attend /confirm, n'exécute pas immédiatement", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ status: "ok", command: "/c", args: "https://exemple.com" }),
+      })),
+    );
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "capture cette page https://exemple.com" });
+
+    expect(res.handled).toBe(true);
+    expect(res.reply.text).toContain("/confirm");
+    expect(res.reply.text).toContain("capture");
+  });
+
+  it("une lecture (/q → query) s'exécute immédiatement, sans passer par /confirm", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ status: "ok", command: "/q", args: "question test" }),
+      })),
+    );
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "question test" });
+
+    expect(res.handled).toBe(true);
+    expect(res.reply.text).not.toContain("/confirm");
+  });
+
+  it("/confirm sur une écriture en attente l'exécute puis vide le brouillon", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ status: "ok", command: "/ingest", args: "" }),
+      })),
+    );
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    await hooks["before_agent_reply"].handler({ cleanedBody: "ingère la file d'attente" });
+    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/confirm" });
+
+    // la sandbox n'est pas disponible en test -> runWikiOp retombe sur un
+    // message d'erreur déterministe, mais SURTOUT ce n'est plus le message
+    // d'attente : la tentative d'exécution a bien eu lieu.
+    expect(res.reply.text).not.toContain("Tapez /confirm");
+
+    const res2 = await hooks["before_agent_reply"].handler({ cleanedBody: "/confirm" });
+    expect(res2.reply.text).toBe("Rien à confirmer (aucun brouillon en attente).");
+  });
+
+  it("/annuler sur une écriture en attente l'abandonne, mentionne l'opération", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ status: "ok", command: "/c", args: "https://exemple.com" }),
+      })),
+    );
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    await hooks["before_agent_reply"].handler({ cleanedBody: "capture cette page https://exemple.com" });
+    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/annuler" });
+
+    expect(res.reply.text).toContain("capture");
+    expect(res.reply.text).toContain("abandonné");
+  });
+});
+
 describe("before_tool_call — garde-fou gog (écriture directe bloquée)", () => {
   it("est enregistré avec la priorité 50", async () => {
     const plugin = await freshPlugin();

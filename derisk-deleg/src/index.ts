@@ -102,8 +102,16 @@ function delegateGog(api: any, op: string, arg: string): Promise<string> {
 const PENDING_TTL_MS = 10 * 60 * 1000;
 type Pending =
   | { kind: "send"; to: string; subject: string; body: string; ts: number }
-  | { kind: "reply"; messageId: string; body: string; ts: number };
+  | { kind: "reply"; messageId: string; body: string; ts: number }
+  | { kind: "router-write"; op: string; args: string; ts: number };
 let pending: Pending | null = null;
+
+// Ops wiki en LECTURE, jamais protégées par confirmation. Liste blanche :
+// toute op absente d'ici (y compris une future op non encore ajoutée à cette
+// liste, ex. kb_update) est traitée comme une écriture et protégée par
+// défaut — cohérent avec la règle "lectures libres, écritures confirmées"
+// déjà en place pour gog (AGENTS.md).
+const WIKI_READ_OPS = new Set(["query", "search", "status", "tags"]);
 
 const AUTH_TTL_MS = 10 * 60 * 1000;
 const GOG_CFG = `${process.env.HOME}/.openclaw/workspace/.gog-config`;
@@ -441,16 +449,28 @@ export default definePluginEntry({
         }
         const p = pending;
         pending = null;
-        const out =
-          p.kind === "send"
-            ? await delegateGog(api, "send", `to=${p.to}; subject=${p.subject}; body=${p.body}`)
-            : await delegateGog(api, "reply", `id=${p.messageId}; body=${p.body}`);
+        let out: string;
+        if (p.kind === "send") {
+          out = await delegateGog(api, "send", `to=${p.to}; subject=${p.subject}; body=${p.body}`);
+        } else if (p.kind === "reply") {
+          out = await delegateGog(api, "reply", `id=${p.messageId}; body=${p.body}`);
+        } else {
+          out = await runWikiOp(api, p.op, p.args);
+        }
         return { handled: true, reply: { text: out.slice(0, 4000) } };
       }
 
       if (cmd === "/annuler") {
         if (!pending) {
           return { handled: true, reply: { text: "Rien à annuler (aucun brouillon en attente)." } };
+        }
+        if (pending.kind === "router-write") {
+          const op = pending.op;
+          pending = null;
+          return {
+            handled: true,
+            reply: { text: `Action wiki abandonnée (${op}). Rien n'a été exécuté.` },
+          };
         }
         const dest = pending.kind === "send" ? pending.to : `réponse à ${pending.messageId}`;
         pending = null;
@@ -486,6 +506,17 @@ export default definePluginEntry({
       }
 
       if (action.kind === "wiki") {
+        // Écriture inférée en langage naturel : jamais exécutée directement,
+        // même logique de mise en attente que gog_send/gog_reply.
+        if (!WIKI_READ_OPS.has(action.op)) {
+          pending = { kind: "router-write", op: action.op, args: routed.args, ts: Date.now() };
+          return {
+            handled: true,
+            reply: {
+              text: `Action wiki en attente : ${action.op}${routed.args ? " | " + routed.args : ""}\n\nTapez /confirm pour l'exécuter (valable 10 min), ou /annuler pour abandonner.`,
+            },
+          };
+        }
         const out = await runWikiOp(api, action.op, routed.args);
         return { handled: true, reply: { text: out.slice(0, 4000) } };
       }
