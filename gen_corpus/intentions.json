@@ -9,5 +9,9 @@
   {"intention": "gog_inbox",      "command": "/inbox",      "variantes": ["sans_args","avec_nombre"]},
   {"intention": "gog_reply",      "command": "/repondre",   "variantes": ["avec_contexte"]},
   {"intention": "gog_drive",      "command": "/drive",      "variantes": ["recherche"]},
+  {"intention": "wiki_search",    "command": "/r",          "variantes": ["mots_cles_simples","recherche_urgente"]},
+  {"intention": "wiki_tags",      "command": "/tags",       "variantes": ["sans_args"]},
+  {"intention": "wiki_kb_update", "command": "/kbupdate",   "variantes": ["sans_args"]},
+  {"intention": "gog_get",        "command": "/lire",       "variantes": ["avec_id_explicite","reference_recente"]},
   {"intention": "out_of_scope",   "command": null,          "variantes": ["action_impossible","envoi_mail_nouveau","agenda","aide_generale","conversation_libre"]}
 ]

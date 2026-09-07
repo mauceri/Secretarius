@@ -67,14 +67,17 @@ def _build_signature(prompt_text: str):
     return GenerateExample
 
 
-def generate_one(predict, intention: str, registre: str, variante: str) -> dict:
+def generate_one(predict, intention: str, registre: str, variante: str, command: str | None) -> dict:
+    # La commande est déterminée par l'intention (intentions.json), pas par le LLM :
+    # demander au modèle de la re-choisir introduit du bruit d'étiquetage quand deux
+    # commandes sont sémantiquement proches (ex. /q vs /r — constaté ~99% d'erreur
+    # sur wiki_search lors de l'ajout de /r). Seuls text/args restent générés.
     result = predict(intention=intention, registre=registre, variante=variante)
-    cmd = result.command if result.command and result.command.lower() not in ("null", "none") else None
     args = result.args.strip()
     if args in ('""', "''"):
         args = ""
     return {"text": result.text, "intention": intention, "registre": registre,
-            "variante": variante, "action": {"command": cmd, "args": args}}
+            "variante": variante, "action": {"command": command, "args": args}}
 
 
 def main(argv=None) -> int:
@@ -102,7 +105,7 @@ def main(argv=None) -> int:
             obj = random.choice(intentions)
             try:
                 entry = generate_one(predict, obj["intention"], random.choice(registres),
-                                     random.choice(obj["variantes"]))
+                                     random.choice(obj["variantes"]), obj["command"])
                 buffer.append(entry)
                 consecutive_errors = 0
             except Exception as e:

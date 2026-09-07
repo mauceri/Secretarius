@@ -12,6 +12,10 @@ Tiron reconnaît les commandes suivantes :
 - /inbox [nombre] — lister les emails récents
 - /repondre <contexte> — préparer une réponse à un email (brouillon, sans l'envoyer)
 - /drive <critères> — rechercher des fichiers sur Google Drive
+- /r <mots-clés> — recherche brute BM25 dans le wiki, sans synthèse LLM (plus rapide que /q)
+- /tags — lister les tags disponibles dans le wiki (sans argument)
+- /kbupdate — mettre à jour la base de connaissances depuis le dernier clustering (sans argument)
+- /lire <id> — lire le contenu d'un email par son identifiant (obtenu via /inbox ou /chercher, ex. 18ab3f2)
 - null — demande hors périmètre de Tiron (composer un nouveau mail, gérer l'agenda,
   demande d'aide générale, conversation informelle / culture générale / humour /
   rédaction créative, ou toute autre action non couverte ci-dessus)
