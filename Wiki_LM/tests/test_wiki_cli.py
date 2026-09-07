@@ -241,6 +241,58 @@ def test_ingest_worker_skips_when_already_running(monkeypatch, tmp_path):
     assert wiki._read_state()["last_run"] == "sentinel"
 
 
+def test_ingest_worker_backend_par_defaut_non_surchargé(monkeypatch, tmp_path):
+    # WIKI_INGEST_LLM_BACKEND absent -> Ingestor reçoit llm=None (son propre
+    # défaut LLM()/WIKI_LLM_BACKEND s'applique, comportement inchangé).
+    wiki = _wiki(monkeypatch, tmp_path)
+    monkeypatch.delenv("WIKI_INGEST_LLM_BACKEND", raising=False)
+    captured = {}
+
+    class _Ing:
+        _MANIFEST = ".ingested"
+
+        def __init__(self, *a, **k):
+            captured.update(k)
+
+        def _load_manifest(self):
+            return {}
+
+        def ingest_raw_dir(self, *a, **k):
+            return []
+
+    monkeypatch.setattr(wiki, "Ingestor", _Ing)
+    wiki.op_ingest_worker()
+    assert captured.get("llm") is None
+
+
+def test_ingest_worker_backend_surchargeable(monkeypatch, tmp_path):
+    # WIKI_INGEST_LLM_BACKEND=ollama -> Ingestor reçoit une instance LLM dédiée,
+    # distincte de celle utilisée par /q (WIKI_LLM_BACKEND reste inchangée).
+    wiki = _wiki(monkeypatch, tmp_path)
+    monkeypatch.setenv("WIKI_INGEST_LLM_BACKEND", "ollama")
+    monkeypatch.setenv("WIKI_INGEST_LLM_MODEL", "qwen3:8b")
+    captured = {}
+
+    class _Ing:
+        _MANIFEST = ".ingested"
+
+        def __init__(self, *a, **k):
+            captured.update(k)
+
+        def _load_manifest(self):
+            return {}
+
+        def ingest_raw_dir(self, *a, **k):
+            return []
+
+    monkeypatch.setattr(wiki, "Ingestor", _Ing)
+    wiki.op_ingest_worker()
+    llm = captured.get("llm")
+    assert llm is not None
+    assert llm._backend.__class__.__name__ == "_OllamaBackend"
+    assert llm._backend.model == "qwen3:8b"
+
+
 def test_do_ingest_writes_last_run(monkeypatch, tmp_path):
     wiki = _wiki(monkeypatch, tmp_path)
     # Deux fichiers en attente ; ingest_raw_dir ne renvoie que les succès

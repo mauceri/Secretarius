@@ -180,7 +180,11 @@
        "HF_HUB_OFFLINE": "1",
        "TRANSFORMERS_OFFLINE": "1",
        "WIKI_ZIM_DIR": "/zim",
-       "WIKI_LOOKUP_OFFLINE": "1"
+       "WIKI_LOOKUP_OFFLINE": "1",
+       "WIKI_INGEST_LLM_BACKEND": "ollama",
+       "WIKI_INGEST_LLM_MODEL": "qwen3:8b",
+       "OLLAMA_BASE_URL": "http://172.17.0.1:11434",
+       "OLLAMA_NUM_GPU": "0"
       }
      }
     },

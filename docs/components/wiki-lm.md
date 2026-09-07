@@ -51,9 +51,13 @@ Variables principales :
 | Variable | Description |
 |----------|-------------|
 | `WIKI_PATH` | Répertoire contenant wiki/, raw/, embeddings/ |
-| `WIKI_LLM_BACKEND` | `openai` (DeepSeek), `ollama`, `claude` |
+| `WIKI_LLM_BACKEND` | `openai` (DeepSeek), `ollama`, `claude` — utilisé par `/q` et par défaut par l'ingestion |
 | `DEEPSEEK_API_KEY` | Clé API DeepSeek |
 | `OPENAI_BASE_URL` | URL du backend LLM compatible OpenAI |
+| `WIKI_INGEST_LLM_BACKEND` | Backend LLM dédié à l'ingestion, distinct de `WIKI_LLM_BACKEND` (`/q` continue d'utiliser ce dernier). Absent = comportement inchangé. En production sandbox wiki : `ollama` (CPU local, `qwen3:8b`) |
+| `WIKI_INGEST_LLM_MODEL` | Modèle pour `WIKI_INGEST_LLM_BACKEND` |
+| `OLLAMA_BASE_URL` | URL du serveur Ollama (défaut `http://localhost:11434`) — depuis un sandbox Docker, viser la passerelle bridge (`http://172.17.0.1:11434`), pas `127.0.0.1` |
+| `OLLAMA_NUM_GPU` | Optionnel — `0` force le CPU (évite la contention avec `tiron-router` sur l'iGPU) ; absent = comportement par défaut d'Ollama |
 
 ## Usage des outils
 

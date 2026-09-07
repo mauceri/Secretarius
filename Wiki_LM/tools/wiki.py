@@ -29,6 +29,7 @@ _bootstrap_api_key()
 sys.path.insert(0, str(Path(__file__).parent))
 from capture import _parse_hashtags, capture_urls, capture_comment, slugify, timestamp, _write_note
 from ingest import Ingestor
+from llm import LLM
 from query import WikiQuery
 from search import WikiSearch
 from kb_tags import collect_tags
@@ -198,13 +199,23 @@ def op_ingest() -> dict:
     return {"status": "launched", "queued": len(pending)}
 
 
+def _ingest_llm() -> LLM | None:
+    """Backend LLM dédié à l'ingestion, distinct de WIKI_LLM_BACKEND (utilisé par
+    /q et le reste de Wiki_LM). Absent par défaut : Ingestor retombe sur son
+    propre LLM()/WIKI_LLM_BACKEND, comportement inchangé."""
+    backend = os.environ.get("WIKI_INGEST_LLM_BACKEND", "")
+    if not backend:
+        return None
+    return LLM(backend=backend, model=os.environ.get("WIKI_INGEST_LLM_MODEL", ""))
+
+
 def _do_ingest() -> dict:
     # ingest_raw_dir ne renvoie que les slugs des fichiers ingérés avec succès ;
     # les échecs sont marqués au manifeste mais absents de la liste. On dérive
     # donc le total des fichiers en attente avant traitement.
     raw = _raw_dir()
     queued = len(_pending_files(raw))
-    ingestor = Ingestor(_wiki_root(), raw_path=raw)
+    ingestor = Ingestor(_wiki_root(), raw_path=raw, llm=_ingest_llm())
     slugs = ingestor.ingest_raw_dir()
     ingested = sum(1 for s in slugs if s)
     return {"status": "done", "ingested": ingested, "errors": queued - ingested, "total": queued}
