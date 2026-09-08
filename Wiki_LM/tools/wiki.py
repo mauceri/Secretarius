@@ -11,7 +11,6 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import quote
 
 def _bootstrap_api_key() -> None:
     # OpenClaw 6.1 efface les valeurs de secret du templating de sandbox.docker.env :
@@ -90,16 +89,14 @@ def op_capture(text: str) -> dict:
     return {"files": [p.name for p in created if p is not None]}
 
 
-def _build_obsidian_uri(history_slug: str) -> str:
-    vault_root = _wiki_root().parent
-    rel_path = f"Wiki_LM/historique/{history_slug}"
-    if not vault_root.name:
-        # WIKI_PATH pointe directement sur la racine du coffre dans le
-        # sandbox (ex. /Wiki_LM) : pas de nom de dossier parent à déduire.
-        # Un lien obsidian:// sans "vault=" se résout contre le coffre déjà
-        # ouvert sur l'appareil (usage mono-coffre ici).
-        return f"obsidian://open?file={quote(rel_path, safe='')}"
-    return f"obsidian://open?vault={quote(vault_root.name, safe='')}&file={quote(rel_path, safe='')}"
+def _history_path(history_slug: str) -> str:
+    """Chemin de la note d'historique, relatif à la racine du coffre.
+
+    Un lien obsidian:// n'est cliquable dans aucune messagerie (seuls les
+    schémas standards le sont) et n'y est même pas copiable partiellement :
+    on renvoie donc un chemin en clair, lisible et collable tel quel.
+    """
+    return f"{_wiki_root().name}/historique/{history_slug}.md"
 
 
 def op_query(question: str) -> dict:
@@ -111,7 +108,7 @@ def op_query(question: str) -> dict:
             "synthesis": result.text,
             "references": result.references,
             "brief": result.brief,
-            "obsidian_uri": _build_obsidian_uri(result.history_slug),
+            "history_path": _history_path(result.history_slug),
         }
     except Exception as exc:
         return {"error": str(exc)}

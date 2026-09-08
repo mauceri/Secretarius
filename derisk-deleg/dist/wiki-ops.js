@@ -77,10 +77,8 @@ export async function runWikiOp(api, op, arg, exec = execWikiSandbox, regime = "
     }
     return formatWikiResult(op, json, regime);
 }
-// Le canal Telegram envoie toujours en parse_mode "HTML" (jamais Markdown) :
-// un obsidian:// nu n'y est jamais cliquable (Telegram ne détecte pas les
-// schémas d'URI personnalisés en mode HTML), et tout &/</> non échappé dans
-// un texte généré par LLM casserait le rendu du message.
+// Le canal Telegram envoie en parse_mode "HTML" : tout &/</> non échappé
+// dans un texte généré par LLM casserait le rendu du message.
 function escapeHtml(text) {
     return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -99,20 +97,19 @@ export function formatWikiResult(op, json, regime = "brief") {
                     : "Réponse wiki vide ou inattendue.";
             }
             const brief = typeof json?.brief === "string" ? json.brief.trim() : "";
-            const uri = typeof json?.obsidian_uri === "string" ? json.obsidian_uri : "";
-            if (!brief && !uri)
+            const path = typeof json?.history_path === "string" ? json.history_path : "";
+            if (!brief && !path)
                 return "Réponse wiki vide ou inattendue.";
-            // PAS de <a href="obsidian://...">: envoyer ce schéma d'URI comme
-            // lien cliquable a bloqué la livraison Telegram en test réel (la
-            // génération de la réponse est rapide — 6s — mais rien n'était jamais
-            // envoyé, probablement une tentative d'aperçu de lien qui reste
-            // bloquée sur un schéma non http(s)). Texte brut échappé : fiable
-            // mais non cliquable, en attendant une solution qui l'est aussi.
+            // Chemin en clair depuis la racine du coffre, pas un lien : aucune
+            // messagerie ne rend cliquable un schéma obsidian://, et la balise
+            // <a> a bloqué la livraison Telegram en test réel. Rendre l'hypertexte
+            // navigable relève d'une surface de lecture servie en HTTPS, pas du
+            // formatage des messages (décision d'architecture du 2026-09-08).
             const parts = [];
             if (brief)
                 parts.push(escapeHtml(brief));
-            if (uri)
-                parts.push(escapeHtml(uri));
+            if (path)
+                parts.push(escapeHtml(path));
             return parts.join("\n\n");
         }
         case "capture": {

@@ -115,11 +115,14 @@ l'ingestion) : `<horodatage>-<slug question>.md`, avec la synthèse complète.
 Distinct du flag `--save`, qui écrit en plus une page polie et **indexée**
 dans `wiki/` (`synth-<slug>.md`).
 
-Sur Telegram, la réponse envoyée est un résumé bref accompagné d'un lien
-`obsidian://` vers cet enregistrement (jamais la synthèse complète, pour
-éviter un mur de Markdown mal rendu par le canal) ; sur l'app web OpenClaw
-(WebChat), qui rend le Markdown correctement, la synthèse complète est
-envoyée telle quelle.
+Sur Telegram, la réponse envoyée est un résumé bref suivi du **chemin de la
+note dans le coffre** (`Wiki_LM/historique/<slug>.md`), jamais la synthèse
+complète — le canal rendrait mal le Markdown. Un lien `obsidian://` a été
+essayé puis abandonné : aucune messagerie ne rend cliquable un schéma d'URI
+non standard, et sous forme de balise `<a>` il bloquait l'envoi. Rendre
+l'hypertexte navigable suppose une surface de lecture servie en HTTPS
+(chantier à part). Sur l'app web OpenClaw (WebChat), qui rend le Markdown
+correctement, la synthèse complète est envoyée telle quelle.
 
 **`lint.py`** — Health-check du wiki
 

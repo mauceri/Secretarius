@@ -65,8 +65,8 @@ def test_query_returns_synthesis(monkeypatch, tmp_path):
     assert out["synthesis"] == "Synthèse."
     assert out["references"] == ["src-a"]
     assert out["brief"] == "Résumé."
-    assert out["obsidian_uri"].startswith("obsidian://open?vault=")
-    assert "&file=Wiki_LM%2Fhistorique%2F20260908-120000-question" in out["obsidian_uri"]
+    # chemin relatif à la racine du coffre : <nom du dossier wiki>/historique/<slug>.md
+    assert out["history_path"] == f"{tmp_path.name}/historique/20260908-120000-question.md"
 
 
 def test_query_empty_kb(monkeypatch, tmp_path):
@@ -87,13 +87,14 @@ def test_query_empty_kb(monkeypatch, tmp_path):
     assert "error" in wiki.op_query("q")
 
 
-def test_build_obsidian_uri_omits_vault_when_root_has_no_parent_name(monkeypatch, tmp_path):
+def test_history_path_is_relative_to_vault_root_in_sandbox(monkeypatch, tmp_path):
+    # Dans le sandbox, WIKI_PATH pointe directement sur /Wiki_LM : le chemin
+    # rendu doit rester relatif à la racine du coffre, pas absolu.
     wiki = _wiki(monkeypatch, tmp_path)
     from pathlib import Path
     monkeypatch.setattr(wiki, "_wiki_root", lambda: Path("/Wiki_LM"))
-    uri = wiki._build_obsidian_uri("20260908-120000-question")
-    assert uri == "obsidian://open?file=Wiki_LM%2Fhistorique%2F20260908-120000-question"
-    assert "vault=" not in uri
+    assert wiki._history_path("20260908-120000-question") == (
+        "Wiki_LM/historique/20260908-120000-question.md")
 
 
 def test_search_returns_results(monkeypatch, tmp_path):

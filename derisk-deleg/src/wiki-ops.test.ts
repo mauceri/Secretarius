@@ -53,28 +53,28 @@ describe("formatWikiResult", () => {
   it("erreur générique inconnue → message par défaut", () => {
     expect(formatWikiResult("query", {})).toBe("Réponse wiki vide ou inattendue.");
   });
-  it("query (regime brief, défaut) : résumé + lien en texte brut échappé (pas de balise <a>)", () => {
+  it("query (regime brief, défaut) : résumé + chemin de la note dans le coffre", () => {
     expect(formatWikiResult("query", {
-      synthesis: "# X", brief: "Résumé.", obsidian_uri: "obsidian://open?vault=V&file=F",
-    })).toBe("Résumé.\n\nobsidian://open?vault=V&amp;file=F");
+      synthesis: "# X", brief: "Résumé.", history_path: "Wiki_LM/historique/20260908-politiciens.md",
+    })).toBe("Résumé.\n\nWiki_LM/historique/20260908-politiciens.md");
   });
-  it("query (regime brief) : brief vide → lien seul", () => {
-    expect(formatWikiResult("query", { brief: "", obsidian_uri: "obsidian://open?vault=V&file=F" }))
-      .toBe("obsidian://open?vault=V&amp;file=F");
+  it("query (regime brief) : brief vide → chemin seul", () => {
+    expect(formatWikiResult("query", { brief: "", history_path: "Wiki_LM/historique/20260908-politiciens.md" }))
+      .toBe("Wiki_LM/historique/20260908-politiciens.md");
   });
-  it("query (regime brief) : lien absent → brief seul", () => {
-    expect(formatWikiResult("query", { brief: "Résumé.", obsidian_uri: "" })).toBe("Résumé.");
+  it("query (regime brief) : chemin absent → brief seul", () => {
+    expect(formatWikiResult("query", { brief: "Résumé.", history_path: "" })).toBe("Résumé.");
   });
   it("query (regime brief) : les deux absents → message par défaut", () => {
     expect(formatWikiResult("query", { synthesis: "# X" })).toBe("Réponse wiki vide ou inattendue.");
   });
   it("query (regime brief) : échappe &/</> dans le résumé (Telegram parse_mode HTML)", () => {
-    expect(formatWikiResult("query", { brief: "État & <politiciens> > citoyens", obsidian_uri: "" }))
+    expect(formatWikiResult("query", { brief: "État & <politiciens> > citoyens", history_path: "" }))
       .toBe("État &amp; &lt;politiciens&gt; &gt; citoyens");
   });
-  it("query (regime full) : ignore brief/obsidian_uri même présents", () => {
+  it("query (regime full) : ignore brief/history_path même présents", () => {
     expect(formatWikiResult("query",
-      { synthesis: "# X", brief: "Résumé.", obsidian_uri: "obsidian://open?vault=V&file=F" }, "full"))
+      { synthesis: "# X", brief: "Résumé.", history_path: "Wiki_LM/historique/20260908-politiciens.md" }, "full"))
       .toBe("# X");
   });
 });
@@ -108,13 +108,13 @@ describe("runWikiOp", () => {
   });
   it("passe le régime à formatWikiResult (full → synthèse verbatim)", async () => {
     const out = await runWikiOp(null, "query", "tee gpu",
-      okExec('{"synthesis": "# GPU TEE", "brief": "Résumé.", "obsidian_uri": "obsidian://x"}'),
+      okExec('{"synthesis": "# GPU TEE", "brief": "Résumé.", "history_path": "Wiki_LM/historique/x.md"}'),
       "full");
     expect(out).toBe("# GPU TEE");
   });
-  it("régime par défaut (brief) : résumé + lien en texte brut, pas la synthèse complète", async () => {
+  it("régime par défaut (brief) : résumé + chemin, pas la synthèse complète", async () => {
     const out = await runWikiOp(null, "query", "tee gpu",
-      okExec('{"synthesis": "# GPU TEE", "brief": "Résumé.", "obsidian_uri": "obsidian://x"}'));
-    expect(out).toBe("Résumé.\n\nobsidian://x");
+      okExec('{"synthesis": "# GPU TEE", "brief": "Résumé.", "history_path": "Wiki_LM/historique/x.md"}'));
+    expect(out).toBe("Résumé.\n\nWiki_LM/historique/x.md");
   });
 });
