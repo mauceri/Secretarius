@@ -65,3 +65,15 @@ def test_query_save_flag_unaffected(tmp_path):
 
     assert result.saved_slug
     assert (tmp_path / "wiki" / f"{result.saved_slug}.md").exists()
+
+
+def test_query_no_results_still_writes_history(tmp_path):
+    wq = _make_query(tmp_path)
+    wq._search.search = lambda q, top_k=5: []
+    result = wq.query("Question sans réponse ?")
+
+    assert result.text == "_Aucune page pertinente trouvée dans le wiki._"
+    assert result.history_slug
+    assert result.brief
+    history_files = list((tmp_path / "historique").glob("*.md"))
+    assert len(history_files) == 1

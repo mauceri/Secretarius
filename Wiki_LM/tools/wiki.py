@@ -93,6 +93,12 @@ def op_capture(text: str) -> dict:
 def _build_obsidian_uri(history_slug: str) -> str:
     vault_root = _wiki_root().parent
     rel_path = f"Wiki_LM/historique/{history_slug}"
+    if not vault_root.name:
+        # WIKI_PATH pointe directement sur la racine du coffre dans le
+        # sandbox (ex. /Wiki_LM) : pas de nom de dossier parent à déduire.
+        # Un lien obsidian:// sans "vault=" se résout contre le coffre déjà
+        # ouvert sur l'appareil (usage mono-coffre ici).
+        return f"obsidian://open?file={quote(rel_path, safe='')}"
     return f"obsidian://open?vault={quote(vault_root.name, safe='')}&file={quote(rel_path, safe='')}"
 
 

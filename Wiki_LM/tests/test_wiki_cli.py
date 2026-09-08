@@ -87,6 +87,15 @@ def test_query_empty_kb(monkeypatch, tmp_path):
     assert "error" in wiki.op_query("q")
 
 
+def test_build_obsidian_uri_omits_vault_when_root_has_no_parent_name(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    from pathlib import Path
+    monkeypatch.setattr(wiki, "_wiki_root", lambda: Path("/Wiki_LM"))
+    uri = wiki._build_obsidian_uri("20260908-120000-question")
+    assert uri == "obsidian://open?file=Wiki_LM%2Fhistorique%2F20260908-120000-question"
+    assert "vault=" not in uri
+
+
 def test_search_returns_results(monkeypatch, tmp_path):
     wiki = _wiki(monkeypatch, tmp_path)
 

@@ -92,7 +92,7 @@ serveur `wiki-lm-server` (port 5051, voir `docs/components/wiki-lm.md`), qui
 
 ### Utilisation
 
-1. Ouvrir/créer la note où insérer le résultat.
+1. Ouvrir n'importe quelle note (son contenu ne sera pas modifié).
 2. Lancer le template : via le raccourci, ou Ctrl/Cmd-P → « Templater: Open Insert
    Template modal » → choisir le template.
 3. Choisir le **mode** (Hybride recommandé / Sémantique / BM25).

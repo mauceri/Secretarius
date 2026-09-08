@@ -40,7 +40,13 @@ try {
 }
 
 const historyPath = `Wiki_LM/historique/${data.history_slug}.md`;
-const file = app.vault.getAbstractFileByPath(historyPath);
+let file = app.vault.getAbstractFileByPath(historyPath);
+for (let i = 0; i < 10 && !file; i++) {
+    // Le serveur vient d'écrire ce fichier hors du cache Obsidian ; laisser
+    // le temps au watcher (et à la synchro sur mobile) de le voir apparaître.
+    await new Promise((r) => setTimeout(r, 200));
+    file = app.vault.getAbstractFileByPath(historyPath);
+}
 if (file) {
     await app.workspace.getLeaf(true).openFile(file);
 } else {

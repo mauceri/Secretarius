@@ -115,6 +115,12 @@ l'ingestion) : `<horodatage>-<slug question>.md`, avec la synthèse complète.
 Distinct du flag `--save`, qui écrit en plus une page polie et **indexée**
 dans `wiki/` (`synth-<slug>.md`).
 
+Sur Telegram, la réponse envoyée est un résumé bref accompagné d'un lien
+`obsidian://` vers cet enregistrement (jamais la synthèse complète, pour
+éviter un mur de Markdown mal rendu par le canal) ; sur l'app web OpenClaw
+(WebChat), qui rend le Markdown correctement, la synthèse complète est
+envoyée telle quelle.
+
 **`lint.py`** — Health-check du wiki
 
 ```bash

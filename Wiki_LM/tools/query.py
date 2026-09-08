@@ -149,10 +149,11 @@ class WikiQuery:
         else:
             results = self._search.search(question, top_k=top_k)
         if not results:
-            return QueryResult(
+            result = QueryResult(
                 question=question,
                 text="_Aucune page pertinente trouvée dans le wiki._",
             )
+            return self._finalize(result)
 
         # 2. Lire le contenu complet des pages trouvées
         pages_block = self._build_pages_block(results)
@@ -167,14 +168,20 @@ class WikiQuery:
         references = list(dict.fromkeys(cited or slugs))  # ordre de première apparition
 
         result = QueryResult(question=question, text=synthesis, references=references)
-        result.history_slug = self._write_history(question, str(result))
-        result.brief = self._generate_brief(question, synthesis)
+        result = self._finalize(result)
 
         # 5. Optionnel : sauvegarder comme page synth-
         if save:
             result.saved_slug = self._save_synth(question, synthesis, references)
             self._append_log("query", question)
 
+        return result
+
+    def _finalize(self, result: QueryResult) -> QueryResult:
+        """Historique + brief systématiques — toute réponse, y compris
+        "aucune page pertinente trouvée", doit produire un enregistrement."""
+        result.history_slug = self._write_history(result.question, str(result))
+        result.brief = self._generate_brief(result.question, result.text)
         return result
 
     # ------------------------------------------------------------------
