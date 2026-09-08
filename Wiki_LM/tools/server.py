@@ -69,6 +69,8 @@ def handle_query():
         "text": result.text,
         "references": result.references,
         "saved_slug": result.saved_slug,
+        "history_slug": result.history_slug,
+        "brief": result.brief,
     })
 
 

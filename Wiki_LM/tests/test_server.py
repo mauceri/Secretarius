@@ -1,4 +1,4 @@
-"""Tests de l'endpoint /capture de server.py."""
+"""Tests des endpoints /capture et /query de server.py."""
 
 from __future__ import annotations
 
@@ -45,3 +45,31 @@ class TestHandleCapture:
         data = response.get_json()
         assert data["status"] == "ok"
         assert data["filename"].endswith(".md")
+
+
+class TestHandleQuery:
+    def test_returns_history_slug_and_brief(self, client, monkeypatch):
+        class _Result:
+            text = "Synthèse."
+            references = ["c-test"]
+            saved_slug = ""
+            history_slug = "20260908-120000-question-test"
+            brief = "Résumé bref."
+
+        class _Q:
+            mode = "hybrid"
+
+            def query(self, question, top_k=5, save=False):
+                return _Result()
+
+        import server
+        monkeypatch.setattr(server, "_wq", _Q())
+
+        response = client.post("/query", json={"question": "Question ?"})
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["text"] == "Synthèse."
+        assert data["references"] == ["c-test"]
+        assert data["history_slug"] == "20260908-120000-question-test"
+        assert data["brief"] == "Résumé bref."
