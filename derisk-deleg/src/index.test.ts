@@ -730,3 +730,54 @@ describe("before_agent_reply — régime de réponse par canal (query)", () => {
     expect(runWikiOpSpy).toHaveBeenCalledWith(api, "query", "question test", undefined, "brief");
   });
 });
+
+describe("before_agent_reply — commande / tapée explicitement vs intention devinée", () => {
+  function stubRouter(command: string, args: string) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: true, json: async () => ({ status: "ok", command, args }) })),
+    );
+  }
+
+  it("/c tapé explicitement s'exécute sans passer par /confirm", async () => {
+    stubRouter("/c", "https://exemple.com");
+    const runWikiOpSpy = vi.fn(async () => "Capturé.");
+    vi.doMock("./wiki-ops.js", () => ({ runWikiOp: runWikiOpSpy }));
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/c https://exemple.com" });
+
+    expect(runWikiOpSpy).toHaveBeenCalledWith(api, "capture", "https://exemple.com", undefined, "brief");
+    expect(res.reply.text).not.toContain("/confirm");
+  });
+
+  it("la même écriture devinée en langage naturel attend toujours /confirm", async () => {
+    stubRouter("/c", "https://exemple.com");
+    const runWikiOpSpy = vi.fn(async () => "Capturé.");
+    vi.doMock("./wiki-ops.js", () => ({ runWikiOp: runWikiOpSpy }));
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "capture cette page https://exemple.com" });
+
+    expect(runWikiOpSpy).not.toHaveBeenCalled();
+    expect(res.reply.text).toContain("/confirm");
+  });
+
+  it("/ingest sans argument tapé explicitement s'exécute aussi directement", async () => {
+    stubRouter("/ingest", "");
+    const runWikiOpSpy = vi.fn(async () => "Ingestion lancée en arrière-plan.");
+    vi.doMock("./wiki-ops.js", () => ({ runWikiOp: runWikiOpSpy }));
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/ingest" });
+
+    expect(runWikiOpSpy).toHaveBeenCalledWith(api, "ingest", "", undefined, "brief");
+    expect(res.reply.text).not.toContain("/confirm");
+  });
+});

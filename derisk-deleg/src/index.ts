@@ -505,10 +505,18 @@ export default definePluginEntry({
         };
       }
 
+      // Une commande TAPÉE explicitement ("/c https://…") est un ordre direct
+      // de l'utilisateur : elle s'exécute telle quelle. Seule une écriture
+      // INFÉRÉE du langage naturel passe par /confirm — c'est l'inférence,
+      // pas l'écriture, qui justifie la confirmation.
+      const typed = text.trim().toLowerCase();
+      const routedCmd = routed.command.toLowerCase();
+      const explicitCommand = typed === routedCmd || typed.startsWith(routedCmd + " ");
+
       if (action.kind === "wiki") {
         // Écriture inférée en langage naturel : jamais exécutée directement,
         // même logique de mise en attente que gog_send/gog_reply.
-        if (!WIKI_READ_OPS.has(action.op)) {
+        if (!explicitCommand && !WIKI_READ_OPS.has(action.op)) {
           pending = { kind: "router-write", op: action.op, args: routed.args, ts: Date.now() };
           return {
             handled: true,
