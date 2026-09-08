@@ -17,4 +17,20 @@ describe("commandToAction", () => {
   it("retourne null pour une commande inconnue", () => {
     expect(commandToAction("/inexistant")).toBeNull();
   });
+
+  it("mappe /r vers wiki search", () => {
+    expect(commandToAction("/r")).toEqual({ kind: "wiki", op: "search" });
+  });
+
+  it("mappe /tags vers wiki tags", () => {
+    expect(commandToAction("/tags")).toEqual({ kind: "wiki", op: "tags" });
+  });
+
+  it("mappe /kbupdate vers wiki kb_update", () => {
+    expect(commandToAction("/kbupdate")).toEqual({ kind: "wiki", op: "kb_update" });
+  });
+
+  it("mappe /lire vers gog get", () => {
+    expect(commandToAction("/lire")).toEqual({ kind: "gog", op: "get" });
+  });
 });

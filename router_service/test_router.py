@@ -121,6 +121,41 @@ def test_explicit_command_empty_required_arg_returns_usage(monkeypatch):
     assert "/c" in r["reply"]
 
 
+def test_explicit_r_bypasses_slm(monkeypatch):
+    monkeypatch.setattr(router_server, "call_adapter",
+                        lambda m: (_ for _ in ()).throw(AssertionError("SLM appelé")))
+    r = router_server.route_message("/r transformers attention")
+    assert r == {"status": "ok", "command": "/r", "args": "transformers attention"}
+
+
+def test_explicit_r_empty_arg_returns_usage(monkeypatch):
+    monkeypatch.setattr(router_server, "call_adapter", lambda m: ("/ingest", ""))
+    r = router_server.route_message("/r")
+    assert r["status"] == "answer"
+    assert "/r" in r["reply"]
+
+
+def test_explicit_tags_kbupdate_no_arg_needed(monkeypatch):
+    monkeypatch.setattr(router_server, "call_adapter",
+                        lambda m: (_ for _ in ()).throw(AssertionError("SLM appelé")))
+    assert router_server.route_message("/tags") == {"status": "ok", "command": "/tags", "args": ""}
+    assert router_server.route_message("/kbupdate") == {"status": "ok", "command": "/kbupdate", "args": ""}
+
+
+def test_explicit_lire_bypasses_slm(monkeypatch):
+    monkeypatch.setattr(router_server, "call_adapter",
+                        lambda m: (_ for _ in ()).throw(AssertionError("SLM appelé")))
+    r = router_server.route_message("/lire 18ab3f2")
+    assert r == {"status": "ok", "command": "/lire", "args": "18ab3f2"}
+
+
+def test_explicit_lire_empty_arg_returns_usage(monkeypatch):
+    monkeypatch.setattr(router_server, "call_adapter", lambda m: ("/ingest", ""))
+    r = router_server.route_message("/lire")
+    assert r["status"] == "answer"
+    assert "/lire" in r["reply"]
+
+
 def test_unknown_slash_command_still_reaches_slm(monkeypatch):
     called = {"n": 0}
 

@@ -12,6 +12,10 @@ const TABLE = {
     "/inbox": { kind: "gog", op: "inbox" },
     "/drive": { kind: "gog", op: "drive_search" },
     "/repondre": { kind: "gog-reply" },
+    "/r": { kind: "wiki", op: "search" },
+    "/tags": { kind: "wiki", op: "tags" },
+    "/kbupdate": { kind: "wiki", op: "kb_update" },
+    "/lire": { kind: "gog", op: "get" },
 };
 export function commandToAction(command) {
     return TABLE[command] ?? null;

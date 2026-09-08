@@ -51,7 +51,7 @@ def call_adapter(message: str):
 
 # Commandes qui exigent un argument : un appel sans argument est une erreur
 # d'usage, pas une capture/requête vide à déléguer.
-NEEDS_ARG = {"/c", "/q", "/source", "/chercher", "/repondre"}
+NEEDS_ARG = {"/c", "/q", "/source", "/chercher", "/repondre", "/r", "/lire"}
 
 
 def route_message(message: str) -> dict:

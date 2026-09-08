@@ -9,8 +9,8 @@ from pathlib import Path
 import torch
 import torch.nn.functional as F
 
-WIKI_CMDS = {"/c", "/q", "/ingest", "/source", "/wikistatus"}
-GOG_CMDS = {"/chercher", "/connecter", "/inbox", "/drive", "/repondre"}
+WIKI_CMDS = {"/c", "/q", "/ingest", "/source", "/wikistatus", "/r", "/tags", "/kbupdate"}
+GOG_CMDS = {"/chercher", "/connecter", "/inbox", "/drive", "/repondre", "/lire"}
 # Corpus des centroïdes : relatif au dépôt (router.py est dans router_service/),
 # surchargeable par GEN_CORPUS_DIR. Plus de chemin machine en dur.
 _GEN_CORPUS = Path(os.environ.get(

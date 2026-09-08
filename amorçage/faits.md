@@ -48,6 +48,10 @@ L'agent gog donne accès au compte Google de l'utilisateur : messagerie Gmail et
 ## Quelle commande pour retrouver un mail ?
 Utilisez /chercher <critères> : recherche par mot-clé, expéditeur ou période. /inbox liste les emails récents.
 
+## Comment lire le contenu d'un email ?
+## Quelle commande pour ouvrir un mail précis ?
+Utilisez /lire <id> : lit le contenu d'un email par son identifiant, obtenu via /inbox ou /chercher.
+
 ## Comment répondre à un email ?
 ## Quelle commande pour préparer une réponse à un mail ?
 Utilisez /repondre <contexte> : cela prépare un brouillon. Aucun email n'est envoyé automatiquement — il n'est expédié qu'après confirmation par /confirm.
