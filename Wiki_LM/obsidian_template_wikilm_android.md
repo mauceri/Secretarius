@@ -2,6 +2,11 @@
 // Template Templater — Interroger Wiki_LM depuis Obsidian desktop/Android (via Tailscale)
 // Nécessite : server.py lancé sur sanroque
 // requestUrl contourne le CSP d'Electron, contrairement à fetch()
+//
+// N'insère plus la réponse dans la note en cours : le serveur écrit lui-même
+// un enregistrement horodaté dans Wiki_LM/historique/, ce template se
+// contente de l'ouvrir dans un nouvel onglet. Appeler via Templater > Open
+// Insert Template modal (pas "Create new note from template").
 
 const WIKI_SERVER = "http://sanroque:5051";
 
@@ -34,14 +39,11 @@ try {
     return;
 }
 
-const refs = (data.references || []).map(r => `[[${r}]]`).join(", ");
-const block = [
-    `## Q : ${question}`,
-    ``,
-    data.text,
-    ``,
-    `*Sources : ${refs || "(aucune)"}*`,
-].join("\n");
-
-tR += block;
+const historyPath = `Wiki_LM/historique/${data.history_slug}.md`;
+const file = app.vault.getAbstractFileByPath(historyPath);
+if (file) {
+    await app.workspace.getLeaf(true).openFile(file);
+} else {
+    new Notice(`Wiki_LM : note d'historique introuvable (${historyPath})`, 8000);
+}
 %>
