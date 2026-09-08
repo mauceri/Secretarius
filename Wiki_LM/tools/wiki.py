@@ -11,6 +11,7 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote
 
 def _bootstrap_api_key() -> None:
     # OpenClaw 6.1 efface les valeurs de secret du templating de sandbox.docker.env :
@@ -89,12 +90,23 @@ def op_capture(text: str) -> dict:
     return {"files": [p.name for p in created if p is not None]}
 
 
+def _build_obsidian_uri(history_slug: str) -> str:
+    vault_root = _wiki_root().parent
+    rel_path = f"Wiki_LM/historique/{history_slug}"
+    return f"obsidian://open?vault={quote(vault_root.name, safe='')}&file={quote(rel_path, safe='')}"
+
+
 def op_query(question: str) -> dict:
     try:
         result = WikiQuery(_wiki_root()).query(question)
         if not result.text:
             return {"error": "KB vide — lancer ingest d'abord"}
-        return {"synthesis": result.text, "references": result.references}
+        return {
+            "synthesis": result.text,
+            "references": result.references,
+            "brief": result.brief,
+            "obsidian_uri": _build_obsidian_uri(result.history_slug),
+        }
     except Exception as exc:
         return {"error": str(exc)}
 

@@ -50,6 +50,8 @@ def test_query_returns_synthesis(monkeypatch, tmp_path):
     class _R:
         text = "Synthèse."
         references = ["src-a"]
+        history_slug = "20260908-120000-question"
+        brief = "Résumé."
 
     class _Q:
         def __init__(self, *a, **k):
@@ -60,7 +62,11 @@ def test_query_returns_synthesis(monkeypatch, tmp_path):
 
     monkeypatch.setattr(wiki, "WikiQuery", _Q)
     out = wiki.op_query("question ?")
-    assert out == {"synthesis": "Synthèse.", "references": ["src-a"]}
+    assert out["synthesis"] == "Synthèse."
+    assert out["references"] == ["src-a"]
+    assert out["brief"] == "Résumé."
+    assert out["obsidian_uri"].startswith("obsidian://open?vault=")
+    assert "&file=Wiki_LM%2Fhistorique%2F20260908-120000-question" in out["obsidian_uri"]
 
 
 def test_query_empty_kb(monkeypatch, tmp_path):
