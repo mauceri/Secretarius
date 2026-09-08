@@ -26,6 +26,7 @@ from pathlib import Path
 
 import frontmatter
 
+from capture import slugify, timestamp
 from llm import LLM
 from search import WikiSearch, WikiSemanticSearch, hybrid_search
 
@@ -40,6 +41,8 @@ class QueryResult:
     text: str                          # synthèse en Markdown
     references: list[str] = field(default_factory=list)   # slugs utilisés
     saved_slug: str = ""               # slug de la page synth- si --save
+    history_slug: str = ""             # slug de l'enregistrement horodaté (historique/)
+    brief: str = ""                    # résumé court (canaux à espace limité, ex. Telegram)
 
     def __str__(self) -> str:
         refs = ", ".join(f"[[{r}]]" for r in self.references)
@@ -96,6 +99,21 @@ sources: [<slugs utilisés, séparés par des virgules>]
 <Corps de la synthèse, réorganisé si nécessaire>
 """
 
+_SYSTEM_BRIEF = """\
+Tu résumes une réponse de wiki personnel en 1 à 2 phrases très courtes, \
+pour un message de chat. Pas de Markdown, pas de citations [[slug]], \
+juste le sens en langage naturel."""
+
+_PROMPT_BRIEF = """\
+Question : {question}
+
+Réponse complète :
+---
+{synthesis}
+---
+
+Résume cette réponse en 1 à 2 phrases courtes."""
+
 
 # ---------------------------------------------------------------------------
 # Moteur de query
@@ -149,6 +167,8 @@ class WikiQuery:
         references = list(dict.fromkeys(cited or slugs))  # ordre de première apparition
 
         result = QueryResult(question=question, text=synthesis, references=references)
+        result.history_slug = self._write_history(question, str(result))
+        result.brief = self._generate_brief(question, synthesis)
 
         # 5. Optionnel : sauvegarder comme page synth-
         if save:
@@ -224,6 +244,26 @@ class WikiQuery:
         today = datetime.date.today().isoformat()
         with log_path.open("a", encoding="utf-8") as f:
             f.write(f"\n## [{today}] {operation} | {title}\n")
+
+    def _write_history(self, question: str, content: str) -> str:
+        """Enregistre la requête et sa réponse complète, horodaté, hors de
+        l'arbre indexé (jamais dans wiki/, jamais vu par la recherche ou
+        l'ingestion). Retourne le slug (sans extension)."""
+        history_dir = self.wiki_root / "historique"
+        history_dir.mkdir(parents=True, exist_ok=True)
+        slug = f"{timestamp()}-{slugify(question)}"
+        (history_dir / f"{slug}.md").write_text(content, encoding="utf-8")
+        return slug
+
+    def _generate_brief(self, question: str, synthesis: str) -> str:
+        """Résumé court pour les canaux à espace limité (ex. Telegram). Ne
+        doit jamais faire échouer query() : repli sur une troncature simple
+        si l'appel LLM échoue."""
+        try:
+            prompt = _PROMPT_BRIEF.format(question=question, synthesis=synthesis)
+            return self.llm.complete(prompt, system=_SYSTEM_BRIEF, max_tokens=120).strip()
+        except Exception:
+            return synthesis[:300]
 
 
 # ---------------------------------------------------------------------------
