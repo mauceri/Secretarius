@@ -114,9 +114,15 @@ export function formatWikiResult(op: string, json: any, regime: WikiOpRegime = "
       const brief = typeof json?.brief === "string" ? json.brief.trim() : "";
       const uri = typeof json?.obsidian_uri === "string" ? json.obsidian_uri : "";
       if (!brief && !uri) return "Réponse wiki vide ou inattendue.";
+      // PAS de <a href="obsidian://...">: envoyer ce schéma d'URI comme
+      // lien cliquable a bloqué la livraison Telegram en test réel (la
+      // génération de la réponse est rapide — 6s — mais rien n'était jamais
+      // envoyé, probablement une tentative d'aperçu de lien qui reste
+      // bloquée sur un schéma non http(s)). Texte brut échappé : fiable
+      // mais non cliquable, en attendant une solution qui l'est aussi.
       const parts: string[] = [];
       if (brief) parts.push(escapeHtml(brief));
-      if (uri) parts.push(`<a href="${uri}">Voir la réponse complète</a>`);
+      if (uri) parts.push(escapeHtml(uri));
       return parts.join("\n\n");
     }
     case "capture": {
