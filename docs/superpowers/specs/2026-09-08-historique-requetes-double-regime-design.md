@@ -1,4 +1,4 @@
-# Historique des requêtes — double régime Telegram/Obsidian pour /q
+# Historique des requêtes — régime par canal (Telegram/WebChat/Obsidian) pour /q
 
 - Date : 2026-09-08
 - Statut : design validé, en attente d'exécution
@@ -14,11 +14,12 @@ tronquées à 4000 caractères (`formatWikiResult` → `out.slice(0, 4000)` dans
 d'OpenClaw envoie en `parse_mode: "HTML"`, jamais converti — sujet déjà
 diagnostiqué séparément, non traité ici).
 
-Il existe donc en réalité **deux régimes de lecture**, jamais distingués dans
-le code : un régime Telegram (message court, consultation rapide) et un
-régime Obsidian (note complète, navigable, sans contrainte de taille). Ce
-design fait cette distinction explicite au lieu de servir le même texte aux
-deux.
+Il existe donc en réalité plusieurs **régimes de lecture**, jamais distingués
+dans le code : un régime Telegram (message court, consultation rapide, rendu
+HTML strict), un régime WebChat (rend le Markdown correctement, mais reste un
+fil de chat) et un régime Obsidian (note complète, navigable, sans contrainte
+de taille). Ce design fait cette distinction explicite au lieu de servir le
+même texte à tous.
 
 ## Objectif
 
@@ -26,16 +27,22 @@ deux.
   de synthèse tronquée en plein message.
 - Dans Obsidian : la réponse complète reste disponible, mais dans une note
   séparée plutôt qu'insérée brutalement dans la note en cours de lecture.
-- Toute requête, quelle que soit son origine (Telegram ou Obsidian), doit
-  produire un enregistrement horodaté consultable — pas seulement celles
-  passées par un flag `--save` explicite.
+- Toute requête, quelle que soit son origine (Telegram, WebChat ou
+  Obsidian), doit produire un enregistrement horodaté consultable — pas
+  seulement celles passées par un flag `--save` explicite. Ceci est un
+  effet de bord gratuit du point d'écriture unique (voir plus bas) : aucune
+  logique supplémentaire par canal n'est nécessaire pour ce point précis.
+- Sur WebChat (app web/Control UI d'OpenClaw), qui rend le Markdown
+  correctement contrairement à Telegram : régime complet conservé (pas de
+  brief+lien), car ce n'est pas le même problème de rendu cassé.
 
 ## Périmètre
 
 **Inclus** : l'opération `query` (`/q` et son routage en langage naturel),
-côté `Wiki_LM/tools/query.py` (source unique), `wiki.py` (façade CLI/sandbox
-Telegram), `server.py` (façade Flask Obsidian), `derisk-deleg/src/wiki-ops.ts`
-(formatage Telegram), les deux templates Templater Obsidian.
+côté `Wiki_LM/tools/query.py` (source unique), `wiki.py` (façade CLI/sandbox,
+utilisée par Telegram et WebChat), `server.py` (façade Flask Obsidian),
+`derisk-deleg/src/wiki-ops.ts` et `index.ts` (formatage par canal),
+les deux templates Templater Obsidian.
 
 **Exclus** :
 - `/r` (search) : renvoie déjà des extraits courts (5 résultats × excerpt),
@@ -64,6 +71,8 @@ Telegram), `server.py` (façade Flask Obsidian), `derisk-deleg/src/wiki-ops.ts`
 | Lien Telegram | URI `obsidian://open?vault=<nom coffre>&file=<chemin encodé>` |
 | Point d'écriture unique | `WikiQuery.query()` dans `query.py` — `wiki.py::op_query` et `server.py::handle_query` en héritent sans dupliquer la logique |
 | Régime Obsidian | Le template ouvre la note d'historique déjà écrite par le serveur dans un nouvel onglet, au lieu d'insérer le texte dans la note courante |
+| Détection du canal (Telegram vs WebChat) | Le hook `before_agent_reply` reçoit un second paramètre `ctx` (`PluginHookAgentContext`) exposant `ctx.messageProvider`, actuellement ignoré par `derisk-deleg`. On le lit pour choisir le régime : `"webchat"` → complet, tout le reste (`"telegram"`, absent) → bref+lien. La chaîne exacte `"webchat"` est confirmée présente dans le bundle OpenClaw comme identifiant de canal, mais pas vérifiée comme étant précisément la valeur de `ctx.messageProvider` en conditions réelles — à confirmer par un test manuel (log de `ctx.messageProvider` sur un message WebChat réel) en tout début d'implémentation, avant d'écrire la logique qui en dépend |
+| Régime par défaut | Bref+lien (comportement le plus sûr) partout où le canal n'est pas identifiable — notamment le chemin des outils enregistrés (`wiki_query` etc.), que l'agent LLM peut invoquer de sa propre initiative et pour lequel le SDK n'expose aucun contexte de canal à `execute()` |
 
 ## Architecture
 
@@ -154,12 +163,19 @@ return jsonify({
 })
 ```
 
-### `derisk-deleg/src/wiki-ops.ts` — formatage Telegram
+### `derisk-deleg/src/wiki-ops.ts` — formatage par régime
 
-`formatWikiResult`, cas `"query"` :
+`formatWikiResult` et `runWikiOp` gagnent un paramètre optionnel
+`regime: "brief" | "full" = "brief"` (dernier paramètre, valeur par défaut
+pour ne pas casser les appelants existants). Cas `"query"` :
 
 ```typescript
 case "query": {
+  if (regime === "full") {
+    return typeof json?.synthesis === "string" && json.synthesis.trim()
+      ? json.synthesis
+      : "Réponse wiki vide ou inattendue.";
+  }
   const brief = typeof json?.brief === "string" ? json.brief.trim() : "";
   const uri = typeof json?.obsidian_uri === "string" ? json.obsidian_uri : "";
   if (!brief && !uri) return "Réponse wiki vide ou inattendue.";
@@ -167,10 +183,24 @@ case "query": {
 }
 ```
 
-Remplace le comportement actuel (`json.synthesis` verbatim). C'est le point
-de correction exact du dump verbeux sur `/q` via Telegram — `synthesis`
-reste dans le JSON (inutilisé par ce chemin, disponible si un futur appelant
-en a besoin) mais n'est plus jamais envoyé sur Telegram.
+Dans `index.ts`, la branche `before_agent_reply` qui gère `action.kind ===
+"wiki"` (dispatch déterministe — c'est le chemin réel d'un `/q` tapé ou
+routé en langage naturel, sur n'importe quel canal) lit `ctx.messageProvider`
+et détermine `regime` avant d'appeler `runWikiOp(api, action.op, routed.args,
+undefined, regime)`. Le hook doit donc être modifié pour capturer son
+second paramètre (`api.on("before_agent_reply", async (event, ctx) =>
+{ ... })`, actuellement `ctx` n'est jamais lu).
+
+Les outils enregistrés (`wiki_query`, etc.), que l'agent LLM peut appeler
+de sa propre initiative, n'ont pas accès à cette information (signature
+SDK `execute(toolCallId, params, signal?, onUpdate?)`, sans contexte de
+canal) — ils utilisent donc le régime par défaut (`"brief"`), un choix
+délibéré et documenté, pas un oubli.
+
+Remplace le comportement actuel (`json.synthesis` verbatim, envoyé sans
+distinction à tous les canaux). C'est le point de correction exact du dump
+verbeux sur `/q` via Telegram — `synthesis` reste dans le JSON dans tous
+les cas (nécessaire au régime `"full"`, inutilisé en régime `"brief"`).
 
 ### Templates Obsidian (`obsidian_template_wikilm.md`, `_android.md`)
 
@@ -215,8 +245,16 @@ JavaScript.
 - `Wiki_LM/tests/test_wiki_cli.py` : `op_query` inclut `brief` et
   `obsidian_uri` dans le JSON retourné ; URI correctement encodée.
 - `derisk-deleg/src/wiki-ops.test.ts` (fichier existant) : cas `query` avec
-  `brief`+`obsidian_uri` présents ; cas `brief` vide mais `obsidian_uri`
-  présent (et inversement) ; cas des deux absents (message de repli).
+  `brief`+`obsidian_uri` présents (régime par défaut/`"brief"`) ; cas
+  `brief` vide mais `obsidian_uri` présent (et inversement) ; cas des deux
+  absents (message de repli) ; régime `"full"` renvoie `synthesis` verbatim,
+  y compris quand `brief`/`obsidian_uri` sont aussi présents (ne doit pas
+  les préférer par erreur).
+- `derisk-deleg/src/index.test.ts` (fichier existant) : la branche wiki du
+  dispatch déterministe choisit `regime: "full"` quand
+  `ctx.messageProvider === "webchat"`, et `"brief"` sinon (Telegram, canal
+  absent/inconnu) — régression à couvrir explicitement puisque c'est un
+  comportement par défaut sur lequel toute erreur serait silencieuse.
 
 ## Documentation
 
