@@ -368,7 +368,7 @@ export default definePluginEntry({
         // le modèle. Le modèle n'a donc aucun outil confirm/cancel à appeler (fini les
         // appels erratiques). L'utilisateur seul déclenche ces commandes ; le hook
         // exécute l'action, répond, et réclame le message (handled:true => pas de modèle).
-        api.on("before_agent_reply", async (event) => {
+        api.on("before_agent_reply", async (event, ctx) => {
             const text = String(event?.cleanedBody ?? "");
             // Retour OAuth : si une autorisation est en attente, le message courant est
             // l'URL de redirection à injecter dans le pont gog.
@@ -467,7 +467,11 @@ export default definePluginEntry({
                         },
                     };
                 }
-                const out = await runWikiOp(api, action.op, routed.args);
+                // WebChat rend le Markdown correctement (contrairement à Telegram) :
+                // synthèse complète conservée pour ce canal. Bref+lien partout
+                // ailleurs, y compris si le canal n'est pas identifiable (défaut sûr).
+                const regime = ctx?.messageProvider === "webchat" ? "full" : "brief";
+                const out = await runWikiOp(api, action.op, routed.args, undefined, regime);
                 return { handled: true, reply: { text: out.slice(0, 4000) } };
             }
             if (action.kind === "scout") {

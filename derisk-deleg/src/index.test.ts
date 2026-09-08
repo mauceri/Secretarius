@@ -69,6 +69,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
+  vi.doUnmock("./wiki-ops.js");
 });
 
 describe("outils gog_* — délégation au sous-agent gog", () => {
@@ -676,5 +677,56 @@ describe("before_tool_call — garde-fou gog (écriture directe bloquée)", () =
     );
 
     expect(res).toBeUndefined();
+  });
+});
+
+describe("before_agent_reply — régime de réponse par canal (query)", () => {
+  function stubRouterQuery() {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ status: "ok", command: "/q", args: "question test" }),
+      })),
+    );
+  }
+
+  it("WebChat (ctx.messageProvider === 'webchat') → runWikiOp reçoit regime 'full'", async () => {
+    stubRouterQuery();
+    const runWikiOpSpy = vi.fn(async () => "réponse simulée");
+    vi.doMock("./wiki-ops.js", () => ({ runWikiOp: runWikiOpSpy }));
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    await hooks["before_agent_reply"].handler({ cleanedBody: "question test" }, { messageProvider: "webchat" });
+
+    expect(runWikiOpSpy).toHaveBeenCalledWith(api, "query", "question test", undefined, "full");
+  });
+
+  it("Telegram (ctx.messageProvider === 'telegram') → runWikiOp reçoit regime 'brief'", async () => {
+    stubRouterQuery();
+    const runWikiOpSpy = vi.fn(async () => "réponse simulée");
+    vi.doMock("./wiki-ops.js", () => ({ runWikiOp: runWikiOpSpy }));
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    await hooks["before_agent_reply"].handler({ cleanedBody: "question test" }, { messageProvider: "telegram" });
+
+    expect(runWikiOpSpy).toHaveBeenCalledWith(api, "query", "question test", undefined, "brief");
+  });
+
+  it("ctx absent (canal inconnu) → runWikiOp reçoit regime 'brief'", async () => {
+    stubRouterQuery();
+    const runWikiOpSpy = vi.fn(async () => "réponse simulée");
+    vi.doMock("./wiki-ops.js", () => ({ runWikiOp: runWikiOpSpy }));
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    await hooks["before_agent_reply"].handler({ cleanedBody: "question test" });
+
+    expect(runWikiOpSpy).toHaveBeenCalledWith(api, "query", "question test", undefined, "brief");
   });
 });
