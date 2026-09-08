@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { formatWikiResult, runWikiOp } from "./wiki-ops.js";
 
 describe("formatWikiResult", () => {
-  it("query : renvoie la synthèse verbatim", () => {
-    expect(formatWikiResult("query", { synthesis: "# GPU TEE\n…", references: ["c-x"] }))
+  it("query (regime full) : renvoie la synthèse verbatim", () => {
+    expect(formatWikiResult("query", { synthesis: "# GPU TEE\n…", references: ["c-x"] }, "full"))
       .toBe("# GPU TEE\n…");
   });
   it("query : erreur surfacée verbatim", () => {
@@ -48,10 +48,30 @@ describe("formatWikiResult", () => {
       .toBe("clusterings/ introuvable");
   });
   it("erreur vide → ne renvoie pas un message vide (retombe sur l'op)", () => {
-    expect(formatWikiResult("query", { error: "", synthesis: "# X" })).toBe("# X");
+    expect(formatWikiResult("query", { error: "", synthesis: "# X" }, "full")).toBe("# X");
   });
   it("erreur générique inconnue → message par défaut", () => {
     expect(formatWikiResult("query", {})).toBe("Réponse wiki vide ou inattendue.");
+  });
+  it("query (regime brief, défaut) : résumé + lien", () => {
+    expect(formatWikiResult("query", {
+      synthesis: "# X", brief: "Résumé.", obsidian_uri: "obsidian://open?vault=V&file=F",
+    })).toBe("Résumé.\n\nobsidian://open?vault=V&file=F");
+  });
+  it("query (regime brief) : brief vide → lien seul", () => {
+    expect(formatWikiResult("query", { brief: "", obsidian_uri: "obsidian://open?vault=V&file=F" }))
+      .toBe("obsidian://open?vault=V&file=F");
+  });
+  it("query (regime brief) : lien absent → brief seul", () => {
+    expect(formatWikiResult("query", { brief: "Résumé.", obsidian_uri: "" })).toBe("Résumé.");
+  });
+  it("query (regime brief) : les deux absents → message par défaut", () => {
+    expect(formatWikiResult("query", { synthesis: "# X" })).toBe("Réponse wiki vide ou inattendue.");
+  });
+  it("query (regime full) : ignore brief/obsidian_uri même présents", () => {
+    expect(formatWikiResult("query",
+      { synthesis: "# X", brief: "Résumé.", obsidian_uri: "obsidian://open?vault=V&file=F" }, "full"))
+      .toBe("# X");
   });
 });
 
@@ -60,7 +80,7 @@ describe("runWikiOp", () => {
 
   it("parse le JSON et formate", async () => {
     const out = await runWikiOp(null, "query", "tee gpu",
-      okExec('{"synthesis": "# GPU TEE", "references": []}'));
+      okExec('{"synthesis": "# GPU TEE", "references": []}'), "full");
     expect(out).toBe("# GPU TEE");
   });
   it("passe op et arg à l'exec", async () => {
@@ -79,7 +99,18 @@ describe("runWikiOp", () => {
   });
   it("ignore les lignes de diagnostic avant le JSON (JSON = dernière ligne)", async () => {
     const stdout = '[query] Embeddings absents — mode BM25 uniquement. Lancez embed.py.\n{"synthesis": "# GPU TEE", "references": []}';
-    const out = await runWikiOp(null, "query", "tee gpu", async () => ({ code: 0, stdout, stderr: "" }));
+    const out = await runWikiOp(null, "query", "tee gpu", async () => ({ code: 0, stdout, stderr: "" }), "full");
     expect(out).toBe("# GPU TEE");
+  });
+  it("passe le régime à formatWikiResult (full → synthèse verbatim)", async () => {
+    const out = await runWikiOp(null, "query", "tee gpu",
+      okExec('{"synthesis": "# GPU TEE", "brief": "Résumé.", "obsidian_uri": "obsidian://x"}'),
+      "full");
+    expect(out).toBe("# GPU TEE");
+  });
+  it("régime par défaut (brief) : résumé + lien, pas la synthèse complète", async () => {
+    const out = await runWikiOp(null, "query", "tee gpu",
+      okExec('{"synthesis": "# GPU TEE", "brief": "Résumé.", "obsidian_uri": "obsidian://x"}'));
+    expect(out).toBe("Résumé.\n\nobsidian://x");
   });
 });

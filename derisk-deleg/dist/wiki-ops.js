@@ -56,7 +56,7 @@ export async function execWikiSandbox(api, argv) {
     }
 }
 // Compose execWikiSandbox : construit argv, exécute, parse JSON, formate ou renvoie erreur.
-export async function runWikiOp(api, op, arg, exec = execWikiSandbox) {
+export async function runWikiOp(api, op, arg, exec = execWikiSandbox, regime = "brief") {
     const argv = ["python3", "/wiki-tools/wiki.py", op];
     if (arg)
         argv.push(arg);
@@ -75,20 +75,28 @@ export async function runWikiOp(api, op, arg, exec = execWikiSandbox) {
     catch {
         return `Erreur wiki : sortie inattendue (${stdout.slice(0, 200)})`;
     }
-    return formatWikiResult(op, json);
+    return formatWikiResult(op, json, regime);
 }
 // Formatage déterministe du JSON de wiki.py en message utilisateur.
 // Aucune invention : sur erreur, on surface le texte de wiki.py verbatim.
-export function formatWikiResult(op, json) {
+export function formatWikiResult(op, json, regime = "brief") {
     if (json && typeof json.error === "string" && json.error.trim())
         return json.error;
     if (json && json.status === "error")
         return json.reason ?? json.error ?? "Erreur wiki.";
     switch (op) {
-        case "query":
-            return typeof json?.synthesis === "string" && json.synthesis.trim()
-                ? json.synthesis
-                : "Réponse wiki vide ou inattendue.";
+        case "query": {
+            if (regime === "full") {
+                return typeof json?.synthesis === "string" && json.synthesis.trim()
+                    ? json.synthesis
+                    : "Réponse wiki vide ou inattendue.";
+            }
+            const brief = typeof json?.brief === "string" ? json.brief.trim() : "";
+            const uri = typeof json?.obsidian_uri === "string" ? json.obsidian_uri : "";
+            if (!brief && !uri)
+                return "Réponse wiki vide ou inattendue.";
+            return [brief, uri].filter(Boolean).join("\n\n");
+        }
         case "capture": {
             const files = Array.isArray(json?.files) ? json.files : [];
             return files.length
