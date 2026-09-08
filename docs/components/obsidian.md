@@ -66,9 +66,11 @@ npx obsidian-headless sync-list-local
 ## Template de requête Wiki_LM (Templater)
 
 Interroger le wiki en langage naturel **directement depuis Obsidian** (desktop ou
-Android) : la synthèse et les liens `[[source]]` sont insérés dans la note courante.
-Le template appelle le serveur `wiki-lm-server` (port 5051, voir
-`docs/components/wiki-lm.md`). Fichier source : `Wiki_LM/obsidian_template_wikilm_android.md`.
+Android) : la réponse s'ouvre dans un **nouvel onglet** (note d'historique
+horodatée), jamais insérée dans la note en cours. Le template appelle le
+serveur `wiki-lm-server` (port 5051, voir `docs/components/wiki-lm.md`), qui
+écrit lui-même cette note dans `Wiki_LM/historique/`. Fichier source :
+`Wiki_LM/obsidian_template_wikilm_android.md`.
 
 ### Prérequis
 
@@ -94,7 +96,8 @@ Le template appelle le serveur `wiki-lm-server` (port 5051, voir
 2. Lancer le template : via le raccourci, ou Ctrl/Cmd-P → « Templater: Open Insert
    Template modal » → choisir le template.
 3. Choisir le **mode** (Hybride recommandé / Sémantique / BM25).
-4. Saisir la **question** → la synthèse + les sources s'insèrent au curseur.
+4. Saisir la **question** → la réponse s'ouvre dans un nouvel onglet (rien
+   n'est inséré dans la note en cours).
 
 ### Dépannage
 

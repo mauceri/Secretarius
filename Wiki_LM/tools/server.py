@@ -7,7 +7,7 @@ Usage :
 Endpoint :
     POST /query
     Body  : {"question": "...", "top_k": 5, "save": false, "mode": "hybrid"}
-    Reply : {"text": "...", "references": [...], "saved_slug": ""}
+    Reply : {"text": "...", "references": [...], "saved_slug": "", "history_slug": "...", "brief": "..."}
 
     POST /capture
     Body  : {"text": "...", "tags": ["..."]}

@@ -109,6 +109,12 @@ python tools/query.py "Comment fonctionne le Memex ?" --top 5
 python tools/query.py "Karpathy et les wikis" --top 5 --save
 ```
 
+Chaque requête écrit automatiquement un enregistrement horodaté dans
+`historique/` (hors de `wiki/`, non indexé, jamais vu par la recherche ni
+l'ingestion) : `<horodatage>-<slug question>.md`, avec la synthèse complète.
+Distinct du flag `--save`, qui écrit en plus une page polie et **indexée**
+dans `wiki/` (`synth-<slug>.md`).
+
 **`lint.py`** — Health-check du wiki
 
 ```bash
@@ -130,7 +136,7 @@ journalctl --user -u wiki-lm-server -f       # logs
 # Lancement manuel (debug) : python tools/server.py [--port 5051] [--mode hybrid]
 ```
 
-Endpoints : `POST /query` `{question, top_k, mode}` → `{text, references, saved_slug}` ;
+Endpoints : `POST /query` `{question, top_k, mode}` → `{text, references, saved_slug, history_slug, brief}` ;
 `GET /health` → `{status, pages}` ; `POST /reload` (reconstruit l'index) ;
 `POST /embed`, `POST /cluster` (tâches de fond).
 
