@@ -53,20 +53,24 @@ describe("formatWikiResult", () => {
   it("erreur générique inconnue → message par défaut", () => {
     expect(formatWikiResult("query", {})).toBe("Réponse wiki vide ou inattendue.");
   });
-  it("query (regime brief, défaut) : résumé + lien", () => {
+  it("query (regime brief, défaut) : résumé + lien cliquable en HTML", () => {
     expect(formatWikiResult("query", {
       synthesis: "# X", brief: "Résumé.", obsidian_uri: "obsidian://open?vault=V&file=F",
-    })).toBe("Résumé.\n\nobsidian://open?vault=V&file=F");
+    })).toBe('Résumé.\n\n<a href="obsidian://open?vault=V&file=F">Voir la réponse complète</a>');
   });
   it("query (regime brief) : brief vide → lien seul", () => {
     expect(formatWikiResult("query", { brief: "", obsidian_uri: "obsidian://open?vault=V&file=F" }))
-      .toBe("obsidian://open?vault=V&file=F");
+      .toBe('<a href="obsidian://open?vault=V&file=F">Voir la réponse complète</a>');
   });
   it("query (regime brief) : lien absent → brief seul", () => {
     expect(formatWikiResult("query", { brief: "Résumé.", obsidian_uri: "" })).toBe("Résumé.");
   });
   it("query (regime brief) : les deux absents → message par défaut", () => {
     expect(formatWikiResult("query", { synthesis: "# X" })).toBe("Réponse wiki vide ou inattendue.");
+  });
+  it("query (regime brief) : échappe &/</> dans le résumé (Telegram parse_mode HTML)", () => {
+    expect(formatWikiResult("query", { brief: "État & <politiciens> > citoyens", obsidian_uri: "" }))
+      .toBe("État &amp; &lt;politiciens&gt; &gt; citoyens");
   });
   it("query (regime full) : ignore brief/obsidian_uri même présents", () => {
     expect(formatWikiResult("query",
@@ -108,9 +112,9 @@ describe("runWikiOp", () => {
       "full");
     expect(out).toBe("# GPU TEE");
   });
-  it("régime par défaut (brief) : résumé + lien, pas la synthèse complète", async () => {
+  it("régime par défaut (brief) : résumé + lien HTML, pas la synthèse complète", async () => {
     const out = await runWikiOp(null, "query", "tee gpu",
       okExec('{"synthesis": "# GPU TEE", "brief": "Résumé.", "obsidian_uri": "obsidian://x"}'));
-    expect(out).toBe("Résumé.\n\nobsidian://x");
+    expect(out).toBe('Résumé.\n\n<a href="obsidian://x">Voir la réponse complète</a>');
   });
 });

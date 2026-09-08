@@ -90,6 +90,14 @@ export async function runWikiOp(
   return formatWikiResult(op, json, regime);
 }
 
+// Le canal Telegram envoie toujours en parse_mode "HTML" (jamais Markdown) :
+// un obsidian:// nu n'y est jamais cliquable (Telegram ne détecte pas les
+// schémas d'URI personnalisés en mode HTML), et tout &/</> non échappé dans
+// un texte généré par LLM casserait le rendu du message.
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 // Formatage déterministe du JSON de wiki.py en message utilisateur.
 // Aucune invention : sur erreur, on surface le texte de wiki.py verbatim.
 export function formatWikiResult(op: string, json: any, regime: WikiOpRegime = "brief"): string {
@@ -106,7 +114,10 @@ export function formatWikiResult(op: string, json: any, regime: WikiOpRegime = "
       const brief = typeof json?.brief === "string" ? json.brief.trim() : "";
       const uri = typeof json?.obsidian_uri === "string" ? json.obsidian_uri : "";
       if (!brief && !uri) return "Réponse wiki vide ou inattendue.";
-      return [brief, uri].filter(Boolean).join("\n\n");
+      const parts: string[] = [];
+      if (brief) parts.push(escapeHtml(brief));
+      if (uri) parts.push(`<a href="${uri}">Voir la réponse complète</a>`);
+      return parts.join("\n\n");
     }
     case "capture": {
       const files = Array.isArray(json?.files) ? json.files : [];
