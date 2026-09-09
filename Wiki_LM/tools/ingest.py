@@ -1054,7 +1054,8 @@ class Ingestor:
                     # .md = note en texte libre → page verbatim (pas de résumé) ;
                     # .pdf/.txt/.html = document → résumé conservé.
                     is_note = path.suffix.lower() == ".md"
-                    slug = self.ingest(str(path), max_concepts=max_concepts, extra_tags=user_tags or None, rename_raw=False, local_note=is_note)
+                    url_hint = self._extract_embedded_url(path.read_text(encoding="utf-8")) if is_note else ""
+                    slug = self.ingest(str(path), max_concepts=max_concepts, extra_tags=user_tags or None, rename_raw=False, local_note=is_note, url_hint=url_hint)
                 slugs.append(slug)
                 self._mark_ingested(path.name, slug=slug, file_hash=_file_hash(path))
             except Exception as e:
@@ -1075,6 +1076,21 @@ class Ingestor:
             line = line.strip()
             if line.startswith("url:"):
                 return line[4:].strip()
+            if line.startswith("http://") or line.startswith("https://"):
+                return line
+        return ""
+
+    @staticmethod
+    def _extract_embedded_url(text: str) -> str:
+        """Cherche une URL nue dans le corps d'une capture texte+URL.
+
+        capture_mixed() (capture.py) écrit texte et URL dans un même .md,
+        l'URL sur sa propre ligne — mais ingest_raw_dir() traite tout .md
+        comme note locale sans jamais relire cette ligne, perdant
+        lien_source. Corrige à la lecture, sans changer le format écrit.
+        """
+        for line in text.splitlines():
+            line = line.strip()
             if line.startswith("http://") or line.startswith("https://"):
                 return line
         return ""
@@ -1136,14 +1152,20 @@ class Ingestor:
         rename_raw: bool = True,
         note: str = "",
         local_note: bool = False,
+        url_hint: str = "",
     ) -> str:
-        """Ingère une source et retourne le slug de la page créée."""
+        """Ingère une source et retourne le slug de la page créée.
+
+        url_hint : URL trouvée dans le corps d'une note locale (capture
+        texte+URL) — reportée dans lien_source même quand `source` est un
+        chemin de fichier local, pas l'URL elle-même.
+        """
         print(f"[ingest] Lecture de la source : {source}")
         if content is None:
             content, title = _read_source(source)
         else:
             title = source.split("/")[-1] or source
-        source_url = source if source.startswith("http") else ""
+        source_url = source if source.startswith("http") else url_hint
 
         # Slug de la page source (éviter le double préfixe si le titre commence déjà par src-)
         base_slug = slug or _slugify(title)

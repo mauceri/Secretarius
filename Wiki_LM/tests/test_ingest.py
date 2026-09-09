@@ -424,6 +424,43 @@ class TestIngestLocalNote:
         ingestor.ingest_raw_dir()
         assert captured.get("local_note") is False
 
+    def test_extract_embedded_url_trouve_une_ligne_url(self):
+        from ingest import Ingestor
+        texte = "Dessin du Christ en une seule ligne:\n\nhttps://x.com/trad_west_/status/1\n"
+        assert Ingestor._extract_embedded_url(texte) == "https://x.com/trad_west_/status/1"
+
+    def test_extract_embedded_url_absente(self):
+        from ingest import Ingestor
+        assert Ingestor._extract_embedded_url("Une note sans aucune URL.") == ""
+
+    def test_md_avec_url_embarquee_passe_url_hint(self, ingestor, raw_dir):
+        # Reproduit capture_mixed() (capture.py) : texte + URL dans un même .md.
+        (raw_dir / "capture.md").write_text(
+            "Dessin du Christ en une seule ligne:\n\nhttps://x.com/trad_west_/status/1\n",
+            encoding="utf-8",
+        )
+        captured = {}
+
+        def fake_ingest(source, **kwargs):
+            captured.update(kwargs)
+            return "src-test"
+
+        ingestor.ingest = fake_ingest
+        ingestor.ingest_raw_dir()
+        assert captured.get("local_note") is True
+        assert captured.get("url_hint") == "https://x.com/trad_west_/status/1"
+
+    def test_md_avec_url_embarquee_produit_lien_source(self, ingestor, wiki_dir, raw_dir):
+        # Bout en bout (sans fake_ingest) : la page produite porte lien_source.
+        (raw_dir / "capture.md").write_text(
+            "Dessin du Christ en une seule ligne:\n\nhttps://x.com/trad_west_/status/1\n",
+            encoding="utf-8",
+        )
+        ingestor.ingest_raw_dir()
+        pages = list((wiki_dir / "sources").glob("src-*.md"))
+        assert pages, "aucune page source créée"
+        assert "lien_source: https://x.com/trad_west_/status/1" in pages[0].read_text()
+
 
 class TestParseRawTags:
     def test_plain_comma_separated(self, tmp_path: Path):
