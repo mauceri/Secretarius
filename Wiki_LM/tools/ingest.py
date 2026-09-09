@@ -897,6 +897,11 @@ class Ingestor:
             sources = post.get("sources", []) or []
             if not isinstance(sources, list):
                 sources = [sources]
+            # Le champ sources: est parfois malformé (ex. liste imbriquée
+            # écrite par erreur) — un élément non-chaîne (liste, dict) ne
+            # peut de toute façon pas être un slug, et ferait planter la
+            # comparaison ci-dessous (unhashable).
+            sources = [s for s in sources if isinstance(s, str)]
             remaining = [s for s in sources if s not in deleted_slugs]
             if len(remaining) == len(sources):
                 continue

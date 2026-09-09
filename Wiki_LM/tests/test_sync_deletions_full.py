@@ -123,6 +123,24 @@ class TestFinalizeDeletions:
         assert "c-multi" in index  # toujours valide sur disque, doit rester
         assert "c-single" not in index  # réellement mis en poubelle
 
+    def test_ignore_un_element_sources_malforme(self, ingestor, wiki_dir: Path):
+        """Régression (2026-09-09) : concepts/c-allegorie-exegetique.md avait
+        sources: [[src-philon-d-alexandrie]] (liste imbriquée par erreur) —
+        un élément non-chaîne fait planter la comparaison "in deleted_slugs"
+        (unhashable), bloquant TOUTE suppression tant que la page n'est pas
+        corrigée à la main. L'élément malformé doit être ignoré, pas planter."""
+        _write_page(wiki_dir, "sources", "src-orphan")
+        _write_page(wiki_dir, "concepts", "c-malforme", sources=[["src-orphan"]])
+
+        # Ne doit pas lever TypeError: unhashable type ('in deleted_slugs' sur
+        # l'élément imbriqué). L'élément malformé n'ayant jamais été un
+        # pointeur valide, la page n'a rien à perdre : elle n'est ni mise en
+        # poubelle ni marquée à-réviser, simplement laissée telle quelle.
+        affected = ingestor._cascade_deleted_slugs({"src-orphan"}, dry_run=False)
+
+        assert "c-malforme" not in affected
+        assert (wiki_dir / "concepts" / "c-malforme.md").exists()
+
 
 class TestManualRemove:
     def test_trash_page_full_removes_slug_everywhere(self, ingestor, wiki_dir: Path):
