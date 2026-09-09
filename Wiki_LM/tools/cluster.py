@@ -127,7 +127,13 @@ def _describe_cluster(
         "2. Une description de 2-3 phrases résumant ce groupe\n\n"
         "Format de réponse strict :\nTITRE: <titre>\nDESCRIPTION: <description>"
     )
-    response = llm.complete(prompt, max_tokens=200)
+    # 200 était trop juste : le titre passait, mais la description était
+    # régulièrement tronquée avant "DESCRIPTION:" (~50 % des grappes lors du
+    # premier clustering du wiki vivant, 2026-09-09) — silencieux, la ligne
+    # manquante fait juste retomber sur les défauts ("Cluster", ""). 350
+    # insuffisant aussi sur les résumés les plus verbeux (4 essais à 600 :
+    # 100 % complets, marge conservée).
+    response = llm.complete(prompt, max_tokens=600)
 
     title = "Cluster"
     description = ""

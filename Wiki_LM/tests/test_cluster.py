@@ -108,6 +108,26 @@ def test_describe_cluster_no_llm_returns_defaults():
     assert isinstance(desc, str)
 
 
+def test_describe_cluster_demande_assez_de_tokens():
+    """Régression (2026-09-09) : max_tokens=200 puis 350 tronquaient la
+    réponse avant DESCRIPTION: sur les résumés les plus verbeux (jusqu'à
+    ~1/3 des grappes lors du premier clustering du wiki vivant) — échec
+    silencieux, retombée sur les défauts ("Cluster", "")."""
+    from cluster import _describe_cluster
+
+    captured = {}
+
+    class MockLLM:
+        def complete(self, prompt: str, **kwargs) -> str:
+            captured.update(kwargs)
+            return "TITRE: T\nDESCRIPTION: D."
+
+    pages = {"src-a": {"title": "Titre A", "abstract": "Résumé A."}}
+    _describe_cluster("src-a", pages, MockLLM())
+
+    assert captured["max_tokens"] >= 500
+
+
 # ---------------------------------------------------------------------------
 # run_clustering — intégration
 # ---------------------------------------------------------------------------
