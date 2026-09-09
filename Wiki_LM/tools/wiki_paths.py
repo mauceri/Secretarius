@@ -35,6 +35,21 @@ def _load_dotenv() -> None:
 
 _load_dotenv()
 
+def wiki_root() -> Path:
+    """Racine Wiki_LM : $WIKI_PATH, ou la racine du dépôt local à défaut."""
+    return Path(os.environ.get("WIKI_PATH", str(Path(__file__).resolve().parent.parent)))
+
+
+def embeddings_dir() -> Path:
+    """Plongements de pages (embeddings_index.json + embeddings.npy).
+
+    Donnée dérivée, donc dans le coffre et non dans le dépôt : c'est le seul
+    emplacement visible à la fois de l'hôte et du sandbox de l'agent wiki,
+    où seul le coffre est monté.
+    """
+    return wiki_root() / "embeddings"
+
+
 CONTENT_SUBDIRS: list[str] = ["sources", "concepts", "entités"]
 CLUSTERING_SUBDIR: str = "clusterings"
 

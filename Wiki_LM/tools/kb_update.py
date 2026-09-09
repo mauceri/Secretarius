@@ -21,8 +21,9 @@ from pathlib import Path
 
 import frontmatter
 import numpy as np
+from wiki_paths import embeddings_dir
 
-_DEFAULT_EMBED_DIR = Path(__file__).resolve().parent.parent / "embeddings"
+_DEFAULT_EMBED_DIR = embeddings_dir()
 _DEFAULT_KB_DIR = Path.home() / "Documents" / "Arbath" / "Wiki_LM" / "knowledge_base"
 FUSION_THRESHOLD = 0.85
 MIN_SIZE = 3

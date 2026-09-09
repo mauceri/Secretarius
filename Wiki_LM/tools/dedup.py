@@ -22,9 +22,9 @@ from pathlib import Path
 import frontmatter
 import numpy as np
 
-from wiki_paths import iter_pages, slug_to_path
+from wiki_paths import embeddings_dir, iter_pages, slug_to_path
 
-EMBED_DIR = Path(__file__).resolve().parent.parent / "embeddings"
+EMBED_DIR = embeddings_dir()
 INDEX_FILE = "embeddings_index.json"
 MATRIX_FILE = "embeddings.npy"
 _MANIFEST = ".ingested"

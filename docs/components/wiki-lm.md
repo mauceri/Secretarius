@@ -154,8 +154,10 @@ Pour que les documents **ingérés après** le lancement deviennent cherchables 
 redémarrage, un thread surveille le dossier `wiki/` et **reconstruit l'index dès
 qu'un document change** (intervalle ~30 s, réglable via `WIKI_WATCH_INTERVAL`).
 Un rechargement immédiat reste possible : `curl -X POST http://localhost:5051/reload`.
-Note : l'index sémantique dépend des embeddings sur disque (`knowledge_base/embeddings/`) ;
-relancer `embed.py` pour les rafraîchir. En mode `hybrid` (défaut), BM25 couvre les
+Note : l'index sémantique dépend des embeddings sur disque
+(`$WIKI_PATH/embeddings/` — à ne pas confondre avec
+`knowledge_base/embeddings/`, qui contient les axes de la base de
+connaissances) ; relancer `embed.py` pour les rafraîchir. En mode `hybrid` (défaut), BM25 couvre les
 documents récents même sans embeddings à jour.
 
 ### Embeddings et similarité

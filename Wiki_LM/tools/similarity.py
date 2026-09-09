@@ -21,9 +21,9 @@ from pathlib import Path
 import frontmatter
 import numpy as np
 
-from wiki_paths import slug_to_path
+from wiki_paths import embeddings_dir, slug_to_path
 
-_EMBED_DIR = Path(__file__).resolve().parent.parent / "embeddings"
+_EMBED_DIR = embeddings_dir()
 
 
 class BaseSimilarity(ABC):

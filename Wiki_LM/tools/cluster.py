@@ -30,9 +30,9 @@ from similarity import (
     EmbeddingSimilarity,
     TagSimilarity,
 )
-from wiki_paths import CLUSTERING_SUBDIR
+from wiki_paths import CLUSTERING_SUBDIR, embeddings_dir
 
-_EMBED_DIR = Path(__file__).resolve().parent.parent / "embeddings"
+_EMBED_DIR = embeddings_dir()
 _DEFAULT_WIKI = os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Arbath/Wiki_LM"))
 
 
