@@ -97,3 +97,12 @@ def iter_pages(
         if not d.exists():
             continue
         yield from sorted(d.glob(pattern))
+
+
+def is_blank_page(post) -> bool:
+    """Vrai si une page n'a ni titre ni contenu exploitable (schéma
+    ``---\\n{}\\n---``, sans corps) — pollue la recherche BM25 et sémantique
+    sans apporter d'information."""
+    title = str(post.get("title", "")).strip()
+    body = post.content.strip() if hasattr(post, "content") else ""
+    return not title and not body

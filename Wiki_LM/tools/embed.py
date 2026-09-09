@@ -16,7 +16,7 @@ from pathlib import Path
 import frontmatter
 import numpy as np
 from sentence_transformers import SentenceTransformer
-from wiki_paths import embeddings_dir, iter_pages
+from wiki_paths import embeddings_dir, is_blank_page, iter_pages
 
 MODEL_NAME = "BAAI/bge-m3"
 EMBED_DIR = embeddings_dir()
@@ -37,6 +37,8 @@ def load_pages(wiki_dir: Path) -> list[dict]:
         try:
             post = frontmatter.load(path)
         except Exception:
+            continue
+        if is_blank_page(post):
             continue
         pages.append({"slug": path.stem, "text": _extract_text(post)})
     return pages

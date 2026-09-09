@@ -28,11 +28,13 @@ import numpy as np
 import pickle
 from rank_bm25 import BM25Plus
 
-from wiki_paths import embeddings_dir, iter_pages, slug_to_path
+from nltk.stem.snowball import FrenchStemmer
+
+from wiki_paths import embeddings_dir, is_blank_page, iter_pages, slug_to_path
 
 _EMBED_DIR = embeddings_dir()
 _CACHE_PATH = Path(os.environ.get("WIKI_PATH", str(Path(__file__).resolve().parent.parent))) / "wiki_bm25_cache.pkl"
-_CACHE_VERSION = 1
+_CACHE_VERSION = 2  # v2 : pages vides exclues + désuffixation française
 
 # ---------------------------------------------------------------------------
 # Stopwords français (liste embarquée — pas de dépendance nltk)
@@ -74,12 +76,19 @@ class SearchResult:
 # ---------------------------------------------------------------------------
 # Tokeniseur français
 # ---------------------------------------------------------------------------
+_stemmer = FrenchStemmer()
+
+
 def tokenize(text: str) -> list[str]:
-    """Minuscule, supprime ponctuation, filtre stopwords et tokens courts."""
+    """Minuscule, supprime ponctuation, filtre stopwords/tokens courts, désuffixe.
+
+    La désuffixation (ex. politicien/politiciens -> même radical) est appliquée
+    à l'indexation ET à la requête, donc les deux restent cohérentes entre elles.
+    """
     text = text.lower()
     text = text.translate(str.maketrans(string.punctuation, " " * len(string.punctuation)))
     tokens = text.split()
-    return [t for t in tokens if len(t) > 2 and t not in FR_STOPWORDS]
+    return [_stemmer.stem(t) for t in tokens if len(t) > 2 and t not in FR_STOPWORDS]
 
 
 # ---------------------------------------------------------------------------
@@ -158,6 +167,8 @@ class WikiSearch:
             try:
                 post = frontmatter.load(path)
             except Exception:
+                continue
+            if is_blank_page(post):
                 continue
 
             slug = path.stem
