@@ -721,7 +721,14 @@ def _parse_frontmatter_block(llm_output: str) -> str:
         if rest:
             return match.group(1) + "\n" + rest
         return match.group(1)
-    return llm_output.strip()
+    # Bloc ouvert mais jamais refermé (glitch LLM) : retirer la seule ligne
+    # d'ouverture plutôt que de laisser tout le texte — frontmatter et corps
+    # inclus — piégé comme corps de page (régression du 2026-09-09).
+    stripped = llm_output.strip()
+    unclosed = re.match(r"```(?:markdown|yaml)?\n", stripped)
+    if unclosed:
+        return stripped[unclosed.end():].strip()
+    return stripped
 
 
 def _extract_items(llm_output: str, prefix: str) -> list[str]:

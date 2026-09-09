@@ -322,6 +322,28 @@ class TestSaveRawNoDuplicate:
         assert (ingestor.raw_dir / "src-example2.url").exists()
 
 
+def test_parse_frontmatter_block_bloc_ferme():
+    from ingest import _parse_frontmatter_block
+    llm = "```markdown\n---\ntitle: T\n---\n\n# T\n```"
+    assert _parse_frontmatter_block(llm) == "---\ntitle: T\n---\n\n# T\n"
+
+
+def test_parse_frontmatter_block_bloc_jamais_ferme():
+    """Régression du 2026-09-09 : le LLM ouvre ```yaml mais ne le referme
+    jamais — le frontmatter et le corps entiers restaient piégés comme
+    texte littéral (5 pages réelles touchées, dont src-1706-03762)."""
+    from ingest import _parse_frontmatter_block
+    llm = "```yaml\n---\ntitle: Attention Is All You Need\ncategory: source\n---\n\n# Attention Is All You Need\n\n## Résumé\nTexte.\n"
+    out = _parse_frontmatter_block(llm)
+    assert out.startswith("---\ntitle: Attention Is All You Need")
+    assert "```" not in out
+
+
+def test_parse_frontmatter_block_sans_bloc():
+    from ingest import _parse_frontmatter_block
+    assert _parse_frontmatter_block("---\ntitle: T\n---\n\n# T\n") == "---\ntitle: T\n---\n\n# T"
+
+
 def test_parse_note_from_url_file(tmp_path):
     from ingest import _parse_note_from_url_file
     p = tmp_path / "x.url"
