@@ -200,14 +200,24 @@ class WikiSearch:
             return []
 
         scores = self._bm25.get_scores(tokens)
+        query_tokens = set(tokens)
         ranked = sorted(
             enumerate(scores), key=lambda x: x[1], reverse=True
-        )[:top_k]
+        )
 
         results = []
         for idx, score in ranked:
+            if len(results) >= top_k:
+                break
             if score < 0.001:
                 break
+            # BM25+ ajoute un plancher (delta * idf) à CHAQUE document, même
+            # sans occurrence du terme — un score positif ne veut donc pas
+            # dire présence réelle. Sans ce filtre, une requête rare (peu de
+            # pages contenant le mot) se voit complétée jusqu'à top_k par des
+            # pages sans rapport, à un score plancher identique entre elles.
+            if query_tokens.isdisjoint(self._corpus[idx]):
+                continue
             page = self._pages[idx]
             try:
                 body = frontmatter.load(page["path"]).content
@@ -345,16 +355,32 @@ def hybrid_search(
     semantic_results: list[SearchResult],
     top_k: int = 5,
     rrf_k: int = 60,
+    bm25_weight: float = 2.0,
+    semantic_weight: float = 1.0,
 ) -> list[SearchResult]:
+    """Fusion par rang réciproque (RRF), pondérée en faveur de BM25.
+
+    BM25 exige désormais une occurrence réelle du terme requêté (voir
+    WikiSearch.search) — signal plus fiable, sur une requête courte, que la
+    seule similarité sémantique : BGE-M3 sur un corpus restreint et
+    hétérogène peut classer des pages sans aucun rapport au-dessus d'un vrai
+    résultat (observé sur "renard" : le résultat pertinent était 4e en
+    sémantique pur, derrière trois pages totalement étrangères au sujet,
+    chacune avec un score individuellement plus haut). bm25_weight >
+    semantic_weight fait dominer un vrai résultat BM25 dans la fusion même
+    quand le sémantique produit du bruit mieux classé à titre individuel.
+    Un résultat trouvé par le sémantique seul garde son poids normal — la
+    pondération ne joue que quand les deux signaux sont en concurrence.
+    """
     rrf: dict[str, float] = {}
     by_slug: dict[str, SearchResult] = {}
 
     for rank, r in enumerate(bm25_results):
-        rrf[r.slug] = rrf.get(r.slug, 0.0) + 1.0 / (rrf_k + rank + 1)
+        rrf[r.slug] = rrf.get(r.slug, 0.0) + bm25_weight / (rrf_k + rank + 1)
         by_slug.setdefault(r.slug, r)
 
     for rank, r in enumerate(semantic_results):
-        rrf[r.slug] = rrf.get(r.slug, 0.0) + 1.0 / (rrf_k + rank + 1)
+        rrf[r.slug] = rrf.get(r.slug, 0.0) + semantic_weight / (rrf_k + rank + 1)
         by_slug.setdefault(r.slug, r)
 
     ranked = sorted(rrf.items(), key=lambda x: x[1], reverse=True)[:top_k]
