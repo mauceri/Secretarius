@@ -126,15 +126,15 @@ class _OllamaBackend:
 
 
 class _OpenAIBackend:
-    def __init__(self, model: str) -> None:
+    def __init__(self, model: str, base_url: str = "", api_key: str = "") -> None:
         try:
             import openai
         except ImportError as e:
             raise ImportError("pip install openai") from e
-        api_key = _env("DEEPSEEK_API_KEY") or _env("OPENAI_API_KEY", "ollama")
+        api_key = api_key or _env("DEEPSEEK_API_KEY") or _env("OPENAI_API_KEY", "ollama")
         self._client = openai.OpenAI(
             api_key=api_key,
-            base_url=_env("OPENAI_BASE_URL", "http://localhost:11434/v1"),
+            base_url=base_url or _env("OPENAI_BASE_URL", "http://localhost:11434/v1"),
         )
         self.model = model or _env("OPENAI_MODEL", "deepseek-v4-flash")
 
@@ -169,13 +169,33 @@ class LLM:
         "claude", "ollama" ou "openai". Défaut : $WIKI_LLM_BACKEND ou "ollama".
     model : str, optional
         Identifiant du modèle. Défaut : dépend du backend.
+    base_url, api_key : str, optional
+        Backend "openai" uniquement — surcharge $OPENAI_BASE_URL/$OPENAI_API_KEY
+        sans les modifier, pour pointer un LLM secondaire (ex. fallback) vers
+        un endpoint distinct de celui utilisé ailleurs dans Wiki_LM.
+    fallback : LLM, optional
+        Second LLM tenté si l'appel au backend principal lève une exception
+        (timeout, erreur réseau…). Aucune inspection de la cause — tout échec
+        déclenche le repli.
     """
 
-    def __init__(self, backend: str = "", model: str = "") -> None:
+    def __init__(
+        self,
+        backend: str = "",
+        model: str = "",
+        *,
+        base_url: str = "",
+        api_key: str = "",
+        fallback: "LLM | None" = None,
+    ) -> None:
         backend = backend or _env("WIKI_LLM_BACKEND", "ollama")
         if backend not in _BACKENDS:
             raise ValueError(f"Backend inconnu : {backend!r}. Valeurs possibles : {list(_BACKENDS)}")
-        self._backend = _BACKENDS[backend](model)
+        if backend == "openai":
+            self._backend = _OpenAIBackend(model, base_url=base_url, api_key=api_key)
+        else:
+            self._backend = _BACKENDS[backend](model)
+        self._fallback = fallback
 
     def complete(
         self,
@@ -202,4 +222,10 @@ class LLM:
             if not prompt:
                 raise ValueError("Fournir prompt= ou messages=")
             messages = [{"role": "user", "content": prompt}]
-        return self._backend.complete(messages, system=system, max_tokens=max_tokens)
+        try:
+            return self._backend.complete(messages, system=system, max_tokens=max_tokens)
+        except Exception as e:
+            if self._fallback is None:
+                raise
+            print(f"[llm] Backend principal en échec ({e}) — repli sur le fallback.")
+            return self._fallback.complete(messages=messages, system=system, max_tokens=max_tokens)

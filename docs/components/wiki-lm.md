@@ -56,6 +56,8 @@ Variables principales :
 | `OPENAI_BASE_URL` | URL du backend LLM compatible OpenAI |
 | `WIKI_INGEST_LLM_BACKEND` | Backend LLM dédié à l'ingestion, distinct de `WIKI_LLM_BACKEND` (`/q` continue d'utiliser ce dernier). Absent = comportement inchangé. En production sandbox wiki : `ollama` (CPU local, `qwen3:8b`) |
 | `WIKI_INGEST_LLM_MODEL` | Modèle pour `WIKI_INGEST_LLM_BACKEND` |
+| `WIKI_INGEST_LLM_FALLBACK_BACKEND` | Backend tenté quand `WIKI_INGEST_LLM_BACKEND` échoue (n'importe quelle exception — timeout Ollama compris). Absent = pas de repli. En production sandbox wiki : `openai`, pointé vers le proxy OpenAI local (`~/obfuscator`, `obfuscator-proxy.service`, port 8001) qui sert Qwen3-14B obfusqué sur Modal — voir `~/obfuscator/docs/acces-openai.md` |
+| `WIKI_INGEST_LLM_FALLBACK_MODEL` / `_BASE_URL` / `_API_KEY` | Modèle, URL et clé du backend de repli (backend `openai` uniquement) — n'affectent pas `OPENAI_BASE_URL`/`OPENAI_API_KEY` utilisées ailleurs |
 | `OLLAMA_BASE_URL` | URL du serveur Ollama (défaut `http://localhost:11434`) — depuis un sandbox Docker, viser la passerelle bridge (`http://172.17.0.1:11434`), pas `127.0.0.1` |
 | `OLLAMA_NUM_GPU` | Optionnel — `0` force le CPU (évite la contention avec `tiron-router` sur l'iGPU) ; absent = comportement par défaut d'Ollama |
 
