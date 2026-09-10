@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatWikiResult, runWikiOp } from "./wiki-ops.js";
+import { fetchWikiOpJson, formatWikiResult, runWikiOp } from "./wiki-ops.js";
 
 describe("formatWikiResult", () => {
   it("query (regime full) : renvoie la synthèse verbatim", () => {
@@ -46,6 +46,22 @@ describe("formatWikiResult", () => {
       .toBe("Mise à jour de la base lancée en arrière-plan.");
     expect(formatWikiResult("kb_update", { status: "error", reason: "clusterings/ introuvable" }))
       .toBe("clusterings/ introuvable");
+  });
+  it("delete_preview : liste ce qui serait affecté", () => {
+    expect(formatWikiResult("delete_preview", { status: "ok", slug: "src-a", affected: ["src-a", "c-related"] }))
+      .toBe("2 page(s) seraient affectées :\nsrc-a\nc-related");
+  });
+  it("delete : liste ce qui a été affecté", () => {
+    expect(formatWikiResult("delete", { status: "ok", slug: "src-a", affected: ["src-a", "c-related"] }))
+      .toBe("2 page(s) affectées :\nsrc-a\nc-related");
+  });
+  it("delete : liste vide", () => {
+    expect(formatWikiResult("delete", { status: "ok", slug: "src-a", affected: [] }))
+      .toBe("Aucune page affectée.");
+  });
+  it("delete_preview : erreur (slug introuvable) surfacée verbatim", () => {
+    expect(formatWikiResult("delete_preview", { error: "Page introuvable pour le slug 'src-x'" }))
+      .toBe("Page introuvable pour le slug 'src-x'");
   });
   it("erreur vide → ne renvoie pas un message vide (retombe sur l'op)", () => {
     expect(formatWikiResult("query", { error: "", synthesis: "# X" }, "full")).toBe("# X");
@@ -116,5 +132,29 @@ describe("runWikiOp", () => {
     const out = await runWikiOp(null, "query", "tee gpu",
       okExec('{"synthesis": "# GPU TEE", "brief": "Résumé.", "history_path": "Wiki_LM/historique/x.md"}'));
     expect(out).toBe("Résumé.\n\nWiki_LM/historique/x.md");
+  });
+});
+
+describe("fetchWikiOpJson", () => {
+  it("succès : ok=true, texte formaté", async () => {
+    const out = await fetchWikiOpJson(null, "delete_preview", "src-a",
+      async () => ({ code: 0, stdout: '{"status":"ok","slug":"src-a","affected":["src-a"]}', stderr: "" }));
+    expect(out).toEqual({ ok: true, text: "1 page(s) seraient affectées :\nsrc-a" });
+  });
+  it("erreur métier (json.error) : ok=false", async () => {
+    const out = await fetchWikiOpJson(null, "delete_preview", "src-x",
+      async () => ({ code: 0, stdout: '{"error":"Page introuvable pour le slug \'src-x\'"}', stderr: "" }));
+    expect(out).toEqual({ ok: false, text: "Page introuvable pour le slug 'src-x'" });
+  });
+  it("exit non nul : ok=false", async () => {
+    const out = await fetchWikiOpJson(null, "delete_preview", "src-a",
+      async () => ({ code: 1, stdout: "", stderr: "boom" }));
+    expect(out).toEqual({ ok: false, text: "Erreur wiki : boom" });
+  });
+  it("stdout non-JSON : ok=false", async () => {
+    const out = await fetchWikiOpJson(null, "delete_preview", "src-a",
+      async () => ({ code: 0, stdout: "pas du json", stderr: "" }));
+    expect(out.ok).toBe(false);
+    expect(out.text).toContain("Erreur wiki");
   });
 });

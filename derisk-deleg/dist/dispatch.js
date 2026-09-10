@@ -16,6 +16,7 @@ const TABLE = {
     "/tags": { kind: "wiki", op: "tags" },
     "/kbupdate": { kind: "wiki", op: "kb_update" },
     "/lire": { kind: "gog", op: "get" },
+    "/supprimer": { kind: "wiki", op: "delete" },
 };
 export function commandToAction(command) {
     return TABLE[command] ?? null;

@@ -77,6 +77,30 @@ export async function runWikiOp(api, op, arg, exec = execWikiSandbox, regime = "
     }
     return formatWikiResult(op, json, regime);
 }
+// Comme runWikiOp, mais renvoie aussi si l'appel a réussi — pour un appelant
+// qui doit décider la suite selon succès/échec (ex. delete_preview : ne
+// proposer /confirm que si l'essai à blanc a réussi, jamais sur un slug
+// introuvable). Duplique volontairement le parsing de runWikiOp plutôt que
+// de le réutiliser, pour ne rien changer au comportement/tests existants.
+export async function fetchWikiOpJson(api, op, arg, exec = execWikiSandbox) {
+    const argv = ["python3", "/wiki-tools/wiki.py", op];
+    if (arg)
+        argv.push(arg);
+    const { code, stdout, stderr } = await exec(api, argv);
+    if (code !== 0)
+        return { ok: false, text: `Erreur wiki : ${(stderr || stdout || "échec").slice(0, 500)}` };
+    const lines = stdout.split("\n").map((l) => l.trim()).filter(Boolean);
+    const lastLine = lines.length ? lines[lines.length - 1] : "";
+    let json;
+    try {
+        json = JSON.parse(lastLine);
+    }
+    catch {
+        return { ok: false, text: `Erreur wiki : sortie inattendue (${stdout.slice(0, 200)})` };
+    }
+    const isError = (typeof json?.error === "string" && json.error.trim()) || json?.status === "error";
+    return { ok: !isError, text: formatWikiResult(op, json) };
+}
 // Le canal Telegram envoie en parse_mode "HTML" : tout &/</> non échappé
 // dans un texte généré par LLM casserait le rendu du message.
 function escapeHtml(text) {
@@ -153,6 +177,14 @@ export function formatWikiResult(op, json, regime = "brief") {
             if (json?.status === "launched")
                 return "Mise à jour de la base lancée en arrière-plan.";
             return "Base de connaissances mise à jour.";
+        case "delete_preview":
+        case "delete": {
+            const affected = Array.isArray(json?.affected) ? json.affected : [];
+            if (!affected.length)
+                return "Aucune page affectée.";
+            const verbe = op === "delete_preview" ? "seraient affectées" : "affectées";
+            return `${affected.length} page(s) ${verbe} :\n${affected.join("\n")}`;
+        }
         default:
             return "Réponse wiki vide ou inattendue.";
     }

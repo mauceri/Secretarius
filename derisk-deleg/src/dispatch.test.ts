@@ -33,4 +33,8 @@ describe("commandToAction", () => {
   it("mappe /lire vers gog get", () => {
     expect(commandToAction("/lire")).toEqual({ kind: "gog", op: "get" });
   });
+
+  it("mappe /supprimer vers wiki delete", () => {
+    expect(commandToAction("/supprimer")).toEqual({ kind: "wiki", op: "delete" });
+  });
 });

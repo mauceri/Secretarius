@@ -2,7 +2,7 @@ import { Type } from "typebox";
 import { definePluginEntry } from "openclaw/plugin-sdk/core";
 import { parseReply } from "./parse.js";
 import { commandToAction } from "./dispatch.js";
-import { runWikiOp } from "./wiki-ops.js";
+import { fetchWikiOpJson, runWikiOp } from "./wiki-ops.js";
 import { readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync, copyFileSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, basename } from "node:path";
@@ -514,6 +514,24 @@ export default definePluginEntry({
       const explicitCommand = typed === routedCmd || typed.startsWith(routedCmd + " ");
 
       if (action.kind === "wiki") {
+        // Suppression : toujours un essai à blanc puis /confirm, MÊME tapée
+        // explicitement — contrairement aux autres écritures, l'ampleur
+        // d'une cascade (pages concept/entité qui perdent leur dernière
+        // source) n'est pas prévisible depuis la commande seule.
+        if (action.op === "delete") {
+          const slug = routed.args.trim();
+          const preview = await fetchWikiOpJson(api, "delete_preview", slug);
+          if (!preview.ok) {
+            return { handled: true, reply: { text: preview.text.slice(0, 4000) } };
+          }
+          pending = { kind: "router-write", op: "delete", args: slug, ts: Date.now() };
+          return {
+            handled: true,
+            reply: {
+              text: `${preview.text}\n\nTapez /confirm pour supprimer (valable 10 min), ou /annuler pour abandonner.`.slice(0, 4000),
+            },
+          };
+        }
         // Écriture inférée en langage naturel : jamais exécutée directement,
         // même logique de mise en attente que gog_send/gog_reply.
         if (!explicitCommand && !WIKI_READ_OPS.has(action.op)) {

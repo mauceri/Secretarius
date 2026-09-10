@@ -441,3 +441,70 @@ def test_op_kb_update_kb_dir_suit_wiki_path(monkeypatch, tmp_path):
 
     assert result["status"] == "ok"
     assert captured["kb_dir"] == tmp_path / "knowledge_base"
+
+
+def _write_wiki_page(tmp_path, subdir: str, slug: str, sources=None):
+    import frontmatter
+    post = frontmatter.Post("# Test", title=slug, category=subdir.rstrip("s"))
+    if sources is not None:
+        post["sources"] = sources
+    d = tmp_path / "wiki" / subdir
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{slug}.md").write_text(frontmatter.dumps(post), encoding="utf-8")
+
+
+def test_delete_preview_ne_modifie_rien(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    _write_wiki_page(tmp_path, "sources", "src-a")
+    _write_wiki_page(tmp_path, "concepts", "c-related", sources=["src-a"])
+
+    out = wiki.op_delete_preview("src-a")
+
+    assert out["status"] == "ok"
+    assert "src-a" in out["affected"]
+    assert "c-related" in out["affected"]
+    # Rien n'a bougé : essai à blanc.
+    assert (tmp_path / "wiki" / "sources" / "src-a.md").exists()
+    assert (tmp_path / "wiki" / "concepts" / "c-related.md").exists()
+
+
+def test_delete_applique_pour_de_vrai(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    _write_wiki_page(tmp_path, "sources", "src-a")
+    _write_wiki_page(tmp_path, "concepts", "c-related", sources=["src-a"])
+
+    out = wiki.op_delete("src-a")
+
+    assert out["status"] == "ok"
+    assert set(out["affected"]) == {"src-a", "c-related"}
+    assert not (tmp_path / "wiki" / "sources" / "src-a.md").exists()
+    assert (tmp_path / "wiki" / "poubelle" / "src-a.md").exists()
+    assert (tmp_path / "wiki" / "poubelle" / "c-related.md").exists()
+
+
+def test_delete_slug_introuvable(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    out = wiki.op_delete_preview("src-inexistant")
+    assert "error" in out
+
+
+def test_delete_sans_slug(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    out = wiki.op_delete_preview("")
+    assert "error" in out
+
+
+def test_main_delete_preview_dispatch(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    _write_wiki_page(tmp_path, "sources", "src-a")
+    out = wiki.main(["delete_preview", "src-a"])
+    assert out["status"] == "ok"
+    assert (tmp_path / "wiki" / "sources" / "src-a.md").exists()
+
+
+def test_main_delete_dispatch(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    _write_wiki_page(tmp_path, "sources", "src-a")
+    out = wiki.main(["delete", "src-a"])
+    assert out["status"] == "ok"
+    assert not (tmp_path / "wiki" / "sources" / "src-a.md").exists()

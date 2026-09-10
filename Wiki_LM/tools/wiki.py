@@ -278,6 +278,27 @@ def op_tags() -> dict:
     return {"tags": sorted(tags.keys())}
 
 
+def _delete(slug: str, dry_run: bool) -> dict:
+    """Suppression propre d'une page (src-/c-/e-) et de sa cascade — voir
+    Ingestor._trash_page_full. dry_run=True ne modifie rien sur disque."""
+    if not slug:
+        return {"error": "slug manquant"}
+    try:
+        ingestor = Ingestor(_wiki_root(), raw_path=_raw_dir())
+        affected = ingestor._trash_page_full(slug, dry_run=dry_run)
+        return {"status": "ok", "slug": slug, "affected": affected}
+    except FileNotFoundError as exc:
+        return {"error": str(exc)}
+
+
+def op_delete_preview(slug: str) -> dict:
+    return _delete(slug, dry_run=True)
+
+
+def op_delete(slug: str) -> dict:
+    return _delete(slug, dry_run=False)
+
+
 def _kb_update_state() -> Path:
     return _wiki_root() / ".kb_update_state.json"
 
@@ -334,6 +355,10 @@ def main(argv: list[str]) -> dict:
         return op_tags()
     if op == "kb_update":
         return op_kb_update()
+    if op == "delete_preview":
+        return op_delete_preview(arg)
+    if op == "delete":
+        return op_delete(arg)
     if op == "_kb_update_worker":
         return op_kb_update_worker()
     if op == "_ingest_worker":

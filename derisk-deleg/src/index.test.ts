@@ -599,6 +599,29 @@ describe("before_agent_reply — confirmation des écritures wiki routées", () 
     expect(res.reply.text).toContain("capture");
     expect(res.reply.text).toContain("abandonné");
   });
+
+  it("/supprimer tapée explicitement exige quand même /confirm (jamais direct, contrairement aux autres écritures)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ status: "ok", command: "/supprimer", args: "src-a" }),
+      })),
+    );
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/supprimer src-a" });
+
+    // Sandbox indisponible en test -> l'essai à blanc échoue -> pas de
+    // /confirm proposé. C'est la propriété qui compte ici : jamais de
+    // /confirm sur un essai à blanc qui a lui-même échoué.
+    expect(res.reply.text).not.toContain("/confirm");
+
+    const res2 = await hooks["before_agent_reply"].handler({ cleanedBody: "/confirm" });
+    expect(res2.reply.text).toBe("Rien à confirmer (aucun brouillon en attente).");
+  });
 });
 
 describe("before_tool_call — garde-fou gog (écriture directe bloquée)", () => {
