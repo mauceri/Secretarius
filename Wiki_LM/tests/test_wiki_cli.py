@@ -309,6 +309,62 @@ def test_ingest_worker_backend_surchargeable(monkeypatch, tmp_path):
     assert llm._backend.model == "qwen3:8b"
 
 
+def test_ingest_worker_sans_fallback_configure(monkeypatch, tmp_path):
+    # WIKI_INGEST_LLM_FALLBACK_BACKEND absente -> pas de repli (comportement
+    # inchangé), même avec un backend d'ingestion dédié.
+    wiki = _wiki(monkeypatch, tmp_path)
+    monkeypatch.setenv("WIKI_INGEST_LLM_BACKEND", "ollama")
+    captured = {}
+
+    class _Ing:
+        _MANIFEST = ".ingested"
+
+        def __init__(self, *a, **k):
+            captured.update(k)
+
+        def _load_manifest(self):
+            return {}
+
+        def ingest_raw_dir(self, *a, **k):
+            return []
+
+    monkeypatch.setattr(wiki, "Ingestor", _Ing)
+    wiki.op_ingest_worker()
+    assert captured["llm"]._fallback is None
+
+
+def test_ingest_worker_fallback_configure(monkeypatch, tmp_path):
+    # Les 4 variables WIKI_INGEST_LLM_FALLBACK_* construisent un LLM de repli
+    # attaché au LLM d'ingestion — cas réel : Qwen3-8B local (Ollama) en
+    # principal, proxy OpenAI local vers Qwen3-14B obfusqué (Modal) en repli.
+    wiki = _wiki(monkeypatch, tmp_path)
+    monkeypatch.setenv("WIKI_INGEST_LLM_BACKEND", "ollama")
+    monkeypatch.setenv("WIKI_INGEST_LLM_FALLBACK_BACKEND", "openai")
+    monkeypatch.setenv("WIKI_INGEST_LLM_FALLBACK_MODEL", "qwen3-14b-h128-a1-h02")
+    monkeypatch.setenv("WIKI_INGEST_LLM_FALLBACK_BASE_URL", "http://127.0.0.1:8001/v1")
+    monkeypatch.setenv("WIKI_INGEST_LLM_FALLBACK_API_KEY", "local")
+    captured = {}
+
+    class _Ing:
+        _MANIFEST = ".ingested"
+
+        def __init__(self, *a, **k):
+            captured.update(k)
+
+        def _load_manifest(self):
+            return {}
+
+        def ingest_raw_dir(self, *a, **k):
+            return []
+
+    monkeypatch.setattr(wiki, "Ingestor", _Ing)
+    wiki.op_ingest_worker()
+    fallback = captured["llm"]._fallback
+    assert fallback is not None
+    assert fallback._backend.model == "qwen3-14b-h128-a1-h02"
+    assert str(fallback._backend._client.base_url).rstrip("/") == "http://127.0.0.1:8001/v1"
+
+
 def test_do_ingest_writes_last_run(monkeypatch, tmp_path):
     wiki = _wiki(monkeypatch, tmp_path)
     # Deux fichiers en attente ; ingest_raw_dir ne renvoie que les succès
@@ -365,3 +421,23 @@ def test_cli_subprocess_outputs_json(monkeypatch, tmp_path):
     import json as _json
     data = _json.loads(r.stdout)
     assert data["running"] is False
+
+
+def test_op_kb_update_kb_dir_suit_wiki_path(monkeypatch, tmp_path):
+    # Régression (2026-09-10) : op_kb_update passait _DEFAULT_KB_DIR
+    # (kb_update.py), qui pointe en dur vers ~/Documents/Arbath/Wiki_LM,
+    # ignorant WIKI_PATH — /kbupdate échouait en prod (mkdir sur un
+    # répertoire Arbath inexistant dans le sandbox).
+    wiki = _wiki(monkeypatch, tmp_path)
+    (tmp_path / "wiki" / "clusterings" / "clustering-embeddings-transfers-0.4").mkdir(parents=True)
+    captured = {}
+
+    def fake_update_kb(**kwargs):
+        captured.update(kwargs)
+        return {"created": 0, "updated": 0, "excluded": 0}
+
+    monkeypatch.setattr(wiki, "update_kb", fake_update_kb)
+    result = wiki.op_kb_update()
+
+    assert result["status"] == "ok"
+    assert captured["kb_dir"] == tmp_path / "knowledge_base"

@@ -33,7 +33,7 @@ from llm import LLM
 from query import WikiQuery
 from search import WikiSearch
 from kb_tags import collect_tags
-from kb_update import update_kb, _DEFAULT_EMBED_DIR, _DEFAULT_KB_DIR
+from kb_update import update_kb, _DEFAULT_EMBED_DIR
 
 _INGESTABLE_SUFFIXES = {".url", ".md", ".pdf", ".txt"}
 
@@ -214,6 +214,21 @@ def op_ingest() -> dict:
     return {"status": "launched", "queued": len(pending)}
 
 
+def _ingest_llm_fallback() -> LLM | None:
+    """Backend de repli, tenté quand WIKI_INGEST_LLM_BACKEND échoue (ex. timeout
+    Ollama sur un texte long). Absent par défaut : aucun repli, comportement
+    inchangé."""
+    backend = os.environ.get("WIKI_INGEST_LLM_FALLBACK_BACKEND", "")
+    if not backend:
+        return None
+    return LLM(
+        backend=backend,
+        model=os.environ.get("WIKI_INGEST_LLM_FALLBACK_MODEL", ""),
+        base_url=os.environ.get("WIKI_INGEST_LLM_FALLBACK_BASE_URL", ""),
+        api_key=os.environ.get("WIKI_INGEST_LLM_FALLBACK_API_KEY", ""),
+    )
+
+
 def _ingest_llm() -> LLM | None:
     """Backend LLM dédié à l'ingestion, distinct de WIKI_LLM_BACKEND (utilisé par
     /q et le reste de Wiki_LM). Absent par défaut : Ingestor retombe sur son
@@ -221,7 +236,11 @@ def _ingest_llm() -> LLM | None:
     backend = os.environ.get("WIKI_INGEST_LLM_BACKEND", "")
     if not backend:
         return None
-    return LLM(backend=backend, model=os.environ.get("WIKI_INGEST_LLM_MODEL", ""))
+    return LLM(
+        backend=backend,
+        model=os.environ.get("WIKI_INGEST_LLM_MODEL", ""),
+        fallback=_ingest_llm_fallback(),
+    )
 
 
 def _do_ingest() -> dict:
@@ -280,7 +299,9 @@ def op_kb_update() -> dict:
         wiki_root=wiki_dir,
         clustering_name=clustering_name,
         embed_dir=_DEFAULT_EMBED_DIR,
-        kb_dir=_DEFAULT_KB_DIR,
+        # _DEFAULT_KB_DIR (kb_update.py) pointe en dur vers l'ancien coffre
+        # Arbath, ignorant WIKI_PATH — kb_dir doit suivre le wiki courant.
+        kb_dir=_wiki_root() / "knowledge_base",
     )
     return {"status": "ok", "clustering": clustering_name, **stats}
 
