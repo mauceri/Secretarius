@@ -185,6 +185,15 @@ export function formatWikiResult(op, json, regime = "brief") {
             const verbe = op === "delete_preview" ? "seraient affectées" : "affectées";
             return `${affected.length} page(s) ${verbe} :\n${affected.join("\n")}`;
         }
+        case "review": {
+            if (json?.status === "empty")
+                return "Rien à relire.";
+            const content = typeof json?.content === "string" ? json.content : "";
+            const slug = typeof json?.slug === "string" ? json.slug : "";
+            return `${content}\n\n— Une fois relu : /verifie ${slug}`;
+        }
+        case "verify":
+            return `Marquée vérifiée : ${json?.slug ?? ""}`;
         default:
             return "Réponse wiki vide ou inattendue.";
     }

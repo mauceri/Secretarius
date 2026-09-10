@@ -622,6 +622,40 @@ describe("before_agent_reply — confirmation des écritures wiki routées", () 
     const res2 = await hooks["before_agent_reply"].handler({ cleanedBody: "/confirm" });
     expect(res2.reply.text).toBe("Rien à confirmer (aucun brouillon en attente).");
   });
+
+  it("/relire (lecture) s'exécute immédiatement, sans /confirm", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ status: "ok", command: "/relire", args: "" }),
+      })),
+    );
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/relire" });
+
+    expect(res.reply.text).not.toContain("/confirm");
+  });
+
+  it("/verifie tapée explicitement s'exécute directement (écriture non destructrice, pas de cas spécial)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ status: "ok", command: "/verifie", args: "src-a" }),
+      })),
+    );
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/verifie src-a" });
+
+    expect(res.reply.text).not.toContain("/confirm");
+  });
 });
 
 describe("before_tool_call — garde-fou gog (écriture directe bloquée)", () => {

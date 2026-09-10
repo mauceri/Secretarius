@@ -111,7 +111,7 @@ let pending: Pending | null = null;
 // liste, ex. kb_update) est traitée comme une écriture et protégée par
 // défaut — cohérent avec la règle "lectures libres, écritures confirmées"
 // déjà en place pour gog (AGENTS.md).
-const WIKI_READ_OPS = new Set(["query", "search", "status", "tags"]);
+const WIKI_READ_OPS = new Set(["query", "search", "status", "tags", "review"]);
 
 const AUTH_TTL_MS = 10 * 60 * 1000;
 const GOG_CFG = `${process.env.HOME}/.openclaw/workspace/.gog-config`;

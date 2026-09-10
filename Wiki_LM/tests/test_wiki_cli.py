@@ -508,3 +508,103 @@ def test_main_delete_dispatch(monkeypatch, tmp_path):
     out = wiki.main(["delete", "src-a"])
     assert out["status"] == "ok"
     assert not (tmp_path / "wiki" / "sources" / "src-a.md").exists()
+
+
+def _write_source_page(tmp_path, slug: str, resume: bool = True, verifie=None, mtime=None):
+    import frontmatter
+    body = "# Test\n\n## Résumé\n\nTexte.\n" if resume else "# Note\n\nTexte verbatim.\n"
+    post = frontmatter.Post(body, title=slug, category="source")
+    if verifie is not None:
+        post["vérifié"] = verifie
+    d = tmp_path / "wiki" / "sources"
+    d.mkdir(parents=True, exist_ok=True)
+    p = d / f"{slug}.md"
+    p.write_text(frontmatter.dumps(post), encoding="utf-8")
+    if mtime is not None:
+        import os
+        os.utime(p, (mtime, mtime))
+    return p
+
+
+def test_review_rien_en_attente(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    out = wiki.op_review()
+    assert out["status"] == "empty"
+
+
+def test_review_ignore_les_pages_sans_resume(monkeypatch, tmp_path):
+    # Note locale verbatim (pas de ## Résumé) : jamais résumée par le LLM,
+    # aucun risque à relire — hors périmètre de la file.
+    wiki = _wiki(monkeypatch, tmp_path)
+    _write_source_page(tmp_path, "src-note", resume=False)
+    out = wiki.op_review()
+    assert out["status"] == "empty"
+
+
+def test_review_ignore_les_pages_deja_verifiees(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    _write_source_page(tmp_path, "src-a", verifie=True)
+    out = wiki.op_review()
+    assert out["status"] == "empty"
+
+
+def test_review_page_sans_champ_verifie_compte_comme_en_attente(monkeypatch, tmp_path):
+    # Pages antérieures à la fonctionnalité : pas de champ du tout -> en attente.
+    wiki = _wiki(monkeypatch, tmp_path)
+    _write_source_page(tmp_path, "src-a")
+    out = wiki.op_review()
+    assert out["status"] == "ok"
+    assert out["slug"] == "src-a"
+    assert "content" in out
+
+
+def test_review_ordre_fifo_plus_ancienne_dabord(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    _write_source_page(tmp_path, "src-recent", verifie=False, mtime=2000)
+    _write_source_page(tmp_path, "src-ancien", verifie=False, mtime=1000)
+    out = wiki.op_review()
+    assert out["slug"] == "src-ancien"
+
+
+def test_verify_marque_la_page(monkeypatch, tmp_path):
+    import frontmatter
+    wiki = _wiki(monkeypatch, tmp_path)
+    _write_source_page(tmp_path, "src-a", verifie=False)
+    out = wiki.op_verify("src-a")
+    assert out["status"] == "ok"
+    post = frontmatter.loads((tmp_path / "wiki" / "sources" / "src-a.md").read_text())
+    assert post["vérifié"] is True
+
+
+def test_verify_disparait_de_la_file(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    _write_source_page(tmp_path, "src-a", verifie=False)
+    wiki.op_verify("src-a")
+    out = wiki.op_review()
+    assert out["status"] == "empty"
+
+
+def test_verify_slug_introuvable(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    out = wiki.op_verify("src-inexistant")
+    assert "error" in out
+
+
+def test_verify_sans_slug(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    out = wiki.op_verify("")
+    assert "error" in out
+
+
+def test_main_review_dispatch(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    _write_source_page(tmp_path, "src-a")
+    out = wiki.main(["review", ""])
+    assert out["status"] == "ok"
+
+
+def test_main_verify_dispatch(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    _write_source_page(tmp_path, "src-a", verifie=False)
+    out = wiki.main(["verify", "src-a"])
+    assert out["status"] == "ok"

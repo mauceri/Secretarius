@@ -112,6 +112,15 @@ def _inject_url(page_md: str, url: str) -> str:
     return page_md.replace("---\n", f"---\nlien_source: {url}\n", 1)
 
 
+def _inject_verified(page_md: str) -> str:
+    """Force vérifié: false — jamais laissé au LLM (qui pourrait toujours se
+    déclarer vérifié). Uniquement pour les pages résumées par le LLM ; une
+    note locale verbatim n'a pas ce risque, pas de champ."""
+    if "vérifié:" in page_md[:400]:
+        return page_md
+    return page_md.replace("---\n", "---\nvérifié: false\n", 1)
+
+
 _ERROR_PAGE_SIGNALS = [
     # WAF / CDN
     "incapsula incident id",
@@ -1242,6 +1251,8 @@ class Ingestor:
                 print(f"[ingest] Slug renommé : {src_slug} → {llm_slug}")
                 src_slug = llm_slug
 
+        if not local_note:
+            source_page_md = _inject_verified(source_page_md)
         if source_url:
             source_page_md = _inject_url(source_page_md, source_url)
         if note:

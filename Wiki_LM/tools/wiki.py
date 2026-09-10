@@ -27,6 +27,7 @@ def _bootstrap_api_key() -> None:
 _bootstrap_api_key()
 
 sys.path.insert(0, str(Path(__file__).parent))
+import frontmatter
 from capture import _parse_hashtags, capture_urls, capture_comment, slugify, timestamp, _write_note
 from ingest import Ingestor
 from llm import LLM
@@ -34,6 +35,7 @@ from query import WikiQuery
 from search import WikiSearch
 from kb_tags import collect_tags
 from kb_update import update_kb, _DEFAULT_EMBED_DIR
+from wiki_paths import slug_to_path
 
 _INGESTABLE_SUFFIXES = {".url", ".md", ".pdf", ".txt"}
 
@@ -299,6 +301,49 @@ def op_delete(slug: str) -> dict:
     return _delete(slug, dry_run=False)
 
 
+def _pending_review(sources_dir: Path) -> list[Path]:
+    """Pages src- résumées par le LLM (## Résumé présent — exclut les notes
+    verbatim et les stubs, jamais réécrits par le LLM) et non vérifiées,
+    triées de la plus ancienne à la plus récente (file FIFO)."""
+    if not sources_dir.exists():
+        return []
+    out = []
+    for p in sorted(sources_dir.glob("src-*.md")):
+        try:
+            post = frontmatter.load(p)
+        except Exception:
+            continue
+        if "## Résumé" not in post.content:
+            continue
+        if post.get("vérifié", False):
+            continue
+        out.append(p)
+    return sorted(out, key=lambda p: p.stat().st_mtime)
+
+
+def op_review() -> dict:
+    pending = _pending_review(_wiki_root() / "wiki" / "sources")
+    if not pending:
+        return {"status": "empty"}
+    path = pending[0]
+    return {"status": "ok", "slug": path.stem, "content": path.read_text(encoding="utf-8")}
+
+
+def op_verify(slug: str) -> dict:
+    if not slug:
+        return {"error": "slug manquant"}
+    path = slug_to_path(_wiki_root() / "wiki", slug)
+    if not path.exists():
+        return {"error": f"Page introuvable pour le slug {slug!r}"}
+    try:
+        post = frontmatter.load(path)
+    except Exception as exc:
+        return {"error": str(exc)}
+    post["vérifié"] = True
+    path.write_text(frontmatter.dumps(post), encoding="utf-8")
+    return {"status": "ok", "slug": slug}
+
+
 def _kb_update_state() -> Path:
     return _wiki_root() / ".kb_update_state.json"
 
@@ -359,6 +404,10 @@ def main(argv: list[str]) -> dict:
         return op_delete_preview(arg)
     if op == "delete":
         return op_delete(arg)
+    if op == "review":
+        return op_review()
+    if op == "verify":
+        return op_verify(arg)
     if op == "_kb_update_worker":
         return op_kb_update_worker()
     if op == "_ingest_worker":

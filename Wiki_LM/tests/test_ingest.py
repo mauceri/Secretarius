@@ -40,6 +40,22 @@ class TestIngestSingle:
         log = (wiki_dir / "log.md").read_text()
         assert "ingest" in log
 
+    def test_source_page_verifie_false_par_defaut(self, ingestor, wiki_dir, tmp_path):
+        src = tmp_path / "article.txt"
+        src.write_text("Contenu.", encoding="utf-8")
+        slug = ingestor.ingest(str(src))
+        post = frontmatter.loads((wiki_dir / "sources" / f"{slug}.md").read_text())
+        assert post["vérifié"] is False
+
+    def test_note_locale_pas_de_champ_verifie(self, ingestor, wiki_dir, tmp_path):
+        # Une note locale (verbatim, pas de résumé LLM) n'a pas ce risque —
+        # pas de champ vérifié.
+        note = tmp_path / "note.md"
+        note.write_text("Ma note perso.", encoding="utf-8")
+        slug = ingestor.ingest(str(note), local_note=True)
+        post = frontmatter.loads((wiki_dir / "sources" / f"{slug}.md").read_text())
+        assert "vérifié" not in post.metadata
+
     def test_concept_pages_created(self, ingestor, wiki_dir, tmp_path):
         src = tmp_path / "article.txt"
         src.write_text("Contenu.", encoding="utf-8")

@@ -63,6 +63,17 @@ describe("formatWikiResult", () => {
     expect(formatWikiResult("delete_preview", { error: "Page introuvable pour le slug 'src-x'" }))
       .toBe("Page introuvable pour le slug 'src-x'");
   });
+  it("review : rien en attente", () => {
+    expect(formatWikiResult("review", { status: "empty" })).toBe("Rien à relire.");
+  });
+  it("review : contenu + rappel /verifie", () => {
+    expect(formatWikiResult("review", { status: "ok", slug: "src-a", content: "# Titre\n\nCorps." }))
+      .toBe("# Titre\n\nCorps.\n\n— Une fois relu : /verifie src-a");
+  });
+  it("verify : confirme le slug marqué", () => {
+    expect(formatWikiResult("verify", { status: "ok", slug: "src-a" }))
+      .toBe("Marquée vérifiée : src-a");
+  });
   it("erreur vide → ne renvoie pas un message vide (retombe sur l'op)", () => {
     expect(formatWikiResult("query", { error: "", synthesis: "# X" }, "full")).toBe("# X");
   });

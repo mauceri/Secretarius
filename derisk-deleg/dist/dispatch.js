@@ -17,6 +17,8 @@ const TABLE = {
     "/kbupdate": { kind: "wiki", op: "kb_update" },
     "/lire": { kind: "gog", op: "get" },
     "/supprimer": { kind: "wiki", op: "delete" },
+    "/relire": { kind: "wiki", op: "review" },
+    "/verifie": { kind: "wiki", op: "verify" },
 };
 export function commandToAction(command) {
     return TABLE[command] ?? null;

@@ -149,6 +149,26 @@ def test_explicit_supprimer_empty_arg_returns_usage(monkeypatch):
     assert "/supprimer" in r["reply"]
 
 
+def test_explicit_relire_no_arg_needed(monkeypatch):
+    monkeypatch.setattr(router_server, "call_adapter",
+                        lambda m: (_ for _ in ()).throw(AssertionError("SLM appelé")))
+    assert router_server.route_message("/relire") == {"status": "ok", "command": "/relire", "args": ""}
+
+
+def test_explicit_verifie_bypasses_slm(monkeypatch):
+    monkeypatch.setattr(router_server, "call_adapter",
+                        lambda m: (_ for _ in ()).throw(AssertionError("SLM appelé")))
+    r = router_server.route_message("/verifie src-a")
+    assert r == {"status": "ok", "command": "/verifie", "args": "src-a"}
+
+
+def test_explicit_verifie_empty_arg_returns_usage(monkeypatch):
+    monkeypatch.setattr(router_server, "call_adapter", lambda m: ("/ingest", ""))
+    r = router_server.route_message("/verifie")
+    assert r["status"] == "answer"
+    assert "/verifie" in r["reply"]
+
+
 def test_explicit_tags_kbupdate_no_arg_needed(monkeypatch):
     monkeypatch.setattr(router_server, "call_adapter",
                         lambda m: (_ for _ in ()).throw(AssertionError("SLM appelé")))

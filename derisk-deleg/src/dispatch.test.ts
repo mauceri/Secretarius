@@ -37,4 +37,12 @@ describe("commandToAction", () => {
   it("mappe /supprimer vers wiki delete", () => {
     expect(commandToAction("/supprimer")).toEqual({ kind: "wiki", op: "delete" });
   });
+
+  it("mappe /relire vers wiki review", () => {
+    expect(commandToAction("/relire")).toEqual({ kind: "wiki", op: "review" });
+  });
+
+  it("mappe /verifie vers wiki verify", () => {
+    expect(commandToAction("/verifie")).toEqual({ kind: "wiki", op: "verify" });
+  });
 });
