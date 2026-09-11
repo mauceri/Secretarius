@@ -13,6 +13,12 @@ Endpoint :
     Body  : {"text": "...", "tags": ["..."]}
     Reply : {"status": "ok", "filename": "..."}
 
+    POST /run
+    Body  : {"command": "/q", "arg": "..."}
+    Reply : JSON de l'opération wiki.py correspondante ; {"error": "..."} si
+            commande inconnue (400) ou en échec (500). /supprimer est
+            toujours refusée.
+
     GET /health
     Reply : {"status": "ok", "pages": <n>}
 """
@@ -33,6 +39,17 @@ from llm import LLM
 from query import WikiQuery
 from cluster import run_clustering
 from capture import capture_comment, _normalize_tags, raw_dir
+from wiki import (
+    op_capture,
+    op_ingest,
+    op_kb_update,
+    op_query,
+    op_review,
+    op_search,
+    op_status,
+    op_tags,
+    op_verify,
+)
 
 app = Flask(__name__)
 _wq: WikiQuery | None = None
@@ -84,6 +101,38 @@ def handle_capture():
     tags = _normalize_tags(tags_raw) if tags_raw else []
     path = capture_comment(text, raw_dir(), tags=tags or None)
     return jsonify({"status": "ok", "filename": path.name})
+
+
+_RUN_OPS = {
+    "/c": lambda arg: op_capture(arg),
+    "/q": lambda arg: op_query(arg),
+    "/ingest": lambda arg: op_ingest(),
+    "/wikistatus": lambda arg: op_status(),
+    "/r": lambda arg: op_search(arg),
+    "/tags": lambda arg: op_tags(),
+    "/kbupdate": lambda arg: op_kb_update(),
+    "/relire": lambda arg: op_review(),
+    "/verifie": lambda arg: op_verify(arg),
+}
+
+
+@app.post("/run")
+def handle_run():
+    """Exécute une commande wiki pour le lot Obsidian (blocs ```wiki). /supprimer
+    est absente de _RUN_OPS : jamais dispatchée, même demandée explicitement."""
+    data = request.get_json(silent=True) or {}
+    command = str(data.get("command", "")).strip()
+    arg = str(data.get("arg", ""))
+
+    op = _RUN_OPS.get(command)
+    if op is None:
+        return jsonify({"error": f"Commande inconnue ou non autorisée en lot : {command!r}"}), 400
+
+    try:
+        result = op(arg)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+    return jsonify(result)
 
 
 @app.get("/health")
