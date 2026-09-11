@@ -95,6 +95,7 @@ export function formatWikiResult(
       return tags.length > 0 ? tags.join(", ") : "Aucun tag.";
     }
     case "/kbupdate":
+      if (data.status === "error") return `**Erreur :** ${data.reason ?? "échec de la mise à jour"}`;
       return `Base de connaissances mise à jour (clustering ${data.clustering}).`;
     case "/relire":
       return data.status === "empty" ? "Rien à relire." : String(data.content ?? "");

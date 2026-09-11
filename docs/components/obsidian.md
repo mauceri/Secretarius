@@ -142,6 +142,30 @@ de `/c`, sans quitter Obsidian), depuis desktop ou mobile. Source :
 4. Une notification confirme la capture ; la note est marquée
    `wiki_capture: <date>` dans son frontmatter.
 
+## Exécution en lot de commandes wiki
+
+Exécuter une liste de commandes `/` Wiki_LM (`/q`, `/c`, `/tags`, `/ingest`,
+`/wikistatus`, `/r`, `/kbupdate`, `/relire`, `/verifie` — `/supprimer` est
+volontairement exclue) depuis une seule note Obsidian, en une action, avec les
+résultats insérés directement dans la note. Utilise le nouvel endpoint
+`POST /run` du même `wiki-lm-server` (voir `docs/components/wiki-lm.md`) —
+même prérequis que le plugin de capture : le service doit tourner et être
+joignable.
+
+### Utilisation
+
+1. Dans la note, ajouter un ou plusieurs blocs de code ` ```wiki ` : la
+   première ligne est la commande (ex. `/q`), les lignes suivantes (s'il y en
+   a) forment l'argument, conservé tel quel (y compris sur plusieurs lignes).
+2. Cliquer l'icône « Exécuter les commandes wiki de la note » dans la barre
+   latérale, ou lancer la commande du même nom (Ctrl/Cmd-P) — distincte de
+   « Capturer la note courante dans Wiki_LM ».
+3. Le résultat de chaque bloc est inséré juste après, entre des marqueurs
+   `<!-- wikilm-run:start -->` / `<!-- wikilm-run:end -->` ; relancer sur la
+   même note remplace le résultat précédent au lieu de le dupliquer.
+4. Si une commande échoue, son message d'erreur est inséré à sa place et les
+   blocs suivants s'exécutent quand même — un échec n'interrompt pas le lot.
+
 ## Archivage du coffre
 
 Il est fortement recommandé d'archiver régulièrement le coffre :

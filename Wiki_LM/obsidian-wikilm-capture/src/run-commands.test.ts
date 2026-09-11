@@ -129,6 +129,16 @@ describe("formatWikiResult", () => {
     );
   });
 
+  it("formats /kbupdate failure reported via status/reason, not error", () => {
+    const text = formatWikiResult(
+      "/kbupdate",
+      { status: "error", reason: "aucun clustering disponible" },
+      true
+    );
+    expect(text).toBe("**Erreur :** aucun clustering disponible");
+    expect(text).not.toContain("undefined");
+  });
+
   it("formats /relire empty or with content", () => {
     expect(formatWikiResult("/relire", { status: "empty" }, true)).toBe("Rien à relire.");
     expect(formatWikiResult("/relire", { status: "ok", slug: "src-x", content: "# Contenu" }, true)).toBe(

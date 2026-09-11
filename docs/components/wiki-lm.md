@@ -149,7 +149,8 @@ journalctl --user -u wiki-lm-server -f       # logs
 
 Endpoints : `POST /query` `{question, top_k, mode}` → `{text, references, saved_slug, history_slug, brief}` ;
 `GET /health` → `{status, pages}` ; `POST /reload` (reconstruit l'index) ;
-`POST /embed`, `POST /cluster` (tâches de fond).
+`POST /embed`, `POST /cluster` (tâches de fond) ;
+`POST /run` `{command, arg}` → JSON de l'opération.
 
 **Rechargement à chaud (auto-reload).** Le serveur charge son index au démarrage.
 Pour que les documents **ingérés après** le lancement deviennent cherchables sans
