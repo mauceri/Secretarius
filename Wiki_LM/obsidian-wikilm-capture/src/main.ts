@@ -8,6 +8,13 @@ import {
   requestUrl,
 } from "obsidian";
 import { buildCaptureText } from "./capture-text";
+import {
+  applyWikiResults,
+  extractWikiBlocks,
+  formatWikiResult,
+  SUPPORTED_COMMANDS,
+  WikiBlockMatch,
+} from "./run-commands";
 
 interface WikilmCaptureSettings {
   serverUrl: string;
@@ -40,6 +47,14 @@ export default class WikilmCapturePlugin extends Plugin {
       id: "capture-current-note",
       name: "Capturer la note courante dans Wiki_LM",
       callback: () => this.captureCurrentNote(),
+    });
+    this.addRibbonIcon("play", "Exécuter les commandes wiki de la note", () =>
+      this.runWikiCommands()
+    );
+    this.addCommand({
+      id: "run-wiki-commands",
+      name: "Exécuter les commandes wiki de la note",
+      callback: () => this.runWikiCommands(),
     });
   }
 
@@ -82,6 +97,49 @@ export default class WikilmCapturePlugin extends Plugin {
       new Notice(`Capturée : ${data.filename}`);
     } catch (err) {
       new Notice(`Erreur de capture : ${err}`);
+    }
+  }
+
+  async runWikiCommands(): Promise<void> {
+    const file = this.app.workspace.getActiveFile();
+    if (!file) {
+      new Notice("Aucune note ouverte");
+      return;
+    }
+
+    const raw = await this.app.vault.read(file);
+    const blocks = extractWikiBlocks(raw);
+    if (blocks.length === 0) {
+      new Notice("Aucune commande wiki trouvée dans la note");
+      return;
+    }
+
+    const resultTexts: string[] = [];
+    for (const block of blocks) {
+      resultTexts.push(await this.runOneCommand(block));
+    }
+
+    const newContent = applyWikiResults(raw, blocks, resultTexts);
+    await this.app.vault.modify(file, newContent);
+    new Notice(`Lot exécuté : ${blocks.length} commande(s)`);
+  }
+
+  async runOneCommand(block: WikiBlockMatch): Promise<string> {
+    if (!(SUPPORTED_COMMANDS as readonly string[]).includes(block.command)) {
+      return formatWikiResult(block.command, {}, true);
+    }
+    try {
+      const response = await requestUrl({
+        url: `${this.settings.serverUrl}/run`,
+        method: "POST",
+        contentType: "application/json",
+        body: JSON.stringify({ command: block.command, arg: block.arg }),
+        throw: false,
+      });
+      const data = (response.json as Record<string, unknown>) ?? {};
+      return formatWikiResult(block.command, data, response.status === 200);
+    } catch (err) {
+      return formatWikiResult(block.command, { error: String(err) }, false);
     }
   }
 }
