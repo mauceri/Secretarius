@@ -150,6 +150,12 @@ class TestCaptureComment:
         path = capture_comment("Idée importante", tmp_path)
         assert "idee" in path.name or "importante" in path.name
 
+    def test_slug_uses_title_when_given(self, tmp_path):
+        path = capture_comment("Note d'origine : Douleur (Ecriture/Exode/Douleur.md)\n\nLizzie Klein avait...",
+                                tmp_path, title="Douleur")
+        assert "douleur" in path.name
+        assert "lizzie" not in path.name
+
 
 class TestCaptureFile:
     def test_copies_file(self, tmp_path):

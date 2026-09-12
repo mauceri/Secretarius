@@ -46,6 +46,15 @@ class TestHandleCapture:
         assert data["status"] == "ok"
         assert data["filename"].endswith(".md")
 
+    def test_slug_uses_title_over_boilerplate_prefixed_text(self, client, raw_path):
+        response = client.post("/capture", json={
+            "text": "Note d'origine : Douleur (Ecriture/Exode/Douleur.md)\n\nLizzie Klein avait...",
+            "title": "Douleur",
+        })
+        data = response.get_json()
+        assert "douleur" in data["filename"]
+        assert "lizzie" not in data["filename"]
+
 
 class TestHandleQuery:
     def test_returns_history_slug_and_brief(self, client, monkeypatch):

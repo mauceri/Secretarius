@@ -11,19 +11,17 @@ describe("buildCaptureText", () => {
     expect(result.startsWith("Note d'origine : Ma note (dossier/ma-note.md)\n\n")).toBe(true);
   });
 
-  it("returns the body as-is when shorter than the incipit length", () => {
+  it("returns the body as-is when there is no Résumé heading", () => {
     const result = buildCaptureText({ body: "Courte note.", title: "T", path: "p.md" });
     expect(result.endsWith("Courte note.")).toBe(true);
-    expect(result).not.toContain("…");
   });
 
-  it("truncates long bodies at the last space before 200 characters", () => {
-    const body = "mot ".repeat(60).trim();
+  it("captures a long body in full, without truncation, when there is no Résumé heading", () => {
+    const body = "mot ".repeat(500).trim();
     const result = buildCaptureText({ body, title: "T", path: "p.md" });
-    const content = result.split("\n\n")[1];
-    expect(content.endsWith("…")).toBe(true);
-    expect(content.length).toBeLessThanOrEqual(201);
-    expect(content).not.toMatch(/ …$/);
+    const content = result.slice(result.indexOf("\n\n") + 2);
+    expect(content).toBe(body);
+    expect(content).not.toContain("…");
   });
 
   it("extracts a level-1 Résumé section verbatim, ignoring length limit", () => {

@@ -10,7 +10,7 @@ Endpoint :
     Reply : {"text": "...", "references": [...], "saved_slug": "", "history_slug": "...", "brief": "..."}
 
     POST /capture
-    Body  : {"text": "...", "tags": ["..."]}
+    Body  : {"text": "...", "tags": ["..."], "title": "..."}
     Reply : {"status": "ok", "filename": "..."}
 
     POST /run
@@ -99,7 +99,8 @@ def handle_capture():
         return jsonify({"error": "Paramètre 'text' manquant"}), 400
     tags_raw = [str(t) for t in (data.get("tags") or [])]
     tags = _normalize_tags(tags_raw) if tags_raw else []
-    path = capture_comment(text, raw_dir(), tags=tags or None)
+    title = str(data.get("title", "")).strip()
+    path = capture_comment(text, raw_dir(), tags=tags or None, title=title or None)
     return jsonify({"status": "ok", "filename": path.name})
 
 

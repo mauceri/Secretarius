@@ -4,7 +4,6 @@ export interface NoteInput {
   path: string;
 }
 
-const INCIPIT_LENGTH = 200;
 const SUMMARY_HEADINGS = ["résumé", "summary"];
 
 export function buildCaptureText({ body, title, path }: NoteInput): string {
@@ -14,7 +13,7 @@ export function buildCaptureText({ body, title, path }: NoteInput): string {
 
 function extractContent(body: string): string {
   const summary = extractSummarySection(body);
-  return summary !== null ? summary : truncateIncipit(body);
+  return summary !== null ? summary : body.trim();
 }
 
 function extractSummarySection(body: string): string | null {
@@ -33,13 +32,4 @@ function extractSummarySection(body: string): string | null {
     sectionLines.push(lines[j]);
   }
   return sectionLines.join("\n").trim();
-}
-
-function truncateIncipit(body: string): string {
-  const trimmed = body.trim();
-  if (trimmed.length <= INCIPIT_LENGTH) return trimmed;
-  const slice = trimmed.slice(0, INCIPIT_LENGTH);
-  const lastSpace = slice.lastIndexOf(" ");
-  const cut = lastSpace > 0 ? slice.slice(0, lastSpace) : slice;
-  return `${cut}…`;
 }

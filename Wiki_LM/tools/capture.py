@@ -211,9 +211,10 @@ def _write_note(path: Path, text: str, tags: list[str] | None, refs: list[str] |
     path.write_text(content, encoding="utf-8")
 
 
-def capture_comment(text: str, raw: Path, tags: list[str] | None = None, refs: list[str] | None = None) -> Path:
+def capture_comment(text: str, raw: Path, tags: list[str] | None = None, refs: list[str] | None = None,
+                    title: str | None = None) -> Path:
     ts = timestamp()
-    slug = slugify(text)
+    slug = slugify(title) if title else slugify(text)
     fname = f"{ts}-{slug}.md"
     path = raw / fname
     _write_note(path, text, tags, refs, raw.parent)

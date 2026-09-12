@@ -88,7 +88,7 @@ export default class WikilmCapturePlugin extends Plugin {
         url: `${this.settings.serverUrl}/capture`,
         method: "POST",
         contentType: "application/json",
-        body: JSON.stringify({ text, tags }),
+        body: JSON.stringify({ text, tags, title: file.basename }),
       });
       const data = response.json as { filename: string };
       await this.app.fileManager.processFrontMatter(file, (fm) => {
