@@ -63,6 +63,25 @@ npx obsidian-headless sync-status --path ~/Documents/Arbath
 npx obsidian-headless sync-list-local
 ```
 
+## Pièges connus
+
+- **Les réglages de synchronisation sont par coffre, jamais globaux.** Que ce
+  soit `ob sync-config --configs ...` sur une machine headless (sanroque) ou
+  le réglage « Sync » dans l'app Obsidian elle-même (tablette, desktop) : une
+  catégorie activée (ex. « Installed community plugins ») pour un coffre ne
+  s'applique **pas** automatiquement aux autres coffres du même compte, ni
+  aux autres appareils. Un plugin qui apparaît bien envoyé côté serveur
+  (visible dans le `sync.log` local : `Upload complete .../main.js`) mais
+  absent des modules installés sur un autre appareil : vérifier ce réglage
+  côté **réception**, coffre par coffre et appareil par appareil — pas
+  seulement côté émission. Rencontré deux fois (Secretarius, puis Arbath,
+  2026-09).
+- **sanroque est headless** : pas d'application Obsidian graphique dessus,
+  uniquement le CLI `ob` (`obsidian-headless`). Toute panne de synchro ou de
+  plugin sur sanroque se diagnostique via `ob sync-status` / `ob sync-config`
+  et les logs sous `~/.config/obsidian-headless/sync/<vaultId>/`, jamais via
+  une interface graphique locale.
+
 ## Template de requête Wiki_LM (Templater)
 
 Interroger le wiki en langage naturel **directement depuis Obsidian** (desktop ou
