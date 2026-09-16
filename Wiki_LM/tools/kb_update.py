@@ -4,10 +4,10 @@ Mise à jour de la base de connaissance à partir d'un wiki archivé.
 
 Usage:
     python tools/kb_update.py \\
-        --wiki ~/Documents/Arbath/Wiki_LM/wiki_signets_05_2026 \\
+        --wiki ~/Documents/Secretarius/Wiki_LM/wiki_signets_05_2026 \\
         --clustering clustering-embeddings-transfers-0.403 \\
         [--embed-dir ~/Secretarius/Wiki_LM/embeddings] \\
-        [--kb-dir ~/Documents/Arbath/Wiki_LM/knowledge_base] \\
+        [--kb-dir ~/Documents/Secretarius/Wiki_LM/knowledge_base] \\
         [--fusion-threshold 0.85] \\
         [--min-size 3]
 """
@@ -24,7 +24,7 @@ import numpy as np
 from wiki_paths import embeddings_dir
 
 _DEFAULT_EMBED_DIR = embeddings_dir()
-_DEFAULT_KB_DIR = Path.home() / "Documents" / "Arbath" / "Wiki_LM" / "knowledge_base"
+_DEFAULT_KB_DIR = Path.home() / "Documents" / "Secretarius" / "Wiki_LM" / "knowledge_base"
 FUSION_THRESHOLD = 0.85
 MIN_SIZE = 3
 

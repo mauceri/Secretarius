@@ -69,7 +69,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Migre wiki/ vers la structure en sous-répertoires")
     parser.add_argument(
         "--wiki",
-        default=os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Arbath/Wiki_LM")),
+        default=os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Secretarius/Wiki_LM")),
     )
     parser.add_argument("--dry-run", action="store_true", help="Affiche sans déplacer")
     args = parser.parse_args()

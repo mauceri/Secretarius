@@ -16,7 +16,7 @@ Usage CLI :
 
 Usage module :
     from lint import WikiLint
-    linter = WikiLint("/home/mauceric/Documents/Arbath/Wiki_LM")
+    linter = WikiLint("/home/mauceric/Documents/Secretarius/Wiki_LM")
     report = linter.run()
     print(report)
 """
@@ -261,7 +261,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Lint du wiki Wiki_LM")
     parser.add_argument(
         "--wiki",
-        default=os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Arbath/Wiki_LM")),
+        default=os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Secretarius/Wiki_LM")),
         help="Chemin vers Wiki_LM",
     )
     parser.add_argument("--json", action="store_true", help="Sortie JSON")

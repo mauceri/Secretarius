@@ -7,7 +7,7 @@ Usage CLI :
 
 Usage module :
     from search import WikiSearch
-    ws = WikiSearch("/home/mauceric/Documents/Arbath/Wiki_LM")
+    ws = WikiSearch("/home/mauceric/Documents/Secretarius/Wiki_LM")
     results = ws.search("zettelkasten mémoire", top_k=5)
     for r in results:
         print(r.slug, r.score, r.excerpt)
@@ -25,7 +25,6 @@ from pathlib import Path
 
 import frontmatter
 import numpy as np
-import pickle
 from rank_bm25 import BM25Plus
 
 from nltk.stem.snowball import FrenchStemmer
@@ -33,8 +32,13 @@ from nltk.stem.snowball import FrenchStemmer
 from wiki_paths import embeddings_dir, is_blank_page, iter_pages, slug_to_path
 
 _EMBED_DIR = embeddings_dir()
-_CACHE_PATH = Path(os.environ.get("WIKI_PATH", str(Path(__file__).resolve().parent.parent))) / "wiki_bm25_cache.pkl"
-_CACHE_VERSION = 2  # v2 : pages vides exclues + désuffixation française
+_CACHE_PATH = Path(os.environ.get("WIKI_PATH", str(Path(__file__).resolve().parent.parent))) / "wiki_bm25_cache.json"
+# v3 : JSON au lieu de pickle — ce cache vit dans le coffre Obsidian synchronisé
+# entre appareils ; charger un pickle reçu par sync (glitch ou altération)
+# exécute du code arbitraire à la désérialisation. Rien dans sa structure
+# (chaînes, nombres, listes, dicts) n'a besoin de pickle. Le bump de version
+# force un rebuild propre : un ancien .pkl n'est jamais lu comme JSON.
+_CACHE_VERSION = 3
 
 # ---------------------------------------------------------------------------
 # Stopwords français (liste embarquée — pas de dépendance nltk)
@@ -119,15 +123,19 @@ class WikiSearch:
         if not _CACHE_PATH.exists():
             return False
         try:
-            with open(_CACHE_PATH, "rb") as f:
-                cached = pickle.load(f)
+            with open(_CACHE_PATH, "r", encoding="utf-8") as f:
+                cached = json.load(f)
             if cached.get("version") != _CACHE_VERSION:
                 return False
             if cached.get("wiki_dir") != str(self.wiki_dir):
                 return False
             if cached.get("dir_mtime") != self._max_mtime():
                 return False
-            self._pages = cached["pages"]
+            # "path" a été sérialisé en chaîne (JSON n'a pas de type Path) —
+            # reconstruit ici, seul endroit qui en a besoin.
+            self._pages = [
+                {**p, "path": Path(p["path"])} for p in cached["pages"]
+            ]
             self._corpus = cached["corpus"]
             self._bm25 = BM25Plus(self._corpus)
             return True
@@ -136,14 +144,17 @@ class WikiSearch:
 
     def _save_cache(self) -> None:
         try:
-            with open(_CACHE_PATH, "wb") as f:
-                pickle.dump({
+            pages_serializable = [
+                {**p, "path": str(p["path"])} for p in self._pages
+            ]
+            with open(_CACHE_PATH, "w", encoding="utf-8") as f:
+                json.dump({
                     "version": _CACHE_VERSION,
                     "wiki_dir": str(self.wiki_dir),
                     "dir_mtime": self._max_mtime(),
-                    "pages": self._pages,
+                    "pages": pages_serializable,
                     "corpus": self._corpus,
-                }, f, protocol=pickle.HIGHEST_PROTOCOL)
+                }, f, ensure_ascii=False, default=str)
         except Exception as e:
             print(f"[search] Cache BM25 non sauvegardé : {e}")
 
@@ -407,8 +418,8 @@ def main() -> None:
     parser.add_argument("--top", type=int, default=5, help="Nombre de résultats (défaut : 5)")
     parser.add_argument(
         "--wiki",
-        default=os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Arbath/Wiki_LM")),
-        help="Chemin vers Wiki_LM (défaut : $WIKI_PATH ou ~/Documents/Arbath/Wiki_LM)",
+        default=os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Secretarius/Wiki_LM")),
+        help="Chemin vers Wiki_LM (défaut : $WIKI_PATH ou ~/Documents/Secretarius/Wiki_LM)",
     )
     args = parser.parse_args()
 

@@ -303,7 +303,7 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=int(os.environ.get("WIKI_SERVER_PORT", 5051)))
     parser.add_argument(
         "--wiki",
-        default=os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Arbath/Wiki_LM")),
+        default=os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Secretarius/Wiki_LM")),
     )
     parser.add_argument("--mode", default="hybrid", choices=["bm25", "semantic", "hybrid"])
     parser.add_argument("--no-public", action="store_true",

@@ -10,8 +10,10 @@ en tête de toute recherche sémantique peu spécifique.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+import search
 from search import SearchResult, WikiSearch, hybrid_search, tokenize
 
 
@@ -37,6 +39,45 @@ def test_build_index_exclut_les_pages_vides(tmp_path):
 
     slugs = {p["slug"] for p in ws._pages}
     assert slugs == {"src-reel"}
+
+
+def test_cache_bm25_est_du_json_pas_du_pickle(tmp_path, monkeypatch):
+    """Revue DSH du 16/09/2026 : ce cache vit dans le coffre Obsidian
+    synchronisé entre appareils — un pickle chargé depuis un fichier reçu par
+    sync exécute du code arbitraire à la désérialisation. Vérifie que le
+    fichier écrit est du JSON lisible, et que le round-trip restitue
+    correctement les pages (y compris le type Path, absent de JSON)."""
+    cache_path = tmp_path / "wiki_bm25_cache.json"
+    monkeypatch.setattr(search, "_CACHE_PATH", cache_path)
+    _make_page(tmp_path, "sources", "src-reel", title="Un sujet réel", body="Du contenu exploitable.")
+
+    WikiSearch(tmp_path)  # construit puis sauvegarde le cache
+
+    assert cache_path.exists()
+    with open(cache_path, encoding="utf-8") as f:
+        cached = json.load(f)  # lève si ce n'est pas du JSON valide
+    assert cached["version"] == search._CACHE_VERSION
+    assert isinstance(cached["pages"][0]["path"], str)  # sérialisé en chaîne
+
+    # Round-trip : une seconde instance doit charger depuis ce cache JSON
+    # (mtime inchangé) plutôt que reconstruire, et reconstituer Path.
+    ws2 = WikiSearch(tmp_path)
+    assert isinstance(ws2._pages[0]["path"], Path)
+    assert ws2._pages[0]["slug"] == "src-reel"
+
+
+def test_cache_pickle_perime_est_ignore_sans_planter(tmp_path, monkeypatch):
+    """Un ancien .pkl ne doit jamais être relu comme JSON — le changement
+    d'extension (.pkl -> .json) et le bump de version (3) garantissent un
+    rebuild propre plutôt qu'un crash ou, pire, un pickle.load."""
+    cache_path = tmp_path / "wiki_bm25_cache.json"
+    cache_path.write_bytes(b"\x80\x04\x95ceci-nest-pas-du-json")  # tête de pickle
+    monkeypatch.setattr(search, "_CACHE_PATH", cache_path)
+    _make_page(tmp_path, "sources", "src-reel", title="Un sujet réel", body="Du contenu exploitable.")
+
+    ws = WikiSearch(tmp_path)  # ne doit pas lever
+
+    assert {p["slug"] for p in ws._pages} == {"src-reel"}
 
 
 def test_recherche_singulier_trouve_ce_que_le_pluriel_trouve(tmp_path):

@@ -18,7 +18,7 @@ from pathlib import Path
 
 import frontmatter
 
-_DEFAULT_WIKI = Path.home() / "Documents" / "Arbath" / "Wiki_LM"
+_DEFAULT_WIKI = Path.home() / "Documents" / "Secretarius" / "Wiki_LM"
 _SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")
 
 

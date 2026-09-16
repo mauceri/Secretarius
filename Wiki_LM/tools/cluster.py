@@ -33,7 +33,7 @@ from similarity import (
 from wiki_paths import CLUSTERING_SUBDIR, embeddings_dir
 
 _EMBED_DIR = embeddings_dir()
-_DEFAULT_WIKI = os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Arbath/Wiki_LM"))
+_DEFAULT_WIKI = os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Secretarius/Wiki_LM"))
 
 
 # ---------------------------------------------------------------------------
@@ -378,7 +378,7 @@ def main() -> None:
     parser.add_argument(
         "--wiki",
         default=_DEFAULT_WIKI,
-        help="Chemin vers le wiki (défaut : $WIKI_PATH ou ~/Documents/Arbath/Wiki_LM)",
+        help="Chemin vers le wiki (défaut : $WIKI_PATH ou ~/Documents/Secretarius/Wiki_LM)",
     )
     parser.add_argument(
         "--signal",

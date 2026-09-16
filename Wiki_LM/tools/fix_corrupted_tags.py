@@ -21,7 +21,7 @@ from pathlib import Path
 
 import frontmatter
 
-_DEFAULT_WIKI = Path.home() / "Documents" / "Arbath" / "Wiki_LM"
+_DEFAULT_WIKI = Path.home() / "Documents" / "Secretarius" / "Wiki_LM"
 
 
 def _looks_corrupted(tags: list) -> bool:

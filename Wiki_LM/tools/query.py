@@ -8,7 +8,7 @@ Usage CLI :
 
 Usage module :
     from query import WikiQuery
-    wq = WikiQuery("/home/mauceric/Documents/Arbath/Wiki_LM")
+    wq = WikiQuery("/home/mauceric/Documents/Secretarius/Wiki_LM")
     answer = wq.query("Comment fonctionne Zettelkasten ?")
     print(answer.text)
     for ref in answer.references:
@@ -284,7 +284,7 @@ def main() -> None:
     parser.add_argument("--save", action="store_true", help="Enregistrer la synthèse comme page synth-")
     parser.add_argument(
         "--wiki",
-        default=os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Arbath/Wiki_LM")),
+        default=os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Secretarius/Wiki_LM")),
         help="Chemin vers Wiki_LM",
     )
     parser.add_argument("--backend", default="", help="Backend LLM : claude | ollama | openai")

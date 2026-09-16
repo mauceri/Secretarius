@@ -41,7 +41,7 @@ _INGESTABLE_SUFFIXES = {".url", ".md", ".pdf", ".txt"}
 
 
 def _wiki_root() -> Path:
-    return Path(os.environ.get("WIKI_PATH", str(Path.home() / "Secretarius" / "Wiki_LM")))
+    return Path(os.environ.get("WIKI_PATH", str(Path.home() / "Documents" / "Secretarius" / "Wiki_LM")))
 
 
 def _raw_dir() -> Path:
@@ -57,19 +57,31 @@ def op_capture(text: str) -> dict:
     refs = re.findall(r"\bref:(\S+)", note)
     if refs:
         note = re.sub(r"\s*\bref:\S+", "", note).strip()
+    wiki_root = _wiki_root()
     file_paths = re.findall(r"\bfile:(\S+)", note)
     if file_paths:
         note = re.sub(r"\s*\bfile:\S+", "", note).strip()
         for fpath in file_paths:
             try:
-                content = Path(fpath).read_text(encoding="utf-8")
+                # file: est prévu pour relire une pièce jointe déjà déposée
+                # par le pont Telegram/le plugin (sous wiki_root), pas pour
+                # lire un chemin arbitraire de l'hôte — sans cette vérif,
+                # combiné à wiki-lm-server sans jeton (accessible sur tout le
+                # tailnet), n'importe qui pourrait faire lire puis relire un
+                # fichier de l'hôte via /run + /c file:<chemin> (revue DSH du
+                # 16/09/2026).
+                resolved = Path(fpath).expanduser().resolve()
+                resolved.relative_to(wiki_root.resolve())
+            except (OSError, ValueError):
+                continue
+            try:
+                content = resolved.read_text(encoding="utf-8")
                 if fpath.endswith(".md"):
                     content = re.sub(r"^---\n.*?\n---\n", "", content, flags=re.DOTALL).strip()
                 if content:
                     note = (note + "\n\n" + content).strip() if note else content.strip()
             except OSError:
                 pass
-    wiki_root = _wiki_root()
     if "simple" in directives:
         sources_dir = wiki_root / "wiki" / "sources"
         sources_dir.mkdir(parents=True, exist_ok=True)

@@ -44,6 +44,39 @@ def test_capture_url_with_tags(monkeypatch, tmp_path):
     assert not list((tmp_path / "raw").glob("*.md"))
 
 
+def test_capture_file_directive_reads_file_under_wiki_root(monkeypatch, tmp_path):
+    """Usage légitime : file: pointe vers une pièce jointe déjà déposée sous
+    le wiki (ex. attachments/), comme le fait le pont Telegram/le plugin."""
+    wiki = _wiki(monkeypatch, tmp_path)
+    attach_dir = tmp_path / "attachments"
+    attach_dir.mkdir()
+    attached = attach_dir / "piece-jointe.txt"
+    attached.write_text("Contenu de la pièce jointe.", encoding="utf-8")
+
+    out = wiki.op_capture(f"#tag file:{attached}")
+
+    fname = out["files"][0]
+    content = (tmp_path / "raw" / fname).read_text(encoding="utf-8")
+    assert "Contenu de la pièce jointe." in content
+
+
+def test_capture_file_directive_ignores_path_outside_wiki_root(monkeypatch, tmp_path):
+    """Revue DSH du 16/09/2026 : file: lisait n'importe quel chemin de
+    l'hôte — combiné à un serveur sans jeton, n'importe qui pouvait faire
+    lire un fichier arbitraire via /run + /c file:<chemin>. Un chemin hors
+    du wiki_root doit maintenant être silencieusement ignoré."""
+    wiki = _wiki(monkeypatch, tmp_path)
+    outside = tmp_path.parent / "hors-du-wiki-secret.txt"
+    outside.write_text("CONTENU SENSIBLE HORS DU WIKI", encoding="utf-8")
+
+    out = wiki.op_capture(f"#tag note libre file:{outside}")
+
+    fname = out["files"][0]
+    content = (tmp_path / "raw" / fname).read_text(encoding="utf-8")
+    assert "CONTENU SENSIBLE" not in content
+    outside.unlink()
+
+
 def test_query_returns_synthesis(monkeypatch, tmp_path):
     wiki = _wiki(monkeypatch, tmp_path)
 

@@ -16,8 +16,8 @@ from pathlib import Path
 
 from ingest import Ingestor
 
-_DEFAULT_WIKI = Path.home() / "Documents" / "Arbath" / "Wiki_LM"
-_DEFAULT_RAW = Path.home() / "Documents" / "Arbath" / "Wiki_LM" / "raw"
+_DEFAULT_WIKI = Path.home() / "Documents" / "Secretarius" / "Wiki_LM"
+_DEFAULT_RAW = Path.home() / "Documents" / "Secretarius" / "Wiki_LM" / "raw"
 
 
 def main() -> None:

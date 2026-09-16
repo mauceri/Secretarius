@@ -88,7 +88,7 @@ def main() -> None:
         "--wiki",
         default=os.environ.get(
             "WIKI_PATH",
-            str(Path.home() / "Documents/Arbath/Wiki_LM")
+            str(Path.home() / "Documents/Secretarius/Wiki_LM")
         ),
     )
     args = parser.parse_args()

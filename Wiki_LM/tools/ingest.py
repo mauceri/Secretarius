@@ -16,7 +16,7 @@ Usage CLI :
 
 Usage module :
     from ingest import Ingestor
-    ing = Ingestor("/home/mauceric/Documents/Arbath/Wiki_LM")
+    ing = Ingestor("/home/mauceric/Documents/Secretarius/Wiki_LM")
     ing.ingest("article.txt", slug="mon-article")
 """
 
@@ -40,7 +40,7 @@ from kb_query import kb_query
 from wiki_lookup import WikiLookup
 from wiki_paths import CONTENT_SUBDIRS, CLUSTERING_SUBDIR, iter_pages, slug_to_path
 
-_DEFAULT_KB_DIR = Path.home() / "Documents" / "Arbath" / "Wiki_LM" / "knowledge_base"
+_DEFAULT_KB_DIR = Path.home() / "Documents" / "Secretarius" / "Wiki_LM" / "knowledge_base"
 
 
 # ---------------------------------------------------------------------------
@@ -769,7 +769,7 @@ def _extract_title_from_page(content: str) -> str:
 # Moteur d'ingestion
 # ---------------------------------------------------------------------------
 
-_DEFAULT_RAW = Path(os.environ.get("WIKI_PATH", str(Path.home() / "Secretarius" / "Wiki_LM"))).expanduser() / "raw"
+_DEFAULT_RAW = Path(os.environ.get("WIKI_PATH", str(Path.home() / "Documents" / "Secretarius" / "Wiki_LM"))).expanduser() / "raw"
 
 
 class Ingestor:
@@ -1645,8 +1645,8 @@ def main() -> None:
     parser.add_argument("--top-entities", type=int, default=5, help="Nombre max de concepts/entités à enrichir")
     parser.add_argument(
         "--wiki",
-        default=os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Arbath/Wiki_LM")),
-        help="Chemin vers Wiki_LM (défaut : $WIKI_PATH ou ~/Documents/Arbath/Wiki_LM)",
+        default=os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Secretarius/Wiki_LM")),
+        help="Chemin vers Wiki_LM (défaut : $WIKI_PATH ou ~/Documents/Secretarius/Wiki_LM)",
     )
     parser.add_argument("--backend", default="", help="Backend LLM : claude | ollama | openai")
     parser.add_argument("--model", default="", help="Modèle LLM (ex: qwen2.5:7b)")

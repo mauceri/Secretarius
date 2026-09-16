@@ -165,7 +165,7 @@ def _fetch_api(title: str, lang: str) -> dict[str, Any] | None:
 # ---------------------------------------------------------------------------
 
 class WikiLookup:
-    _DEFAULT_ZIM = Path.home() / "Secretarius" / "Wiki_LM" / "zim"
+    _DEFAULT_ZIM = Path.home() / "Documents" / "Secretarius" / "Wiki_LM" / "zim"
 
     def __init__(self, wiki_path: str | Path,
                  zim_dir: str | Path | None = None) -> None:

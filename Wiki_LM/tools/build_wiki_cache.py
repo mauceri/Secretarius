@@ -22,7 +22,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from wiki_lookup import WikiLookup
 
-WIKI_PATH_DEFAULT = Path.home() / "Documents/Arbath/Wiki_LM"
+WIKI_PATH_DEFAULT = Path.home() / "Documents/Secretarius/Wiki_LM"
 
 
 def _collect_names(wiki_dir: Path) -> list[str]:

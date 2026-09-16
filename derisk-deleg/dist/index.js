@@ -112,8 +112,14 @@ export default definePluginEntry({
             async execute(_id, params) {
                 let arg = (params?.command ?? "").trim();
                 // Joindre le fichier le plus récent de media/inbound/ (< 5 min) si présent.
+                // attachDir doit suivre le wiki courant (WIKI_PATH), comme wiki.py côté
+                // Python — un chemin en dur vers Arbath (ancien emplacement du wiki)
+                // faisait échouer silencieusement le lien [[...]] ajouté par ref:
+                // (_write_note ignore un ref hors du wiki_root réel), en plus de
+                // supprimer le fichier entrant via rmSync (revue DSH du 16/09/2026).
                 const inboundDir = join(homedir(), ".openclaw", "media", "inbound");
-                const attachDir = join(homedir(), "Documents", "Arbath", "Wiki_LM", "attachments");
+                const wikiPath = process.env.WIKI_PATH || join(homedir(), "Documents", "Secretarius", "Wiki_LM");
+                const attachDir = join(wikiPath, "attachments");
                 if (existsSync(inboundDir)) {
                     const now = Date.now();
                     const recent = readdirSync(inboundDir)

@@ -8,7 +8,7 @@ Met à jour le fichier cluster en place.
 
 Usage:
     python tools/name_clusters.py \\
-        --clustering ~/Documents/Arbath/Wiki_LM/wiki_signets_05_2026/clusterings/clustering-embeddings-transfers-0.404 \\
+        --clustering ~/Documents/Secretarius/Wiki_LM/wiki_signets_05_2026/clusterings/clustering-embeddings-transfers-0.404 \\
         [--force]          # retitrer même les clusters déjà titrés
         [--dry-run]        # affiche sans écrire
         [--max-members 20] # nb max de titres envoyés au LLM

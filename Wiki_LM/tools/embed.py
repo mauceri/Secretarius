@@ -48,7 +48,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Calcule les embeddings BGE-M3 du wiki")
     parser.add_argument(
         "--wiki",
-        default=os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Arbath/Wiki_LM")),
+        default=os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Secretarius/Wiki_LM")),
     )
     parser.add_argument("--force", action="store_true", help="Recalculer tous les embeddings")
     parser.add_argument("--batch-size", type=int, default=32)

@@ -4,7 +4,7 @@ Construction du dictionnaire de tags normalisés par similarité sémantique.
 
 Usage:
     python tools/kb_tags.py \\
-        --wiki ~/Documents/Arbath/Wiki_LM/wiki_signets_05_2026 \\
+        --wiki ~/Documents/Secretarius/Wiki_LM/wiki_signets_05_2026 \\
         [--kb-dir ~/Secretarius/Wiki_LM/knowledge_base] \\
         [--threshold 0.90] \\
         [--min-count 2]
@@ -18,7 +18,7 @@ from pathlib import Path
 import frontmatter
 import numpy as np
 
-_DEFAULT_KB_DIR = Path.home() / "Documents" / "Arbath" / "Wiki_LM" / "knowledge_base"
+_DEFAULT_KB_DIR = Path.home() / "Documents" / "Secretarius" / "Wiki_LM" / "knowledge_base"
 
 
 def collect_tags(wiki_root: Path) -> dict[str, int]:

@@ -28,7 +28,7 @@ EMBED_DIR = embeddings_dir()
 INDEX_FILE = "embeddings_index.json"
 MATRIX_FILE = "embeddings.npy"
 _MANIFEST = ".ingested"
-_DEFAULT_RAW = Path.home() / "Secretarius" / "Wiki_LM" / "raw"
+_DEFAULT_RAW = Path.home() / "Documents" / "Secretarius" / "Wiki_LM" / "raw"
 _BAD_STATUS = {"illisible", "inaccessible"}
 
 
@@ -298,7 +298,7 @@ def main() -> None:
     parser.add_argument("--embed-dir", default=str(EMBED_DIR))
     parser.add_argument(
         "--wiki",
-        default=os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Arbath/Wiki_LM")),
+        default=os.environ.get("WIKI_PATH", str(Path.home() / "Documents/Secretarius/Wiki_LM")),
     )
     parser.add_argument(
         "--raw",
