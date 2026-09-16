@@ -198,7 +198,7 @@
        "deny": [
         "wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read",
         "gog_inbox", "gog_send", "gog_connect_start", "gog_search", "gog_get",
-        "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update", "wiki_search"
+        "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update", "wiki_search", "wiki_review", "wiki_verify", "wiki_delete"
        ]
       }
      }
@@ -218,7 +218,7 @@
        "deny": [
         "wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read",
         "gog_inbox", "gog_send", "gog_connect_start", "gog_search", "gog_get",
-        "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update", "wiki_search"
+        "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update", "wiki_search", "wiki_review", "wiki_verify", "wiki_delete"
        ]
       }
      }
@@ -255,7 +255,7 @@
        "deny": [
         "wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read",
         "gog_inbox", "gog_send", "gog_connect_start", "gog_search", "gog_get",
-        "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update", "wiki_search"
+        "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update", "wiki_search", "wiki_review", "wiki_verify", "wiki_delete"
        ]
       }
      }
@@ -280,7 +280,7 @@
      "gog", "read", "sessions_list", "sessions_spawn", "sessions_yield", "group:runtime",
      "wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read",
      "gog_inbox", "gog_send", "gog_connect_start", "gog_search", "gog_get",
-     "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update", "wiki_search"
+     "gog_drive_search", "gog_reply", "wiki_tags", "wiki_kb_update", "wiki_search", "wiki_review", "wiki_verify", "wiki_delete"
     ],
     "deny": [
      "browser", "canvas", "nodes", "cron",

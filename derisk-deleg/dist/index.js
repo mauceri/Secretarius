@@ -199,6 +199,70 @@ export default definePluginEntry({
                 return { content: [{ type: "text", text: out.slice(0, 4000) }] };
             },
         });
+        // Lecture libre, comme les autres wiki_* en lecture (WIKI_READ_OPS).
+        api.registerTool({
+            name: "wiki_review",
+            description: "Affiche la prochaine page à relire (délègue 'op: review' à l'agent wiki).",
+            parameters: Type.Object({ command: Type.Optional(Type.String({ description: "Inutilisé." })) }),
+            async execute(_id, _params) {
+                const out = await runWikiOp(api, "review", "");
+                return { content: [{ type: "text", text: out.slice(0, 4000) }] };
+            },
+        });
+        // Écriture : ne marque JAMAIS directement, même appelé en tant qu'outil —
+        // prépare la confirmation comme gog_send/gog_reply. "verify" est absent
+        // de WIKI_READ_OPS, donc le flux /confirm générique (router-write) le
+        // traiterait déjà ainsi si inféré du langage naturel ; ce garde-fou dans
+        // l'outil lui-même le rend vrai aussi pour un appel de modèle direct.
+        api.registerTool({
+            name: "wiki_verify",
+            description: "Marque une page comme vérifiée (prépare l'action ; confirmation requise via /confirm, jamais direct).",
+            parameters: Type.Object({
+                command: Type.Optional(Type.String({ description: "Le slug de la page à marquer vérifiée." })),
+            }),
+            async execute(_id, params) {
+                const slug = (params?.command ?? "").trim();
+                if (!slug)
+                    return { content: [{ type: "text", text: "Usage: /verifie <page>" }] };
+                pending = { kind: "router-write", op: "verify", args: slug, ts: Date.now() };
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: `Marquer la page ${slug} comme vérifiée ?\n\nTapez /confirm pour valider (valable 10 min), ou /annuler pour abandonner.`,
+                        },
+                    ],
+                };
+            },
+        });
+        // Même garde-fou que /supprimer tapée explicitement : essai à blanc puis
+        // confirmation obligatoire, jamais de suppression directe même appelée
+        // en tant qu'outil par un modèle.
+        api.registerTool({
+            name: "wiki_delete",
+            description: "Supprime une page du wiki et sa cascade (toujours un essai à blanc puis /confirm, jamais direct).",
+            parameters: Type.Object({
+                command: Type.Optional(Type.String({ description: "Le slug de la page à supprimer." })),
+            }),
+            async execute(_id, params) {
+                const slug = (params?.command ?? "").trim();
+                if (!slug)
+                    return { content: [{ type: "text", text: "Usage: /supprimer <page>" }] };
+                const preview = await fetchWikiOpJson(api, "delete_preview", slug);
+                if (!preview.ok) {
+                    return { content: [{ type: "text", text: preview.text.slice(0, 4000) }] };
+                }
+                pending = { kind: "router-write", op: "delete", args: slug, ts: Date.now() };
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: `${preview.text}\n\nTapez /confirm pour supprimer (valable 10 min), ou /annuler pour abandonner.`.slice(0, 4000),
+                        },
+                    ],
+                };
+            },
+        });
         api.registerTool({
             name: "source_read",
             description: "Read/summarize an external web page NOW via the anti-injection scout agent (delegates 'url: <url>').",

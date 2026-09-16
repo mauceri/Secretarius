@@ -27,7 +27,10 @@
       "gog_reply",
       "wiki_tags",
       "wiki_kb_update",
-      "wiki_search"
+      "wiki_search",
+      "wiki_review",
+      "wiki_verify",
+      "wiki_delete"
     ]
   }
 }

@@ -193,6 +193,105 @@ describe("outils gog_* — délégation au sous-agent gog", () => {
   });
 });
 
+describe("outils wiki_review / wiki_verify / wiki_delete", () => {
+  afterEach(() => {
+    vi.doUnmock("./wiki-ops.js");
+  });
+
+  it("wiki_review délègue op:review sans argument", async () => {
+    const runWikiOpSpy = vi.fn(async () => "Page à relire : src-a.");
+    vi.doMock("./wiki-ops.js", () => ({ runWikiOp: runWikiOpSpy }));
+    const plugin = await freshPlugin();
+    const { api, tools } = makeApi();
+    plugin.register(api);
+
+    const res = await tools["wiki_review"].execute("id", {});
+
+    expect(res.content[0].text).toBe("Page à relire : src-a.");
+    expect(runWikiOpSpy).toHaveBeenCalledWith(api, "review", "");
+  });
+
+  it("wiki_verify sans argument renvoie l'usage sans rien préparer", async () => {
+    const plugin = await freshPlugin();
+    const { api, tools } = makeApi();
+    plugin.register(api);
+
+    const res = await tools["wiki_verify"].execute("id", {});
+
+    expect(res.content[0].text).toBe("Usage: /verifie <page>");
+  });
+
+  it("wiki_verify prépare la confirmation SANS marquer directement", async () => {
+    const runWikiOpSpy = vi.fn(async () => "ne doit jamais être appelé ici");
+    vi.doMock("./wiki-ops.js", () => ({ runWikiOp: runWikiOpSpy }));
+    const plugin = await freshPlugin();
+    const { api, tools } = makeApi();
+    plugin.register(api);
+
+    const res = await tools["wiki_verify"].execute("id", { command: "src-a" });
+
+    expect(runWikiOpSpy).not.toHaveBeenCalled();
+    const text = res.content[0].text as string;
+    expect(text).toContain("src-a");
+    expect(text).toContain("/confirm");
+    expect(text).toContain("/annuler");
+  });
+
+  it("wiki_delete sans argument renvoie l'usage sans essai à blanc", async () => {
+    const fetchWikiOpJsonSpy = vi.fn(async () => ({ ok: true, text: "ne doit jamais être appelé ici" }));
+    vi.doMock("./wiki-ops.js", () => ({ fetchWikiOpJson: fetchWikiOpJsonSpy }));
+    const plugin = await freshPlugin();
+    const { api, tools } = makeApi();
+    plugin.register(api);
+
+    const res = await tools["wiki_delete"].execute("id", {});
+
+    expect(res.content[0].text).toBe("Usage: /supprimer <page>");
+    expect(fetchWikiOpJsonSpy).not.toHaveBeenCalled();
+  });
+
+  it("wiki_delete : essai à blanc réussi prépare /confirm, ne supprime jamais directement", async () => {
+    const fetchWikiOpJsonSpy = vi.fn(async () => ({
+      ok: true,
+      text: "Suppression de src-a : 2 pages affectées.",
+    }));
+    const runWikiOpSpy = vi.fn(async () => "ne doit jamais être appelé ici");
+    vi.doMock("./wiki-ops.js", () => ({
+      fetchWikiOpJson: fetchWikiOpJsonSpy,
+      runWikiOp: runWikiOpSpy,
+    }));
+    const plugin = await freshPlugin();
+    const { api, tools } = makeApi();
+    plugin.register(api);
+
+    const res = await tools["wiki_delete"].execute("id", { command: "src-a" });
+
+    expect(fetchWikiOpJsonSpy).toHaveBeenCalledWith(api, "delete_preview", "src-a");
+    expect(runWikiOpSpy).not.toHaveBeenCalled();
+    const text = res.content[0].text as string;
+    expect(text).toContain("Suppression de src-a : 2 pages affectées.");
+    expect(text).toContain("/confirm");
+    expect(text).toContain("/annuler");
+  });
+
+  it("wiki_delete : essai à blanc en échec ne propose jamais /confirm", async () => {
+    const fetchWikiOpJsonSpy = vi.fn(async () => ({
+      ok: false,
+      text: "Erreur wiki : slug introuvable.",
+    }));
+    vi.doMock("./wiki-ops.js", () => ({ fetchWikiOpJson: fetchWikiOpJsonSpy }));
+    const plugin = await freshPlugin();
+    const { api, tools } = makeApi();
+    plugin.register(api);
+
+    const res = await tools["wiki_delete"].execute("id", { command: "src-inconnu" });
+
+    const text = res.content[0].text as string;
+    expect(text).toBe("Erreur wiki : slug introuvable.");
+    expect(text).not.toContain("/confirm");
+  });
+});
+
 describe("source_read — délégation à scout", () => {
   it("délègue url:<url> à l'agent scout", async () => {
     const plugin = await freshPlugin();
