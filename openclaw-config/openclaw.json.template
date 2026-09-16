@@ -102,6 +102,7 @@
   { "agentId": "main", "match": { "channel": "telegram", "accountId": "default" } }
  ],
  "agents": {
+  "ownership": "explicit",
   "defaults": {
    "systemAgent": { "agentId": "main" },
    "heartbeat": { "every": "0m" },
@@ -117,8 +118,7 @@
    },
    "workspace": "${HOME}/${OPENCLAW_DIR}/workspace",
    "compaction": {
-    "mode": "safeguard",
-    "reserveTokensFloor": 20000
+    "mode": "safeguard"
    },
    "maxConcurrent": 1,
    "subagents": {
@@ -134,7 +134,7 @@
    {
     "id": "main",
     "model": {
-     "primary": "euria/Qwen/Qwen3.5-397B-A17B-FP8"
+     "primary": "tiron-llm/tiron-router"
     },
     "subagents": {
      "allowAgents": ["wiki", "scout", "gog"]
@@ -214,7 +214,7 @@
      "deny": ["exec"],
      "sandbox": {
       "tools": {
-       "allow": ["read", "write", "process", "sessions_yield", "image"],
+       "allow": ["read", "write", "process", "sessions_yield", "view_image"],
        "deny": [
         "wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read",
         "gog_inbox", "gog_send", "gog_connect_start", "gog_search", "gog_get",
@@ -328,7 +328,7 @@
     "http://${HOSTNAME}:${OPENCLAW_PORT}",
     "https://${HOSTNAME}.tailc69141.ts.net:8443"
    ],
-   "allowInsecureAuth": true
+   "dangerouslyDisableDeviceAuth": true
   },
   "auth": {
    "mode": "token",
@@ -339,11 +339,13 @@
   },
   "trustedProxies": ["127.0.0.1", "::1"],
   "nodes": {
-   "denyCommands": [
-    "camera.snap", "camera.clip", "screen.record",
-    "contacts.add", "calendar.add", "reminders.add",
-    "sms.send", "config.patch", "config.apply"
-   ]
+   "commands": {
+    "deny": [
+     "camera.snap", "camera.clip", "screen.record",
+     "contacts.add", "calendar.add", "reminders.add",
+     "sms.send", "config.patch", "config.apply"
+    ]
+   }
   }
  },
  "plugins": { "allow": [], "entries": { "memory-core": { "config": { "dreaming": { "enabled": false } } }, "derisk-deleg": { "enabled": true, "hooks": { "allowConversationAccess": true } } } },
