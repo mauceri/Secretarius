@@ -51,6 +51,24 @@ else
   warn "wiki-lm-server.service non activé (normal si Wiki_LM non installé)"
 fi
 
+# Garde d'injection et watcher Scout (optionnels — si Scout est installé) :
+# ni l'un ni l'autre n'était relancé ici, ce qui laissait Scout éteint après
+# un arrêt manuel même sur une installation où il tournait déjà (relevé par
+# la revue DSH du 16/09/2026).
+if systemctl --user is-enabled openclaw-injection-guard.service &>/dev/null 2>&1; then
+  systemctl --user restart openclaw-injection-guard.service
+  info "openclaw-injection-guard démarré ✓"
+else
+  warn "openclaw-injection-guard.service non activé (normal si Scout non installé)"
+fi
+
+if systemctl --user is-enabled openclaw-scout.service &>/dev/null 2>&1; then
+  systemctl --user restart openclaw-scout.service
+  info "openclaw-scout (watcher) démarré ✓"
+else
+  warn "openclaw-scout.service non activé (normal si Scout non installé)"
+fi
+
 echo ""
 info "=== Services Secretarius ==="
 systemctl --user status openclaw-gateway.service --no-pager -l 2>&1 \

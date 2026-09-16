@@ -8,6 +8,10 @@ PENDING="${SCOUT_WORKSPACE}/tasks/pending"
 DONE="${SCOUT_WORKSPACE}/tasks/done"
 RESULTS="${SCOUT_WORKSPACE}/results"
 SCOUT_PROCESS="${HOME}/.local/bin/scout_process.py"
+# scout_process.py importe `requests`, absent du python3 système par défaut —
+# le venv Wiki_LM l'a déjà (déclaré dans requirements.txt), donc on l'utilise
+# spécifiquement pour cet appel plutôt que d'ajouter une dépendance système.
+SCOUT_PROCESS_PYTHON="${HOME}/Secretarius/Wiki_LM/.venv/bin/python3"
 
 mkdir -p "$PENDING" "$DONE" "$RESULTS"
 
@@ -39,7 +43,7 @@ print(d.get('check_email', ''))
 
     if [[ -n "$CHECK_EMAIL" ]]; then
       echo "[scout-watcher] Tâche check_email — appel injection-guard directement"
-      python3 "$SCOUT_PROCESS" "$task_file"
+      "$SCOUT_PROCESS_PYTHON" "$SCOUT_PROCESS" "$task_file"
       mv "$task_file" "${DONE}/${task_id}.json"
       echo "[scout-watcher] Tâche email traitée : ${task_id}"
       continue
@@ -56,12 +60,15 @@ print(d.get('url_or_path', ''))
     if [[ -n "$URL" && "$URL" =~ ^https?:// ]]; then
       echo "[scout-watcher] Fetch : ${URL}"
       FETCHED_FILE="$(mktemp)"
-      CURL_HTTP_CODE="$(curl -sL --max-time 30 --user-agent 'Scout/1.0' \
+      # --max-filesize et --max-redirs bornent le fetch lui-même (le garde ne
+      # tronque qu'après coup) ; relevé par la revue DSH du 16/09/2026.
+      CURL_HTTP_CODE="$(curl -sL --max-time 30 --max-filesize 20971520 --max-redirs 5 \
+          --user-agent 'Scout/1.0' \
           -w '%{http_code}' -o "$FETCHED_FILE" "$URL" 2>/dev/null || echo '000')"
       FETCHED_SIZE="$(wc -c < "$FETCHED_FILE")"
 
       if [[ "$CURL_HTTP_CODE" =~ ^[23] && "$FETCHED_SIZE" -gt 0 ]]; then
-        python3 "$SCOUT_PROCESS" "$task_file" "$FETCHED_FILE"
+        "$SCOUT_PROCESS_PYTHON" "$SCOUT_PROCESS" "$task_file" "$FETCHED_FILE"
         echo "[scout-watcher] Contenu traité : HTTP ${CURL_HTTP_CODE}, brut ${FETCHED_SIZE} octets"
       else
         echo "[scout-watcher] ERREUR fetch : HTTP ${CURL_HTTP_CODE}, ${FETCHED_SIZE} octets" >&2

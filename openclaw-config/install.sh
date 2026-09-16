@@ -381,6 +381,24 @@ mkdir -p "${OPENCLAW_PATH}/workspace-scout/tasks/pending" \
 mkdir -p "${OPENCLAW_PATH}/workspace/.gog-config"
 info "Répertoires scout (tasks/results) et .gog-config créés"
 
+# injection-guard : filtre le contenu externe (motifs regex + DeBERTa) avant
+# toute lecture par un LLM. Installé et démarré AVANT scout-watcher : le
+# watcher l'appelle (via scout_process.py) dès la première tâche traitée.
+cp "${SCRIPT_DIR}/injection_guard.py" "${HOME}/.local/bin/injection_guard.py"
+chmod +x "${HOME}/.local/bin/injection_guard.py"
+info "injection_guard.py installé dans ${HOME}/.local/bin"
+GUARD_SVC_DST="${SYSTEMD_USER_DIR}/openclaw-injection-guard.service"
+if [[ -f "$GUARD_SVC_DST" && "$FORCE" != "true" ]]; then
+  info "openclaw-injection-guard.service existe déjà — ignoré"
+else
+  cp "${SCRIPT_DIR}/openclaw-injection-guard.service" "$GUARD_SVC_DST"
+  info "openclaw-injection-guard.service installé dans ${SYSTEMD_USER_DIR}"
+fi
+systemctl --user daemon-reload 2>/dev/null || true
+systemctl --user enable --now openclaw-injection-guard.service 2>/dev/null && \
+  info "openclaw-injection-guard.service activé et démarré" || \
+  warn "Activation de openclaw-injection-guard.service échouée"
+
 # scout-watcher : surveille workspace-scout/tasks/pending, pré-fetch les URLs
 # (curl côté watcher, pas d'exec dans scout) et signale scout via tasks/done.
 mkdir -p "${HOME}/.local/bin"
@@ -396,8 +414,11 @@ else
   info "openclaw-scout.service installé dans ${SYSTEMD_USER_DIR}"
 fi
 systemctl --user daemon-reload 2>/dev/null || true
-systemctl --user enable openclaw-scout.service 2>/dev/null && \
-  info "openclaw-scout.service activé au boot" || \
+# --now : sans lui, le watcher restait éteint jusqu'au prochain boot sur une
+# installation neuve (relevé par la revue DSH du 16/09/2026, start.sh ne le
+# relance pas non plus).
+systemctl --user enable --now openclaw-scout.service 2>/dev/null && \
+  info "openclaw-scout.service activé et démarré" || \
   warn "Activation de openclaw-scout.service échouée"
 
 # Finalisation
