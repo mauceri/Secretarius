@@ -81,6 +81,22 @@ npx obsidian-headless sync-list-local
   plugin sur sanroque se diagnostique via `ob sync-status` / `ob sync-config`
   et les logs sous `~/.config/obsidian-headless/sync/<vaultId>/`, jamais via
   une interface graphique locale.
+- **La synchro peut se déclarer « réussie » sans avoir réellement écrasé un
+  fichier local divergent.** Observé avec le client Obsidian Sync natif
+  (desktop, poste Ubuntu) sur un `main.js` de plugin déjà présent localement
+  dans une version différente : le journal de sync affiche bien
+  `Downloading complete` puis `Accepted` pour ce fichier, mais le contenu sur
+  disque ne change pas — ni en relançant la synchro, ni en redémarrant
+  Obsidian complètement (2026-09-16). Le correctif qui a fonctionné :
+  **désinstaller le plugin depuis Obsidian** (supprime le dossier local ; la
+  suppression se propage par sync aux autres appareils, y compris à
+  sanroque) **puis redéployer manuellement les fichiers à jour** — plutôt que
+  de compter sur la sync pour écraser un fichier existant qui diverge.
+- **Une icône absente de la barre latérale ne veut pas dire que la commande
+  a disparu.** Obsidian peut réordonner/replier les icônes de la barre sans
+  prévenir ; avant de conclure à un problème, vérifier la commande dans la
+  palette (Ctrl/Cmd-P) — si elle y est, ce n'est qu'un déplacement d'icône,
+  pas un bug.
 
 ## Template de requête Wiki_LM (Templater)
 
