@@ -91,7 +91,7 @@ Plugin derisk-deleg : fournit gog_* et wiki_* aux agents ; intercepte /confirm e
   > docker info | grep "Docker Root Dir"   # vérifier, puis: sudo rm -rf /var/lib/docker.old
   > ```
   > Vérifiez que le volume est dans `/etc/fstab` (option `nofail`) pour survivre au reboot.
-- Python 3.10+ (pour Wiki_LM)
+- Python 3.11+ (pour Wiki_LM)
 - `envsubst` : `apt install gettext`
 - `gog-bin` : binaire [gogcli](https://gogcli.sh/) (CLI Google Workspace) — télécharger le binaire Linux depuis [github.com/openclaw/gogcli](https://github.com/openclaw/gogcli/releases), renommer en `gog-bin` et placer à la racine du dépôt ; ou copier depuis une machine déjà configurée via `scp`
 - Bot Telegram (token via [@BotFather](https://t.me/botfather))

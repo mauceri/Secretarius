@@ -13,7 +13,8 @@ Permet à l'agent OpenClaw d'interagir avec les services Google via OAuth2.
 ## Prérequis
 
 - Compte Google avec accès aux APIs souhaitées
-- `gog` installé : `brew install steipete/tap/gogcli`
+- `gog` installé : `brew install steipete/tap/gogcli` (macOS) ou binaire `gog-bin` à la
+  racine du dépôt (Linux, voir Installation)
 - Fichier `client_secret.json` (Google Cloud Console)
 
 ## Installation
@@ -22,8 +23,9 @@ Permet à l'agent OpenClaw d'interagir avec les services Google via OAuth2.
 # macOS
 brew install steipete/tap/gogcli
 
-# Linux (télécharger le binaire depuis gogcli.sh)
-curl -L https://gogcli.sh/install.sh | bash
+# Linux : télécharger le binaire depuis github.com/openclaw/gogcli/releases,
+# le renommer gog-bin et le placer à la racine du dépôt Secretarius
+# (ou le copier via scp depuis une machine déjà configurée) — voir README.md
 ```
 
 ## Configuration OAuth (une fois)
