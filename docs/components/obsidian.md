@@ -110,8 +110,10 @@ serveur `wiki-lm-server` (port 5051, voir `docs/components/wiki-lm.md`), qui
 ### Prérequis
 
 - Service `wiki-lm-server` actif sur sanroque (`systemctl --user status wiki-lm-server`).
-- L'appareil Obsidian atteint `sanroque:5051` (réseau local ou **Tailscale** ;
-  tester : `curl http://sanroque:5051/health`).
+- L'appareil Obsidian atteint `sanroque` via le **tailnet** uniquement — le
+  serveur n'écoute plus que sur la boucle locale (`--no-public`), publié par
+  `tailscale serve` ;
+  tester : `curl https://sanroque.tailc69141.ts.net:10443/health`.
 - Plugin communautaire **Templater** installé et activé
   (Paramètres → Modules complémentaires → Templater).
 
@@ -137,11 +139,13 @@ serveur `wiki-lm-server` (port 5051, voir `docs/components/wiki-lm.md`), qui
 ### Dépannage
 
 - « Wiki_LM : erreur — … » : serveur injoignable → vérifier
-  `curl http://sanroque:5051/health` depuis l'appareil.
+  `curl https://sanroque.tailc69141.ts.net:10443/health` depuis l'appareil
+  (nécessite d'être sur le tailnet).
 - Le template utilise **`requestUrl`** (API Obsidian), pas `fetch()`, pour
   contourner le CSP d'Electron — ne pas revenir à `fetch()`.
 - « Aucune information » sur un document récent : normalement résolu par
-  l'auto-reload du serveur ; sinon forcer `curl -X POST http://sanroque:5051/reload`.
+  l'auto-reload du serveur ; sinon forcer, depuis sanroque,
+  `curl -X POST http://127.0.0.1:5051/reload`.
 
 ## Plugin de capture Wiki_LM
 
@@ -153,7 +157,8 @@ de `/c`, sans quitter Obsidian), depuis desktop ou mobile. Source :
 
 - Service `wiki-lm-server` actif sur sanroque (le plugin appelle le nouvel
   endpoint `POST /capture`, voir `docs/components/wiki-lm.md`).
-- L'appareil Obsidian atteint `sanroque:5051` (réseau local ou Tailscale).
+- L'appareil Obsidian atteint `sanroque` via le tailnet (voir plus haut —
+  le serveur n'est plus accessible en LAN direct).
 
 ### Installation
 
@@ -164,7 +169,8 @@ de `/c`, sans quitter Obsidian), depuis desktop ou mobile. Source :
 3. Dans Obsidian : Paramètres → Modules communautaires → activer
    « Wiki_LM Capture ».
 4. Dans les réglages du plugin, renseigner l'URL du serveur (ex.
-   `http://sanroque:5051`).
+   `https://sanroque.tailc69141.ts.net:10443`) — c'est déjà la valeur par
+   défaut du plugin.
 
 ### Utilisation
 

@@ -8,7 +8,7 @@
 // contente de l'ouvrir dans un nouvel onglet. Appeler via Templater > Open
 // Insert Template modal (pas "Create new note from template").
 
-const WIKI_SERVER = "http://sanroque:5051";
+const WIKI_SERVER = "https://sanroque.tailc69141.ts.net:10443";
 
 const mode = await tp.system.suggester(
     ["Hybride (BM25 + sémantique)", "Sémantique", "BM25"],

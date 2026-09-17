@@ -21,7 +21,7 @@ interface WikilmCaptureSettings {
 }
 
 const DEFAULT_SETTINGS: WikilmCaptureSettings = {
-  serverUrl: "http://sanroque:5051",
+  serverUrl: "https://sanroque.tailc69141.ts.net:10443",
 };
 
 function stripFrontmatter(raw: string, cache: CachedMetadata | null): string {
@@ -158,10 +158,10 @@ class WikilmCaptureSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("URL du serveur Wiki_LM")
-      .setDesc("Adresse du serveur wiki-lm-server (ex. http://sanroque:5051)")
+      .setDesc("Adresse du serveur wiki-lm-server (ex. https://sanroque.tailc69141.ts.net:10443)")
       .addText((text) =>
         text
-          .setPlaceholder("http://sanroque:5051")
+          .setPlaceholder("https://sanroque.tailc69141.ts.net:10443")
           .setValue(this.plugin.settings.serverUrl)
           .onChange(async (value) => {
             this.plugin.settings.serverUrl = value.trim();

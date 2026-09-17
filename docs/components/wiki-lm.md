@@ -152,6 +152,14 @@ Endpoints : `POST /query` `{question, top_k, mode}` → `{text, references, save
 `POST /embed`, `POST /cluster` (tâches de fond) ;
 `POST /run` `{command, arg}` → JSON de l'opération.
 
+**Exposition (depuis le 17/09/2026).** Le service tourne avec `--no-public` :
+il n'écoute plus que sur `127.0.0.1`. L'accès depuis un autre appareil passe
+par `tailscale serve` (`https://sanroque.tailc69141.ts.net:10443`, tailnet
+uniquement) — plus d'accès direct par l'IP/le nom LAN. Aucun endpoint
+n'exige d'authentification au-delà de cette restriction réseau : capture,
+ingestion et mise à jour de la base restent déclenchables par quiconque est
+sur le tailnet.
+
 **Rechargement à chaud (auto-reload).** Le serveur charge son index au démarrage.
 Pour que les documents **ingérés après** le lancement deviennent cherchables sans
 redémarrage, un thread surveille le dossier `wiki/` et **reconstruit l'index dès
