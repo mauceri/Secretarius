@@ -97,6 +97,25 @@ npx obsidian-headless sync-list-local
   prévenir ; avant de conclure à un problème, vérifier la commande dans la
   palette (Ctrl/Cmd-P) — si elle y est, ce n'est qu'un déplacement d'icône,
   pas un bug.
+- **`ob sync --continuous` ne détecte pas toujours une modification en
+  place d'un fichier déjà connu.** Observé sur sanroque (2026-09-17) : un
+  `main.js` de plugin modifié sur disque, avec la synchro déjà active
+  depuis avant l'édition, n'est jamais réémis — le processus continue
+  d'annoncer « Fully synced » indéfiniment, y compris sur d'autres fichiers
+  modifiés entre-temps (donc pas une panne totale, seulement ce fichier).
+  Un simple redémarrage (Ctrl-C puis relancer `ob sync --continuous` dans
+  la session tmux du coffre) force une comparaison complète et déclenche
+  l'envoi immédiatement. Vérifier après tout déploiement de fichier vers un
+  coffre déjà sous synchro continue : `grep <fichier> sync.log` doit
+  montrer un envoi **après** l'heure de la modification, pas seulement une
+  entrée ancienne.
+- **Une session `ob sync --continuous` peut se déconnecter silencieusement
+  et ne jamais se relancer.** La session tmux reste vivante (juste un shell
+  inactif), mais plus aucun contenu ne part ni n'arrive — repéré ici après
+  cinq jours d'inactivité (`Disconnected from server` dans le pane tmux,
+  aucune unité systemd pour redémarrer automatiquement, voir aussi le point
+  en suspens correspondant dans la synthèse). Vérifier périodiquement
+  `tmux capture-pane -t <session> -p | tail` pour chaque coffre.
 
 ## Template de requête Wiki_LM (Templater)
 
