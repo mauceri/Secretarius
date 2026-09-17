@@ -6,14 +6,16 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 def test_generate_one_structure():
+    # command est désormais imposé par l'appelant (intentions.json), pas
+    # deviné par le modèle — voir la note dans generate_one(). result.command
+    # n'est donc plus lu ; seuls result.text et result.args le sont.
     from generate_corpus import generate_one
     mock_result = MagicMock()
     mock_result.text = "garde cet article https://example.com"
-    mock_result.command = "/c"
     mock_result.args = "https://example.com"
     mock_predict = MagicMock(return_value=mock_result)
 
-    entry = generate_one(mock_predict, "wiki_capture", "familier", "url_seule")
+    entry = generate_one(mock_predict, "wiki_capture", "familier", "url_seule", "/c")
 
     assert entry["text"] == "garde cet article https://example.com"
     assert entry["intention"] == "wiki_capture"
@@ -27,11 +29,10 @@ def test_generate_one_null_command():
     from generate_corpus import generate_one
     mock_result = MagicMock()
     mock_result.text = "commande une pizza"
-    mock_result.command = "null"
     mock_result.args = ""
     mock_predict = MagicMock(return_value=mock_result)
 
-    entry = generate_one(mock_predict, "out_of_scope", "familier", "action_impossible")
+    entry = generate_one(mock_predict, "out_of_scope", "familier", "action_impossible", None)
     assert entry["action"]["command"] is None
 
 
@@ -39,11 +40,10 @@ def test_generate_one_normalizes_literal_empty_quotes():
     from generate_corpus import generate_one
     mock_result = MagicMock()
     mock_result.text = "état wiki ?"
-    mock_result.command = "/wikistatus"
     mock_result.args = '""'
     mock_predict = MagicMock(return_value=mock_result)
 
-    entry = generate_one(mock_predict, "wiki_status", "abrégé", "sans_args")
+    entry = generate_one(mock_predict, "wiki_status", "abrégé", "sans_args", "/wikistatus")
     assert entry["action"]["args"] == ""
 
 

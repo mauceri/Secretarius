@@ -30,6 +30,7 @@ openclaw-config/gateway.systemd.env
 .DS_Store
 .worktrees/
 node_modules/
+*.bak
 
 # Binaire gogcli, requis par openclaw-config/Dockerfile.gog (COPY --chmod=755
 # gog-bin /usr/local/bin/gog-bin) — à télécharger séparément et placer ici
