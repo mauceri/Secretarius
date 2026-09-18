@@ -14,6 +14,14 @@ def lookup(tmp_path):
 
 
 class TestCache:
+    def test_default_zim_points_to_repo_not_vault(self, monkeypatch):
+        """Le fichier ZIM (plusieurs Go) ne doit jamais tomber dans un
+        chemin sous surveillance d'un coffre Obsidian synchronisé — et
+        c'est ce que monte le conteneur d'ingestion (revue du 17/09/2026)."""
+        monkeypatch.delenv("WIKI_ZIM_DIR", raising=False)
+        assert WikiLookup._DEFAULT_ZIM == Path.home() / "Secretarius" / "Wiki_LM" / "zim"
+        assert "Documents" not in WikiLookup._DEFAULT_ZIM.parts
+
     def test_env_zim_dir_used_when_argument_missing(self, tmp_path, monkeypatch):
         configured = tmp_path / "configured-zim"
         monkeypatch.setenv("WIKI_ZIM_DIR", str(configured))
@@ -51,6 +59,7 @@ class TestCache:
         assert calls == []
 
     def test_backends_cache_only_uses_cache_without_api_or_zim(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("WIKI_LOOKUP_OFFLINE", raising=False)
         monkeypatch.setenv("WIKI_LOOKUP_BACKENDS", "cache")
         monkeypatch.setattr("wiki_lookup._zim_files", lambda zim_dir: {"fr": tmp_path / "fake.zim"})
         monkeypatch.setattr("wiki_lookup._zim_lookup", lambda *args: pytest.fail("ZIM should not be called"))
@@ -63,6 +72,7 @@ class TestCache:
         assert result["abstract"] == "cache"
 
     def test_default_backend_order_is_zim_cache_api(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("WIKI_LOOKUP_OFFLINE", raising=False)
         calls = []
         monkeypatch.setattr("wiki_lookup._zim_files", lambda zim_dir: {"fr": tmp_path / "fake.zim"})
         monkeypatch.setattr("wiki_lookup._zim_lookup", lambda *args: calls.append("zim") or None)
@@ -90,6 +100,7 @@ class TestCache:
         assert calls == ["zim", "cache", "api"]
 
     def test_invalid_backend_list_falls_back_to_default(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("WIKI_LOOKUP_OFFLINE", raising=False)
         monkeypatch.setenv("WIKI_LOOKUP_BACKENDS", "nonsense,other")
         calls = []
         monkeypatch.setattr("wiki_lookup._zim_files", lambda zim_dir: {})
@@ -136,8 +147,15 @@ class TestCache:
         assert result["abstract"] == "Depuis le cache."
         assert len(calls) == 0
 
-    def test_api_result_cached(self, lookup, monkeypatch):
-        """Résultat API stocké en cache pour appels suivants."""
+    def test_api_result_cached(self, tmp_path, monkeypatch):
+        """Résultat API stocké en cache pour appels suivants.
+
+        Construit WikiLookup explicitement (pas via la fixture `lookup`) :
+        _backends se fige à l'instanciation, donc le delenv doit précéder
+        la construction, pas seulement l'appel à lookup().
+        """
+        monkeypatch.delenv("WIKI_LOOKUP_OFFLINE", raising=False)
+        lookup = WikiLookup(tmp_path, zim_dir=tmp_path / "zim")
         fake = {"lang": "fr", "title": "Nouveau", "abstract": "Depuis l'API.", "url": ""}
         monkeypatch.setattr("wiki_lookup._fetch_api", lambda *a, **kw: fake)
         lookup.lookup("Nouveau", langs=["fr"])

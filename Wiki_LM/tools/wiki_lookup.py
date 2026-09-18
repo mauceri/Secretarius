@@ -165,7 +165,12 @@ def _fetch_api(title: str, lang: str) -> dict[str, Any] | None:
 # ---------------------------------------------------------------------------
 
 class WikiLookup:
-    _DEFAULT_ZIM = Path.home() / "Documents" / "Secretarius" / "Wiki_LM" / "zim"
+    # Chemin du dépôt, pas du coffre : le fichier ZIM (plusieurs Go) ne doit
+    # jamais entrer dans un dossier synchronisé par Obsidian — c'est aussi
+    # ce que monte le conteneur d'ingestion (openclaw.json, bind zim/). Un
+    # défaut pointant vers le coffre laissait la consultation hors ligne
+    # non reproductible sur une installation neuve (revue du 17/09/2026).
+    _DEFAULT_ZIM = Path.home() / "Secretarius" / "Wiki_LM" / "zim"
 
     def __init__(self, wiki_path: str | Path,
                  zim_dir: str | Path | None = None) -> None:
