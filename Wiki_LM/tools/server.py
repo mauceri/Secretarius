@@ -7,10 +7,12 @@ Usage :
 Endpoint :
     POST /query
     Body  : {"question": "...", "top_k": 5, "save": false, "mode": "hybrid",
-             "vault_path": "..."}
-             vault_path (optionnel) : chemin absolu du coffre Obsidian
-             appelant. S'il diffère du coffre canonique, une seconde copie
-             de l'enregistrement d'historique y est écrite.
+             "vault_name": "..."}
+             vault_name (optionnel) : nom du coffre Obsidian appelant
+             (app.vault.getName(), jamais un chemin — un chemin client n'a
+             de sens que sur sa propre machine). S'il figure dans
+             WIKI_VAULT_MIRRORS, une seconde copie de l'enregistrement
+             d'historique est écrite dans le miroir local correspondant.
     Reply : {"text": "...", "references": [...], "saved_slug": "", "history_slug": "...", "brief": "..."}
 
     POST /capture
@@ -81,12 +83,12 @@ def handle_query():
     top_k = int(data.get("top_k", 5))
     save = bool(data.get("save", False))
     mode = str(data.get("mode", _wq.mode))
-    vault_path = str(data.get("vault_path", "")).strip() or None
+    vault_name = str(data.get("vault_name", "")).strip() or None
 
     if mode != _wq.mode:
         _wq.mode = mode
 
-    result = _wq.query(question, top_k=top_k, save=save, vault_path=vault_path)
+    result = _wq.query(question, top_k=top_k, save=save, vault_name=vault_name)
     return jsonify({
         "text": result.text,
         "references": result.references,

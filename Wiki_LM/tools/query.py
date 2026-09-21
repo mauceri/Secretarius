@@ -116,6 +116,27 @@ Résume cette réponse en 1 à 2 phrases courtes."""
 
 
 # ---------------------------------------------------------------------------
+# Coffres Obsidian miroités localement (historique multi-coffre)
+# ---------------------------------------------------------------------------
+
+def _vault_mirrors() -> dict[str, Path]:
+    """Coffres Obsidian, autres que le canonique, dont ce serveur tient un
+    miroir local (via ob sync --continuous) — pour la copie d'historique
+    multi-coffre. Format : WIKI_VAULT_MIRRORS=Nom1=chemin1,Nom2=chemin2."""
+    raw = os.environ.get("WIKI_VAULT_MIRRORS", "")
+    mirrors: dict[str, Path] = {}
+    for pair in raw.split(","):
+        pair = pair.strip()
+        if not pair or "=" not in pair:
+            continue
+        name, _, path = pair.partition("=")
+        name, path = name.strip(), path.strip()
+        if name and path:
+            mirrors[name] = Path(path).expanduser()
+    return mirrors
+
+
+# ---------------------------------------------------------------------------
 # Moteur de query
 # ---------------------------------------------------------------------------
 
@@ -137,14 +158,17 @@ class WikiQuery:
         self.llm = llm or LLM()
 
     def query(self, question: str, top_k: int = 5, save: bool = False,
-              vault_path: str | None = None) -> QueryResult:
+              vault_name: str | None = None) -> QueryResult:
         """Répond à une question en cherchant dans le wiki puis en synthétisant.
 
-        vault_path : coffre Obsidian d'où la requête a été émise (optionnel).
-        S'il diffère du coffre canonique (self.wiki_root), une seconde copie
-        de l'enregistrement d'historique y est écrite — sinon le lien ouvert
-        par le modèle Templater dans ce coffre-là pointe vers un fichier qui
-        n'existe pas (revue du 21/09/2026)."""
+        vault_name : nom du coffre Obsidian d'où la requête a été émise
+        (app.vault.getName() côté client — jamais un chemin : un chemin
+        n'a de sens que sur la machine du client, pas sur ce serveur, cf.
+        revue du 21/09/2026). S'il diffère du coffre canonique et figure
+        dans WIKI_VAULT_MIRRORS, une seconde copie de l'enregistrement
+        d'historique est écrite dans le miroir local correspondant — sinon
+        le lien ouvert par le modèle Templater dans ce coffre-là pointe
+        vers un fichier qui n'existe pas."""
 
         # 1. Recherche
         if self.mode == "semantic":
@@ -160,7 +184,7 @@ class WikiQuery:
                 question=question,
                 text="_Aucune page pertinente trouvée dans le wiki._",
             )
-            return self._finalize(result, vault_path)
+            return self._finalize(result, vault_name)
 
         # 2. Lire le contenu complet des pages trouvées
         pages_block = self._build_pages_block(results)
@@ -175,7 +199,7 @@ class WikiQuery:
         references = list(dict.fromkeys(cited or slugs))  # ordre de première apparition
 
         result = QueryResult(question=question, text=synthesis, references=references)
-        result = self._finalize(result, vault_path)
+        result = self._finalize(result, vault_name)
 
         # 5. Optionnel : sauvegarder comme page synth-
         if save:
@@ -184,10 +208,10 @@ class WikiQuery:
 
         return result
 
-    def _finalize(self, result: QueryResult, vault_path: str | None = None) -> QueryResult:
+    def _finalize(self, result: QueryResult, vault_name: str | None = None) -> QueryResult:
         """Historique + brief systématiques — toute réponse, y compris
         "aucune page pertinente trouvée", doit produire un enregistrement."""
-        result.history_slug = self._write_history(result.question, str(result), vault_path)
+        result.history_slug = self._write_history(result.question, str(result), vault_name)
         result.brief = self._generate_brief(result.question, result.text)
         return result
 
@@ -260,29 +284,35 @@ class WikiQuery:
             f.write(f"\n## [{today}] {operation} | {title}\n")
 
     def _write_history(self, question: str, content: str,
-                        vault_path: str | None = None) -> str:
+                        vault_name: str | None = None) -> str:
         """Enregistre la requête et sa réponse complète, horodaté, hors de
         l'arbre indexé (jamais dans wiki/, jamais vu par la recherche ou
         l'ingestion). Retourne le slug (sans extension).
 
-        Si vault_path désigne un coffre Obsidian différent de wiki_root,
-        écrit une seconde copie sous <vault_path>/Wiki_LM/historique/ : le
+        Si vault_name correspond à une entrée de WIKI_VAULT_MIRRORS (coffre
+        Obsidian différent, miroré localement par ob sync --continuous),
+        écrit une seconde copie sous <miroir>/Wiki_LM/historique/ : le
         modèle Templater lancé depuis ce coffre-là ouvre son propre chemin
         historique/<slug>.md, qui n'existe sinon que dans le coffre
-        canonique."""
+        canonique. Le nom du coffre vient du client (app.vault.getName()) ;
+        seul un chemin connu du serveur lui-même est jamais utilisé pour
+        écrire — jamais un chemin fourni par le client, qui n'a de sens que
+        sur sa propre machine (revue du 21/09/2026, cas buho)."""
         history_dir = self.wiki_root / "historique"
         history_dir.mkdir(parents=True, exist_ok=True)
         slug = f"{timestamp()}-{slugify(question)}"
         (history_dir / f"{slug}.md").write_text(content, encoding="utf-8")
 
-        if vault_path:
-            try:
-                other_dir = Path(vault_path).expanduser().resolve() / "Wiki_LM" / "historique"
-                if other_dir != history_dir.resolve():
-                    other_dir.mkdir(parents=True, exist_ok=True)
-                    (other_dir / f"{slug}.md").write_text(content, encoding="utf-8")
-            except OSError:
-                pass  # ne doit jamais faire échouer query()
+        if vault_name:
+            mirror = _vault_mirrors().get(vault_name)
+            if mirror is not None:
+                try:
+                    other_dir = mirror.resolve() / "Wiki_LM" / "historique"
+                    if other_dir != history_dir.resolve():
+                        other_dir.mkdir(parents=True, exist_ok=True)
+                        (other_dir / f"{slug}.md").write_text(content, encoding="utf-8")
+                except OSError:
+                    pass  # ne doit jamais faire échouer query()
 
         return slug
 

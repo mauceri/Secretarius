@@ -68,7 +68,7 @@ class TestHandleQuery:
         class _Q:
             mode = "hybrid"
 
-            def query(self, question, top_k=5, save=False, vault_path=None):
+            def query(self, question, top_k=5, save=False, vault_name=None):
                 return _Result()
 
         import server
@@ -83,7 +83,7 @@ class TestHandleQuery:
         assert data["history_slug"] == "20260908-120000-question-test"
         assert data["brief"] == "Résumé bref."
 
-    def test_forwards_vault_path_to_query(self, client, monkeypatch):
+    def test_forwards_vault_name_to_query(self, client, monkeypatch):
         class _Result:
             text = "Synthèse."
             references = []
@@ -96,17 +96,17 @@ class TestHandleQuery:
         class _Q:
             mode = "hybrid"
 
-            def query(self, question, top_k=5, save=False, vault_path=None):
-                calls.append(vault_path)
+            def query(self, question, top_k=5, save=False, vault_name=None):
+                calls.append(vault_name)
                 return _Result()
 
         import server
         monkeypatch.setattr(server, "_wq", _Q())
 
-        client.post("/query", json={"question": "Question ?", "vault_path": "/home/x/Arbath"})
+        client.post("/query", json={"question": "Question ?", "vault_name": "Arbath"})
         client.post("/query", json={"question": "Question ?"})
 
-        assert calls == ["/home/x/Arbath", None]
+        assert calls == ["Arbath", None]
 
 
 class TestHandleRun:
