@@ -22,8 +22,12 @@ Endpoint :
     POST /run
     Body  : {"command": "/q", "arg": "..."}
     Reply : JSON de l'opération wiki.py correspondante ; {"error": "..."} si
-            commande inconnue (400) ou en échec (500). /supprimer est
-            toujours refusée.
+            commande inconnue (400) ou en échec (500). /supprimer (sans
+            point d'exclamation, réservée à Telegram avec /confirm) est
+            toujours refusée. /supprimer? (essai à blanc) et /supprimer!
+            (suppression réelle immédiate, pas de confirmation possible en
+            lot non interactif — le ! tapé dans la note en tient lieu) sont
+            les seules formes de suppression exposées ici.
 
     GET /health
     Reply : {"status": "ok", "pages": <n>}
@@ -47,6 +51,8 @@ from cluster import run_clustering
 from capture import capture_comment, _normalize_tags, raw_dir
 from wiki import (
     op_capture,
+    op_delete,
+    op_delete_preview,
     op_ingest,
     op_kb_update,
     op_query,
@@ -121,6 +127,11 @@ _RUN_OPS = {
     "/kbupdate": lambda arg: op_kb_update(),
     "/relire": lambda arg: op_review(),
     "/verifie": lambda arg: op_verify(arg),
+    # /supprimer (sans !) reste absente : jamais dispatchée, même demandée
+    # explicitement — seule Telegram, avec essai à blanc puis /confirm,
+    # peut supprimer sans le ! explicite ci-dessous.
+    "/supprimer?": lambda arg: op_delete_preview(arg),
+    "/supprimer!": lambda arg: op_delete(arg),
 }
 
 

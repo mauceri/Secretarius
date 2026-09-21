@@ -8,6 +8,8 @@ export const SUPPORTED_COMMANDS = [
   "/kbupdate",
   "/relire",
   "/verifie",
+  "/supprimer?",
+  "/supprimer!",
 ] as const;
 
 export interface WikiBlockMatch {
@@ -101,6 +103,14 @@ export function formatWikiResult(
       return data.status === "empty" ? "Rien à relire." : String(data.content ?? "");
     case "/verifie":
       return `Page ${data.slug} marquée vérifiée.`;
+    case "/supprimer?": {
+      const affected = (data.affected as string[] | undefined) ?? [];
+      return `Essai à blanc — ${affected.length} page(s) seraient supprimées : ${affected.join(", ")}.\n\nRien n'a été supprimé. Remplacez par /supprimer! pour confirmer.`;
+    }
+    case "/supprimer!": {
+      const affected = (data.affected as string[] | undefined) ?? [];
+      return `Supprimé : ${affected.length} page(s) — ${affected.join(", ")}.`;
+    }
     default:
       return `Commande non prise en charge en exécution par lot : ${command}`;
   }

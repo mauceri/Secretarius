@@ -120,6 +120,8 @@ class TestHandleRun:
         ("/kbupdate", "op_kb_update", ""),
         ("/relire", "op_review", ""),
         ("/verifie", "op_verify", "src-test"),
+        ("/supprimer?", "op_delete_preview", "src-test"),
+        ("/supprimer!", "op_delete", "src-test"),
     ]
 
     @pytest.mark.parametrize("command,op_name,arg", _COMMAND_TABLE)

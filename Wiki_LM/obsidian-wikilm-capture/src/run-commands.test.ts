@@ -157,16 +157,48 @@ describe("formatWikiResult", () => {
       "Commande non prise en charge en exécution par lot : /supprimer"
     );
   });
+
+  it("formats /supprimer? as a dry-run report, nothing deleted", () => {
+    const text = formatWikiResult(
+      "/supprimer?",
+      { status: "ok", slug: "c-x", affected: ["c-x", "src-y"] },
+      true
+    );
+    expect(text).toBe(
+      "Essai à blanc — 2 page(s) seraient supprimées : c-x, src-y.\n\nRien n'a été supprimé. Remplacez par /supprimer! pour confirmer."
+    );
+  });
+
+  it("formats /supprimer! as a completed deletion report", () => {
+    const text = formatWikiResult(
+      "/supprimer!",
+      { status: "ok", slug: "c-x", affected: ["c-x", "src-y"] },
+      true
+    );
+    expect(text).toBe("Supprimé : 2 page(s) — c-x, src-y.");
+  });
 });
 
 describe("SUPPORTED_COMMANDS", () => {
-  it("excludes /supprimer", () => {
+  it("excludes /supprimer (sans !) — seule Telegram, avec /confirm, peut l'utiliser", () => {
     expect(SUPPORTED_COMMANDS).not.toContain("/supprimer");
   });
 
-  it("contains exactly the nine wiki commands from the spec", () => {
+  it("contains exactly the eleven wiki commands from the spec", () => {
     expect([...SUPPORTED_COMMANDS].sort()).toEqual(
-      ["/c", "/ingest", "/kbupdate", "/q", "/r", "/relire", "/tags", "/verifie", "/wikistatus"].sort()
+      [
+        "/c",
+        "/ingest",
+        "/kbupdate",
+        "/q",
+        "/r",
+        "/relire",
+        "/supprimer!",
+        "/supprimer?",
+        "/tags",
+        "/verifie",
+        "/wikistatus",
+      ].sort()
     );
   });
 });
