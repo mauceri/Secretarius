@@ -314,6 +314,45 @@ def _truncate(text: str, max_chars: int = 12_000) -> str:
     return text[:max_chars] + f"\n\n[… texte tronqué à {max_chars} caractères …]"
 
 
+_SUMMARY_HEADINGS = {"résumé", "summary"}
+
+
+def _extract_summary_section(content: str) -> str | None:
+    """Section sous un titre de niveau 1 « # Résumé »/« # Summary » en tout
+    début de texte, si présent. Retourne None si absent — le corps de la
+    page reste toujours le texte intégral (voir _generate_note_page) ;
+    seule l'extraction titre/concepts par le LLM utilise cette section
+    plutôt qu'une troncature aveugle, quand elle existe (revue du
+    21/09/2026 : un résumé déjà rédigé est une bien meilleure entrée
+    qu'une coupe arbitraire aux premiers caractères).
+
+    Le plugin Obsidian préfixe toujours la capture d'une ligne
+    « Note d'origine : titre (chemin) » avant le corps de la note (jamais
+    présente pour une capture Telegram/CLI directe) — elle est ignorée pour
+    retrouver l'en-tête propre à la note elle-même (trouvé en test de bout
+    en bout : sans ce saut, aucune capture venant du plugin ne matchait
+    jamais)."""
+    lines = content.split("\n")
+    i = 0
+    while i < len(lines) and lines[i].strip() == "":
+        i += 1
+    if i < len(lines) and re.match(r"^Note d'origine\s*:\s*.+$", lines[i]):
+        i += 1
+        while i < len(lines) and lines[i].strip() == "":
+            i += 1
+    if i >= len(lines):
+        return None
+    heading = re.match(r"^#\s+(.+)$", lines[i])
+    if not heading or heading.group(1).strip().lower() not in _SUMMARY_HEADINGS:
+        return None
+    section: list[str] = []
+    for line in lines[i + 1:]:
+        if re.match(r"^#{1,6}\s+", line):
+            break
+        section.append(line)
+    return "\n".join(section).strip()
+
+
 def _file_hash(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as f:
@@ -1405,10 +1444,15 @@ class Ingestor:
         """Page d'une note en texte libre : texte VERBATIM + liens, sans résumé.
 
         Le LLM ne sert qu'à extraire un titre et la liste des concepts/entités
-        (pour le linking en aval) ; le corps de la page reste le texte tel quel.
-        """
+        (pour le linking en aval) ; le corps de la page reste le texte tel
+        quel, intégral. Si la note porte une section « # Résumé »/« # Summary »
+        en tête, c'est elle (et non une troncature aveugle du texte complet)
+        qui sert d'entrée à cette extraction — mais le corps de la page reste
+        toujours l'intégralité de content, résumé compris."""
+        summary_section = _extract_summary_section(content)
+        llm_input = _truncate(summary_section if summary_section else content)
         raw = self.llm.complete(
-            _PROMPT_NOTE_ITEMS.format(content=_truncate(content)),
+            _PROMPT_NOTE_ITEMS.format(content=llm_input),
             system=_SYSTEM_INGEST,
             max_tokens=600,
         )

@@ -24,24 +24,12 @@ describe("buildCaptureText", () => {
     expect(content).not.toContain("…");
   });
 
-  it("extracts a level-1 Résumé section verbatim, ignoring length limit", () => {
+  it("captures a note with a Résumé heading in full — the section is not stripped", () => {
     const longSummary = "Phrase de résumé assez longue pour dépasser deux cents caractères si on la répète. ".repeat(5).trim();
-    const body = `# Résumé\n\n${longSummary}\n\n## Autre section\n\nIgnoré.`;
+    const body = `# Résumé\n\n${longSummary}\n\n## Autre section\n\nPas ignoré.`;
     const result = buildCaptureText({ body, title: "T", path: "p.md" });
     const content = result.slice(result.indexOf("\n\n") + 2);
-    expect(content.trim()).toBe(longSummary);
-    expect(content).not.toContain("Ignoré");
-  });
-
-  it("matches '# Summary' case-insensitively", () => {
-    const body = "# summary\nHello world.";
-    const result = buildCaptureText({ body, title: "T", path: "p.md" });
-    expect(result.endsWith("Hello world.")).toBe(true);
-  });
-
-  it("does not treat a level-2 heading as a summary section", () => {
-    const body = "## Résumé\nTexte court.";
-    const result = buildCaptureText({ body, title: "T", path: "p.md" });
-    expect(result.endsWith("## Résumé\nTexte court.")).toBe(true);
+    expect(content).toBe(body);
+    expect(content).toContain("Pas ignoré");
   });
 });

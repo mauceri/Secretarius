@@ -4,32 +4,11 @@ export interface NoteInput {
   path: string;
 }
 
-const SUMMARY_HEADINGS = ["résumé", "summary"];
-
+// La note entière est toujours capturée intégralement, y compris une
+// éventuelle section « # Résumé » en tête : c'est ingest.py qui décide,
+// côté serveur, d'utiliser cette section pour l'extraction titre/concepts
+// par le LLM — le corps de la page src- reste toujours le texte intégral
+// (revue du 21/09/2026).
 export function buildCaptureText({ body, title, path }: NoteInput): string {
-  const content = extractContent(body);
-  return `Note d'origine : ${title} (${path})\n\n${content}`;
-}
-
-function extractContent(body: string): string {
-  const summary = extractSummarySection(body);
-  return summary !== null ? summary : body.trim();
-}
-
-function extractSummarySection(body: string): string | null {
-  const lines = body.split("\n");
-  let i = 0;
-  while (i < lines.length && lines[i].trim() === "") i++;
-  if (i >= lines.length) return null;
-
-  const headingMatch = lines[i].match(/^#\s+(.+)$/);
-  if (!headingMatch) return null;
-  if (!SUMMARY_HEADINGS.includes(headingMatch[1].trim().toLowerCase())) return null;
-
-  const sectionLines: string[] = [];
-  for (let j = i + 1; j < lines.length; j++) {
-    if (/^#{1,6}\s+/.test(lines[j])) break;
-    sectionLines.push(lines[j]);
-  }
-  return sectionLines.join("\n").trim();
+  return `Note d'origine : ${title} (${path})\n\n${body.trim()}`;
 }

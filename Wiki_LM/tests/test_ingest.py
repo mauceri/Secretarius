@@ -546,3 +546,116 @@ class TestParseRawSimple:
         f = tmp_path / "test.url"
         f.write_text("https://example.com\nSimple: True\n", encoding="utf-8")
         assert Ingestor._parse_raw_simple(f) is True
+
+
+class TestExtractSummarySection:
+    def test_extracts_section_under_level1_resume_heading(self):
+        from ingest import _extract_summary_section
+        content = "# Résumé\n\nPhrase de résumé.\n\n## Autre section\n\nReste."
+        assert _extract_summary_section(content) == "Phrase de résumé."
+
+    def test_matches_summary_case_insensitively(self):
+        from ingest import _extract_summary_section
+        assert _extract_summary_section("# summary\nHello world.") == "Hello world."
+
+    def test_returns_none_without_leading_resume_heading(self):
+        from ingest import _extract_summary_section
+        assert _extract_summary_section("Texte sans en-tête.") is None
+
+    def test_ignores_a_level2_resume_heading(self):
+        from ingest import _extract_summary_section
+        assert _extract_summary_section("## Résumé\nTexte court.") is None
+
+    def test_tolerates_leading_blank_lines(self):
+        from ingest import _extract_summary_section
+        content = "\n\n# Résumé\n\nContenu.\n"
+        assert _extract_summary_section(content) == "Contenu."
+
+    def test_skips_the_plugin_note_dorigine_prefix_line(self):
+        """Trouvé en test de bout en bout : le plugin Obsidian préfixe
+        toujours la capture de « Note d'origine : ... », ce qui masquait
+        systématiquement l'en-tête Résumé sans ce saut."""
+        from ingest import _extract_summary_section
+        content = (
+            "Note d'origine : ma-note (dossier/ma-note.md)\n\n"
+            "# Résumé\n\nContenu.\n\n## Suite\n\nReste."
+        )
+        assert _extract_summary_section(content) == "Contenu."
+
+
+class TestNotePageSummarySection:
+    """Revue du 21/09/2026 : une note avec une section # Résumé en tête doit
+    fournir cette section (pas une troncature aveugle du texte complet) à
+    l'extraction titre/concepts par le LLM — mais le corps de la page reste
+    toujours le texte intégral, résumé compris."""
+
+    def test_llm_receives_only_the_resume_section(self, ingestor, wiki_dir, tmp_path):
+        captured = {}
+
+        def fake_complete(prompt, system="", max_tokens=2000):
+            captured["prompt"] = prompt
+            return "TITRE: Ma note\n"
+
+        ingestor.llm.complete = fake_complete
+
+        rest = "Texte non pertinent. " * 1000  # bien plus long que le résumé
+        note = tmp_path / "note.md"
+        note.write_text(
+            f"# Résumé\n\nPhrase de résumé.\n\n## Suite\n\n{rest}", encoding="utf-8"
+        )
+
+        slug = ingestor.ingest(str(note), local_note=True)
+
+        assert "Phrase de résumé." in captured["prompt"]
+        assert "Texte non pertinent" not in captured["prompt"]
+        page = (wiki_dir / "sources" / f"{slug}.md").read_text()
+        assert "Texte non pertinent" in page  # corps intégral malgré tout
+        assert "Phrase de résumé." in page
+
+    def test_llm_receives_truncated_full_content_without_resume_heading(
+        self, ingestor, wiki_dir, tmp_path
+    ):
+        captured = {}
+
+        def fake_complete(prompt, system="", max_tokens=2000):
+            captured["prompt"] = prompt
+            return "TITRE: Ma note\n"
+
+        ingestor.llm.complete = fake_complete
+
+        note = tmp_path / "note.md"
+        note.write_text("Note sans en-tête de résumé.", encoding="utf-8")
+
+        ingestor.ingest(str(note), local_note=True)
+
+        assert "Note sans en-tête de résumé." in captured["prompt"]
+
+    def test_works_through_the_real_plugin_note_dorigine_prefix(
+        self, ingestor, wiki_dir, tmp_path
+    ):
+        """Reproduit le format réel écrit par capture-text.ts : la ligne
+        « Note d'origine : ... » précède toujours le corps capturé par le
+        plugin Obsidian — trouvé cassé en test de bout en bout avant le
+        correctif de _extract_summary_section."""
+        captured = {}
+
+        def fake_complete(prompt, system="", max_tokens=2000):
+            captured["prompt"] = prompt
+            return "TITRE: Ma note\n"
+
+        ingestor.llm.complete = fake_complete
+
+        rest = "Texte non pertinent. " * 1000
+        note = tmp_path / "note.md"
+        note.write_text(
+            "Note d'origine : ma-note (dossier/ma-note.md)\n\n"
+            f"# Résumé\n\nPhrase de résumé.\n\n## Suite\n\n{rest}",
+            encoding="utf-8",
+        )
+
+        slug = ingestor.ingest(str(note), local_note=True)
+
+        assert "Phrase de résumé." in captured["prompt"]
+        assert "Texte non pertinent" not in captured["prompt"]
+        page = (wiki_dir / "sources" / f"{slug}.md").read_text()
+        assert "Texte non pertinent" in page
