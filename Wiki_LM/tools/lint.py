@@ -33,6 +33,8 @@ from pathlib import Path
 
 import frontmatter
 
+from wiki_paths import iter_pages
+
 
 # ---------------------------------------------------------------------------
 # Rapport
@@ -221,9 +223,13 @@ class WikiLint:
     # ------------------------------------------------------------------
 
     def _load_pages(self) -> dict[str, dict]:
-        """Charge toutes les pages wiki (sauf meta) et extrait leurs liens."""
+        """Charge toutes les pages wiki (sauf meta) et extrait leurs liens.
+
+        iter_pages() parcourt sources/, concepts/, entités/ — un glob à plat
+        sur wiki_dir ne voyait plus rien depuis la restructuration en
+        sous-répertoires (lint.py jamais migré, revue du 21/09/2026)."""
         pages: dict[str, dict] = {}
-        for path in sorted(self.wiki_dir.glob("*.md")):
+        for path in iter_pages(self.wiki_dir):
             slug = path.stem
             if slug in _META_PAGES:
                 continue
