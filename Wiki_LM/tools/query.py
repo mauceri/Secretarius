@@ -136,8 +136,15 @@ class WikiQuery:
             self.mode = "bm25"
         self.llm = llm or LLM()
 
-    def query(self, question: str, top_k: int = 5, save: bool = False) -> QueryResult:
-        """Répond à une question en cherchant dans le wiki puis en synthétisant."""
+    def query(self, question: str, top_k: int = 5, save: bool = False,
+              vault_path: str | None = None) -> QueryResult:
+        """Répond à une question en cherchant dans le wiki puis en synthétisant.
+
+        vault_path : coffre Obsidian d'où la requête a été émise (optionnel).
+        S'il diffère du coffre canonique (self.wiki_root), une seconde copie
+        de l'enregistrement d'historique y est écrite — sinon le lien ouvert
+        par le modèle Templater dans ce coffre-là pointe vers un fichier qui
+        n'existe pas (revue du 21/09/2026)."""
 
         # 1. Recherche
         if self.mode == "semantic":
@@ -153,7 +160,7 @@ class WikiQuery:
                 question=question,
                 text="_Aucune page pertinente trouvée dans le wiki._",
             )
-            return self._finalize(result)
+            return self._finalize(result, vault_path)
 
         # 2. Lire le contenu complet des pages trouvées
         pages_block = self._build_pages_block(results)
@@ -168,7 +175,7 @@ class WikiQuery:
         references = list(dict.fromkeys(cited or slugs))  # ordre de première apparition
 
         result = QueryResult(question=question, text=synthesis, references=references)
-        result = self._finalize(result)
+        result = self._finalize(result, vault_path)
 
         # 5. Optionnel : sauvegarder comme page synth-
         if save:
@@ -177,10 +184,10 @@ class WikiQuery:
 
         return result
 
-    def _finalize(self, result: QueryResult) -> QueryResult:
+    def _finalize(self, result: QueryResult, vault_path: str | None = None) -> QueryResult:
         """Historique + brief systématiques — toute réponse, y compris
         "aucune page pertinente trouvée", doit produire un enregistrement."""
-        result.history_slug = self._write_history(result.question, str(result))
+        result.history_slug = self._write_history(result.question, str(result), vault_path)
         result.brief = self._generate_brief(result.question, result.text)
         return result
 
@@ -252,14 +259,31 @@ class WikiQuery:
         with log_path.open("a", encoding="utf-8") as f:
             f.write(f"\n## [{today}] {operation} | {title}\n")
 
-    def _write_history(self, question: str, content: str) -> str:
+    def _write_history(self, question: str, content: str,
+                        vault_path: str | None = None) -> str:
         """Enregistre la requête et sa réponse complète, horodaté, hors de
         l'arbre indexé (jamais dans wiki/, jamais vu par la recherche ou
-        l'ingestion). Retourne le slug (sans extension)."""
+        l'ingestion). Retourne le slug (sans extension).
+
+        Si vault_path désigne un coffre Obsidian différent de wiki_root,
+        écrit une seconde copie sous <vault_path>/Wiki_LM/historique/ : le
+        modèle Templater lancé depuis ce coffre-là ouvre son propre chemin
+        historique/<slug>.md, qui n'existe sinon que dans le coffre
+        canonique."""
         history_dir = self.wiki_root / "historique"
         history_dir.mkdir(parents=True, exist_ok=True)
         slug = f"{timestamp()}-{slugify(question)}"
         (history_dir / f"{slug}.md").write_text(content, encoding="utf-8")
+
+        if vault_path:
+            try:
+                other_dir = Path(vault_path).expanduser().resolve() / "Wiki_LM" / "historique"
+                if other_dir != history_dir.resolve():
+                    other_dir.mkdir(parents=True, exist_ok=True)
+                    (other_dir / f"{slug}.md").write_text(content, encoding="utf-8")
+            except OSError:
+                pass  # ne doit jamais faire échouer query()
+
         return slug
 
     def _generate_brief(self, question: str, synthesis: str) -> str:

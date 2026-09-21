@@ -23,13 +23,23 @@ if (!question) { return; }
 // requestUrl (API Obsidian) contourne le CSP d'Electron, contrairement à fetch().
 const { requestUrl } = tp.obsidian ?? require("obsidian");
 
+// Chemin absolu du coffre appelant : si différent du coffre Secretarius, le
+// serveur y écrit une seconde copie de l'enregistrement d'historique — sinon
+// le fichier ouvert plus bas n'existe que dans le coffre Secretarius.
+let vaultPath;
+try {
+    vaultPath = app.vault.adapter.getBasePath();
+} catch (e) {
+    vaultPath = undefined;
+}
+
 let data;
 try {
     const resp = await requestUrl({
         url: `${WIKI_SERVER}/query`,
         method: "POST",
         contentType: "application/json",
-        body: JSON.stringify({ question: question, top_k: 5, mode: mode }),
+        body: JSON.stringify({ question: question, top_k: 5, mode: mode, vault_path: vaultPath }),
         throw: false,
     });
     if (resp.status !== 200) throw new Error(`HTTP ${resp.status}`);

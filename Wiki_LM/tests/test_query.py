@@ -59,6 +59,36 @@ def test_query_brief_falls_back_to_truncation_on_llm_failure(tmp_path):
     assert result.brief == result.text[:300]
 
 
+def test_query_writes_second_copy_in_calling_vault(tmp_path):
+    other_vault = tmp_path / "other-vault"
+    other_vault.mkdir()
+    wq = _make_query(tmp_path)
+
+    result = wq.query("Question test ?", vault_path=str(other_vault))
+
+    canonical = (tmp_path / "historique" / f"{result.history_slug}.md").read_text(encoding="utf-8")
+    copy = (other_vault / "Wiki_LM" / "historique" / f"{result.history_slug}.md").read_text(encoding="utf-8")
+    assert copy == canonical
+
+
+def test_query_does_not_duplicate_when_vault_path_is_canonical(tmp_path):
+    wq = _make_query(tmp_path)
+
+    wq.query("Question test ?", vault_path=str(tmp_path))
+
+    history_files = list((tmp_path / "historique").glob("*.md"))
+    assert len(history_files) == 1
+
+
+def test_query_without_vault_path_writes_only_canonical_copy(tmp_path):
+    wq = _make_query(tmp_path)
+
+    wq.query("Question test ?")
+
+    history_files = list((tmp_path / "historique").glob("*.md"))
+    assert len(history_files) == 1
+
+
 def test_query_save_flag_unaffected(tmp_path):
     wq = _make_query(tmp_path)
     result = wq.query("Question test ?", save=True)

@@ -6,7 +6,11 @@ Usage :
 
 Endpoint :
     POST /query
-    Body  : {"question": "...", "top_k": 5, "save": false, "mode": "hybrid"}
+    Body  : {"question": "...", "top_k": 5, "save": false, "mode": "hybrid",
+             "vault_path": "..."}
+             vault_path (optionnel) : chemin absolu du coffre Obsidian
+             appelant. S'il diffère du coffre canonique, une seconde copie
+             de l'enregistrement d'historique y est écrite.
     Reply : {"text": "...", "references": [...], "saved_slug": "", "history_slug": "...", "brief": "..."}
 
     POST /capture
@@ -77,11 +81,12 @@ def handle_query():
     top_k = int(data.get("top_k", 5))
     save = bool(data.get("save", False))
     mode = str(data.get("mode", _wq.mode))
+    vault_path = str(data.get("vault_path", "")).strip() or None
 
     if mode != _wq.mode:
         _wq.mode = mode
 
-    result = _wq.query(question, top_k=top_k, save=save)
+    result = _wq.query(question, top_k=top_k, save=save, vault_path=vault_path)
     return jsonify({
         "text": result.text,
         "references": result.references,
