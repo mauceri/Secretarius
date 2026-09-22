@@ -111,3 +111,110 @@ def test_iter_pages_missing_subdir(tmp_path):
     # Aucun sous-répertoire créé
     paths = list(iter_pages(wiki))
     assert paths == []
+
+
+class TestVaultMirrors:
+    def test_parses_single_entry(self, monkeypatch, tmp_path):
+        from wiki_paths import vault_mirrors
+        monkeypatch.setenv("WIKI_VAULT_MIRRORS", f"Arbath={tmp_path}")
+        assert vault_mirrors() == {"Arbath": tmp_path}
+
+    def test_parses_multiple_entries(self, monkeypatch, tmp_path):
+        from wiki_paths import vault_mirrors
+        a, b = tmp_path / "a", tmp_path / "b"
+        monkeypatch.setenv("WIKI_VAULT_MIRRORS", f"Arbath={a},Autre={b}")
+        assert vault_mirrors() == {"Arbath": a, "Autre": b}
+
+    def test_empty_when_unset(self, monkeypatch):
+        from wiki_paths import vault_mirrors
+        monkeypatch.delenv("WIKI_VAULT_MIRRORS", raising=False)
+        assert vault_mirrors() == {}
+
+    def test_ignores_malformed_pairs(self, monkeypatch, tmp_path):
+        from wiki_paths import vault_mirrors
+        monkeypatch.setenv("WIKI_VAULT_MIRRORS", f"sans-egal,Arbath={tmp_path}")
+        assert vault_mirrors() == {"Arbath": tmp_path}
+
+
+class TestMirrorPage:
+    def _make_wiki(self, tmp_path):
+        wiki_root = tmp_path / "canonical"
+        (wiki_root / "wiki" / "concepts").mkdir(parents=True)
+        page = wiki_root / "wiki" / "concepts" / "c-x.md"
+        page.write_text("---\ntitle: X\n---\n\nContenu.", encoding="utf-8")
+        return wiki_root, page
+
+    def test_copies_page_to_known_mirror(self, monkeypatch, tmp_path):
+        from wiki_paths import mirror_page
+        wiki_root, page = self._make_wiki(tmp_path)
+        mirror = tmp_path / "mirror-vault"
+        monkeypatch.setenv("WIKI_VAULT_MIRRORS", f"Arbath={mirror}")
+
+        mirror_page(wiki_root, "Arbath", "c-x")
+
+        dest = mirror / "Wiki_LM" / "wiki" / "concepts" / "c-x.md"
+        assert dest.read_text(encoding="utf-8") == page.read_text(encoding="utf-8")
+
+    def test_overwrites_existing_mirror_copy(self, monkeypatch, tmp_path):
+        from wiki_paths import mirror_page
+        wiki_root, page = self._make_wiki(tmp_path)
+        mirror = tmp_path / "mirror-vault"
+        dest_dir = mirror / "Wiki_LM" / "wiki" / "concepts"
+        dest_dir.mkdir(parents=True)
+        (dest_dir / "c-x.md").write_text("ancienne version", encoding="utf-8")
+        monkeypatch.setenv("WIKI_VAULT_MIRRORS", f"Arbath={mirror}")
+
+        mirror_page(wiki_root, "Arbath", "c-x")
+
+        assert (dest_dir / "c-x.md").read_text(encoding="utf-8") == page.read_text(encoding="utf-8")
+
+    def test_noop_when_vault_name_is_none(self, monkeypatch, tmp_path):
+        from wiki_paths import mirror_page
+        wiki_root, _ = self._make_wiki(tmp_path)
+        mirror = tmp_path / "mirror-vault"
+        monkeypatch.setenv("WIKI_VAULT_MIRRORS", f"Arbath={mirror}")
+
+        mirror_page(wiki_root, None, "c-x")
+
+        assert not mirror.exists()
+
+    def test_noop_when_vault_unknown(self, monkeypatch, tmp_path):
+        from wiki_paths import mirror_page
+        wiki_root, _ = self._make_wiki(tmp_path)
+        monkeypatch.delenv("WIKI_VAULT_MIRRORS", raising=False)
+
+        mirror_page(wiki_root, "Coffre inconnu", "c-x")
+        # Ne lève pas — c'est le seul comportement observable ici.
+
+    def test_noop_when_source_page_missing(self, monkeypatch, tmp_path):
+        from wiki_paths import mirror_page
+        wiki_root, _ = self._make_wiki(tmp_path)
+        mirror = tmp_path / "mirror-vault"
+        monkeypatch.setenv("WIKI_VAULT_MIRRORS", f"Arbath={mirror}")
+
+        mirror_page(wiki_root, "Arbath", "c-absent")
+
+        assert not (mirror / "Wiki_LM" / "wiki" / "concepts" / "c-absent.md").exists()
+
+    def test_noop_when_mirror_resolves_to_canonical(self, monkeypatch, tmp_path):
+        from wiki_paths import mirror_page
+        wiki_root, page = self._make_wiki(tmp_path)
+        monkeypatch.setenv("WIKI_VAULT_MIRRORS", f"Secretarius={wiki_root}")
+
+        mirror_page(wiki_root, "Secretarius", "c-x")
+
+        # Rien d'autre à vérifier que l'absence de doublon écrit hors de wiki_root :
+        # aucun répertoire "Wiki_LM" imbriqué ne doit apparaître sous wiki_root.
+        assert not (wiki_root / "Wiki_LM").exists()
+
+    def test_write_failure_is_silently_ignored(self, monkeypatch, tmp_path):
+        from wiki_paths import mirror_page
+        wiki_root, _ = self._make_wiki(tmp_path)
+        mirror = tmp_path / "mirror-vault"
+        monkeypatch.setenv("WIKI_VAULT_MIRRORS", f"Arbath={mirror}")
+
+        def boom(*a, **k):
+            raise OSError("disque plein")
+
+        monkeypatch.setattr(Path, "write_text", boom)
+        mirror_page(wiki_root, "Arbath", "c-x")  # ne lève pas

@@ -106,3 +106,46 @@ def is_blank_page(post) -> bool:
     title = str(post.get("title", "")).strip()
     body = post.content.strip() if hasattr(post, "content") else ""
     return not title and not body
+
+
+def vault_mirrors() -> dict[str, Path]:
+    """Coffres Obsidian, autres que le canonique, dont ce serveur tient un
+    miroir local (via ob sync --continuous). Format :
+    WIKI_VAULT_MIRRORS=Nom1=chemin1,Nom2=chemin2."""
+    raw = os.environ.get("WIKI_VAULT_MIRRORS", "")
+    mirrors: dict[str, Path] = {}
+    for pair in raw.split(","):
+        pair = pair.strip()
+        if not pair or "=" not in pair:
+            continue
+        name, _, path = pair.partition("=")
+        name, path = name.strip(), path.strip()
+        if name and path:
+            mirrors[name] = Path(path).expanduser()
+    return mirrors
+
+
+def mirror_page(wiki_root: Path, vault_name: str | None, slug: str) -> None:
+    """Copie la page `slug` vers le miroir du coffre `vault_name`, si connu
+    et différent du canonique. Copie brutale : écrase toujours la version
+    déjà présente. Ne lève jamais — une erreur d'écriture ne doit jamais
+    faire échouer l'appelant (requête ou ingestion)."""
+    if not vault_name:
+        return
+    mirror = vault_mirrors().get(vault_name)
+    if mirror is None:
+        return
+    # Skip if mirror is the canonical wiki_root (avoid nested Wiki_LM structure)
+    if mirror.resolve() == wiki_root.resolve():
+        return
+    src = find_page(wiki_root / "wiki", slug)
+    if src is None:
+        return
+    try:
+        dest = mirror.resolve() / "Wiki_LM" / "wiki" / subdir_for_slug(slug) / f"{slug}.md"
+        if dest.resolve() == src.resolve():
+            return
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+    except OSError:
+        pass
