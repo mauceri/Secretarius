@@ -104,6 +104,36 @@ def test_query_without_vault_name_writes_only_canonical_copy(tmp_path):
     assert len(history_files) == 1
 
 
+def test_query_mirrors_cited_pages_to_calling_vault(tmp_path, monkeypatch):
+    other_vault = tmp_path / "other-vault"
+    monkeypatch.setenv("WIKI_VAULT_MIRRORS", f"Arbath={other_vault}")
+    wq = _make_query(tmp_path)  # crée tmp_path/wiki/c-test.md (à plat, pour son propre stub de recherche)
+    # mirror_page() résout le slug via la vraie arborescence (wiki/concepts/,
+    # subdir_for_slug) — la fixture _make_query écrit à plat pour son propre
+    # usage ; la page doit aussi exister au bon sous-dossier pour que la
+    # copie miroir la trouve.
+    concepts_dir = tmp_path / "wiki" / "concepts"
+    concepts_dir.mkdir(parents=True, exist_ok=True)
+    (concepts_dir / "c-test.md").write_text("Contenu de test.", encoding="utf-8")
+
+    wq.query("Question test ?", vault_name="Arbath")  # synthèse stub cite [[c-test]]
+
+    mirrored = other_vault / "Wiki_LM" / "wiki" / "concepts" / "c-test.md"
+    assert mirrored.read_text(encoding="utf-8") == "Contenu de test."
+
+
+def test_query_does_not_mirror_cited_pages_without_vault_name(tmp_path, monkeypatch):
+    monkeypatch.setenv("WIKI_VAULT_MIRRORS", f"Arbath={tmp_path / 'other-vault'}")
+    wq = _make_query(tmp_path)
+    concepts_dir = tmp_path / "wiki" / "concepts"
+    concepts_dir.mkdir(parents=True, exist_ok=True)
+    (concepts_dir / "c-test.md").write_text("Contenu de test.", encoding="utf-8")
+
+    wq.query("Question test ?")
+
+    assert not (tmp_path / "other-vault").exists()
+
+
 def test_query_save_flag_unaffected(tmp_path):
     wq = _make_query(tmp_path)
     result = wq.query("Question test ?", save=True)

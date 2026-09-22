@@ -29,6 +29,7 @@ import frontmatter
 from capture import slugify, timestamp
 from llm import LLM
 from search import WikiSearch, WikiSemanticSearch, hybrid_search
+from wiki_paths import mirror_page, vault_mirrors
 
 
 # ---------------------------------------------------------------------------
@@ -116,27 +117,6 @@ Résume cette réponse en 1 à 2 phrases courtes."""
 
 
 # ---------------------------------------------------------------------------
-# Coffres Obsidian miroités localement (historique multi-coffre)
-# ---------------------------------------------------------------------------
-
-def _vault_mirrors() -> dict[str, Path]:
-    """Coffres Obsidian, autres que le canonique, dont ce serveur tient un
-    miroir local (via ob sync --continuous) — pour la copie d'historique
-    multi-coffre. Format : WIKI_VAULT_MIRRORS=Nom1=chemin1,Nom2=chemin2."""
-    raw = os.environ.get("WIKI_VAULT_MIRRORS", "")
-    mirrors: dict[str, Path] = {}
-    for pair in raw.split(","):
-        pair = pair.strip()
-        if not pair or "=" not in pair:
-            continue
-        name, _, path = pair.partition("=")
-        name, path = name.strip(), path.strip()
-        if name and path:
-            mirrors[name] = Path(path).expanduser()
-    return mirrors
-
-
-# ---------------------------------------------------------------------------
 # Moteur de query
 # ---------------------------------------------------------------------------
 
@@ -210,8 +190,12 @@ class WikiQuery:
 
     def _finalize(self, result: QueryResult, vault_name: str | None = None) -> QueryResult:
         """Historique + brief systématiques — toute réponse, y compris
-        "aucune page pertinente trouvée", doit produire un enregistrement."""
+        "aucune page pertinente trouvée", doit produire un enregistrement.
+        Les pages citées sont en plus copiées vers le miroir du coffre
+        appelant, s'il est connu (sous-wikis par coffre, 2026-09-22)."""
         result.history_slug = self._write_history(result.question, str(result), vault_name)
+        for slug in result.references:
+            mirror_page(self.wiki_root, vault_name, slug)
         result.brief = self._generate_brief(result.question, result.text)
         return result
 
@@ -304,7 +288,7 @@ class WikiQuery:
         (history_dir / f"{slug}.md").write_text(content, encoding="utf-8")
 
         if vault_name:
-            mirror = _vault_mirrors().get(vault_name)
+            mirror = vault_mirrors().get(vault_name)
             if mirror is not None:
                 try:
                     other_dir = mirror.resolve() / "Wiki_LM" / "historique"
