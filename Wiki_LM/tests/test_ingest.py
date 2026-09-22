@@ -422,6 +422,29 @@ class TestIngestLocalNote:
         ingestor.ingest(str(note), local_note=True)
         assert (wiki_dir / "entités" / "e-vannevar-bush.md").exists()
 
+    def test_note_items_extraction_uses_a_generous_token_budget(
+        self, ingestor, wiki_dir, tmp_path
+    ):
+        """Trouvé le 22/09/2026 : 600 tokens suffisaient pour une note courte,
+        mais un modèle « raisonneur » (reasoning_content) épuise ce budget
+        rien qu'à raisonner sur une note longue/complexe, avant d'écrire la
+        moindre ligne de réponse (finish_reason=length, contenu vide) — d'où
+        titre et concepts/entités absents. 1500 tokens, même budget que la
+        génération de page concept/entité (déjà généreuse pour ce cas)."""
+        captured = {}
+
+        def fake_complete(prompt, system="", max_tokens=2000):
+            captured["max_tokens"] = max_tokens
+            return "TITRE: Ma note\n"
+
+        ingestor.llm.complete = fake_complete
+        note = tmp_path / "note.md"
+        note.write_text("Note sur Vannevar Bush.", encoding="utf-8")
+
+        ingestor.ingest(str(note), local_note=True)
+
+        assert captured["max_tokens"] == 1500
+
     def test_non_note_source_still_summarized(self, ingestor, wiki_dir, tmp_path):
         src = tmp_path / "doc.txt"
         src.write_text("Un document à résumer.", encoding="utf-8")

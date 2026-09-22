@@ -1489,7 +1489,11 @@ class Ingestor:
         raw = self.llm.complete(
             _PROMPT_NOTE_ITEMS.format(content=llm_input),
             system=_SYSTEM_INGEST,
-            max_tokens=600,
+            # 600 était trop court pour un modèle « raisonneur » (reasoning_content) :
+            # sur une note longue/complexe, le raisonnement interne épuisait le budget
+            # avant qu'une seule ligne de réponse ne soit écrite (finish_reason=length,
+            # contenu vide) — trouvé le 22/09/2026 sur une capture de ~13 000 caractères.
+            max_tokens=1500,
         )
         title = source_name
         item_lines: list[str] = []
