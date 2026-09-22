@@ -32,17 +32,30 @@ sous-ensemble en lecture seule qui grossit avec l'usage de ce coffre.
   qu'*elle* cite à son tour au-delà du premier niveau produit par
   l'événement qui a déclenché la copie (une requête copie ce qu'elle cite,
   une ingestion copie ce qu'elle produit).
-- Rafraîchissement d'une page déjà miroitée si elle est modifiée plus tard
-  par une activité extérieure à ce coffre (piste B de la discussion,
-  réconciliation périodique — accepté comme limitation connue, à traiter
-  plus tard si elle pose un problème réel, pas anticipée).
-- Résolution à la demande côté client (piste C) — écartée : surface
-  supplémentaire côté API Obsidian, déjà source de fragilité cette semaine.
+- Résolution à la demande côté client (piste C, écartée définitivement) :
+  surface supplémentaire côté API Obsidian, déjà source de fragilité cette
+  semaine.
 - Les 875 liens cassés et 128 frontmatter doublés trouvés par `lint.py` le
   21/09 — chantier de réparation séparé, non traité ici.
 - Le régime de `/supprimer!` (pas d'essai à blanc, joignable sans
   authentification) et la reproductibilité de `WIKI_VAULT_MIRRORS` (aucun
   script d'installation ne le pose) — décisions en attente, non traitées ici.
+
+## Reporté, pas écarté : rafraîchissement des pages déjà miroitées (piste B)
+
+Ce design copie une page vers un miroir **au moment** où elle est produite
+ou citée. Si le canonique change ensuite (nouvelle ingestion qui met à jour
+`c-x`, `/verifie`, etc.) sans qu'une nouvelle requête depuis ce coffre ne
+recite `c-x`, le miroir reste figé sur l'ancienne version — silencieusement,
+sans le symptôme visible (fichier vide) qui a motivé ce chantier.
+
+Piste de réconciliation périodique envisagée puis délibérément mise de
+côté : recalculer, pour chaque coffre, l'ensemble des slugs déjà miroités
+(dérivable de son `historique/` et de son `wiki/` local), et resynchroniser
+les pages devenues obsolètes. Non retenue maintenant parce qu'elle
+réintroduit un processus de fond — exactement le type de surface qui a
+fait défaut deux fois cette semaine (`ob sync --continuous`). À reprendre
+si le figement s'avère un problème réel en usage, pas avant.
 
 ## Architecture
 
