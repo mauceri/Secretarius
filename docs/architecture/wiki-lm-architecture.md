@@ -306,8 +306,15 @@ requêtes, premier clustering du wiki vivant.
 
 **Non résolu, noté pour mémoire** :
 
-- `lint.py` — glob non récursif, ne trouve quasiment rien (1458 « erreurs »
-  rapportées à tort lors du dernier audit) ; jamais corrigé.
+- `lint.py` — réparé le 21/09/2026 (migré vers `iter_pages()`). Un module
+  de réparation (`repair.py`) répare depuis le 22/09/2026 deux des
+  familles qu'il rapporte : liens cassés (retrait des crochets au-delà de
+  la limite de citations retenues) et frontmatter manquant (déplacement
+  mécanique ou régénération LLM du titre selon la forme). Exposé via
+  `/lint`, `/repair?`, `/repair!` en lot Obsidian. Restent non traités :
+  les pages orphelines de l'index (« index-ghost », devraient se résorber
+  à la reconstruction de l'index) et les catégories inconnues.
+  Spec : `docs/superpowers/specs/2026-09-22-repair-wiki-design.md`.
 - `kb_lint.py` — jamais écrit. Prévu pour détecter dérive des centroïdes,
   doublons d'axes, axes orphelins ; complémentaire de la mesure `dry_run`
   qui dit *qu'il y a* dérive sans dire *où*.
