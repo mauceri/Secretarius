@@ -161,7 +161,8 @@ def _normalize_tags(raw_tags: list[str], kb_dir: Path = _DEFAULT_KB_DIR) -> list
 # ---------------------------------------------------------------------------
 
 def capture_urls(urls: list[str], raw: Path, tags: list[str] | None = None,
-                 note: str | None = None, simple: bool = False) -> list[Path]:
+                 note: str | None = None, simple: bool = False,
+                 vault_name: str | None = None) -> list[Path]:
     ts = timestamp()
     existing = _existing_urls(raw)
     created = []
@@ -183,12 +184,15 @@ def capture_urls(urls: list[str], raw: Path, tags: list[str] | None = None,
             content += f"tags: {', '.join(tags)}\n"
         if note and not created:            # note attachée au premier .url créé
             content += f"note: {note}\n"
+        if vault_name:
+            content += f"vault: {vault_name}\n"
         path.write_text(content, encoding="utf-8")
         created.append(path)
     return created
 
 
-def _write_note(path: Path, text: str, tags: list[str] | None, refs: list[str] | None, wiki_root: Path) -> None:
+def _write_note(path: Path, text: str, tags: list[str] | None, refs: list[str] | None, wiki_root: Path,
+                 vault_name: str | None = None) -> None:
     body_lines = [text.strip()] if text.strip() else []
     for ref in (refs or []):
         try:
@@ -197,13 +201,15 @@ def _write_note(path: Path, text: str, tags: list[str] | None, refs: list[str] |
         except ValueError:
             pass
     body = "\n".join(body_lines)
-    if tags or refs:
+    if tags or refs or vault_name:
         fm = "---\n"
         if tags:
             fm += f"tags: [{', '.join(tags)}]\n"
         if refs:
             fm += (f"ref: {refs[0]}\n" if len(refs) == 1
                    else "refs:\n" + "".join(f"  - {r}\n" for r in refs))
+        if vault_name:
+            fm += f"vault: {vault_name}\n"
         fm += "---\n"
         content = fm + body + "\n"
     else:
@@ -212,12 +218,12 @@ def _write_note(path: Path, text: str, tags: list[str] | None, refs: list[str] |
 
 
 def capture_comment(text: str, raw: Path, tags: list[str] | None = None, refs: list[str] | None = None,
-                    title: str | None = None) -> Path:
+                    title: str | None = None, vault_name: str | None = None) -> Path:
     ts = timestamp()
     slug = slugify(title) if title else slugify(text)
     fname = f"{ts}-{slug}.md"
     path = raw / fname
-    _write_note(path, text, tags, refs, raw.parent)
+    _write_note(path, text, tags, refs, raw.parent, vault_name)
     return path
 
 

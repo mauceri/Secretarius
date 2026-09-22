@@ -134,6 +134,14 @@ class TestCaptureUrls:
         files = capture_urls(["https://example.com"], tmp_path)
         assert "simple:" not in files[0].read_text()
 
+    def test_vault_name_written(self, tmp_path):
+        files = capture_urls(["https://example.com"], tmp_path, vault_name="Arbath")
+        assert "vault: Arbath" in files[0].read_text()
+
+    def test_vault_name_absent_by_default(self, tmp_path):
+        files = capture_urls(["https://example.com"], tmp_path)
+        assert "vault:" not in files[0].read_text()
+
 
 class TestCaptureComment:
     def test_creates_md_file(self, tmp_path):
@@ -155,6 +163,16 @@ class TestCaptureComment:
                                 tmp_path, title="Douleur")
         assert "douleur" in path.name
         assert "lizzie" not in path.name
+
+    def test_vault_name_written_in_frontmatter(self, tmp_path):
+        path = capture_comment("Une note", tmp_path, vault_name="Arbath")
+        content = path.read_text(encoding="utf-8")
+        assert "vault: Arbath" in content
+        assert content.startswith("---\n")
+
+    def test_vault_name_absent_by_default(self, tmp_path):
+        path = capture_comment("Une note", tmp_path)
+        assert "vault:" not in path.read_text(encoding="utf-8")
 
 
 class TestCaptureFile:
