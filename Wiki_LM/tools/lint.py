@@ -46,6 +46,9 @@ class LintIssue:
     code: str           # identifiant court
     slug: str           # page concernée (ou "" si global)
     message: str
+    target: str = ""    # slug cible pour code == "broken-link", vide sinon
+                         # (structuré séparément du message texte pour que
+                         # repair.py n'ait pas à le reparser — 2026-09-22)
 
     def __str__(self) -> str:
         prefix = {"error": "✗", "warning": "⚠", "info": "·"}.get(self.level, "?")
@@ -59,8 +62,8 @@ class LintReport:
     checked_pages: int = 0
     timestamp: str = field(default_factory=lambda: datetime.date.today().isoformat())
 
-    def add(self, level: str, code: str, slug: str, message: str) -> None:
-        self.issues.append(LintIssue(level=level, code=code, slug=slug, message=message))
+    def add(self, level: str, code: str, slug: str, message: str, target: str = "") -> None:
+        self.issues.append(LintIssue(level=level, code=code, slug=slug, message=message, target=target))
 
     @property
     def errors(self) -> list[LintIssue]:
@@ -167,6 +170,7 @@ class WikiLint:
                     report.add(
                         "error", "broken-link", slug,
                         f"Lien cassé : [[{target}]]",
+                        target=target,
                     )
 
     def _check_orphans(self, pages: dict, report: LintReport) -> None:

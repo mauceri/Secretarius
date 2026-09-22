@@ -103,6 +103,25 @@ class TestCheckLinks:
 
         assert not any(i.code == "broken-link" for i in report.errors)
 
+    def test_broken_link_target_is_structured(self, wiki_root, wiki_dir):
+        _write_page(
+            wiki_dir, "sources", "src-a", title="A", category="source",
+            body="Voir [[c-inexistant]].",
+        )
+
+        report = WikiLint(wiki_root).run()
+
+        broken = [i for i in report.errors if i.code == "broken-link"]
+        assert len(broken) == 1
+        assert broken[0].target == "c-inexistant"
+
+    def test_non_broken_link_issue_has_empty_target(self, wiki_root, wiki_dir):
+        _write_page(wiki_dir, "sources", "src-a", body="Sans frontmatter valide.")
+
+        report = WikiLint(wiki_root).run()
+
+        assert all(i.target == "" for i in report.issues if i.code != "broken-link")
+
 
 class TestCheckOrphans:
     def test_page_with_no_incoming_link_is_orphan(self, wiki_root, wiki_dir):
