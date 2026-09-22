@@ -46,6 +46,11 @@ class RepairReport:
 
 _FENCE_LINE_RE = re.compile(r"^(?:```(?:yaml|markdown)?|yaml)\s*$", re.MULTILINE)
 _CLOSED_BLOCK_RE = re.compile(r"^---\n(.*?)\n---\s*\n?", re.DOTALL | re.MULTILINE)
+# Tentative de frontmatter jamais refermée traînant en fin de corps nettoyé
+# (ex. `---\ntitle: X\nsources: [src-a`, coupée avant la fermeture) : ne doit
+# jamais être écrite telle quelle dans la page finale (finding 3, revue du
+# 22/09/2026) — reste néanmoins envoyée au LLM, qui peut en tirer un titre.
+_UNCLOSED_BLOCK_RE = re.compile(r"\n?---\n(?:(?!\n---\n).)*$", re.DOTALL)
 
 _SUBDIR_TO_CATEGORY = {"sources": "source", "concepts": "concept", "entités": "entité"}
 
@@ -157,6 +162,7 @@ class WikiRepair:
         slugs = sorted({i.slug for i in report_before.issues if i.code == "missing-frontmatter"})
 
         changes: list[str] = []
+        repaired_count = 0
         for slug in slugs:
             subdir = subdir_for_slug(slug)
             path = self.wiki_dir / subdir / f"{slug}.md"
@@ -164,16 +170,29 @@ class WikiRepair:
                 continue
             raw = path.read_text(encoding="utf-8")
             import frontmatter as fm_module
-            post = fm_module.loads(raw)
+            try:
+                post = fm_module.loads(raw)
+            except Exception as exc:
+                # YAML syntaxiquement invalide (ex. un caractère indicateur
+                # réservé en tête de scalaire) : ne jamais laisser une seule
+                # page planter la méthode entière et perdre le rapport de
+                # toutes les pages déjà réparées (finding 1, revue du
+                # 22/09/2026). On saute cette page, on ne touche pas au
+                # fichier, et on continue.
+                changes.append(f"{slug} : ignorée (frontmatter illisible : {exc})")
+                continue
             body = post.content
 
             found = _extract_closed_frontmatter_block(body)
             if found:
                 meta, rest = found
+                rest = _clean_body_for_regeneration(rest)
                 new_content = "---\n" + yaml.safe_dump(meta, allow_unicode=True, sort_keys=False) + f"---\n\n{rest}\n"
                 changes.append(f"{slug} : bloc frontmatter bien formé déplacé")
+                repaired_count += 1
             else:
                 cleaned = _clean_body_for_regeneration(body)
+                written_body = _UNCLOSED_BLOCK_RE.sub("", cleaned).strip()
                 category = _SUBDIR_TO_CATEGORY.get(subdir, "source")
                 if cleaned and not dry_run:
                     title = self.llm.complete(
@@ -191,7 +210,7 @@ class WikiRepair:
                     "created": datetime.date.fromtimestamp(path.stat().st_mtime).isoformat(),
                     "sources": [],
                 }
-                new_content = "---\n" + yaml.safe_dump(meta, allow_unicode=True, sort_keys=False) + f"---\n\n{cleaned}\n"
+                new_content = "---\n" + yaml.safe_dump(meta, allow_unicode=True, sort_keys=False) + f"---\n\n{written_body}\n"
                 if cleaned and dry_run:
                     changes.append(
                         f"{slug} : frontmatter serait régénéré par le LLM à partir du corps "
@@ -199,6 +218,7 @@ class WikiRepair:
                     )
                 else:
                     changes.append(f"{slug} : frontmatter régénéré (titre : {title!r})")
+                repaired_count += 1
 
             if not dry_run:
                 path.write_text(new_content, encoding="utf-8")
@@ -208,7 +228,7 @@ class WikiRepair:
             dry_run=dry_run,
             changes=changes,
             before_count=before_count,
-            after_count=before_count - 2 * len(changes),
+            after_count=before_count - 2 * repaired_count,
         )
 
 

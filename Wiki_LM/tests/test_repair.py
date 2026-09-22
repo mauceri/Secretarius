@@ -159,6 +159,28 @@ class TestRepairFrontmatter:
         assert "Le corps réel." in content
         assert report.family == "missing-frontmatter"
 
+    def test_well_formed_block_moved_strips_trailing_fence_debris(self, wiki_root, wiki_dir):
+        """Finding 2 (revue du 22/09/2026) : `rest` doit être nettoyé des
+        débris de balises de code (ex. un ``` seul en fin de corps), sinon
+        Obsidian rend toute la page comme un unique bloc de code."""
+        path = wiki_dir / "concepts" / "c-x.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "---\n{}\n---\n\nyaml\n---\ntitle: Mon concept\ncategory: concept\n"
+            "---\n```\n\n# Mon concept\n\nLe corps réel.\n```\n",
+            encoding="utf-8",
+        )
+
+        class _NoCallLLM:
+            def complete(self, *a, **k):
+                raise AssertionError("le LLM ne doit pas être appelé pour un bloc bien formé")
+
+        WikiRepair(wiki_root, llm=_NoCallLLM()).repair_frontmatter(dry_run=False)
+
+        content = path.read_text(encoding="utf-8")
+        assert "```" not in content
+        assert "Le corps réel." in content
+
     def test_missing_block_regenerates_title_via_llm(self, wiki_root, wiki_dir):
         path = wiki_dir / "concepts" / "c-y.md"
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -184,6 +206,39 @@ class TestRepairFrontmatter:
         assert "Du contenu réel sur le sujet Y." in content
         assert len(stub.calls) == 1
         assert "Du contenu réel sur le sujet Y." in stub.calls[0]
+
+    def test_regenerated_body_strips_trailing_unclosed_frontmatter_fragment(self, wiki_root, wiki_dir):
+        """Finding 3 (revue du 22/09/2026) : un fragment de frontmatter
+        tronqué et jamais refermé (ex. `---\\ntitle: ...` sans `---` de
+        clôture) traînant en fin de corps ne doit pas être écrit dans la
+        page finale, même si le LLM continue de le recevoir dans son
+        contexte (il peut en tirer un titre)."""
+        path = wiki_dir / "concepts" / "c-z.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "---\n{}\n---\n\n## Extrait Wikipedia\n\nDu contenu réel sur Z.\n\n"
+            "---\ntitle: Z tronqué\ncategory: concept\nsources: [src-a\n",
+            encoding="utf-8",
+        )
+
+        class _StubLLM:
+            def __init__(self):
+                self.calls = []
+
+            def complete(self, prompt, system="", max_tokens=2048):
+                self.calls.append(prompt)
+                return "Titre régénéré"
+
+        stub = _StubLLM()
+        WikiRepair(wiki_root, llm=stub).repair_frontmatter(dry_run=False)
+
+        content = path.read_text(encoding="utf-8")
+        assert "Du contenu réel sur Z." in content
+        assert "sources: [src-a" not in content  # fragment tronqué non écrit
+        # Le fragment était bien envoyé au LLM (contexte utile), même s'il
+        # n'est pas écrit dans le corps final.
+        assert len(stub.calls) == 1
+        assert "sources: [src-a" in stub.calls[0]
 
     def test_category_derived_from_subdir_for_entity(self, wiki_root, wiki_dir):
         path = wiki_dir / "entités" / "e-z.md"
@@ -226,6 +281,42 @@ class TestRepairFrontmatter:
 
         assert path.read_text(encoding="utf-8") == original
         assert report.dry_run is True
+
+    def test_unparseable_yaml_is_skipped_without_aborting_other_pages(self, wiki_root, wiki_dir):
+        """Finding 1 (revue du 22/09/2026) : une page dont le frontmatter est
+        syntaxiquement invalide (ex. un `@` en tête de scalaire, caractère
+        indicateur YAML réservé) ne doit ni planter repair_frontmatter() ni
+        faire perdre le rapport des autres pages — elle doit être sautée et
+        signalée. Vérifié empiriquement (yaml.scanner.ScannerError) avant
+        d'écrire ce test."""
+        bad = wiki_dir / "concepts" / "c-bad.md"
+        bad.parent.mkdir(parents=True, exist_ok=True)
+        bad.write_text(
+            "---\ntitle: @not valid\ncategory: concept\n---\n\nCorps.\n",
+            encoding="utf-8",
+        )
+        original_bad = bad.read_text(encoding="utf-8")
+
+        good = wiki_dir / "concepts" / "c-good.md"
+        good.write_text("---\n{}\n---\n\nDu contenu sur Good.\n", encoding="utf-8")
+
+        class _StubLLM:
+            def complete(self, prompt, system="", max_tokens=2048):
+                return "Titre Good"
+
+        report = WikiRepair(wiki_root, llm=_StubLLM()).repair_frontmatter(dry_run=False)
+
+        # La page invalide n'est pas touchée sur disque.
+        assert bad.read_text(encoding="utf-8") == original_bad
+        # Elle est signalée comme ignorée dans le rapport.
+        assert any("c-bad" in c and "ignorée" in c for c in report.changes)
+        # L'autre page, elle, est bien réparée.
+        good_content = good.read_text(encoding="utf-8")
+        assert "title: Titre Good" in good_content
+        # before_count compte les deux pages (4 champs manquants : title+category
+        # x2), mais after_count ne doit refléter que la page réellement réparée.
+        assert report.before_count == 4
+        assert report.after_count == 2
 
     def test_dry_run_with_real_content_does_not_fabricate_a_title_in_report(self, wiki_root, wiki_dir):
         path = wiki_dir / "concepts" / "c-y.md"
