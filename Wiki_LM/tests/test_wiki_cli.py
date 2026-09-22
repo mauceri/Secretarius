@@ -682,3 +682,95 @@ class TestOpQueryVaultName:
         wiki.op_query("question ?")
 
         assert calls == ["Arbath", None]
+
+
+class TestOpLint:
+    def test_returns_counts_by_code(self, monkeypatch, tmp_path):
+        wiki = _wiki(monkeypatch, tmp_path)
+
+        class _FakeIssue:
+            def __init__(self, code):
+                self.code = code
+
+        class _FakeReport:
+            checked_pages = 3
+            issues = [_FakeIssue("broken-link"), _FakeIssue("broken-link"), _FakeIssue("missing-frontmatter")]
+
+            @property
+            def errors(self):
+                return self.issues
+
+            @property
+            def warnings(self):
+                return []
+
+        class _FakeLint:
+            def __init__(self, wiki_path):
+                pass
+
+            def run(self):
+                return _FakeReport()
+
+        monkeypatch.setattr(wiki, "WikiLint", _FakeLint, raising=False)
+        out = wiki.op_lint()
+
+        assert out["checked_pages"] == 3
+        assert out["errors"] == 3
+        assert out["by_code"] == {"broken-link": 2, "missing-frontmatter": 1}
+
+
+class TestOpRepair:
+    def test_preview_calls_dry_run(self, monkeypatch, tmp_path):
+        wiki = _wiki(monkeypatch, tmp_path)
+        calls = []
+
+        class _FakeReport:
+            family = "broken-link"
+            dry_run = True
+            before_count = 5
+            after_count = 0
+            changes = ["src-a : 5 lien(s) cassé(s) retiré(s)"]
+
+        class _FakeRepair:
+            def __init__(self, wiki_path):
+                pass
+
+            def repair_broken_links(self, dry_run):
+                calls.append(dry_run)
+                return _FakeReport()
+
+        monkeypatch.setattr(wiki, "WikiRepair", _FakeRepair, raising=False)
+        out = wiki.op_repair_preview("broken-link")
+
+        assert calls == [True]
+        assert out["family"] == "broken-link"
+        assert out["before_count"] == 5
+
+    def test_apply_calls_real_run(self, monkeypatch, tmp_path):
+        wiki = _wiki(monkeypatch, tmp_path)
+        calls = []
+
+        class _FakeReport:
+            family = "missing-frontmatter"
+            dry_run = False
+            before_count = 2
+            after_count = 0
+            changes = []
+
+        class _FakeRepair:
+            def __init__(self, wiki_path):
+                pass
+
+            def repair_frontmatter(self, dry_run):
+                calls.append(dry_run)
+                return _FakeReport()
+
+        monkeypatch.setattr(wiki, "WikiRepair", _FakeRepair, raising=False)
+        wiki.op_repair("missing-frontmatter")
+
+        assert calls == [False]
+
+    def test_unknown_family_returns_error(self, monkeypatch, tmp_path):
+        wiki = _wiki(monkeypatch, tmp_path)
+        out = wiki.op_repair_preview("famille-inconnue")
+        assert "error" in out

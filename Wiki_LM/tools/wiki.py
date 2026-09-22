@@ -30,8 +30,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 import frontmatter
 from capture import _parse_hashtags, capture_urls, capture_comment, slugify, timestamp, _write_note
 from ingest import Ingestor
+from lint import WikiLint
 from llm import LLM
 from query import WikiQuery
+from repair import WikiRepair
 from search import WikiSearch
 from kb_tags import collect_tags
 from kb_update import update_kb, _DEFAULT_EMBED_DIR
@@ -290,6 +292,46 @@ def op_ingest_worker() -> dict:
 def op_tags() -> dict:
     tags = collect_tags(_wiki_root() / "wiki")
     return {"tags": sorted(tags.keys())}
+
+
+def op_lint() -> dict:
+    report = WikiLint(_wiki_root()).run()
+    from collections import Counter
+    by_code = Counter(i.code for i in report.issues)
+    return {
+        "checked_pages": report.checked_pages,
+        "errors": len(report.errors),
+        "warnings": len(report.warnings),
+        "by_code": dict(by_code),
+    }
+
+
+_REPAIR_FAMILIES = {"broken-link", "missing-frontmatter"}
+
+
+def _repair(family: str, dry_run: bool) -> dict:
+    if family not in _REPAIR_FAMILIES:
+        return {"error": f"Famille de réparation inconnue : {family!r}"}
+    repairer = WikiRepair(_wiki_root())
+    if family == "broken-link":
+        report = repairer.repair_broken_links(dry_run=dry_run)
+    else:
+        report = repairer.repair_frontmatter(dry_run=dry_run)
+    return {
+        "family": report.family,
+        "dry_run": report.dry_run,
+        "before_count": report.before_count,
+        "after_count": report.after_count,
+        "changes": report.changes,
+    }
+
+
+def op_repair_preview(family: str) -> dict:
+    return _repair(family, dry_run=True)
+
+
+def op_repair(family: str) -> dict:
+    return _repair(family, dry_run=False)
 
 
 def _delete(slug: str, dry_run: bool) -> dict:
