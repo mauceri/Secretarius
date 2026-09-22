@@ -136,6 +136,9 @@ class TestHandleRun:
         ("/verifie", "op_verify", "src-test"),
         ("/supprimer?", "op_delete_preview", "src-test"),
         ("/supprimer!", "op_delete", "src-test"),
+        ("/lint", "op_lint", ""),
+        ("/repair?", "op_repair_preview", "broken-link"),
+        ("/repair!", "op_repair", "broken-link"),
     ]
 
     @pytest.mark.parametrize("command,op_name,arg", _COMMAND_TABLE)

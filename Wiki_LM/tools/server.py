@@ -30,7 +30,10 @@ Endpoint :
             toujours refusée. /supprimer? (essai à blanc) et /supprimer!
             (suppression réelle immédiate, pas de confirmation possible en
             lot non interactif — le ! tapé dans la note en tient lieu) sont
-            les seules formes de suppression exposées ici.
+            les seules formes de suppression exposées ici. /lint liste les
+            anomalies du wiki. /repair? (essai à blanc) et /repair!
+            (réparation réelle immédiate, même logique de ! que
+            /supprimer!) réparent une famille d'anomalies.
 
     GET /health
     Reply : {"status": "ok", "pages": <n>}
@@ -58,7 +61,10 @@ from wiki import (
     op_delete_preview,
     op_ingest,
     op_kb_update,
+    op_lint,
     op_query,
+    op_repair,
+    op_repair_preview,
     op_review,
     op_search,
     op_status,
@@ -140,6 +146,13 @@ _RUN_OPS = {
     # peut supprimer sans le ! explicite ci-dessous.
     "/supprimer?": lambda arg, vault: op_delete_preview(arg),
     "/supprimer!": lambda arg, vault: op_delete(arg),
+    "/lint": lambda arg, vault: op_lint(),
+    # /repair! répare toute une famille en un seul appel (jusqu'à des
+    # centaines de pages) — rayon d'action plus large qu'un /supprimer!,
+    # qui ne touche qu'une page. Le ! tient lieu de la même confirmation
+    # explicite (réparation du wiki, 2026-09-22).
+    "/repair?": lambda arg, vault: op_repair_preview(arg),
+    "/repair!": lambda arg, vault: op_repair(arg),
 }
 
 
