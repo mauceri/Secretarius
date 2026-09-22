@@ -467,6 +467,27 @@ class TestIngestLocalNote:
         texte = "Dessin du Christ en une seule ligne:\n\nhttps://x.com/trad_west_/status/1\n"
         assert Ingestor._extract_embedded_url(texte) == "https://x.com/trad_west_/status/1"
 
+    def test_leading_frontmatter_stripped_from_note_body(self, ingestor, wiki_dir, tmp_path):
+        # Le plugin envoie désormais toujours vault_name → _write_note() (capture.py)
+        # émet un bloc frontmatter même pour une note sans tags ; il ne doit pas
+        # se retrouver en texte visible dans la page générée (verbatim).
+        note = tmp_path / "note.md"
+        note.write_text(
+            "---\nvault: Arbath\n---\n\nCeci est ma note.", encoding="utf-8"
+        )
+        slug = ingestor.ingest(str(note), local_note=True)
+        page = (wiki_dir / "sources" / f"{slug}.md").read_text()
+        assert "vault: Arbath" not in page
+        assert "---\n---" not in page
+        assert "Ceci est ma note." in page
+
+    def test_note_without_frontmatter_still_works(self, ingestor, wiki_dir, tmp_path):
+        note = tmp_path / "note.md"
+        note.write_text("Ceci est ma note.", encoding="utf-8")
+        slug = ingestor.ingest(str(note), local_note=True)
+        page = (wiki_dir / "sources" / f"{slug}.md").read_text()
+        assert "Ceci est ma note." in page
+
     def test_extract_embedded_url_absente(self):
         from ingest import Ingestor
         assert Ingestor._extract_embedded_url("Une note sans aucune URL.") == ""
@@ -730,3 +751,26 @@ class TestIngestRawDirMirrorsToVault:
         ingestor.ingest_raw_dir()
 
         assert not mirror.exists()
+
+    def test_ingestion_marked_even_if_mirror_push_fails(
+        self, ingestor, wiki_dir, raw_dir, monkeypatch, tmp_path
+    ):
+        # mirror_page() ne doit jamais lever, mais même si elle le faisait,
+        # l'ingestion (déjà réussie et payée en LLM) doit rester marquée —
+        # sinon elle est silencieusement retraitée à chaque /ingest suivant.
+        import ingest as ingest_module
+        mirror = tmp_path / "mirror-vault"
+        monkeypatch.setenv("WIKI_VAULT_MIRRORS", f"Arbath={mirror}")
+        monkeypatch.setattr(
+            ingest_module, "mirror_page",
+            lambda *a, **k: (_ for _ in ()).throw(RuntimeError("miroir cassé")),
+        )
+        (raw_dir / "note.md").write_text(
+            "---\nvault: Arbath\n---\n\nNote sur Vannevar Bush.", encoding="utf-8"
+        )
+
+        ingestor.ingest_raw_dir()  # le mirror push échoue, mais ne remonte pas
+
+        manifest = ingestor._load_manifest()
+        assert "note.md" in manifest
+        assert manifest["note.md"]["slug"].startswith("src-")

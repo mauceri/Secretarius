@@ -230,3 +230,47 @@ class TestMirrorPage:
 
         monkeypatch.setattr(Path, "resolve", boom)
         mirror_page(wiki_root, "Arbath", "c-x")  # ne lève pas
+
+    def test_decode_failure_is_silently_ignored(self, monkeypatch, tmp_path):
+        from wiki_paths import mirror_page
+        wiki_root, _ = self._make_wiki(tmp_path)
+        mirror = tmp_path / "mirror-vault"
+        monkeypatch.setenv("WIKI_VAULT_MIRRORS", f"Arbath={mirror}")
+
+        def boom(self, *a, **k):
+            raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
+
+        monkeypatch.setattr(Path, "read_text", boom)
+        mirror_page(wiki_root, "Arbath", "c-x")  # ne lève pas
+
+    def test_traversal_slug_is_rejected(self, monkeypatch, tmp_path):
+        from wiki_paths import mirror_page
+        wiki_root, _ = self._make_wiki(tmp_path)
+        mirror = tmp_path / "mirror-vault"
+        monkeypatch.setenv("WIKI_VAULT_MIRRORS", f"Arbath={mirror}")
+
+        mirror_page(wiki_root, "Arbath", "../../../etc/passwd")
+
+        assert not mirror.exists()
+
+    def test_slug_with_alias_suffix_is_normalized(self, monkeypatch, tmp_path):
+        from wiki_paths import mirror_page
+        wiki_root, page = self._make_wiki(tmp_path)
+        mirror = tmp_path / "mirror-vault"
+        monkeypatch.setenv("WIKI_VAULT_MIRRORS", f"Arbath={mirror}")
+
+        mirror_page(wiki_root, "Arbath", "c-x|Alias affichée")
+
+        dest = mirror / "Wiki_LM" / "wiki" / "concepts" / "c-x.md"
+        assert dest.read_text(encoding="utf-8") == page.read_text(encoding="utf-8")
+
+    def test_slug_with_section_suffix_is_normalized(self, monkeypatch, tmp_path):
+        from wiki_paths import mirror_page
+        wiki_root, page = self._make_wiki(tmp_path)
+        mirror = tmp_path / "mirror-vault"
+        monkeypatch.setenv("WIKI_VAULT_MIRRORS", f"Arbath={mirror}")
+
+        mirror_page(wiki_root, "Arbath", "c-x#Section")
+
+        dest = mirror / "Wiki_LM" / "wiki" / "concepts" / "c-x.md"
+        assert dest.read_text(encoding="utf-8") == page.read_text(encoding="utf-8")

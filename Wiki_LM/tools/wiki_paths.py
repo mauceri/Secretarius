@@ -135,6 +135,13 @@ def mirror_page(wiki_root: Path, vault_name: str | None, slug: str) -> None:
     mirror = vault_mirrors().get(vault_name)
     if mirror is None:
         return
+    # slug est du texte libre généré par un LLM (citations [[slug]] extraites
+    # d'une synthèse) : normaliser les formes bénignes ([[slug|Alias]],
+    # [[slug#Section]]) et rejeter toute tentative de traversée de chemin
+    # avant de construire un chemin filesystem à partir de cette chaîne.
+    slug = slug.split("|", 1)[0].split("#", 1)[0].strip()
+    if not slug or "/" in slug or "\\" in slug or ".." in slug:
+        return
     try:
         mirror_resolved = mirror.resolve()
         # Ignorer si le miroir est le wiki_root canonique (éviter la structure Wiki_LM imbriquée)
@@ -148,5 +155,7 @@ def mirror_page(wiki_root: Path, vault_name: str | None, slug: str) -> None:
             return
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
-    except OSError:
+    except (OSError, ValueError):
+        # ValueError couvre UnicodeDecodeError (page source pas en UTF-8
+        # valide) : ne doit pas plus faire échouer l'appelant qu'un OSError.
         pass

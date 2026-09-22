@@ -353,6 +353,15 @@ def _extract_summary_section(content: str) -> str | None:
     return "\n".join(section).strip()
 
 
+def _strip_leading_frontmatter(content: str) -> str:
+    """Retire un bloc frontmatter YAML (``---\\n...\\n---\\n``) s'il ouvre le
+    texte — même motif que wiki.py/op_capture pour la directive `file:`.
+    Une note locale capturée avec `vault_name` porte désormais toujours un
+    tel bloc (ex. ``vault: Arbath``) ; sans ce nettoyage il apparaît tel
+    quel, en texte visible, dans le corps de la page générée (verbatim)."""
+    return re.sub(r"^---\n.*?\n---\n", "", content, flags=re.DOTALL)
+
+
 def _file_hash(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as f:
@@ -1128,13 +1137,16 @@ class Ingestor:
                     is_note = path.suffix.lower() == ".md"
                     url_hint = self._extract_embedded_url(path.read_text(encoding="utf-8")) if is_note else ""
                     slug = self.ingest(str(path), max_concepts=max_concepts, extra_tags=user_tags or None, rename_raw=False, local_note=is_note, url_hint=url_hint)
+                slugs.append(slug)
+                self._mark_ingested(path.name, slug=slug, file_hash=_file_hash(path))
+                # Après _mark_ingested : une ingestion déjà réussie et payée
+                # (LLM) ne doit jamais être re-traitée juste parce que le
+                # miroir échoue (revue finale du 22/09/2026).
                 vault_name = self._parse_raw_vault(path)
                 if vault_name:
                     mirror_page(self.wiki_root, vault_name, slug)
                     for related_slug in self._last_related_slugs:
                         mirror_page(self.wiki_root, vault_name, related_slug)
-                slugs.append(slug)
-                self._mark_ingested(path.name, slug=slug, file_hash=_file_hash(path))
             except Exception as e:
                 print(f"[ingest] ERREUR sur {path.name} : {e}")
                 # Pas de _mark_ingested : un échec (souvent transitoire — fetch/LLM
@@ -1287,6 +1299,7 @@ class Ingestor:
 
         if local_note:
             print("[ingest] Note locale → page verbatim (pas de résumé)…")
+            content = _strip_leading_frontmatter(content)
             source_page_md = self._generate_note_page(content, title, extra_tags=extra_tags)
         else:
             print("[ingest] Génération de la page source…")
