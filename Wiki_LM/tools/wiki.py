@@ -48,7 +48,7 @@ def _raw_dir() -> Path:
     return Path(os.environ.get("WIKI_RAW_PATH", str(_wiki_root() / "raw")))
 
 
-def op_capture(text: str) -> dict:
+def op_capture(text: str, vault_name: str | None = None) -> dict:
     directives = [m.group(1).lower() for m in re.finditer(r"@(\w+)", text)]
     text = re.sub(r"@\w+\s*", "", text).strip()
     tags, remaining = _parse_hashtags(text)
@@ -95,11 +95,11 @@ def op_capture(text: str) -> dict:
     created = []
     if urls:
         # texte + URL → un seul .url embarquant la note (combiné à l'ingestion)
-        created.extend(capture_urls(urls, raw, tags=tags or None, note=note or None))
+        created.extend(capture_urls(urls, raw, tags=tags or None, note=note or None, vault_name=vault_name))
         if refs:
-            created.append(capture_comment("", raw, tags=None, refs=refs))
+            created.append(capture_comment("", raw, tags=None, refs=refs, vault_name=vault_name))
     elif note or refs:
-        created.append(capture_comment(note, raw, tags=tags or None, refs=refs or None))
+        created.append(capture_comment(note, raw, tags=tags or None, refs=refs or None, vault_name=vault_name))
     return {"files": [p.name for p in created if p is not None]}
 
 
@@ -113,9 +113,9 @@ def _history_path(history_slug: str) -> str:
     return f"{_wiki_root().name}/historique/{history_slug}.md"
 
 
-def op_query(question: str) -> dict:
+def op_query(question: str, vault_name: str | None = None) -> dict:
     try:
-        result = WikiQuery(_wiki_root()).query(question)
+        result = WikiQuery(_wiki_root()).query(question, vault_name=vault_name)
         if not result.text:
             return {"error": "KB vide — lancer ingest d'abord"}
         return {

@@ -90,7 +90,7 @@ def test_query_returns_synthesis(monkeypatch, tmp_path):
         def __init__(self, *a, **k):
             pass
 
-        def query(self, q, top_k=5):
+        def query(self, q, top_k=5, vault_name=None):
             return _R()
 
     monkeypatch.setattr(wiki, "WikiQuery", _Q)
@@ -113,7 +113,7 @@ def test_query_empty_kb(monkeypatch, tmp_path):
         def __init__(self, *a, **k):
             pass
 
-        def query(self, q, top_k=5):
+        def query(self, q, top_k=5, vault_name=None):
             return _R()
 
     monkeypatch.setattr(wiki, "WikiQuery", _Q)
@@ -641,3 +641,44 @@ def test_main_verify_dispatch(monkeypatch, tmp_path):
     _write_source_page(tmp_path, "src-a", verifie=False)
     out = wiki.main(["verify", "src-a"])
     assert out["status"] == "ok"
+
+
+class TestOpCaptureVaultName:
+    def test_forwards_vault_name_to_raw_file(self, monkeypatch, tmp_path):
+        wiki = _wiki(monkeypatch, tmp_path)
+        out = wiki.op_capture("note libre", vault_name="Arbath")
+        raw_file = tmp_path / "raw" / out["files"][0]
+        assert "vault: Arbath" in raw_file.read_text(encoding="utf-8")
+
+    def test_no_vault_line_without_vault_name(self, monkeypatch, tmp_path):
+        wiki = _wiki(monkeypatch, tmp_path)
+        out = wiki.op_capture("note libre")
+        raw_file = tmp_path / "raw" / out["files"][0]
+        assert "vault:" not in raw_file.read_text(encoding="utf-8")
+
+
+class TestOpQueryVaultName:
+    def test_forwards_vault_name_to_query(self, monkeypatch, tmp_path):
+        wiki = _wiki(monkeypatch, tmp_path)
+
+        class _R:
+            text = "Synthèse."
+            references = []
+            history_slug = "slug"
+            brief = "Bref."
+
+        calls = []
+
+        class _Q:
+            def __init__(self, *a, **k):
+                pass
+
+            def query(self, q, top_k=5, vault_name=None):
+                calls.append(vault_name)
+                return _R()
+
+        monkeypatch.setattr(wiki, "WikiQuery", _Q)
+        wiki.op_query("question ?", vault_name="Arbath")
+        wiki.op_query("question ?")
+
+        assert calls == ["Arbath", None]
