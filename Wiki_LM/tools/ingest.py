@@ -38,7 +38,7 @@ import frontmatter
 from llm import LLM
 from kb_query import kb_query
 from wiki_lookup import WikiLookup
-from wiki_paths import CONTENT_SUBDIRS, CLUSTERING_SUBDIR, iter_pages, slug_to_path
+from wiki_paths import CONTENT_SUBDIRS, CLUSTERING_SUBDIR, iter_pages, mirror_page, slug_to_path
 
 _DEFAULT_KB_DIR = Path.home() / "Documents" / "Secretarius" / "Wiki_LM" / "knowledge_base"
 
@@ -829,6 +829,8 @@ class Ingestor:
         for d in (self.wiki_dir, self.raw_dir):
             d.mkdir(parents=True, exist_ok=True)
 
+        self._last_related_slugs: list[str] = []
+
         for subdir in CONTENT_SUBDIRS + [CLUSTERING_SUBDIR]:
             (self.wiki_dir / subdir).mkdir(parents=True, exist_ok=True)
 
@@ -1126,6 +1128,11 @@ class Ingestor:
                     is_note = path.suffix.lower() == ".md"
                     url_hint = self._extract_embedded_url(path.read_text(encoding="utf-8")) if is_note else ""
                     slug = self.ingest(str(path), max_concepts=max_concepts, extra_tags=user_tags or None, rename_raw=False, local_note=is_note, url_hint=url_hint)
+                vault_name = self._parse_raw_vault(path)
+                if vault_name:
+                    mirror_page(self.wiki_root, vault_name, slug)
+                    for related_slug in self._last_related_slugs:
+                        mirror_page(self.wiki_root, vault_name, related_slug)
                 slugs.append(slug)
                 self._mark_ingested(path.name, slug=slug, file_hash=_file_hash(path))
             except Exception as e:
@@ -1188,6 +1195,18 @@ class Ingestor:
                 return line[len("simple:"):].strip().lower() == "true"
         return False
 
+    @staticmethod
+    def _parse_raw_vault(path: Path) -> str | None:
+        """Lit la ligne `vault: <nom>` d'un fichier raw si présente — coffre
+        d'origine de la capture, pour repousser au bon miroir après
+        ingestion (sous-wikis par coffre, 2026-09-22)."""
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if line.lower().startswith("vault:"):
+                value = line[len("vault:"):].strip()
+                return value or None
+        return None
+
     def ingest_batch(self, url_file: str | Path, max_concepts: int = 5) -> list[str]:
         """Ingère toutes les URLs listées dans un fichier texte.
 
@@ -1230,6 +1249,7 @@ class Ingestor:
         texte+URL) — reportée dans lien_source même quand `source` est un
         chemin de fichier local, pas l'URL elle-même.
         """
+        self._last_related_slugs = []
         print(f"[ingest] Lecture de la source : {source}")
         if content is None:
             content, title = _read_source(source)
@@ -1307,9 +1327,11 @@ class Ingestor:
         # 4. Mettre à jour / créer les pages de concepts et entités
         for concept in concepts:
             self._update_concept_page(concept, source_title, src_slug, content)
+            self._last_related_slugs.append(f"c-{_slugify(concept)}")
 
         for entity in entities:
             self._update_entity_page(entity, source_title, src_slug, content)
+            self._last_related_slugs.append(f"e-{_slugify(entity)}")
 
         # 4b. Réécrire la page source avec des [[liens]] dans la section concepts/entités
         if concepts or entities:

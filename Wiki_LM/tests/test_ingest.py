@@ -659,3 +659,74 @@ class TestNotePageSummarySection:
         assert "Texte non pertinent" not in captured["prompt"]
         page = (wiki_dir / "sources" / f"{slug}.md").read_text()
         assert "Texte non pertinent" in page
+
+
+class TestParseRawVault:
+    def test_reads_vault_line(self, tmp_path: Path):
+        from ingest import Ingestor
+        f = tmp_path / "test.url"
+        f.write_text("https://example.com\nvault: Arbath\n", encoding="utf-8")
+        assert Ingestor._parse_raw_vault(f) == "Arbath"
+
+    def test_none_when_absent(self, tmp_path: Path):
+        from ingest import Ingestor
+        f = tmp_path / "test.url"
+        f.write_text("https://example.com\n", encoding="utf-8")
+        assert Ingestor._parse_raw_vault(f) is None
+
+
+class TestIngestTracksRelatedSlugs:
+    def test_last_related_slugs_populated_with_concepts_and_entities(
+        self, ingestor, wiki_dir, tmp_path
+    ):
+        note = tmp_path / "note.md"
+        note.write_text("Note sur Vannevar Bush.", encoding="utf-8")
+        # mock_llm (fixture ingestor) répond, pour une note personnelle :
+        # "TITRE: Ma note de test\n- concept: zettelkasten\n- entité: Vannevar Bush\n"
+        ingestor.ingest(str(note), local_note=True)
+
+        assert ingestor._last_related_slugs == ["c-zettelkasten", "e-vannevar-bush"]
+
+    def test_last_related_slugs_reset_on_stub_page(self, ingestor, wiki_dir, tmp_path):
+        # Contenu binaire (caractères de contrôle, illisible) → page stub,
+        # retour avant le calcul concepts/entités. Suffixe .txt (pas .pdf) :
+        # un .pdf corrompu fait lever pypdf.errors.PdfStreamError avant même
+        # d'atteindre _is_binary_content, un gap préexistant dans _read_pdf
+        # hors périmètre de cette tâche.
+        binary = tmp_path / "bin.txt"
+        binary.write_bytes(bytes([0, 1, 2, 3, 4, 5]) * 60)
+        ingestor.ingest(str(binary))
+
+        assert ingestor._last_related_slugs == []
+
+
+class TestIngestRawDirMirrorsToVault:
+    def test_pushes_source_and_related_pages_to_known_mirror(
+        self, ingestor, wiki_dir, raw_dir, monkeypatch, tmp_path
+    ):
+        from wiki_paths import mirror_page
+        mirror = tmp_path / "mirror-vault"
+        monkeypatch.setenv("WIKI_VAULT_MIRRORS", f"Arbath={mirror}")
+        (raw_dir / "note.md").write_text(
+            "---\nvault: Arbath\n---\n\nNote sur Vannevar Bush.", encoding="utf-8"
+        )
+
+        ingestor.ingest_raw_dir()
+
+        pages = list((wiki_dir / "sources").glob("src-*.md"))
+        assert pages, "aucune page source créée"
+        mirrored_src = mirror / "Wiki_LM" / "wiki" / "sources" / pages[0].name
+        assert mirrored_src.exists()
+        mirrored_entity = mirror / "Wiki_LM" / "wiki" / "entités" / "e-vannevar-bush.md"
+        assert mirrored_entity.exists()
+
+    def test_no_mirror_push_without_vault_line(
+        self, ingestor, wiki_dir, raw_dir, monkeypatch, tmp_path
+    ):
+        mirror = tmp_path / "mirror-vault"
+        monkeypatch.setenv("WIKI_VAULT_MIRRORS", f"Arbath={mirror}")
+        (raw_dir / "note.md").write_text("Note sans coffre.", encoding="utf-8")
+
+        ingestor.ingest_raw_dir()
+
+        assert not mirror.exists()
