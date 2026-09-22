@@ -135,14 +135,15 @@ def mirror_page(wiki_root: Path, vault_name: str | None, slug: str) -> None:
     mirror = vault_mirrors().get(vault_name)
     if mirror is None:
         return
-    # Skip if mirror is the canonical wiki_root (avoid nested Wiki_LM structure)
-    if mirror.resolve() == wiki_root.resolve():
-        return
-    src = find_page(wiki_root / "wiki", slug)
-    if src is None:
-        return
     try:
-        dest = mirror.resolve() / "Wiki_LM" / "wiki" / subdir_for_slug(slug) / f"{slug}.md"
+        mirror_resolved = mirror.resolve()
+        # Ignorer si le miroir est le wiki_root canonique (éviter la structure Wiki_LM imbriquée)
+        if mirror_resolved == wiki_root.resolve():
+            return
+        src = find_page(wiki_root / "wiki", slug)
+        if src is None:
+            return
+        dest = mirror_resolved / "Wiki_LM" / "wiki" / subdir_for_slug(slug) / f"{slug}.md"
         if dest.resolve() == src.resolve():
             return
         dest.parent.mkdir(parents=True, exist_ok=True)

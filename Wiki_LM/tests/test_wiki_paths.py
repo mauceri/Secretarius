@@ -218,3 +218,15 @@ class TestMirrorPage:
 
         monkeypatch.setattr(Path, "write_text", boom)
         mirror_page(wiki_root, "Arbath", "c-x")  # ne lève pas
+
+    def test_resolve_failure_is_silently_ignored(self, monkeypatch, tmp_path):
+        from wiki_paths import mirror_page
+        wiki_root, _ = self._make_wiki(tmp_path)
+        mirror = tmp_path / "mirror-vault"
+        monkeypatch.setenv("WIKI_VAULT_MIRRORS", f"Arbath={mirror}")
+
+        def boom(self):
+            raise OSError("miroir indisponible")
+
+        monkeypatch.setattr(Path, "resolve", boom)
+        mirror_page(wiki_root, "Arbath", "c-x")  # ne lève pas
