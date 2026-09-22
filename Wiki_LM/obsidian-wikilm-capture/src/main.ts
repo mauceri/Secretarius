@@ -88,7 +88,7 @@ export default class WikilmCapturePlugin extends Plugin {
         url: `${this.settings.serverUrl}/capture`,
         method: "POST",
         contentType: "application/json",
-        body: JSON.stringify({ text, tags, title: file.basename }),
+        body: JSON.stringify({ text, tags, title: file.basename, vault_name: this.app.vault.getName() }),
       });
       const data = response.json as { filename: string };
       await this.app.fileManager.processFrontMatter(file, (fm) => {
@@ -133,7 +133,7 @@ export default class WikilmCapturePlugin extends Plugin {
         url: `${this.settings.serverUrl}/run`,
         method: "POST",
         contentType: "application/json",
-        body: JSON.stringify({ command: block.command, arg: block.arg }),
+        body: JSON.stringify({ command: block.command, arg: block.arg, vault_name: this.app.vault.getName() }),
         throw: false,
       });
       const data = (response.json as Record<string, unknown>) ?? {};
