@@ -322,9 +322,13 @@ requêtes, premier clustering du wiki vivant.
   et échappé à la déduplication). Non systématiquement traité.
 - **Ingérer la documentation du projet** dans le wiki, ou monter un wiki
   dédié à la documentation — évoqué, coût à évaluer, pas encore fait.
-- **Généralisation multi-wiki** — le système entier suppose un wiki
-  unique via `WIKI_PATH` (outils, sandbox, services systemd). Sujet
-  architectural à part entière, pas encore brainstormé.
+- **Sous-wikis par coffre** — les pages produites/citées par les requêtes
+  et ingestions d'un coffre client sont copiées vers son miroir local
+  depuis le 22/09/2026 (`docs/superpowers/specs/2026-09-22-sous-wikis-par-
+  coffre-design.md`). Reste : rafraîchissement des pages déjà miroitées si
+  le canonique change sans nouvelle citation (piste B de la spec, reportée
+  délibérément) ; `WIKI_PATH` reste supposé unique côté outils/sandbox pour
+  tout le reste (services systemd, ZIM, embeddings).
 
 ## Références
 
