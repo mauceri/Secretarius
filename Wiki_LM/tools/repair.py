@@ -23,11 +23,16 @@ Usage module :
 from __future__ import annotations
 
 import argparse
+import datetime
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import yaml
+
 from lint import WikiLint
-from wiki_paths import slug_to_path
+from llm import LLM
+from wiki_paths import slug_to_path, subdir_for_slug
 
 
 @dataclass
@@ -39,10 +44,70 @@ class RepairReport:
     after_count: int = 0
 
 
+_FENCE_LINE_RE = re.compile(r"^(?:```(?:yaml|markdown)?|yaml)\s*$", re.MULTILINE)
+_CLOSED_BLOCK_RE = re.compile(r"^---\n(.*?)\n---\s*\n?", re.DOTALL | re.MULTILINE)
+
+_SUBDIR_TO_CATEGORY = {"sources": "source", "concepts": "concept", "entités": "entité"}
+
+_PROMPT_REGENERATE_TITLE = """\
+Voici le contenu d'une page de wiki dont le titre a été perdu (bug \
+d'écriture antérieur). Réponds uniquement par un titre court (une seule \
+ligne, sans guillemets, sans ponctuation finale) résumant le sujet de \
+cette page — n'invente rien qui ne soit pas dans le contenu.
+
+Contenu :
+---
+{content}
+---
+
+Titre :"""
+
+
+def _extract_closed_frontmatter_block(body: str) -> tuple[dict, str] | None:
+    """Cherche un second bloc frontmatter bien formé et fermé dans le corps
+    d'une page (motif du 21-22/09/2026 : ---\\n{}\\n---\\n vide en tête,
+    parfois suivi de débris de balises de code, puis un second bloc
+    --- ... --- qui, lui, contient les vraies métadonnées). Retourne
+    (métadonnées, reste du corps après le bloc) si ce bloc contient au
+    moins title et category ; None sinon — y compris si le bloc n'est
+    jamais refermé (génération interrompue)."""
+    m = _CLOSED_BLOCK_RE.search(body)
+    if not m:
+        return None
+    try:
+        meta = yaml.safe_load(m.group(1))
+    except Exception:
+        return None
+    if not isinstance(meta, dict) or not meta.get("title") or not meta.get("category"):
+        return None
+    rest = body[m.end():].strip()
+    return meta, rest
+
+
+def _clean_body_for_regeneration(body: str) -> str:
+    """Retire les débris de balises de code (```yaml, ```markdown, ```, ou
+    un « yaml » seul sur sa ligne) qui traînent dans un corps de page dont
+    le frontmatter n'a pas pu être promu — sans quoi ces lignes polluent
+    l'entrée envoyée au LLM. Une éventuelle tentative de frontmatter
+    tronquée (ex. `---\\ntitle: ...\\nsources: [src-a`, jamais refermée)
+    reste dans le résultat : elle contient souvent le titre en clair, une
+    bien meilleure base pour l'extraction qu'un corps vide."""
+    return _FENCE_LINE_RE.sub("", body).strip()
+
+
+def _slug_to_title(slug: str) -> str:
+    """Repli déterministe si le corps ne contient rien d'exploitable :
+    dérive un titre lisible du slug lui-même (c-mon-concept -> "mon
+    concept"). N'appelle jamais le LLM."""
+    base = re.sub(r"^(?:src|c|e)-", "", slug)
+    return base.replace("-", " ").strip() or slug
+
+
 class WikiRepair:
-    def __init__(self, wiki_path: str | Path) -> None:
+    def __init__(self, wiki_path: str | Path, llm: LLM | None = None) -> None:
         self.wiki_root = Path(wiki_path)
         self.wiki_dir = self.wiki_root / "wiki"
+        self.llm = llm or LLM()
 
     def repair_broken_links(self, dry_run: bool = True) -> RepairReport:
         """Retire les crochets des liens cassés — [[slug]] devient slug en
@@ -79,6 +144,65 @@ class WikiRepair:
             changes=changes,
             before_count=before_count,
             after_count=before_count - fixed_count,
+        )
+
+    def repair_frontmatter(self, dry_run: bool = True) -> RepairReport:
+        """Répare le frontmatter vide/tronqué. Deux traitements selon la
+        forme : un second bloc bien formé mais mal placé se déplace
+        mécaniquement (aucun appel LLM) ; sinon, le titre est régénéré par
+        le LLM à partir du corps restant — category est toujours dérivé du
+        sous-répertoire, jamais deviné."""
+        report_before = WikiLint(self.wiki_root).run()
+        before_count = sum(1 for i in report_before.issues if i.code == "missing-frontmatter")
+        slugs = sorted({i.slug for i in report_before.issues if i.code == "missing-frontmatter"})
+
+        changes: list[str] = []
+        for slug in slugs:
+            subdir = subdir_for_slug(slug)
+            path = self.wiki_dir / subdir / f"{slug}.md"
+            if not path.exists():
+                continue
+            raw = path.read_text(encoding="utf-8")
+            import frontmatter as fm_module
+            post = fm_module.loads(raw)
+            body = post.content
+
+            found = _extract_closed_frontmatter_block(body)
+            if found:
+                meta, rest = found
+                new_content = "---\n" + yaml.safe_dump(meta, allow_unicode=True, sort_keys=False) + f"---\n\n{rest}\n"
+                changes.append(f"{slug} : bloc frontmatter bien formé déplacé")
+            else:
+                cleaned = _clean_body_for_regeneration(body)
+                category = _SUBDIR_TO_CATEGORY.get(subdir, "source")
+                if cleaned and not dry_run:
+                    title = self.llm.complete(
+                        _PROMPT_REGENERATE_TITLE.format(content=cleaned[:4000]),
+                        max_tokens=100,
+                    ).strip().strip('"').strip("'")
+                    if not title:
+                        title = _slug_to_title(slug)
+                else:
+                    title = _slug_to_title(slug)
+                meta = {
+                    "title": title,
+                    "category": category,
+                    "tags": [],
+                    "created": datetime.date.fromtimestamp(path.stat().st_mtime).isoformat(),
+                    "sources": [],
+                }
+                new_content = "---\n" + yaml.safe_dump(meta, allow_unicode=True, sort_keys=False) + f"---\n\n{cleaned}\n"
+                changes.append(f"{slug} : frontmatter régénéré (titre : {title!r})")
+
+            if not dry_run:
+                path.write_text(new_content, encoding="utf-8")
+
+        return RepairReport(
+            family="missing-frontmatter",
+            dry_run=dry_run,
+            changes=changes,
+            before_count=before_count,
+            after_count=before_count - 2 * len(changes),
         )
 
 
