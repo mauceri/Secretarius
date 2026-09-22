@@ -192,7 +192,13 @@ class WikiRepair:
                     "sources": [],
                 }
                 new_content = "---\n" + yaml.safe_dump(meta, allow_unicode=True, sort_keys=False) + f"---\n\n{cleaned}\n"
-                changes.append(f"{slug} : frontmatter régénéré (titre : {title!r})")
+                if cleaned and dry_run:
+                    changes.append(
+                        f"{slug} : frontmatter serait régénéré par le LLM à partir du corps "
+                        "(titre non déterminé en essai à blanc)"
+                    )
+                else:
+                    changes.append(f"{slug} : frontmatter régénéré (titre : {title!r})")
 
             if not dry_run:
                 path.write_text(new_content, encoding="utf-8")

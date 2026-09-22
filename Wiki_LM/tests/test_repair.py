@@ -226,3 +226,23 @@ class TestRepairFrontmatter:
 
         assert path.read_text(encoding="utf-8") == original
         assert report.dry_run is True
+
+    def test_dry_run_with_real_content_does_not_fabricate_a_title_in_report(self, wiki_root, wiki_dir):
+        path = wiki_dir / "concepts" / "c-y.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            "---\n{}\n---\n\n## Extrait Wikipedia\n\nDu contenu réel sur le sujet Y.\n",
+            encoding="utf-8",
+        )
+
+        class _NoCallLLM:
+            def complete(self, *a, **k):
+                raise AssertionError("essai à blanc : le LLM ne doit pas être appelé")
+
+        report = WikiRepair(wiki_root, llm=_NoCallLLM()).repair_frontmatter(dry_run=True)
+
+        assert len(report.changes) == 1
+        change = report.changes[0]
+        assert "titre : " not in change  # aucun titre précis promis en essai à blanc
+        assert "non déterminé" in change
+        assert report.after_count == report.before_count - 2 * len(report.changes)
