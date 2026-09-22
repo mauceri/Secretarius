@@ -55,6 +55,22 @@ class TestHandleCapture:
         assert "douleur" in data["filename"]
         assert "lizzie" not in data["filename"]
 
+    def test_forwards_vault_name(self, client, monkeypatch):
+        import server
+        calls = []
+
+        def fake_capture_comment(text, raw, tags=None, title=None, vault_name=None):
+            calls.append(vault_name)
+            class _Path:
+                name = "fake.md"
+            return _Path()
+
+        monkeypatch.setattr(server, "capture_comment", fake_capture_comment)
+        client.post("/capture", json={"text": "note", "vault_name": "Arbath"})
+        client.post("/capture", json={"text": "note"})
+
+        assert calls == ["Arbath", None]
+
 
 class TestHandleQuery:
     def test_returns_history_slug_and_brief(self, client, monkeypatch):
@@ -111,8 +127,6 @@ class TestHandleQuery:
 
 class TestHandleRun:
     _COMMAND_TABLE = [
-        ("/c", "op_capture", "texte de capture"),
-        ("/q", "op_query", "une question ?"),
         ("/ingest", "op_ingest", ""),
         ("/wikistatus", "op_status", ""),
         ("/r", "op_search", "une recherche"),
@@ -140,6 +154,27 @@ class TestHandleRun:
         assert response.get_json() == {"status": "ok"}
         assert calls == ([(arg,)] if arg else [()])
 
+    def test_dispatches_c_with_vault_name(self, client, monkeypatch):
+        import server
+        calls = []
+        monkeypatch.setattr(server, "op_capture", lambda *a: calls.append(a) or {"status": "ok"})
+        client.post("/run", json={"command": "/c", "arg": "texte", "vault_name": "Arbath"})
+        assert calls == [("texte", "Arbath")]
+
+    def test_dispatches_c_without_vault_name(self, client, monkeypatch):
+        import server
+        calls = []
+        monkeypatch.setattr(server, "op_capture", lambda *a: calls.append(a) or {"status": "ok"})
+        client.post("/run", json={"command": "/c", "arg": "texte"})
+        assert calls == [("texte", None)]
+
+    def test_dispatches_q_with_vault_name(self, client, monkeypatch):
+        import server
+        calls = []
+        monkeypatch.setattr(server, "op_query", lambda *a: calls.append(a) or {"status": "ok"})
+        client.post("/run", json={"command": "/q", "arg": "question ?", "vault_name": "Arbath"})
+        assert calls == [("question ?", "Arbath")]
+
     def test_unknown_command_returns_400(self, client):
         response = client.post("/run", json={"command": "/inconnue", "arg": ""})
         assert response.status_code == 400
@@ -153,7 +188,7 @@ class TestHandleRun:
     def test_op_exception_returns_500(self, client, monkeypatch):
         import server
 
-        def boom(arg):
+        def boom(*a):
             raise RuntimeError("panne simulée")
 
         monkeypatch.setattr(server, "op_capture", boom)

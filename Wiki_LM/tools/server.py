@@ -16,11 +16,14 @@ Endpoint :
     Reply : {"text": "...", "references": [...], "saved_slug": "", "history_slug": "...", "brief": "..."}
 
     POST /capture
-    Body  : {"text": "...", "tags": ["..."], "title": "..."}
+    Body  : {"text": "...", "tags": ["..."], "title": "...", "vault_name": "..."}
+            vault_name (optionnel) : voir /query ci-dessus.
     Reply : {"status": "ok", "filename": "..."}
 
     POST /run
-    Body  : {"command": "/q", "arg": "..."}
+    Body  : {"command": "/q", "arg": "...", "vault_name": "..."}
+            vault_name (optionnel) : transmis tel quel aux commandes /c et
+            /q (voir /query ci-dessus) ; ignoré par les autres commandes.
     Reply : JSON de l'opération wiki.py correspondante ; {"error": "..."} si
             commande inconnue (400) ou en échec (500). /supprimer (sans
             point d'exclamation, réservée à Telegram avec /confirm) est
@@ -113,25 +116,30 @@ def handle_capture():
     tags_raw = [str(t) for t in (data.get("tags") or [])]
     tags = _normalize_tags(tags_raw) if tags_raw else []
     title = str(data.get("title", "")).strip()
-    path = capture_comment(text, raw_dir(), tags=tags or None, title=title or None)
+    vault_name = str(data.get("vault_name", "")).strip() or None
+    path = capture_comment(text, raw_dir(), tags=tags or None, title=title or None, vault_name=vault_name)
     return jsonify({"status": "ok", "filename": path.name})
 
 
 _RUN_OPS = {
-    "/c": lambda arg: op_capture(arg),
-    "/q": lambda arg: op_query(arg),
-    "/ingest": lambda arg: op_ingest(),
-    "/wikistatus": lambda arg: op_status(),
-    "/r": lambda arg: op_search(arg),
-    "/tags": lambda arg: op_tags(),
-    "/kbupdate": lambda arg: op_kb_update(),
-    "/relire": lambda arg: op_review(),
-    "/verifie": lambda arg: op_verify(arg),
+    # Chaque entrée reçoit (arg, vault_name) de façon uniforme — un seul
+    # protocole d'appel dans la table de dispatch. Seules /c et /q
+    # utilisent vault_name ; les autres l'ignorent (sous-wikis par coffre,
+    # 2026-09-22).
+    "/c": lambda arg, vault: op_capture(arg, vault),
+    "/q": lambda arg, vault: op_query(arg, vault),
+    "/ingest": lambda arg, vault: op_ingest(),
+    "/wikistatus": lambda arg, vault: op_status(),
+    "/r": lambda arg, vault: op_search(arg),
+    "/tags": lambda arg, vault: op_tags(),
+    "/kbupdate": lambda arg, vault: op_kb_update(),
+    "/relire": lambda arg, vault: op_review(),
+    "/verifie": lambda arg, vault: op_verify(arg),
     # /supprimer (sans !) reste absente : jamais dispatchée, même demandée
     # explicitement — seule Telegram, avec essai à blanc puis /confirm,
     # peut supprimer sans le ! explicite ci-dessous.
-    "/supprimer?": lambda arg: op_delete_preview(arg),
-    "/supprimer!": lambda arg: op_delete(arg),
+    "/supprimer?": lambda arg, vault: op_delete_preview(arg),
+    "/supprimer!": lambda arg, vault: op_delete(arg),
 }
 
 
@@ -142,13 +150,14 @@ def handle_run():
     data = request.get_json(silent=True) or {}
     command = str(data.get("command", "")).strip()
     arg = str(data.get("arg", ""))
+    vault_name = str(data.get("vault_name", "")).strip() or None
 
     op = _RUN_OPS.get(command)
     if op is None:
         return jsonify({"error": f"Commande inconnue ou non autorisée en lot : {command!r}"}), 400
 
     try:
-        result = op(arg)
+        result = op(arg, vault_name)
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
     return jsonify(result)
