@@ -162,11 +162,21 @@ class WikiLint:
                 )
 
     def _check_links(self, pages: dict, report: LintReport) -> None:
-        """Détecte les liens [[slug]] cassés."""
+        """Détecte les liens [[slug]] cassés. `target` est le texte intégral
+        capturé entre crochets, qui peut porter un alias ([[c-x|Alias]]) ou
+        une section ([[c-x#Section]]) — mêmes formes que mirror_page() dans
+        wiki_paths.py. On teste l'appartenance sur le slug normalisé (sinon
+        un alias sur une page qui existe bel et bien est signalé à tort),
+        mais on rapporte le texte ORIGINAL non normalisé comme target : c'est
+        ce texte-là, littéralement, qui apparaît entre crochets dans le
+        corps de la page, et repair.py en a besoin tel quel pour son
+        remplacement littéral `[[{target}]]` -> target (finding 4, revue du
+        22/09/2026)."""
         all_slugs = set(pages.keys()) | _META_PAGES
         for slug, info in pages.items():
             for target in info["links"]:
-                if target not in all_slugs:
+                normalized = target.split("|", 1)[0].split("#", 1)[0].strip()
+                if normalized not in all_slugs:
                     report.add(
                         "error", "broken-link", slug,
                         f"Lien cassé : [[{target}]]",

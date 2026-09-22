@@ -115,6 +115,38 @@ class TestCheckLinks:
         assert len(broken) == 1
         assert broken[0].target == "c-inexistant"
 
+    def test_aliased_link_to_existing_page_not_broken(self, wiki_root, wiki_dir):
+        """Finding 4 (revue du 22/09/2026) : [[c-x|Alias]] doit être reconnu
+        comme pointant vers c-x, même si le texte capturé entre crochets
+        porte l'alias — mirror_page() dans wiki_paths.py normalise déjà
+        cette forme, il faut la même normalisation ici."""
+        _write_page(wiki_dir, "concepts", "c-x", title="X", category="concept")
+        _write_page(
+            wiki_dir, "sources", "src-a", title="A", category="source",
+            body="Voir [[c-x|Alias affichée]].",
+        )
+
+        report = WikiLint(wiki_root).run()
+
+        assert not any(i.code == "broken-link" for i in report.errors)
+
+    def test_aliased_link_to_missing_page_reported_with_original_target(self, wiki_root, wiki_dir):
+        """Un lien avec alias réellement cassé doit rester signalé, et son
+        `target` doit être le texte ORIGINAL non normalisé (« c-nonexistent
+        |Alias ») : repair.py fait un remplacement littéral `[[{target}]]`
+        sur le texte du fichier, qui contient bien `[[c-nonexistent|Alias]]`
+        et non `[[c-nonexistent]]`."""
+        _write_page(
+            wiki_dir, "sources", "src-a", title="A", category="source",
+            body="Voir [[c-nonexistent|Alias]].",
+        )
+
+        report = WikiLint(wiki_root).run()
+
+        broken = [i for i in report.errors if i.code == "broken-link"]
+        assert len(broken) == 1
+        assert broken[0].target == "c-nonexistent|Alias"
+
     def test_non_broken_link_issue_has_empty_target(self, wiki_root, wiki_dir):
         _write_page(wiki_dir, "sources", "src-a", body="Sans frontmatter valide.")
 
