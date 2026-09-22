@@ -177,6 +177,41 @@ describe("formatWikiResult", () => {
     );
     expect(text).toBe("Supprimé : 2 page(s) — c-x, src-y.");
   });
+
+  it("formats /lint as a per-code summary", () => {
+    const text = formatWikiResult(
+      "/lint",
+      { checked_pages: 863, errors: 890, warnings: 2, by_code: { "broken-link": 875, "unknown-category": 2 } },
+      true
+    );
+    expect(text).toContain("863");
+    expect(text).toContain("890");
+    expect(text).toContain("broken-link: 875");
+  });
+
+  it("formats /repair? as a dry-run report, nothing changed", () => {
+    const text = formatWikiResult(
+      "/repair?",
+      { family: "broken-link", before_count: 890, after_count: 0, changes: ["src-a : 2 lien(s) cassé(s) retiré(s)"] },
+      true
+    );
+    expect(text).toContain("Essai à blanc");
+    expect(text).toContain("890");
+    expect(text).toContain("0");
+    expect(text).toContain("src-a");
+    expect(text).toContain("/repair!");
+  });
+
+  it("formats /repair! as a completed repair report", () => {
+    const text = formatWikiResult(
+      "/repair!",
+      { family: "missing-frontmatter", before_count: 130, after_count: 4, changes: ["c-x : frontmatter régénéré (titre : 'X')"] },
+      true
+    );
+    expect(text).toContain("130");
+    expect(text).toContain("4");
+    expect(text).toContain("c-x");
+  });
 });
 
 describe("SUPPORTED_COMMANDS", () => {
@@ -184,15 +219,18 @@ describe("SUPPORTED_COMMANDS", () => {
     expect(SUPPORTED_COMMANDS).not.toContain("/supprimer");
   });
 
-  it("contains exactly the eleven wiki commands from the spec", () => {
+  it("contains exactly the fourteen wiki commands from the spec", () => {
     expect([...SUPPORTED_COMMANDS].sort()).toEqual(
       [
         "/c",
         "/ingest",
         "/kbupdate",
+        "/lint",
         "/q",
         "/r",
         "/relire",
+        "/repair!",
+        "/repair?",
         "/supprimer!",
         "/supprimer?",
         "/tags",

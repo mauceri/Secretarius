@@ -10,6 +10,9 @@ export const SUPPORTED_COMMANDS = [
   "/verifie",
   "/supprimer?",
   "/supprimer!",
+  "/lint",
+  "/repair?",
+  "/repair!",
 ] as const;
 
 export interface WikiBlockMatch {
@@ -110,6 +113,21 @@ export function formatWikiResult(
     case "/supprimer!": {
       const affected = (data.affected as string[] | undefined) ?? [];
       return `Supprimé : ${affected.length} page(s) — ${affected.join(", ")}.`;
+    }
+    case "/lint": {
+      const byCode = (data.by_code as Record<string, number> | undefined) ?? {};
+      const details = Object.entries(byCode).map(([code, n]) => `${code}: ${n}`).join(", ");
+      return `${data.checked_pages} page(s) vérifiée(s) — ${data.errors} erreur(s), ${data.warnings} avertissement(s).${details ? `\n${details}` : ""}`;
+    }
+    case "/repair?": {
+      const changes = (data.changes as string[] | undefined) ?? [];
+      const detail = changes.length > 0 ? `\n\n${changes.join("\n")}` : "";
+      return `Essai à blanc (${data.family}) — ${data.before_count} → ${data.after_count} après réparation.${detail}\n\nRien n'a été modifié. Remplacez par /repair! pour confirmer.`;
+    }
+    case "/repair!": {
+      const changes = (data.changes as string[] | undefined) ?? [];
+      const detail = changes.length > 0 ? `\n\n${changes.join("\n")}` : "";
+      return `Réparé (${data.family}) — ${data.before_count} → ${data.after_count}.${detail}`;
     }
     default:
       return `Commande non prise en charge en exécution par lot : ${command}`;
