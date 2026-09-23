@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { existsSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { execSync } from "node:child_process";
 
 // Seules les 4 fonctions réellement utilisées par le flux GOG_CFG/OAuth sont
 // mockées ; le reste de node:fs (readdirSync, statSync, copyFileSync,
@@ -13,6 +14,13 @@ vi.mock("node:fs", async (importOriginal) => {
     writeFileSync: vi.fn(),
     rmSync: vi.fn(),
   };
+});
+
+// /maj (secrets-sync) est la seule chose du plugin qui lance des commandes
+// système (systemctl, systemd-run) : jamais réellement exécutées en test.
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:child_process")>();
+  return { ...actual, execSync: vi.fn() };
 });
 
 // --- Harnais : capture ce que register(api) enregistre, sans toucher à
@@ -64,10 +72,12 @@ beforeEach(() => {
   vi.mocked(readFileSync).mockReset();
   vi.mocked(writeFileSync).mockReset();
   vi.mocked(rmSync).mockReset();
+  vi.mocked(execSync).mockReset();
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   vi.useRealTimers();
   vi.doUnmock("./wiki-ops.js");
 });
@@ -398,6 +408,119 @@ describe("before_agent_reply — /confirm et /annuler", () => {
 
     const res2 = await hooks["before_agent_reply"].handler({ cleanedBody: "/confirm" });
     expect(res2.reply.text).toBe("Rien à confirmer (aucun brouillon en attente).");
+  });
+});
+
+describe("before_agent_reply — /maj", () => {
+  function setupFiles(files: Record<string, string>) {
+    vi.mocked(existsSync).mockImplementation((p: any) => String(p) in files);
+    vi.mocked(readFileSync).mockImplementation((p: any) => {
+      const key = String(p);
+      if (!(key in files)) throw new Error(`ENOENT (test): ${key}`);
+      return files[key];
+    });
+  }
+
+  beforeEach(() => {
+    vi.stubEnv("HOME", "/home/test");
+  });
+
+  const secretsPath = "/home/test/.config/secrets.env";
+  const gatewayPath = "/home/test/.openclaw/gateway.systemd.env";
+  const wikiEnvPath = "/home/test/Secretarius/Wiki_LM/.env";
+
+  it("secrets.env introuvable : message d'erreur, rien écrit", async () => {
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+    setupFiles({});
+
+    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/maj" });
+
+    expect(res.reply.text).toBe(`${secretsPath} introuvable.`);
+    expect(writeFileSync).not.toHaveBeenCalled();
+  });
+
+  it("rien n'a changé : ne touche à aucun fichier, aucun redémarrage", async () => {
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+    setupFiles({
+      [secretsPath]: "DEEPSEEK_API_KEY=same\n",
+      [gatewayPath]: "DEEPSEEK_API_KEY=same\n",
+    });
+
+    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/maj" });
+
+    expect(res.reply.text).toBe("Rien à synchroniser — tout est déjà à jour.");
+    expect(writeFileSync).not.toHaveBeenCalled();
+    expect(execSync).not.toHaveBeenCalled();
+  });
+
+  it("Wiki_LM/.env seul change (DeepSeek) : écrit et redémarre wiki-lm-server immédiatement, pas de restart différé", async () => {
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+    setupFiles({
+      [secretsPath]: "DEEPSEEK_API_KEY=nouvelle\n",
+      [wikiEnvPath]: "DEEPSEEK_API_KEY=ancienne\n",
+    });
+
+    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/maj" });
+
+    expect(writeFileSync).toHaveBeenCalledWith(wikiEnvPath, "DEEPSEEK_API_KEY=nouvelle\n", "utf8");
+    expect(execSync).toHaveBeenCalledWith("systemctl --user restart wiki-lm-server.service");
+    expect(execSync).not.toHaveBeenCalledWith(expect.stringContaining("systemd-run"));
+    expect(res.reply.text).toContain("wiki-lm-server.service redémarré");
+    expect(res.reply.text).not.toContain("va redémarrer dans 5s");
+  });
+
+  it("TELEGRAM_BOT_TOKEN valide pour le bon bot : écrit gateway.systemd.env et programme un restart différé", async () => {
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+    setupFiles({
+      [secretsPath]: "TELEGRAM_BOT_TOKEN=abc:123\n",
+      [gatewayPath]: "TELEGRAM_BOT_TOKEN=old:000\n",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ ok: true, result: { username: "secretarius_tiron_bot" } }),
+      })),
+    );
+
+    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/maj" });
+
+    expect(writeFileSync).toHaveBeenCalledWith(gatewayPath, "TELEGRAM_BOT_TOKEN=abc:123\n", "utf8");
+    expect(execSync).toHaveBeenCalledWith(expect.stringContaining("systemd-run"));
+    expect(execSync).toHaveBeenCalledWith(expect.stringContaining("openclaw-gateway.service"));
+    expect(res.reply.text).toContain("va redémarrer dans 5s");
+  });
+
+  it("TELEGRAM_BOT_TOKEN d'un autre bot (piège du 22/09) : refuse, n'écrit rien", async () => {
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+    setupFiles({
+      [secretsPath]: "TELEGRAM_BOT_TOKEN=abc:123\n",
+      [gatewayPath]: "TELEGRAM_BOT_TOKEN=old:000\n",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ ok: true, result: { username: "secretarius1789_bot" } }),
+      })),
+    );
+
+    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/maj" });
+
+    expect(res.reply.text).toContain("Refusé");
+    expect(res.reply.text).toContain("secretarius1789_bot");
+    expect(writeFileSync).not.toHaveBeenCalled();
+    expect(execSync).not.toHaveBeenCalled();
   });
 });
 

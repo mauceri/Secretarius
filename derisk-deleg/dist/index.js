@@ -4,8 +4,10 @@ import { parseReply } from "./parse.js";
 import { commandToAction } from "./dispatch.js";
 import { fetchWikiOpJson, runWikiOp } from "./wiki-ops.js";
 import { readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync, copyFileSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
+import { homedir, hostname } from "node:os";
 import { join } from "node:path";
+import { execSync } from "node:child_process";
+import { parseEnv, diffEnv, applyEnvDiff, validateTelegramToken, EXPECTED_TELEGRAM_BOT } from "./secrets-sync.js";
 const ROUTER_URL = "http://127.0.0.1:8999/route";
 async function callRouter(message) {
     try {
@@ -460,8 +462,96 @@ export default definePluginEntry({
                 const ok = done === "ok";
                 return { handled: true, reply: { text: ok ? "Compte Google connecté." : `Échec de la connexion (${done || "timeout"}). Réessayez /connecter.` } };
             }
-            const m = text.match(/(^|\s)\/(confirm|annuler)\b/i);
+            const m = text.match(/(^|\s)\/(confirm|annuler|maj)\b/i);
             const cmd = m ? "/" + m[2].toLowerCase() : "";
+            // /maj : resynchronise les clés d'API changées dans secrets.env vers
+            // gateway.systemd.env et Wiki_LM/.env, puis relance les services
+            // concernés. Commande directe (comme /confirm, /annuler) : ne passe
+            // pas par le routeur sémantique, pas de délégation à un sous-agent —
+            // elle touche des fichiers hôte hors du wiki, donc hors du périmètre
+            // des outils wiki_*.
+            if (cmd === "/maj") {
+                const HOME = process.env.HOME || homedir();
+                const secretsPath = join(HOME, ".config", "secrets.env");
+                if (!existsSync(secretsPath)) {
+                    return { handled: true, reply: { text: `${secretsPath} introuvable.` } };
+                }
+                const secrets = parseEnv(readFileSync(secretsPath, "utf8"));
+                const targets = [
+                    {
+                        path: join(HOME, ".openclaw", "gateway.systemd.env"),
+                        label: "gateway.systemd.env",
+                        restartUnit: "openclaw-gateway.service",
+                        deferRestart: true,
+                    },
+                    {
+                        path: process.env.WIKI_LM_REPO_ENV || join(HOME, "Secretarius", "Wiki_LM", ".env"),
+                        label: "Wiki_LM/.env",
+                        restartUnit: "wiki-lm-server.service",
+                        deferRestart: false,
+                    },
+                ];
+                const report = [];
+                let deferredUnit = null;
+                for (const t of targets) {
+                    if (!existsSync(t.path))
+                        continue;
+                    const targetContent = readFileSync(t.path, "utf8");
+                    const diffs = diffEnv(secrets, parseEnv(targetContent));
+                    if (diffs.length === 0)
+                        continue;
+                    const tgDiff = diffs.find((d) => d.key === "TELEGRAM_BOT_TOKEN");
+                    if (tgDiff) {
+                        const expected = EXPECTED_TELEGRAM_BOT[hostname()];
+                        if (!expected) {
+                            return {
+                                handled: true,
+                                reply: { text: `Hôte "${hostname()}" inconnu du garde-fou Telegram — /maj refuse d'écrire ${t.label}.` },
+                            };
+                        }
+                        const check = await validateTelegramToken(tgDiff.newValue, expected);
+                        if (!check.ok) {
+                            return { handled: true, reply: { text: `Refusé : ${check.reason}. ${t.label} inchangé, rien d'autre écrit.` } };
+                        }
+                    }
+                    writeFileSync(t.path, applyEnvDiff(targetContent, diffs), "utf8");
+                    report.push(`${t.label} : ${diffs.map((d) => d.key).join(", ")}`);
+                    if (t.restartUnit) {
+                        if (t.deferRestart) {
+                            deferredUnit = t.restartUnit;
+                        }
+                        else {
+                            try {
+                                execSync(`systemctl --user restart ${t.restartUnit}`);
+                                report.push(`→ ${t.restartUnit} redémarré.`);
+                            }
+                            catch (e) {
+                                report.push(`→ échec du redémarrage de ${t.restartUnit} : ${e?.message ?? e}`);
+                            }
+                        }
+                    }
+                }
+                if (report.length === 0) {
+                    return { handled: true, reply: { text: "Rien à synchroniser — tout est déjà à jour." } };
+                }
+                if (deferredUnit) {
+                    report.push(`→ ${deferredUnit} va redémarrer dans 5s (cette session va se couper).`);
+                }
+                const replyText = report.join("\n");
+                if (deferredUnit) {
+                    // Restart différé : ce process EST le gateway qu'on redémarre — un
+                    // restart immédiat couperait la connexion avant l'envoi de la
+                    // confirmation ci-dessus. systemd-run détache le minuteur du
+                    // process courant.
+                    try {
+                        execSync(`systemd-run --user --on-active=5s --unit=maj-restart-${Date.now()} systemctl --user restart ${deferredUnit}`);
+                    }
+                    catch (e) {
+                        return { handled: true, reply: { text: `${replyText}\n\n(échec de la programmation du redémarrage : ${e?.message ?? e})` } };
+                    }
+                }
+                return { handled: true, reply: { text: replyText } };
+            }
             if (cmd === "/confirm") {
                 if (!pending) {
                     return { handled: true, reply: { text: "Rien à confirmer (aucun brouillon en attente)." } };
