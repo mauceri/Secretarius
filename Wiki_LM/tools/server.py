@@ -59,6 +59,7 @@ from wiki import (
     op_capture,
     op_delete,
     op_delete_preview,
+    op_help,
     op_ingest,
     op_kb_update,
     op_lint,
@@ -68,6 +69,7 @@ from wiki import (
     op_review,
     op_search,
     op_status,
+    op_switch_model,
     op_tags,
     op_verify,
 )
@@ -153,6 +155,8 @@ _RUN_OPS = {
     # explicite (réparation du wiki, 2026-09-22).
     "/repair?": lambda arg, vault: op_repair_preview(arg),
     "/repair!": lambda arg, vault: op_repair(arg),
+    "/switch-wiki-model": lambda arg, vault: _switch_wiki_model(arg),
+    "/help": lambda arg, vault: op_help(),
 }
 
 
@@ -179,6 +183,25 @@ def handle_run():
 @app.get("/health")
 def health():
     return jsonify({"status": "ok", "pages": len(_wq._search._pages)})
+
+
+def _switch_wiki_model(alias: str) -> dict:
+    """op_switch_model persiste le choix dans Wiki_LM/.env (survit à un
+    redémarrage, et s'applique aussi aux invocations wiki.py du sandbox
+    Telegram à leur prochain appel) ; on bascule en plus _wq.llm ici pour
+    un effet immédiat côté Obsidian, sans redémarrer ce service."""
+    result = op_switch_model(alias)
+    if "error" in result or _wq is None:
+        return result
+    api_key_env = result.get("api_key_env") or ""
+    api_key = os.environ.get(api_key_env, "") if api_key_env else ""
+    _wq.llm = LLM(
+        backend=result["backend"],
+        model=result["model"],
+        base_url=result["base_url"],
+        api_key=api_key or "local",
+    )
+    return result
 
 
 def _reload_index() -> int:

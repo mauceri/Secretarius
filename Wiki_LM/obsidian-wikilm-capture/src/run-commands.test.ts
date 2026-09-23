@@ -152,6 +152,20 @@ describe("formatWikiResult", () => {
     );
   });
 
+  it("formats /switch-wiki-model as a confirmation naming the new alias and model", () => {
+    expect(
+      formatWikiResult(
+        "/switch-wiki-model",
+        { alias: "infomaniak", backend: "openai", model: "mistralai/Mistral-Small-4-119B-2603" },
+        true
+      )
+    ).toBe("Modèle du wiki basculé sur infomaniak (mistralai/Mistral-Small-4-119B-2603).");
+  });
+
+  it("formats /help by returning the help text verbatim", () => {
+    expect(formatWikiResult("/help", { help: "texte d'aide" }, true)).toBe("texte d'aide");
+  });
+
   it("formats an unsupported command as a client-side refusal", () => {
     expect(formatWikiResult("/supprimer", {}, true)).toBe(
       "Commande non prise en charge en exécution par lot : /supprimer"
@@ -219,10 +233,11 @@ describe("SUPPORTED_COMMANDS", () => {
     expect(SUPPORTED_COMMANDS).not.toContain("/supprimer");
   });
 
-  it("contains exactly the fourteen wiki commands from the spec", () => {
+  it("contains exactly the sixteen wiki commands from the spec", () => {
     expect([...SUPPORTED_COMMANDS].sort()).toEqual(
       [
         "/c",
+        "/help",
         "/ingest",
         "/kbupdate",
         "/lint",
@@ -233,6 +248,7 @@ describe("SUPPORTED_COMMANDS", () => {
         "/repair?",
         "/supprimer!",
         "/supprimer?",
+        "/switch-wiki-model",
         "/tags",
         "/verifie",
         "/wikistatus",

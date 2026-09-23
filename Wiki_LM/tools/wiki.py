@@ -130,6 +130,91 @@ def op_query(question: str, vault_name: str | None = None) -> dict:
         return {"error": str(exc)}
 
 
+# Alias exposés à /switch-wiki-model. api_key_env pointe vers la variable
+# d'environnement qui porte la clé réelle (déjà propagée par /maj côté
+# OpenClaw) — vide pour "obfusque", qui n'exige aucune clé client (proxy
+# local en écoute sur 127.0.0.1, cf. openai_proxy.py).
+MODEL_ALIASES: dict[str, dict[str, str]] = {
+    "deepseek": {
+        "backend": "openai",
+        "model": "deepseek-v4-flash",
+        "base_url": "https://api.deepseek.com/v1",
+        "api_key_env": "DEEPSEEK_API_KEY",
+    },
+    "infomaniak": {
+        "backend": "openai",
+        "model": "mistralai/Mistral-Small-4-119B-2603",
+        "base_url": "https://api.infomaniak.com/2/ai/109005/openai/v1",
+        "api_key_env": "EURIA_API_KEY",
+    },
+    "obfusque": {
+        "backend": "openai",
+        "model": "aloepri-qwen3-14b",
+        "base_url": "http://127.0.0.1:8001/v1",
+        "api_key_env": "",
+    },
+}
+
+
+def _wiki_env_path() -> Path:
+    return Path(__file__).parent.parent / ".env"
+
+
+def op_switch_model(alias: str) -> dict:
+    alias = alias.strip().lower()
+    cfg = MODEL_ALIASES.get(alias)
+    if not cfg:
+        return {"error": f"Alias inconnu : {alias!r}. Disponibles : {', '.join(sorted(MODEL_ALIASES))}"}
+    env_path = _wiki_env_path()
+    if not env_path.exists():
+        return {"error": f"{env_path} introuvable"}
+
+    content = env_path.read_text(encoding="utf-8")
+    updates = {
+        "WIKI_LLM_BACKEND": cfg["backend"],
+        "OPENAI_MODEL": cfg["model"],
+        "OPENAI_BASE_URL": cfg["base_url"],
+    }
+    for key, value in updates.items():
+        pattern = re.compile(rf"^{key}=.*$", re.MULTILINE)
+        if pattern.search(content):
+            content = pattern.sub(f"{key}={value}", content)
+        else:
+            content = content.rstrip("\n") + f"\n{key}={value}\n"
+    env_path.write_text(content, encoding="utf-8")
+
+    return {"alias": alias, **cfg}
+
+
+_HELP_TEXT = """\
+## Consultation (lecture seule)
+
+- **/wikistatus** — état de l'ingestion (en cours, dernier run, en attente, fichiers bloqués).
+- **/r `<mots-clés>`** — recherche BM25 (sans synthèse LLM), 5 meilleurs résultats.
+- **/tags** — liste tous les tags présents dans le wiki.
+- **/relire** — page source la plus ancienne, non vérifiée et déjà résumée, à relire.
+- **/supprimer? `<slug>`** — essai à blanc d'une suppression en cascade (rien n'est modifié).
+- **/lint** — audite le wiki (liens cassés, frontmatter manquant, pages orphelines...).
+- **/repair? `<famille>`** — essai à blanc d'une réparation (`broken-link` ou `missing-frontmatter`).
+- **/help** — cette aide.
+
+## Modification
+
+- **/c `<texte>`** — capture (note ou URL, `#tag`, `ref:`, `file:`, `@simple` pour une page directe).
+- **/q `<question>`** — recherche hybride + synthèse LLM (écrit aussi un enregistrement d'historique).
+- **/ingest** — lance l'ingestion asynchrone des fichiers en attente.
+- **/kbupdate** — reconstruit la base de connaissances depuis le dernier clustering.
+- **/verifie `<slug>`** — marque une page comme vérifiée.
+- **/supprimer! `<slug>`** — supprime réellement (déplace vers la poubelle), en cascade.
+- **/repair! `<famille>`** — applique réellement la réparation (`broken-link` ou `missing-frontmatter`).
+- **/switch-wiki-model `<alias>`** — bascule le LLM du wiki (`deepseek`, `infomaniak`, `obfusque`).
+"""
+
+
+def op_help() -> dict:
+    return {"help": _HELP_TEXT}
+
+
 def op_search(question: str) -> dict:
     try:
         results = WikiSearch(_wiki_root()).search(question, top_k=5)

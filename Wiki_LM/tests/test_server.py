@@ -139,6 +139,7 @@ class TestHandleRun:
         ("/lint", "op_lint", ""),
         ("/repair?", "op_repair_preview", "broken-link"),
         ("/repair!", "op_repair", "broken-link"),
+        ("/help", "op_help", ""),
     ]
 
     @pytest.mark.parametrize("command,op_name,arg", _COMMAND_TABLE)
@@ -199,3 +200,89 @@ class TestHandleRun:
 
         assert response.status_code == 500
         assert "panne simulée" in response.get_json()["error"]
+
+
+class TestSwitchWikiModel:
+    """op_switch_model persiste dans Wiki_LM/.env (testé dans
+    test_wiki_cli.py) ; ici on vérifie seulement la bascule en mémoire
+    de _wq.llm, propre à server.py."""
+
+    class _Q:
+        def __init__(self):
+            self.llm = "old"
+
+    def test_swaps_llm_in_memory_on_success(self, client, monkeypatch):
+        import server
+
+        q = self._Q()
+        monkeypatch.setattr(server, "_wq", q)
+        monkeypatch.setattr(
+            server,
+            "op_switch_model",
+            lambda alias: {
+                "alias": alias,
+                "backend": "openai",
+                "model": "m",
+                "base_url": "http://127.0.0.1:8001/v1",
+                "api_key_env": "",
+            },
+        )
+        captured = {}
+
+        class _FakeLLM:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+        monkeypatch.setattr(server, "LLM", _FakeLLM)
+
+        response = client.post("/run", json={"command": "/switch-wiki-model", "arg": "obfusque"})
+
+        assert response.status_code == 200
+        assert isinstance(q.llm, _FakeLLM)
+        assert captured == {
+            "backend": "openai",
+            "model": "m",
+            "base_url": "http://127.0.0.1:8001/v1",
+            "api_key": "local",
+        }
+
+    def test_does_not_swap_on_error(self, client, monkeypatch):
+        import server
+
+        q = self._Q()
+        monkeypatch.setattr(server, "_wq", q)
+        monkeypatch.setattr(server, "op_switch_model", lambda alias: {"error": "alias inconnu"})
+
+        response = client.post("/run", json={"command": "/switch-wiki-model", "arg": "bidon"})
+
+        assert response.get_json() == {"error": "alias inconnu"}
+        assert q.llm == "old"
+
+    def test_resolves_api_key_from_env_var(self, client, monkeypatch):
+        import server
+
+        q = self._Q()
+        monkeypatch.setattr(server, "_wq", q)
+        monkeypatch.setenv("EURIA_API_KEY", "the-real-key")
+        monkeypatch.setattr(
+            server,
+            "op_switch_model",
+            lambda alias: {
+                "alias": alias,
+                "backend": "openai",
+                "model": "m",
+                "base_url": "https://api.infomaniak.com/2/ai/109005/openai/v1",
+                "api_key_env": "EURIA_API_KEY",
+            },
+        )
+        captured = {}
+
+        class _FakeLLM:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+        monkeypatch.setattr(server, "LLM", _FakeLLM)
+
+        client.post("/run", json={"command": "/switch-wiki-model", "arg": "infomaniak"})
+
+        assert captured["api_key"] == "the-real-key"

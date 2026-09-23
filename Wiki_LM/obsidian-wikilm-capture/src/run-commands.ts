@@ -13,6 +13,8 @@ export const SUPPORTED_COMMANDS = [
   "/lint",
   "/repair?",
   "/repair!",
+  "/switch-wiki-model",
+  "/help",
 ] as const;
 
 export interface WikiBlockMatch {
@@ -129,6 +131,10 @@ export function formatWikiResult(
       const detail = changes.length > 0 ? `\n\n${changes.join("\n")}` : "";
       return `Réparé (${data.family}) — ${data.before_count} → ${data.after_count}.${detail}`;
     }
+    case "/switch-wiki-model":
+      return `Modèle du wiki basculé sur ${data.alias} (${data.model}).`;
+    case "/help":
+      return String(data.help ?? "");
     default:
       return `Commande non prise en charge en exécution par lot : ${command}`;
   }

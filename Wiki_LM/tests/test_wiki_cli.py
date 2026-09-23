@@ -120,6 +120,101 @@ def test_query_empty_kb(monkeypatch, tmp_path):
     assert "error" in wiki.op_query("q")
 
 
+def test_help_lists_all_commands_including_itself(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+
+    out = wiki.op_help()
+
+    assert "help" in out
+    text = out["help"]
+    for command in [
+        "/c", "/q", "/ingest", "/wikistatus", "/r", "/tags", "/kbupdate",
+        "/relire", "/verifie", "/supprimer?", "/supprimer!", "/lint",
+        "/repair?", "/repair!", "/switch-wiki-model", "/help",
+    ]:
+        assert command in text, f"{command} absent du texte d'aide"
+
+
+def test_help_separates_read_only_from_writing_commands(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    text = wiki.op_help()["help"]
+
+    read_only = ["/wikistatus", "/r", "/tags", "/relire", "/supprimer?", "/lint", "/repair?"]
+    writes = ["/c", "/q", "/ingest", "/kbupdate", "/verifie", "/supprimer!", "/repair!", "/switch-wiki-model"]
+
+    consultation_idx = text.index("Consultation")
+    modification_idx = text.index("Modification")
+    assert consultation_idx < modification_idx
+
+    for command in read_only:
+        idx = text.index(command)
+        assert consultation_idx < idx < modification_idx, f"{command} hors de la section Consultation"
+    for command in writes:
+        idx = text.index(command)
+        assert idx > modification_idx, f"{command} hors de la section Modification"
+
+
+def test_switch_model_unknown_alias(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    env_path = tmp_path / ".env"
+    env_path.write_text("WIKI_LLM_BACKEND=openai\n", encoding="utf-8")
+    monkeypatch.setattr(wiki, "_wiki_env_path", lambda: env_path)
+
+    out = wiki.op_switch_model("inconnu")
+
+    assert "error" in out
+    assert env_path.read_text(encoding="utf-8") == "WIKI_LLM_BACKEND=openai\n"
+
+
+def test_switch_model_replaces_existing_keys(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "WIKI_LLM_BACKEND=openai\nOPENAI_MODEL=deepseek-v4-flash\n"
+        "OPENAI_BASE_URL=https://api.deepseek.com/v1\nOTHER=untouched\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(wiki, "_wiki_env_path", lambda: env_path)
+
+    out = wiki.op_switch_model("infomaniak")
+
+    content = env_path.read_text(encoding="utf-8")
+    assert "OPENAI_MODEL=mistralai/Mistral-Small-4-119B-2603" in content
+    assert "OPENAI_BASE_URL=https://api.infomaniak.com/2/ai/109005/openai/v1" in content
+    assert "OTHER=untouched" in content
+    assert content.count("OPENAI_MODEL=") == 1
+    assert out == {
+        "alias": "infomaniak",
+        "backend": "openai",
+        "model": "mistralai/Mistral-Small-4-119B-2603",
+        "base_url": "https://api.infomaniak.com/2/ai/109005/openai/v1",
+        "api_key_env": "EURIA_API_KEY",
+    }
+
+
+def test_switch_model_appends_missing_keys(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    env_path = tmp_path / ".env"
+    env_path.write_text("SOMETHING=else\n", encoding="utf-8")
+    monkeypatch.setattr(wiki, "_wiki_env_path", lambda: env_path)
+
+    wiki.op_switch_model("obfusque")
+
+    content = env_path.read_text(encoding="utf-8")
+    assert "SOMETHING=else" in content
+    assert "WIKI_LLM_BACKEND=openai" in content
+    assert "OPENAI_BASE_URL=http://127.0.0.1:8001/v1" in content
+
+
+def test_switch_model_missing_env_file(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    monkeypatch.setattr(wiki, "_wiki_env_path", lambda: tmp_path / "absent.env")
+
+    out = wiki.op_switch_model("deepseek")
+
+    assert "error" in out
+
+
 def test_history_path_is_relative_to_vault_root_in_sandbox(monkeypatch, tmp_path):
     # Dans le sandbox, WIKI_PATH pointe directement sur /Wiki_LM : le chemin
     # rendu doit rester relatif à la racine du coffre, pas absolu.
