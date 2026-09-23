@@ -246,6 +246,29 @@ class TestSwitchWikiModel:
             "api_key": "local",
         }
 
+    def test_does_not_swap_on_status_report(self, client, monkeypatch):
+        import server
+
+        q = self._Q()
+        monkeypatch.setattr(server, "_wq", q)
+        monkeypatch.setattr(
+            server,
+            "op_switch_model",
+            lambda alias: {
+                "status": "current",
+                "backend": "openai",
+                "model": "deepseek-v4-flash",
+                "base_url": "https://api.deepseek.com/v1",
+                "alias": "deepseek",
+                "available": ["deepseek", "infomaniak", "obfusque"],
+            },
+        )
+
+        response = client.post("/run", json={"command": "/switch-wiki-model", "arg": ""})
+
+        assert response.get_json()["status"] == "current"
+        assert q.llm == "old"
+
     def test_does_not_swap_on_error(self, client, monkeypatch):
         import server
 

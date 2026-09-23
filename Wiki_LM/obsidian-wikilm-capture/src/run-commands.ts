@@ -131,8 +131,14 @@ export function formatWikiResult(
       const detail = changes.length > 0 ? `\n\n${changes.join("\n")}` : "";
       return `Réparé (${data.family}) — ${data.before_count} → ${data.after_count}.${detail}`;
     }
-    case "/switch-wiki-model":
+    case "/switch-wiki-model": {
+      if (data.status === "current") {
+        const available = (data.available as string[] | undefined) ?? [];
+        const alias = data.alias ? String(data.alias) : "aucun alias connu";
+        return `Modèle actuel : ${alias} — ${data.backend}/${data.model} (${data.base_url}).\nAlias disponibles : ${available.join(", ")}.`;
+      }
       return `Modèle du wiki basculé sur ${data.alias} (${data.model}).`;
+    }
     case "/help":
       return String(data.help ?? "");
     default:

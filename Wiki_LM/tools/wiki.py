@@ -160,8 +160,40 @@ def _wiki_env_path() -> Path:
     return Path(__file__).parent.parent / ".env"
 
 
+def _current_model_status() -> dict:
+    env_path = _wiki_env_path()
+    if not env_path.exists():
+        return {"error": f"{env_path} introuvable"}
+    content = env_path.read_text(encoding="utf-8")
+
+    def _read(key: str) -> str:
+        m = re.search(rf"^{key}=(.*)$", content, re.MULTILINE)
+        return m.group(1) if m else ""
+
+    backend = _read("WIKI_LLM_BACKEND")
+    model = _read("OPENAI_MODEL")
+    base_url = _read("OPENAI_BASE_URL")
+    alias = next(
+        (
+            name for name, cfg in MODEL_ALIASES.items()
+            if cfg["backend"] == backend and cfg["model"] == model and cfg["base_url"] == base_url
+        ),
+        None,
+    )
+    return {
+        "status": "current",
+        "backend": backend,
+        "model": model,
+        "base_url": base_url,
+        "alias": alias,
+        "available": sorted(MODEL_ALIASES),
+    }
+
+
 def op_switch_model(alias: str) -> dict:
     alias = alias.strip().lower()
+    if not alias:
+        return _current_model_status()
     cfg = MODEL_ALIASES.get(alias)
     if not cfg:
         return {"error": f"Alias inconnu : {alias!r}. Disponibles : {', '.join(sorted(MODEL_ALIASES))}"}
@@ -207,7 +239,7 @@ _HELP_TEXT = """\
 - **/verifie `<slug>`** — marque une page comme vérifiée.
 - **/supprimer! `<slug>`** — supprime réellement (déplace vers la poubelle), en cascade.
 - **/repair! `<famille>`** — applique réellement la réparation (`broken-link` ou `missing-frontmatter`).
-- **/switch-wiki-model `<alias>`** — bascule le LLM du wiki (`deepseek`, `infomaniak`, `obfusque`).
+- **/switch-wiki-model `<alias>`** — bascule le LLM du wiki (`deepseek`, `infomaniak`, `obfusque`). Sans argument : affiche le modèle actuel (lecture seule).
 """
 
 

@@ -191,7 +191,7 @@ def _switch_wiki_model(alias: str) -> dict:
     Telegram à leur prochain appel) ; on bascule en plus _wq.llm ici pour
     un effet immédiat côté Obsidian, sans redémarrer ce service."""
     result = op_switch_model(alias)
-    if "error" in result or _wq is None:
+    if "error" in result or result.get("status") == "current" or _wq is None:
         return result
     api_key_env = result.get("api_key_env") or ""
     api_key = os.environ.get(api_key_env, "") if api_key_env else ""

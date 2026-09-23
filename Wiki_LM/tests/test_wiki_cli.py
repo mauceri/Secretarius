@@ -154,6 +154,47 @@ def test_help_separates_read_only_from_writing_commands(monkeypatch, tmp_path):
         assert idx > modification_idx, f"{command} hors de la section Modification"
 
 
+def test_switch_model_empty_arg_reports_current_status_without_writing(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "WIKI_LLM_BACKEND=openai\nOPENAI_MODEL=deepseek-v4-flash\n"
+        "OPENAI_BASE_URL=https://api.deepseek.com/v1\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(wiki, "_wiki_env_path", lambda: env_path)
+
+    out = wiki.op_switch_model("")
+
+    assert out == {
+        "status": "current",
+        "backend": "openai",
+        "model": "deepseek-v4-flash",
+        "base_url": "https://api.deepseek.com/v1",
+        "alias": "deepseek",
+        "available": ["deepseek", "infomaniak", "obfusque"],
+    }
+    assert env_path.read_text(encoding="utf-8") == (
+        "WIKI_LLM_BACKEND=openai\nOPENAI_MODEL=deepseek-v4-flash\n"
+        "OPENAI_BASE_URL=https://api.deepseek.com/v1\n"
+    )
+
+
+def test_switch_model_empty_arg_with_unrecognized_values_has_no_alias(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "WIKI_LLM_BACKEND=ollama\nOPENAI_MODEL=qwen2.5\nOPENAI_BASE_URL=http://x\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(wiki, "_wiki_env_path", lambda: env_path)
+
+    out = wiki.op_switch_model("  ")
+
+    assert out["alias"] is None
+    assert out["status"] == "current"
+
+
 def test_switch_model_unknown_alias(monkeypatch, tmp_path):
     wiki = _wiki(monkeypatch, tmp_path)
     env_path = tmp_path / ".env"

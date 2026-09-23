@@ -162,6 +162,43 @@ describe("formatWikiResult", () => {
     ).toBe("Modèle du wiki basculé sur infomaniak (mistralai/Mistral-Small-4-119B-2603).");
   });
 
+  it("formats /switch-wiki-model as a status report when called without an alias", () => {
+    expect(
+      formatWikiResult(
+        "/switch-wiki-model",
+        {
+          status: "current",
+          alias: "deepseek",
+          backend: "openai",
+          model: "deepseek-v4-flash",
+          base_url: "https://api.deepseek.com/v1",
+          available: ["deepseek", "infomaniak", "obfusque"],
+        },
+        true
+      )
+    ).toBe(
+      "Modèle actuel : deepseek — openai/deepseek-v4-flash (https://api.deepseek.com/v1).\n" +
+        "Alias disponibles : deepseek, infomaniak, obfusque."
+    );
+  });
+
+  it("formats /switch-wiki-model status report with no matching alias", () => {
+    expect(
+      formatWikiResult(
+        "/switch-wiki-model",
+        {
+          status: "current",
+          alias: null,
+          backend: "ollama",
+          model: "qwen2.5",
+          base_url: "http://x",
+          available: ["deepseek", "infomaniak", "obfusque"],
+        },
+        true
+      )
+    ).toContain("Modèle actuel : aucun alias connu");
+  });
+
   it("formats /help by returning the help text verbatim", () => {
     expect(formatWikiResult("/help", { help: "texte d'aide" }, true)).toBe("texte d'aide");
   });
