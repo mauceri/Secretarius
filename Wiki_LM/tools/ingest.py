@@ -451,33 +451,40 @@ def _fix_mojibake(text: str) -> str:
 _LINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 
 
+_CONCEPT_LINE_RE = re.compile(r"^-\s+concept:\s+(.+)$", re.IGNORECASE)
+_ENTITY_LINE_RE = re.compile(r"^-\s+entit[eé]:\s+(.+)$", re.IGNORECASE)
+
+
 def _linkify_concepts_section(
     content: str, concepts: list[str] | None = None, entities: list[str] | None = None
 ) -> str:
-    """Remplace les noms nus par [[c-slug]] / [[e-slug]] dans la section concepts/entités.
+    """Linkifie les concepts/entités effectivement traités et retire les
+    mentions au-delà.
 
-    Opère directement sur le texte — indépendant de la liste concepts/entities,
-    ce qui évite les omissions dues à la troncature max_concepts.
+    concepts/entities sont déjà tronqués à max_concepts par l'appelant (seuls
+    ces éléments-là ont une page créée). Les garder en texte brut au-delà de
+    cette limite laissait des « noms fantômes » — plus de lien mort après un
+    /repair! broken-link, mais toujours aucune page pour eux (2026-09-28).
     """
-    def _replace(m: re.Match, prefix: str) -> str:
-        leader, name = m.group(1), m.group(2).strip()
-        if name.startswith("[["):
-            return m.group(0)
-        return f"{leader}[[{prefix}{_slugify(name)}]]"
-
-    content = re.sub(
-        r"^(-\s+concept:\s+)([^\[].+)$",
-        lambda m: _replace(m, "c-"),
-        content,
-        flags=re.MULTILINE,
-    )
-    content = re.sub(
-        r"^(-\s+entit[eé]:\s+)([^\[].+)$",
-        lambda m: _replace(m, "e-"),
-        content,
-        flags=re.MULTILINE,
-    )
-    return content
+    limits = {"concept": len(concepts or []), "entité": len(entities or [])}
+    seen = {"concept": 0, "entité": 0}
+    out_lines = []
+    for line in content.splitlines():
+        m = _CONCEPT_LINE_RE.match(line)
+        kind, prefix = ("concept", "c-") if m else (None, None)
+        if not m:
+            m = _ENTITY_LINE_RE.match(line)
+            if m:
+                kind, prefix = "entité", "e-"
+        if m:
+            seen[kind] += 1
+            if seen[kind] > limits[kind]:
+                continue
+            name = m.group(1).strip()
+            if not name.startswith("[["):
+                line = f"- {kind}: [[{prefix}{_slugify(name)}]]"
+        out_lines.append(line)
+    return "\n".join(out_lines) + ("\n" if content.endswith("\n") else "")
 
 
 _YAML_UNSAFE = re.compile(r":\s|[#{}[\]]")

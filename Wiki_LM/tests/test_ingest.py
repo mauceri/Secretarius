@@ -7,7 +7,56 @@ from pathlib import Path
 import frontmatter
 import pytest
 
-from ingest import Ingestor
+from ingest import Ingestor, _linkify_concepts_section
+
+
+class TestLinkifyConceptsSection:
+    """concepts/entities sont déjà tronqués à max_concepts par l'appelant
+    (ingest.py) — la fonction ne doit traiter QUE ces éléments-là, et retirer
+    toute mention au-delà (sinon : liens morts, puis "noms fantômes" en texte
+    brut après un /repair! broken-link — incident du 2026-09-28)."""
+
+    def test_linkifies_names_within_limit(self):
+        content = (
+            "## Concepts et entités mentionnés\n\n"
+            "- concept: zettelkasten\n"
+            "- entité: Vannevar Bush\n"
+        )
+        out = _linkify_concepts_section(content, ["zettelkasten"], ["Vannevar Bush"])
+        assert "- concept: [[c-zettelkasten]]" in out
+        assert "- entité: [[e-vannevar-bush]]" in out
+
+    def test_leaves_already_bracketed_line_within_limit_untouched(self):
+        content = "- concept: [[c-custom-slug]]\n"
+        out = _linkify_concepts_section(content, ["peu importe"], [])
+        assert out == "- concept: [[c-custom-slug]]\n"
+
+    def test_drops_concept_lines_beyond_the_truncated_list(self):
+        content = (
+            "## Concepts et entités mentionnés\n\n"
+            "- concept: a\n"
+            "- concept: b\n"
+            "- concept: c\n"
+        )
+        out = _linkify_concepts_section(content, ["a", "b"], [])
+        assert "[[c-a]]" in out
+        assert "[[c-b]]" in out
+        assert "c-c" not in out
+        assert "- concept: c" not in out
+
+    def test_drops_entity_lines_beyond_the_truncated_list(self):
+        content = "- entité: a\n- entité: b\n- entité: c\n"
+        out = _linkify_concepts_section(content, [], ["a", "b"])
+        assert "[[e-a]]" in out
+        assert "[[e-b]]" in out
+        assert "e-c" not in out
+
+    def test_empty_lists_drop_all_concept_and_entity_lines(self):
+        content = "Intro.\n- concept: a\n- entité: b\nConclusion.\n"
+        out = _linkify_concepts_section(content, [], [])
+        assert "concept" not in out
+        assert "entité" not in out
+        assert "Intro." in out and "Conclusion." in out
 
 
 class TestIngestSingle:
