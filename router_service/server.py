@@ -41,10 +41,9 @@ def route_message(message: str) -> dict:
         if entry is not None:
             return {"status": "answer", "reply": entry["answer"]}
 
-    try:
-        command, probability = _classifier.classify(message)
-    except Exception:
+    if _classifier is None:
         return {"status": "no_match"}
+    command, probability = _classifier.classify(message)
     if command is None:
         return {"status": "no_match"}
     if command in GOG_CMDS and probability < SEUIL_GOG:
