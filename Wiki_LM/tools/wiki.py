@@ -227,7 +227,7 @@ _HELP_TEXT = """\
 - **/relire** — page source la plus ancienne, non vérifiée et déjà résumée, à relire.
 - **/supprimer? `<slug>`** — essai à blanc d'une suppression en cascade (rien n'est modifié).
 - **/lint** — audite le wiki (liens cassés, frontmatter manquant, pages orphelines...).
-- **/repair? `<famille>`** — essai à blanc d'une réparation (`broken-link`, `missing-frontmatter` ou `unlinked-mention`).
+- **/repair? `<famille>`** — essai à blanc d'une réparation (`broken-link`, `missing-frontmatter` ou `unlinked-mention`). Sans argument : liste les familles disponibles.
 - **/help** — cette aide.
 
 ## Modification
@@ -238,7 +238,7 @@ _HELP_TEXT = """\
 - **/kbupdate** — reconstruit la base de connaissances depuis le dernier clustering.
 - **/verifie `<slug>`** — marque une page comme vérifiée.
 - **/supprimer! `<slug>`** — supprime réellement (déplace vers la poubelle), en cascade.
-- **/repair! `<famille>`** — applique réellement la réparation (`broken-link`, `missing-frontmatter` ou `unlinked-mention`).
+- **/repair! `<famille>`** — applique réellement la réparation (`broken-link`, `missing-frontmatter` ou `unlinked-mention`). Sans argument : liste les familles disponibles.
 - **/switch-wiki-model `<alias>`** — bascule le LLM du wiki (`deepseek`, `infomaniak`, `obfusque`). Sans argument : affiche le modèle actuel (lecture seule).
 """
 
@@ -427,6 +427,9 @@ _REPAIR_FAMILIES = {"broken-link", "missing-frontmatter", "unlinked-mention"}
 
 
 def _repair(family: str, dry_run: bool) -> dict:
+    family = family.strip()
+    if not family:
+        return {"status": "families", "available": sorted(_REPAIR_FAMILIES)}
     if family not in _REPAIR_FAMILIES:
         return {"error": f"Famille de réparation inconnue : {family!r}"}
     repairer = WikiRepair(_wiki_root())

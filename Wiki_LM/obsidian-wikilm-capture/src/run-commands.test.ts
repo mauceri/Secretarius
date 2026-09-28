@@ -263,6 +263,26 @@ describe("formatWikiResult", () => {
     expect(text).toContain("4");
     expect(text).toContain("c-x");
   });
+
+  it("formats /repair? without a family as the list of available families", () => {
+    const text = formatWikiResult(
+      "/repair?",
+      { status: "families", available: ["broken-link", "missing-frontmatter", "unlinked-mention"] },
+      true
+    );
+    expect(text).toContain("broken-link");
+    expect(text).toContain("missing-frontmatter");
+    expect(text).toContain("unlinked-mention");
+  });
+
+  it("formats /repair! without a family as the list of available families", () => {
+    const text = formatWikiResult(
+      "/repair!",
+      { status: "families", available: ["broken-link", "missing-frontmatter", "unlinked-mention"] },
+      true
+    );
+    expect(text).toContain("broken-link");
+  });
 });
 
 describe("SUPPORTED_COMMANDS", () => {

@@ -911,6 +911,32 @@ class TestOpRepair:
         out = wiki.op_repair_preview("famille-inconnue")
         assert "error" in out
 
+    def test_empty_family_lists_available_families_preview(self, monkeypatch, tmp_path):
+        wiki = _wiki(monkeypatch, tmp_path)
+        out = wiki.op_repair_preview("")
+        assert out == {
+            "status": "families",
+            "available": ["broken-link", "missing-frontmatter", "unlinked-mention"],
+        }
+
+    def test_empty_family_lists_available_families_apply(self, monkeypatch, tmp_path):
+        wiki = _wiki(monkeypatch, tmp_path)
+        out = wiki.op_repair("   ")
+        assert out["status"] == "families"
+
+    def test_empty_family_does_not_touch_wikirepair(self, monkeypatch, tmp_path):
+        wiki = _wiki(monkeypatch, tmp_path)
+        calls = []
+
+        class _FakeRepair:
+            def __init__(self, wiki_path):
+                calls.append("constructed")
+
+        monkeypatch.setattr(wiki, "WikiRepair", _FakeRepair, raising=False)
+        wiki.op_repair_preview("")
+
+        assert calls == []
+
     def test_dispatches_unlinked_mention_family(self, monkeypatch, tmp_path):
         wiki = _wiki(monkeypatch, tmp_path)
         calls = []
