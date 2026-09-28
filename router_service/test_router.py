@@ -1,14 +1,12 @@
-from router_service.router import GogGate, WIKI_CMDS, GOG_CMDS
+from router_service.router import embed_bge_m3, WIKI_CMDS, GOG_CMDS
 
 
-def test_gog_confident_on_clear_gog_message():
-    gate = GogGate()
-    assert gate.gog_confident("cherche les mails de Paul cette semaine") is True
-
-
-def test_gog_not_confident_on_wiki_message():
-    gate = GogGate()
-    assert gate.gog_confident("que dit le wiki sur le projet Alpha ?") is False
+def test_embed_bge_m3_returns_normalized_vectors():
+    import torch
+    vecs = embed_bge_m3(["bonjour", "au revoir"])
+    assert vecs.shape[0] == 2
+    norms = torch.linalg.norm(vecs, dim=1)
+    assert torch.allclose(norms, torch.ones_like(norms), atol=1e-4)
 
 
 def test_command_sets_disjoint():
