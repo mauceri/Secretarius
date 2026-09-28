@@ -18,22 +18,19 @@ class LayaClassifier:
         return laya.load(checkpoint)
 
     def _query(self, message: str) -> dict:
-        return self._agent.ask({
-            "state": message,
-            "questions": {
-                "command": {
-                    "type": "choice",
-                    "instructions": _INSTRUCTIONS,
-                    "criteria": COMMAND_CRITERIA,
-                }
-            },
-        })
+        questions = {
+            "command": {
+                "type": "choice",
+                "instructions": _INSTRUCTIONS,
+                "criteria": COMMAND_CRITERIA,
+            }
+        }
+        return self._agent.predict(message, questions)
 
     def classify(self, message: str) -> tuple[str | None, float]:
         result = self._query(message)
         answer = result["answers"]["command"]
-        value = answer["value"]
+        value = answer["choice"]
         if value == "aucune":
             return None, 0.0
-        probability = answer["probabilities"][value]
-        return value, probability
+        return value, answer["confidence"]
