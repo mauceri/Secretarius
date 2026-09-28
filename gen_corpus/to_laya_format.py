@@ -6,30 +6,15 @@ from __future__ import annotations
 
 import json
 import random
+import sys
 from pathlib import Path
 
-COMMAND_CRITERIA: dict[str, str] = {
-    "/c": "capturer une note ou une URL dans le wiki",
-    "/q": "poser une question au wiki, réponse synthétisée",
-    "/ingest": "lancer l'ingestion des sources en attente",
-    "/source": "déléguer une recherche web à Scout",
-    "/wikistatus": "connaître l'état de l'ingestion du wiki",
-    "/r": "rechercher par mots-clés dans le wiki, sans synthèse",
-    "/tags": "lister les tags du wiki",
-    "/kbupdate": "mettre à jour la base de connaissances du wiki",
-    "/supprimer": "supprimer une page du wiki",
-    "/relire": "obtenir la prochaine page du wiki à relire",
-    "/verifie": "marquer une page du wiki comme vérifiée",
-    "/chercher": "rechercher dans les emails Gmail",
-    "/connecter": "démarrer la connexion au compte Google",
-    "/inbox": "lister les nouveaux emails",
-    "/drive": "rechercher dans Google Drive",
-    "/repondre": "répondre à un email",
-    "/lire": "lire le contenu d'un email",
-    "aucune": "aucune commande ne correspond, message hors sujet",
-}
+# Permet `python3 gen_corpus/to_laya_format.py` en exécution directe (sinon
+# seul le répertoire gen_corpus/ est sur sys.path et router_service reste
+# introuvable).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-_INSTRUCTIONS = "Quelle commande Tiron ce message déclenche-t-il ?"
+from router_service.router import COMMAND_CRITERIA, _INSTRUCTIONS  # noqa: E402
 
 
 def _iter_examples(path: Path):
@@ -67,6 +52,15 @@ def reformat(
     seed: int = 0,
 ) -> tuple[int, int]:
     rows = [_to_laya_row(text, cmd) for text, cmd in _iter_examples(Path(input_path))]
+    seen_states: set[str] = set()
+    deduped_rows = []
+    for row in rows:
+        if row["state"] in seen_states:
+            continue
+        seen_states.add(row["state"])
+        deduped_rows.append(row)
+    rows = deduped_rows
+
     rng = random.Random(seed)
     indices = list(range(len(rows)))
     rng.shuffle(indices)

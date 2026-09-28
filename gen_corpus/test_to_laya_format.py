@@ -53,6 +53,25 @@ def test_reformat_converts_null_command_to_aucune(tmp_path):
     assert row["answers"]["command"] == "aucune"
 
 
+def test_reformat_deduplicates_state_before_split(tmp_path):
+    src = tmp_path / "corpus.jsonl"
+    line = json.dumps({
+        "messages": [
+            {"role": "system", "content": "ignoré"},
+            {"role": "user", "content": "cherche transformers dans le wiki"},
+            {"role": "assistant", "content": json.dumps(
+                {"command": "/r", "args": "transformers"})},
+        ]
+    })
+    src.write_text((line + "\n") * 2, encoding="utf-8")
+    train_path = tmp_path / "train.jsonl"
+    val_path = tmp_path / "val.jsonl"
+
+    n_train, n_val = reformat(src, train_path, val_path, val_ratio=0.5, seed=0)
+
+    assert n_train + n_val == 1
+
+
 def test_reformat_splits_train_and_val_deterministically(tmp_path):
     src = tmp_path / "corpus.jsonl"
     lines = []

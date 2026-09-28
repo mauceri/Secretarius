@@ -446,16 +446,12 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
   `(commande, probabilité)`. C'est cette méthode que la Task 5 appelle en
   remplacement de `call_adapter()`.
 
-**Avant d'écrire le code** : consulter la documentation Laya
-(`nandhakishorm.github.io/laya/`) pour confirmer la forme exacte de la
-réponse d'inférence côté SDK Python (le protocole HTTP `/v1/systemone` est
-confirmé par la recherche du 2026-09-28 — `state`+`questions`+`criteria`
-en entrée, probabilités par option en sortie ; la forme précise de l'appel
-Python direct, elle, n'a pas été vérifiée dans cette session). Si le SDK
-expose un appel Python direct équivalent à l'exemple ci-dessous, l'utiliser
-plutôt que l'aller-retour HTTP local — ajuster `_query()` en conséquence,
-le reste de la classe (schéma de requête, parsing de la réponse) ne change
-pas.
+**API confirmée** (README `github.com/NandhaKishorM/laya`, vérifié le
+2026-09-28 lors de la revue de cette tâche) : l'appel Python direct est
+`agent.predict(state, questions)` — pas d'aller-retour HTTP. La réponse a
+la forme `result["answers"][nom_question]["choice"]` (label gagnant) et
+`result["answers"][nom_question]["confidence"]` (confiance calibrée,
+1 − entropie normalisée). Le code ci-dessous utilise cette forme.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -464,34 +460,19 @@ pas.
 from router_service.laya_classifier import LayaClassifier
 
 
-class _FakeResponse:
-    def __init__(self, payload):
-        self._payload = payload
-
-    def json(self):
-        return self._payload
-
-
-def test_classify_returns_top_command_and_probability(monkeypatch):
+def test_classify_returns_top_command_and_confidence(monkeypatch):
     clf = LayaClassifier.__new__(LayaClassifier)  # évite de charger un vrai modèle
     clf.checkpoint = "test"
 
     def fake_query(self, message):
-        return {
-            "answers": {
-                "command": {
-                    "value": "/q",
-                    "probabilities": {"/q": 0.91, "/r": 0.05, "aucune": 0.04},
-                }
-            }
-        }
+        return {"answers": {"command": {"choice": "/q", "confidence": 0.91}}}
 
     monkeypatch.setattr(LayaClassifier, "_query", fake_query)
 
-    command, prob = clf.classify("qu'est-ce que le SPLADE ?")
+    command, confidence = clf.classify("qu'est-ce que le SPLADE ?")
 
     assert command == "/q"
-    assert prob == 0.91
+    assert confidence == 0.91
 
 
 def test_classify_returns_none_when_top_choice_is_aucune(monkeypatch):
@@ -499,21 +480,14 @@ def test_classify_returns_none_when_top_choice_is_aucune(monkeypatch):
     clf.checkpoint = "test"
 
     def fake_query(self, message):
-        return {
-            "answers": {
-                "command": {
-                    "value": "aucune",
-                    "probabilities": {"/q": 0.10, "aucune": 0.80},
-                }
-            }
-        }
+        return {"answers": {"command": {"choice": "aucune", "confidence": 0.80}}}
 
     monkeypatch.setattr(LayaClassifier, "_query", fake_query)
 
-    command, prob = clf.classify("il fait beau aujourd'hui")
+    command, confidence = clf.classify("il fait beau aujourd'hui")
 
     assert command is None
-    assert prob == 0.0
+    assert confidence == 0.0
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -545,25 +519,22 @@ class LayaClassifier:
         return laya.load(checkpoint)
 
     def _query(self, message: str) -> dict:
-        return self._agent.ask({
-            "state": message,
-            "questions": {
-                "command": {
-                    "type": "choice",
-                    "instructions": _INSTRUCTIONS,
-                    "criteria": COMMAND_CRITERIA,
-                }
-            },
-        })
+        questions = {
+            "command": {
+                "type": "choice",
+                "instructions": _INSTRUCTIONS,
+                "criteria": COMMAND_CRITERIA,
+            }
+        }
+        return self._agent.predict(message, questions)
 
     def classify(self, message: str) -> tuple[str | None, float]:
         result = self._query(message)
         answer = result["answers"]["command"]
-        value = answer["value"]
+        value = answer["choice"]
         if value == "aucune":
             return None, 0.0
-        probability = answer["probabilities"][value]
-        return value, probability
+        return value, answer["confidence"]
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -1022,7 +993,13 @@ Cette tâche s'exécute hors du dépôt, par l'utilisateur — pas de code à
   déjà mesurée par le passé, cf. mémoire projet routage) — si Laya est du
   même ordre de grandeur ou meilleur, passer à la Task 7 ; sinon, revenir à
   la Task 1 (corpus/critères) avant de continuer, ne pas déployer un
-  classifieur moins bon sans discussion.
+  classifieur moins bon sans discussion. **Angle mort confirmé en revue
+  finale** : `/supprimer`, `/relire` et `/verifie` n'ont aucun exemple dans
+  le corpus d'entraînement — regarder l'exactitude par classe (pas
+  seulement l'exactitude globale) avant de conclure "du même ordre ou
+  meilleur", en particulier sur ces trois classes-là. Le LoRA actuel a la
+  même lacune (pas de régression introduite par Laya), mais ça reste un
+  angle mort à connaître avant de déployer.
 
 ---
 
@@ -1065,7 +1042,21 @@ hors de ce worktree isolé.
 
 - [ ] **Step 1** : Confirmer que plus rien n'appelle
   `http://127.0.0.1:8998` (recherche : `grep -rn "8998"` sur le dépôt
-  fusionné, hors documentation/mémoire).
+  fusionné, hors documentation/mémoire). Vérifier et corriger en particulier
+  les orphelins identifiés en revue finale (2026-09-28), qui référencent
+  encore l'ancien routeur génératif phi-4-mini/`call_adapter()` :
+  - `switch-brain.sh` (hors worktree, tourne sur sanroque) écrit encore
+    `TIRON_LLAMA_BASE`/`TIRON_LLAMA_KEY` dans l'environnement du routeur —
+    variables que `router_service/server.py` ne lit plus depuis le passage
+    à Laya ; à retirer ou adapter.
+  - `tests/test_switch_brain.py` — vérifier s'il teste encore ces variables
+    d'environnement obsolètes.
+  - `openclaw-config/install.sh` — vérifier les mentions de l'ancien
+    endpoint 8998 dans les étapes d'installation/config.
+  - `README.md` — vérifier les mentions de l'ancien endpoint 8998.
+  - la ligne `Description=` de l'unité systemd `tiron-router.service`, qui
+    mentionne encore « BGE-M3 gate » (garde-fou GogGate retiré à la Task 2,
+    remplacé par le score calibré Laya) — à mettre à jour.
 - [ ] **Step 2** : Arrêter et désactiver le service systemd llama.cpp
   correspondant (nom exact à confirmer sur sanroque — demander confirmation
   avant `systemctl stop`/`disable`, comme pour toute action `systemctl`).
@@ -1093,12 +1084,12 @@ déploiement sanroque (Task 7, hors worktree), décommissionnement
 phi-4-mini (Task 8, hors worktree). Santiago explicitement hors périmètre
 (spec). FAQ explicitement inchangée (Task 2 la préserve via `embed_bge_m3`).
 
-**Incertitude assumée** : la Task 3 signale explicitement, avant le code,
-que l'appel d'inférence exact du SDK Laya n'a pas été vérifié en détail
-dans cette session (seul le protocole HTTP `/v1/systemone` est confirmé) —
-ce n'est pas un TBD dans le sens interdit par le processus : le code fourni
-est complet et fonctionnel contre ce protocole, avec une note explicite
-disant où vérifier avant de le considérer définitif.
+**Incertitude levée en cours d'exécution** : la Task 3 signalait initialement
+que l'appel d'inférence exact du SDK Laya restait à vérifier. Confirmé
+pendant la revue de cette tâche (2026-09-28, README `NandhaKishorM/laya`) :
+`agent.predict(state, questions)`, réponse
+`result["answers"][q]["choice"]`/`["confidence"]`. Le code ci-dessus est à
+jour avec cette forme confirmée.
 
 **Cohérence des types** : `LayaClassifier.classify()` retourne
 `tuple[str | None, float]` partout (Task 3 le définit, Task 4 et Task 5 le

@@ -3,9 +3,7 @@ seule passe) — remplace l'appel génératif à phi-4-mini+LoRA. Cf.
 docs/superpowers/specs/2026-09-28-routeur-laya-design.md."""
 from __future__ import annotations
 
-from gen_corpus.to_laya_format import COMMAND_CRITERIA
-
-_INSTRUCTIONS = "Quelle commande Tiron ce message déclenche-t-il ?"
+from router_service.router import COMMAND_CRITERIA, _INSTRUCTIONS
 
 
 class LayaClassifier:

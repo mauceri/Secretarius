@@ -9,7 +9,7 @@ from router_service.router import WIKI_CMDS, GOG_CMDS, embed_bge_m3
 from router_service.faq import FaqIndex, FAQ_PATH
 from router_service.laya_classifier import LayaClassifier
 
-LAYA_CHECKPOINT = os.environ.get("LAYA_CHECKPOINT", "convaiinnovations/laya")
+LAYA_CHECKPOINT = os.environ["LAYA_CHECKPOINT"]
 SEUIL_GOG = 0.50
 
 # Commandes qui exigent un argument : un appel sans argument est une erreur
