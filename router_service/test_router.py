@@ -21,180 +21,153 @@ import urllib.request
 from router_service import server as router_server
 
 
+class _FakeClassifier:
+    def __init__(self, command, prob=0.9):
+        self._command = command
+        self._prob = prob
+
+    def classify(self, message):
+        return self._command, self._prob
+
+
 def test_route_endpoint_end_to_end():
-    router_server._gate = router_server.GogGate()
+    router_server._classifier = _FakeClassifier(None)
+    router_server._faq = None
     httpd = __import__("http.server", fromlist=["ThreadingHTTPServer"]).ThreadingHTTPServer(
-        ("127.0.0.1", 8999), router_server.Handler)
-    t = threading.Thread(target=httpd.serve_forever, daemon=True)
-    t.start()
-    time.sleep(0.5)
+        ("127.0.0.1", 0), router_server.Handler)
+    port = httpd.server_address[1]
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
     try:
+        time.sleep(0.1)
         req = urllib.request.Request(
-            "http://127.0.0.1:8999/route",
-            data=json.dumps({"message": "cherche les mails de Paul"}).encode(),
-            headers={"Content-Type": "application/json"})
-        resp = json.load(urllib.request.urlopen(req, timeout=30))
+            f"http://127.0.0.1:{port}/route",
+            data=json.dumps({"message": "/wikistatus"}).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        resp = json.load(urllib.request.urlopen(req, timeout=5))
         assert resp["status"] in ("ok", "no_match")
     finally:
         httpd.shutdown()
 
 
-def _start_stub(received):
-    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-
-    class Stub(BaseHTTPRequestHandler):
-        def do_POST(self):
-            received["auth"] = self.headers.get("Authorization")
-            self.rfile.read(int(self.headers.get("Content-Length", 0)))
-            payload = json.dumps({"choices": [{"message": {
-                "content": '{"command": null, "args": ""}'}}]}).encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(payload)))
-            self.end_headers()
-            self.wfile.write(payload)
-
-        def log_message(self, fmt, *args):
-            pass
-
-    httpd = ThreadingHTTPServer(("127.0.0.1", 0), Stub)
-    threading.Thread(target=httpd.serve_forever, daemon=True).start()
-    return httpd
-
-
-def test_call_adapter_sends_bearer_when_key_set(monkeypatch):
-    received = {}
-    httpd = _start_stub(received)
-    try:
-        monkeypatch.setattr(router_server, "LLAMA_BASE",
-                            f"http://127.0.0.1:{httpd.server_address[1]}")
-        monkeypatch.setattr(router_server, "LLAMA_KEY", "secret123")
-        router_server.call_adapter("bonjour")
-        assert received["auth"] == "Bearer secret123"
-    finally:
-        httpd.shutdown()
-
-
-def test_call_adapter_no_header_without_key(monkeypatch):
-    received = {}
-    httpd = _start_stub(received)
-    try:
-        monkeypatch.setattr(router_server, "LLAMA_BASE",
-                            f"http://127.0.0.1:{httpd.server_address[1]}")
-        monkeypatch.setattr(router_server, "LLAMA_KEY", "")
-        router_server.call_adapter("bonjour")
-        assert received["auth"] is None
-    finally:
-        httpd.shutdown()
-
-
 def test_explicit_command_bypasses_slm(monkeypatch):
-    # Une commande tapée en toutes lettres est honorée telle quelle, sans jamais
-    # être soumise à phi-4 (qui, ici, la classerait à tort en /source).
-    called = {"n": 0}
-
-    def boom(msg):
-        called["n"] += 1
-        return ("/source", msg)
-
-    monkeypatch.setattr(router_server, "call_adapter", boom)
-    r = router_server.route_message(
-        "/c #TEE Serveur de GPU TEE https://phala.com/x")
-    assert r == {"status": "ok", "command": "/c",
-                 "args": "#TEE Serveur de GPU TEE https://phala.com/x"}
-    assert called["n"] == 0
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier(("boom")))
+    r = router_server.route_message("/wikistatus")
+    assert r == {"status": "ok", "command": "/wikistatus", "args": ""}
 
 
 def test_explicit_gog_command_bypasses_slm(monkeypatch):
-    monkeypatch.setattr(router_server, "call_adapter",
-                        lambda m: (_ for _ in ()).throw(AssertionError("SLM appelé")))
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("boom"))
     r = router_server.route_message("/inbox")
     assert r == {"status": "ok", "command": "/inbox", "args": ""}
 
 
 def test_explicit_command_empty_required_arg_returns_usage(monkeypatch):
-    monkeypatch.setattr(router_server, "call_adapter", lambda m: ("/ingest", ""))
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("/ingest"))
     r = router_server.route_message("/c")
-    assert r["status"] == "answer"
-    assert "/c" in r["reply"]
+    assert r == {"status": "answer", "reply": "Usage : /c <argument>"}
 
 
 def test_explicit_r_bypasses_slm(monkeypatch):
-    monkeypatch.setattr(router_server, "call_adapter",
-                        lambda m: (_ for _ in ()).throw(AssertionError("SLM appelé")))
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("boom"))
     r = router_server.route_message("/r transformers attention")
     assert r == {"status": "ok", "command": "/r", "args": "transformers attention"}
 
 
 def test_explicit_r_empty_arg_returns_usage(monkeypatch):
-    monkeypatch.setattr(router_server, "call_adapter", lambda m: ("/ingest", ""))
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("/ingest"))
     r = router_server.route_message("/r")
-    assert r["status"] == "answer"
-    assert "/r" in r["reply"]
+    assert r == {"status": "answer", "reply": "Usage : /r <argument>"}
 
 
 def test_explicit_supprimer_bypasses_slm(monkeypatch):
-    monkeypatch.setattr(router_server, "call_adapter",
-                        lambda m: (_ for _ in ()).throw(AssertionError("SLM appelé")))
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("boom"))
     r = router_server.route_message("/supprimer src-a")
     assert r == {"status": "ok", "command": "/supprimer", "args": "src-a"}
 
 
 def test_explicit_supprimer_empty_arg_returns_usage(monkeypatch):
-    monkeypatch.setattr(router_server, "call_adapter", lambda m: ("/ingest", ""))
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("/ingest"))
     r = router_server.route_message("/supprimer")
-    assert r["status"] == "answer"
-    assert "/supprimer" in r["reply"]
+    assert r == {"status": "answer", "reply": "Usage : /supprimer <argument>"}
 
 
 def test_explicit_relire_no_arg_needed(monkeypatch):
-    monkeypatch.setattr(router_server, "call_adapter",
-                        lambda m: (_ for _ in ()).throw(AssertionError("SLM appelé")))
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("boom"))
     assert router_server.route_message("/relire") == {"status": "ok", "command": "/relire", "args": ""}
 
 
 def test_explicit_verifie_bypasses_slm(monkeypatch):
-    monkeypatch.setattr(router_server, "call_adapter",
-                        lambda m: (_ for _ in ()).throw(AssertionError("SLM appelé")))
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("boom"))
     r = router_server.route_message("/verifie src-a")
     assert r == {"status": "ok", "command": "/verifie", "args": "src-a"}
 
 
 def test_explicit_verifie_empty_arg_returns_usage(monkeypatch):
-    monkeypatch.setattr(router_server, "call_adapter", lambda m: ("/ingest", ""))
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("/ingest"))
     r = router_server.route_message("/verifie")
-    assert r["status"] == "answer"
-    assert "/verifie" in r["reply"]
+    assert r == {"status": "answer", "reply": "Usage : /verifie <argument>"}
 
 
 def test_explicit_tags_kbupdate_no_arg_needed(monkeypatch):
-    monkeypatch.setattr(router_server, "call_adapter",
-                        lambda m: (_ for _ in ()).throw(AssertionError("SLM appelé")))
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("boom"))
     assert router_server.route_message("/tags") == {"status": "ok", "command": "/tags", "args": ""}
     assert router_server.route_message("/kbupdate") == {"status": "ok", "command": "/kbupdate", "args": ""}
 
 
 def test_explicit_lire_bypasses_slm(monkeypatch):
-    monkeypatch.setattr(router_server, "call_adapter",
-                        lambda m: (_ for _ in ()).throw(AssertionError("SLM appelé")))
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("boom"))
     r = router_server.route_message("/lire 18ab3f2")
     assert r == {"status": "ok", "command": "/lire", "args": "18ab3f2"}
 
 
 def test_explicit_lire_empty_arg_returns_usage(monkeypatch):
-    monkeypatch.setattr(router_server, "call_adapter", lambda m: ("/ingest", ""))
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("/ingest"))
     r = router_server.route_message("/lire")
-    assert r["status"] == "answer"
-    assert "/lire" in r["reply"]
+    assert r == {"status": "answer", "reply": "Usage : /lire <argument>"}
 
 
 def test_unknown_slash_command_still_reaches_slm(monkeypatch):
     called = {"n": 0}
 
-    def fake(msg):
-        called["n"] += 1
-        return (None, "")
+    class _Counting:
+        def classify(self, message):
+            called["n"] += 1
+            return None, 0.0
 
-    monkeypatch.setattr(router_server, "call_adapter", fake)
+    monkeypatch.setattr(router_server, "_classifier", _Counting())
     router_server.route_message("/inconnu bla")
     assert called["n"] == 1
+
+
+def test_nl_inferred_command_uses_full_message_as_args(monkeypatch):
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("/q", 0.92))
+    r = router_server.route_message("qu'est-ce que le SPLADE ?")
+    assert r == {"status": "ok", "command": "/q", "args": "qu'est-ce que le SPLADE ?"}
+
+
+def test_nl_no_match_returns_no_match(monkeypatch):
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier(None))
+    r = router_server.route_message("il fait beau aujourd'hui")
+    assert r == {"status": "no_match"}
+
+
+def test_gog_command_below_confidence_threshold_returns_no_match(monkeypatch):
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("/inbox", 0.30))
+    r = router_server.route_message("y a-t-il du nouveau ?")
+    assert r == {"status": "no_match"}
+
+
+def test_gog_command_above_confidence_threshold_is_ok(monkeypatch):
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("/inbox", 0.80))
+    r = router_server.route_message("y a-t-il du nouveau ?")
+    assert r == {"status": "ok", "command": "/inbox", "args": "y a-t-il du nouveau ?"}
+
+
+def test_wiki_command_from_slm_does_not_use_confidence_threshold(monkeypatch):
+    # Seules les commandes gog passent par le seuil de confiance — le
+    # classifieur ne renvoie de toute façon que des commandes connues.
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("/q", 0.10))
+    r = router_server.route_message("dis-moi ce que dit le wiki sur X")
+    assert r == {"status": "ok", "command": "/q", "args": "dis-moi ce que dit le wiki sur X"}
