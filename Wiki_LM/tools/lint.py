@@ -116,6 +116,7 @@ class LintReport:
 _META_PAGES = {"index", "log", "schema"}
 _LINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 _REQUIRED_FRONTMATTER = {"title", "category"}
+_UNLINKED_ITEM_RE = re.compile(r"^-\s+(?:concept|entit[eé]):\s+(?!\[\[).+$", re.MULTILINE | re.IGNORECASE)
 
 
 class WikiLint:
@@ -133,6 +134,7 @@ class WikiLint:
 
         self._check_frontmatter(pages, report)
         self._check_links(pages, report)
+        self._check_unlinked_mentions(pages, report)
         self._check_orphans(pages, report)
         self._check_index(pages, report)
         self._append_log(report)
@@ -182,6 +184,22 @@ class WikiLint:
                         f"Lien cassé : [[{target}]]",
                         target=target,
                     )
+
+    def _check_unlinked_mentions(self, pages: dict, report: LintReport) -> None:
+        """Détecte les mentions `- concept: X` / `- entité: Y` en texte brut,
+        sans lien [[...]] — jamais de page créée pour elles (le pipeline
+        d'ingestion ne traite que les max_concepts premiers éléments
+        extraits, cf. ingest.py::_linkify_concepts_section, 2026-09-28).
+        Distinct de broken-link : une mention déjà crochetée mais cassée
+        reste du ressort de _check_links, jamais signalée ici aussi."""
+        for slug, info in pages.items():
+            for m in _UNLINKED_ITEM_RE.finditer(info.get("body", "")):
+                line = m.group(0).strip()
+                report.add(
+                    "warning", "unlinked-mention", slug,
+                    f"Mention non liée : {line}",
+                    target=line,
+                )
 
     def _check_orphans(self, pages: dict, report: LintReport) -> None:
         """Détecte les pages sans aucun lien entrant."""
@@ -256,7 +274,7 @@ class WikiLint:
                 continue
 
             links = [m.group(1) for m in _LINK_RE.finditer(body)]
-            pages[slug] = {"path": path, "meta": meta, "links": links}
+            pages[slug] = {"path": path, "meta": meta, "links": links, "body": body}
 
         return pages
 

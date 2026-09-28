@@ -152,7 +152,73 @@ class TestCheckLinks:
 
         report = WikiLint(wiki_root).run()
 
-        assert all(i.target == "" for i in report.issues if i.code != "broken-link")
+        assert all(
+            i.target == "" for i in report.issues
+            if i.code not in ("broken-link", "unlinked-mention")
+        )
+
+
+class TestCheckUnlinkedMentions:
+    """Mentions `- concept: X` / `- entité: Y` en texte brut, sans page créée
+    pour elles — le pipeline d'ingestion ne traite que les max_concepts
+    premiers éléments extraits, cf. ingest.py::_linkify_concepts_section
+    (2026-09-28). Ni /lint ni /repair ne les voyaient avant : elles ne
+    prennent jamais la forme d'un [[lien cassé]]."""
+
+    def test_unbracketed_concept_line_reported(self, wiki_root, wiki_dir):
+        _write_page(
+            wiki_dir, "sources", "src-a", title="A", category="source",
+            body="## Concepts et entités mentionnés\n\n- concept: guerre-psychologique\n",
+        )
+
+        report = WikiLint(wiki_root).run()
+
+        mentions = [i for i in report.warnings if i.code == "unlinked-mention"]
+        assert len(mentions) == 1
+        assert mentions[0].slug == "src-a"
+
+    def test_unbracketed_entity_line_reported(self, wiki_root, wiki_dir):
+        _write_page(
+            wiki_dir, "sources", "src-a", title="A", category="source",
+            body="- entité: armina\n",
+        )
+
+        report = WikiLint(wiki_root).run()
+
+        assert any(i.code == "unlinked-mention" for i in report.warnings)
+
+    def test_bracketed_line_not_reported_even_if_broken(self, wiki_root, wiki_dir):
+        """C'est le travail de broken-link, pas d'unlinked-mention — pas de
+        double signalement."""
+        _write_page(
+            wiki_dir, "sources", "src-a", title="A", category="source",
+            body="- concept: [[c-inexistant]]\n",
+        )
+
+        report = WikiLint(wiki_root).run()
+
+        assert not any(i.code == "unlinked-mention" for i in report.warnings)
+
+    def test_aucun_not_reported(self, wiki_root, wiki_dir):
+        _write_page(
+            wiki_dir, "sources", "src-a", title="A", category="source",
+            body="## Concepts et entités mentionnés\n\nAucun\n",
+        )
+
+        report = WikiLint(wiki_root).run()
+
+        assert not any(i.code == "unlinked-mention" for i in report.warnings)
+
+    def test_target_is_the_exact_line(self, wiki_root, wiki_dir):
+        _write_page(
+            wiki_dir, "sources", "src-a", title="A", category="source",
+            body="- concept: guerre-psychologique\n",
+        )
+
+        report = WikiLint(wiki_root).run()
+
+        mentions = [i for i in report.warnings if i.code == "unlinked-mention"]
+        assert mentions[0].target == "- concept: guerre-psychologique"
 
 
 class TestCheckOrphans:

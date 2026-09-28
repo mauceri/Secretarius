@@ -910,3 +910,29 @@ class TestOpRepair:
         wiki = _wiki(monkeypatch, tmp_path)
         out = wiki.op_repair_preview("famille-inconnue")
         assert "error" in out
+
+    def test_dispatches_unlinked_mention_family(self, monkeypatch, tmp_path):
+        wiki = _wiki(monkeypatch, tmp_path)
+        calls = []
+
+        class _FakeReport:
+            family = "unlinked-mention"
+            dry_run = True
+            before_count = 15
+            after_count = 0
+            changes = ["src-a : 15 mention(s) non liée(s) retirée(s)"]
+
+        class _FakeRepair:
+            def __init__(self, wiki_path):
+                pass
+
+            def repair_unlinked_mentions(self, dry_run):
+                calls.append(dry_run)
+                return _FakeReport()
+
+        monkeypatch.setattr(wiki, "WikiRepair", _FakeRepair, raising=False)
+        out = wiki.op_repair_preview("unlinked-mention")
+
+        assert calls == [True]
+        assert out["family"] == "unlinked-mention"
+        assert out["before_count"] == 15

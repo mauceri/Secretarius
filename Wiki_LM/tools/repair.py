@@ -151,6 +151,46 @@ class WikiRepair:
             after_count=before_count - fixed_count,
         )
 
+    def repair_unlinked_mentions(self, dry_run: bool = True) -> RepairReport:
+        """Retire les mentions `- concept: X` / `- entité: Y` laissées en
+        texte brut par l'ingestion (au-delà de max_concepts, cf. ingest.py)
+        — contrairement à repair_broken_links, la ligne entière disparaît,
+        pas seulement les crochets : il n'y a jamais eu de page pour ces
+        mentions, les garder en texte n'apporte rien (2026-09-28)."""
+        report_before = WikiLint(self.wiki_root).run()
+        before_count = sum(1 for i in report_before.issues if i.code == "unlinked-mention")
+
+        by_page: dict[str, list[str]] = {}
+        for issue in report_before.issues:
+            if issue.code == "unlinked-mention":
+                by_page.setdefault(issue.slug, []).append(issue.target)
+
+        changes: list[str] = []
+        fixed_count = 0
+        for slug, lines in sorted(by_page.items()):
+            path = slug_to_path(self.wiki_dir, slug)
+            if not path.exists():
+                continue
+            content = path.read_text(encoding="utf-8")
+            updated = content
+            for line in lines:
+                updated = updated.replace(line + "\n", "", 1)
+                if line in updated:
+                    updated = updated.replace(line, "", 1)
+            if updated != content:
+                changes.append(f"{slug} : {len(lines)} mention(s) non liée(s) retirée(s)")
+                fixed_count += len(lines)
+                if not dry_run:
+                    path.write_text(updated, encoding="utf-8")
+
+        return RepairReport(
+            family="unlinked-mention",
+            dry_run=dry_run,
+            changes=changes,
+            before_count=before_count,
+            after_count=before_count - fixed_count,
+        )
+
     def repair_frontmatter(self, dry_run: bool = True) -> RepairReport:
         """Répare le frontmatter vide/tronqué. Deux traitements selon la
         forme : un second bloc bien formé mais mal placé se déplace

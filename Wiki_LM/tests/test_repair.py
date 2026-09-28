@@ -97,6 +97,66 @@ class TestRepairBrokenLinks:
         assert report.after_count == 0
 
 
+class TestRepairUnlinkedMentions:
+    def test_dry_run_does_not_modify_disk(self, wiki_root, wiki_dir):
+        path = _write_page(
+            wiki_dir, "sources", "src-a", title="A", category="source",
+            body="## Concepts et entités mentionnés\n\n- concept: guerre-psychologique\n",
+        )
+        original = path.read_text(encoding="utf-8")
+
+        report = WikiRepair(wiki_root).repair_unlinked_mentions(dry_run=True)
+
+        assert path.read_text(encoding="utf-8") == original
+        assert report.dry_run is True
+        assert report.family == "unlinked-mention"
+
+    def test_apply_removes_the_unlinked_line_entirely(self, wiki_root, wiki_dir):
+        path = _write_page(
+            wiki_dir, "sources", "src-a", title="A", category="source",
+            body="- concept: guerre-psychologique\n- concept: rebellion\n",
+        )
+
+        WikiRepair(wiki_root).repair_unlinked_mentions(dry_run=False)
+
+        content = path.read_text(encoding="utf-8")
+        assert "guerre-psychologique" not in content
+        assert "rebellion" not in content
+
+    def test_apply_leaves_linked_mentions_untouched(self, wiki_root, wiki_dir):
+        _write_page(wiki_dir, "concepts", "c-hyperloop", title="Hyperloop", category="concept")
+        path = _write_page(
+            wiki_dir, "sources", "src-a", title="A", category="source",
+            body="- concept: [[c-hyperloop]]\n- concept: rebellion\n",
+        )
+
+        WikiRepair(wiki_root).repair_unlinked_mentions(dry_run=False)
+
+        content = path.read_text(encoding="utf-8")
+        assert "[[c-hyperloop]]" in content
+        assert "rebellion" not in content
+
+    def test_before_after_counts(self, wiki_root, wiki_dir):
+        _write_page(
+            wiki_dir, "sources", "src-a", title="A", category="source",
+            body="- concept: a\n- entité: b\n",
+        )
+
+        report = WikiRepair(wiki_root).repair_unlinked_mentions(dry_run=False)
+
+        assert report.before_count == 2
+        assert report.after_count == 0
+
+    def test_no_unlinked_mentions_reports_empty_changes(self, wiki_root, wiki_dir):
+        _write_page(wiki_dir, "sources", "src-a", title="A", category="source", body="Rien à réparer.")
+
+        report = WikiRepair(wiki_root).repair_unlinked_mentions(dry_run=True)
+
+        assert report.changes == []
+        assert report.before_count == 0
+        assert report.after_count == 0
+
+
 class TestExtractClosedFrontmatterBlock:
     def test_finds_well_formed_second_block(self):
         from repair import _extract_closed_frontmatter_block
