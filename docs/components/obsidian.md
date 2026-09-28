@@ -43,6 +43,45 @@ Le chemin du coffre (`OBSIDIAN_PATH`) est configuré dans `install.conf` et prop
 dans `openclaw.json` via `envsubst`. Les outils Wiki_LM utilisent
 `WIKI_PATH = ${OBSIDIAN_PATH}/Wiki_LM`.
 
+## Procédure : ajouter un coffre additionnel
+
+Aucun script d'installation ne fait ça (décision en suspens, cf.
+`docs/superpowers/specs/2026-09-22-sous-wikis-par-coffre-design.md`) : c'est
+entièrement manuel, en 4 étapes indépendantes. Sauter l'une d'elles laisse le
+coffre partiellement fonctionnel (les commandes répondent, mais les liens
+`[[...]]` des réponses sont morts dans ce coffre-là) — voir
+`docs/architecture/wiki-lm-architecture.md` pour le détail de ce que fait
+`vault_name`.
+
+1. **Synchroniser le contenu du coffre** (§ Installation ci-dessus) :
+   `obsidian-headless sync-setup --path <chemin> --remote "<Nom exact du
+   coffre>"`, puis un premier `sync`.
+2. **Déclarer le coffre à Wiki_LM** : ajouter `Nom=chemin` à
+   `WIKI_VAULT_MIRRORS` dans `Wiki_LM/.env` (le nom doit être **identique**
+   à celui utilisé à l'étape 1, `app.vault.getName()` côté client — jamais
+   un chemin). Puis `systemctl --user restart wiki-lm-server.service` :
+   `WIKI_VAULT_MIRRORS` n'est relu qu'au démarrage du process Flask (les
+   invocations `wiki.py` côté sandbox Telegram, elles, relisent `.env` à
+   chaque appel — pas de redémarrage nécessaire pour ce côté-là).
+3. **Installer le plugin** dans ce coffre : builder une fois
+   (`Wiki_LM/obsidian-wikilm-capture/`, `npm run build`), puis copier
+   `manifest.json` et `main.js` dans
+   `<coffre>/.obsidian/plugins/wikilm-capture/` — une copie séparée par
+   coffre, jamais un lien symbolique (même piège que `derisk-deleg`, cf.
+   `docs/architecture/wiki-lm-architecture.md`).
+4. **Relancer la synchro continue et vérifier qu'elle a repris.** Rencontré
+   plusieurs fois : `ob sync --continuous`, s'il tournait déjà pour ce
+   coffre avant le dépôt des fichiers de l'étape 3, ne détecte pas toujours
+   la modification en place d'un fichier déjà connu (`main.js` remplacé
+   sur disque, synchro qui continue d'annoncer « Fully synced » sans jamais
+   renvoyer le nouveau contenu), ou peut s'être déconnectée silencieusement
+   depuis longtemps sans se relancer — voir « Pièges connus » ci-dessous
+   pour le diagnostic exact (`grep <fichier> sync.log`,
+   `tmux capture-pane -t <session> -p | tail`). Par prudence : après le
+   dépôt du plugin, **toujours** couper (Ctrl-C) et relancer
+   `ob sync --continuous` dans la session tmux du coffre plutôt que de
+   supposer qu'une synchro déjà active le détectera.
+
 ## Désinstallation
 
 ```bash
