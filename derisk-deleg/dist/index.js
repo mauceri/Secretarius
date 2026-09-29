@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync,
 import { homedir, hostname } from "node:os";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
-import { parseEnv, diffEnv, applyEnvDiff, validateTelegramToken, EXPECTED_TELEGRAM_BOT } from "./secrets-sync.js";
+import { parseEnv, diffEnv, applyEnvDiff, syncSecretFile, validateTelegramToken, EXPECTED_TELEGRAM_BOT } from "./secrets-sync.js";
 const ROUTER_URL = "http://127.0.0.1:8999/route";
 async function callRouter(message) {
     try {
@@ -530,6 +530,26 @@ export default definePluginEntry({
                             }
                         }
                     }
+                }
+                // Fichiers secret bruts montés dans un sandbox (convention Docker
+                // _FILE, pas un .env) — incident du 29/09/2026 : euria-key périmé
+                // dans le sandbox wiki, 401 sur /q. Lu à chaque appel par wiki.py
+                // (subprocess), donc aucun redémarrage requis après écriture.
+                const secretFiles = [
+                    {
+                        path: join(HOME, ".openclaw", "secrets", "euria-key"),
+                        label: "secrets/euria-key",
+                        envKey: "EURIA_API_KEY",
+                    },
+                ];
+                for (const sf of secretFiles) {
+                    if (!existsSync(sf.path))
+                        continue;
+                    const newContent = syncSecretFile(secrets[sf.envKey], readFileSync(sf.path, "utf8"));
+                    if (newContent === null)
+                        continue;
+                    writeFileSync(sf.path, newContent, "utf8");
+                    report.push(`${sf.label} (${sf.envKey})`);
                 }
                 if (report.length === 0) {
                     return { handled: true, reply: { text: "Rien à synchroniser — tout est déjà à jour." } };

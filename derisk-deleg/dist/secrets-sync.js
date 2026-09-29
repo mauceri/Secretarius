@@ -46,6 +46,17 @@ export function applyEnvDiff(content, diffs) {
     }
     return out;
 }
+// Fichiers secret bruts (convention Docker _FILE, pas un .env) — ex.
+// ~/.openclaw/secrets/euria-key monté dans le sandbox wiki en
+// OPENAI_API_KEY_FILE. Retourne le nouveau contenu si la source diffère du
+// fichier actuel (comparé sans espace de fin), ou null si rien à écrire.
+export function syncSecretFile(sourceValue, currentFileContent) {
+    if (sourceValue === undefined)
+        return null;
+    if (sourceValue === currentFileContent.trim())
+        return null;
+    return sourceValue;
+}
 // sanroque = bot dev, santiago = bot prod (cf. openclaw-config/INSTALL.md,
 // section "Deux instances").
 export const EXPECTED_TELEGRAM_BOT = {

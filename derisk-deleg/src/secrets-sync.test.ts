@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { parseEnv, diffEnv, applyEnvDiff, validateTelegramToken, EXPECTED_TELEGRAM_BOT } from "./secrets-sync.js";
+import { parseEnv, diffEnv, applyEnvDiff, syncSecretFile, validateTelegramToken, EXPECTED_TELEGRAM_BOT } from "./secrets-sync.js";
 
 describe("parseEnv", () => {
   it("lit des valeurs sans guillemets", () => {
@@ -50,6 +50,20 @@ describe("applyEnvDiff", () => {
     const content = "A=old\n";
     const out = applyEnvDiff(content, [{ key: "Z", oldValue: "x", newValue: "y" }]);
     expect(out).toBe("A=old\n");
+  });
+});
+
+describe("syncSecretFile", () => {
+  it("retourne la nouvelle valeur si elle diffère du contenu actuel", () => {
+    expect(syncSecretFile("new-key", "old-key\n")).toBe("new-key");
+  });
+
+  it("retourne null si la valeur est déjà à jour (espace de fin ignoré)", () => {
+    expect(syncSecretFile("same-key", "same-key\n")).toBeNull();
+  });
+
+  it("retourne null si la source n'a pas cette clé", () => {
+    expect(syncSecretFile(undefined, "old-key\n")).toBeNull();
   });
 });
 
