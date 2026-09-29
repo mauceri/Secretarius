@@ -19,8 +19,15 @@ except Exception:
     pass
 dspy.settings.cache = None
 
-COMMANDS_KNOWN = {"/c", "/ingest", "/wiki-status", "/q", "/source", "/mail", "/agenda", "/drive", "/help"}
-REQUIRES_ARGS = {"wiki_capture", "wiki_query", "source_read", "gog_mail", "gog_calendar", "gog_drive"}
+COMMANDS_KNOWN = {
+    "/c", "/ingest", "/wikistatus", "/q", "/source", "/r", "/tags", "/kbupdate",
+    "/supprimer", "/relire", "/verifie", "/chercher", "/connecter", "/inbox",
+    "/drive", "/repondre", "/lire",
+}
+REQUIRES_ARGS = {
+    "wiki_capture", "wiki_query", "source_read", "gog_search", "gog_reply",
+    "gog_drive", "wiki_search", "gog_get", "wiki_delete", "wiki_verify",
+}
 
 
 def _is_null_command(cmd: str) -> bool:
@@ -132,6 +139,42 @@ class EvalRealisme(dspy.Signature):
     score: int = dspy.OutputField(desc="Entier 1..5")
 
 
+# Descriptions courtes utilisées uniquement pour juger la fidélité sémantique
+# texte↔intention — indépendantes de GEPAPrompt.txt (qui, lui, est optimisé),
+# pour ne jamais faire dépendre le juge du texte qu'il évalue indirectement.
+INTENTION_DESCRIPTIONS = {
+    "wiki_capture": "capturer une URL ou une note dans le wiki",
+    "wiki_ingest": "lancer l'ingestion des captures en attente du wiki",
+    "wiki_status": "consulter l'état de l'ingestion du wiki",
+    "wiki_query": "poser une question au wiki et obtenir une réponse synthétisée par un LLM",
+    "source_read": "lire une page web externe immédiatement, sans la sauvegarder",
+    "gog_search": "rechercher des emails Gmail par mot-clé, expéditeur ou période",
+    "gog_connect": "autoriser l'accès au compte Google",
+    "gog_inbox": "lister les emails récents de la boîte de réception",
+    "gog_reply": "préparer un brouillon de réponse à un email, sans l'envoyer",
+    "gog_drive": "rechercher des fichiers sur Google Drive",
+    "wiki_search": "rechercher par mots-clés dans le wiki, résultats bruts SANS synthèse ni résumé LLM (différent de wiki_query qui synthétise une réponse)",
+    "wiki_tags": "lister les tags disponibles dans le wiki",
+    "wiki_kb_update": "reconstruire la base de connaissances du wiki depuis le dernier clustering",
+    "gog_get": "lire le contenu d'un email précis (par identifiant, ou le dernier/un email récent) — UNIQUEMENT un email, jamais une page wiki, une capture, un document Drive ou l'état du wiki",
+    "wiki_delete": "supprimer une page du wiki (par son slug)",
+    "wiki_reread": "obtenir la prochaine page du wiki à relire",
+    "wiki_verify": "marquer une page du wiki comme vérifiée (par son slug)",
+    "out_of_scope": "demande hors périmètre de Tiron (aucune des commandes ci-dessus ne s'applique)",
+}
+
+
+class EvalFidelite(dspy.Signature):
+    """Ce message correspond-il vraiment à l'intention décrite, et à elle seule
+    (pas à une intention voisine ni à une autre commande) ? Répondre 1 si le
+    message décrit sans ambiguïté cette intention précise, 0 sinon — y compris
+    si le message est plausible pour une AUTRE intention que celle donnée.
+    Répondre avec 0 ou 1 uniquement, sans commentaire."""
+    text: str = dspy.InputField(desc="Message utilisateur généré")
+    intention_description: str = dspy.InputField(desc="Description de l'intention que le message doit illustrer")
+    score: int = dspy.OutputField(desc="0 ou 1")
+
+
 def make_metric(eval_lm: dspy.LM):
     class Evaluator(dspy.Module):
         def __init__(self):
@@ -146,7 +189,21 @@ def make_metric(eval_lm: dspy.LM):
             except Exception:
                 return 3
 
+    class FideliteEvaluator(dspy.Module):
+        def __init__(self):
+            super().__init__()
+            self.pred = dspy.Predict(EvalFidelite)
+
+        def forward(self, text: str, intention_description: str) -> int:
+            with dspy.settings.context(lm=eval_lm):
+                out = self.pred(text=text, intention_description=intention_description)
+            try:
+                return max(0, min(1, int(out.score)))
+            except Exception:
+                return 0
+
     evaluator = Evaluator()
+    fidelite_evaluator = FideliteEvaluator()
     counter = {"n": 0}
 
     def metric(gold, pred, trace=None, pred_name=None, pred_trace=None):
@@ -158,10 +215,19 @@ def make_metric(eval_lm: dspy.LM):
             s_real = evaluator(text=text) / 5.0
         except Exception:
             s_real = 0.6
+        intention = str(gold.get("intention") or "")
+        desc = INTENTION_DESCRIPTIONS.get(intention, intention)
+        try:
+            s_fidele = float(fidelite_evaluator(text=text, intention_description=desc))
+        except Exception:
+            s_fidele = 0.5
         counter["n"] += 1
         if counter["n"] % 10 == 0:
-            print(f"[métrique] appel {counter['n']} struct={s_struct:.2f} réalisme={s_real:.2f}")
-        return 0.5 * s_real + 0.5 * s_struct
+            print(f"[métrique] appel {counter['n']} struct={s_struct:.2f} réalisme={s_real:.2f} fidélité={s_fidele:.2f}")
+        # La fidélité pèse le plus lourd : un texte hors-sujet mais bien formé
+        # et réaliste (ex. exemple /lire parlant d'une capture wiki) est le
+        # défaut qui a motivé cet ajout — cf. mémoire projet routage Laya.
+        return 0.25 * s_real + 0.25 * s_struct + 0.5 * s_fidele
 
     return metric
 
@@ -201,6 +267,7 @@ def main(argv=None) -> int:
         max_metric_calls=cfg.max_metric_calls,
         track_stats=True,
         track_best_outputs=True,
+        num_threads=2,  # sanroque déjà proche de la limite mémoire (autres services actifs)
     )
     compiled = teleprompter.compile(generator, trainset=trainset)
     best_prompt = _extract_best_prompt(compiled, teleprompter, initial_prompt)

@@ -15,7 +15,10 @@ Tiron reconnaît les commandes suivantes :
 - /r <mots-clés> — recherche brute BM25 dans le wiki, sans synthèse LLM (plus rapide que /q)
 - /tags — lister les tags disponibles dans le wiki (sans argument)
 - /kbupdate — mettre à jour la base de connaissances depuis le dernier clustering (sans argument)
-- /lire <id> — lire le contenu d'un email par son identifiant (obtenu via /inbox ou /chercher, ex. 18ab3f2)
+- /lire <id> — lire le contenu d'un email par son identifiant (obtenu via /inbox ou /chercher, ex. 18ab3f2) ; uniquement un email, jamais une page wiki, une capture, un document Drive ou l'état du wiki
+- /supprimer <slug> — supprimer une page du wiki (par son slug)
+- /relire — obtenir la prochaine page du wiki à relire, la plus ancienne non vérifiée (sans argument)
+- /verifie <slug> — marquer une page du wiki comme vérifiée (par son slug)
 - null — demande hors périmètre de Tiron (composer un nouveau mail, gérer l'agenda,
   demande d'aide générale, conversation informelle / culture générale / humour /
   rédaction créative, ou toute autre action non couverte ci-dessus)

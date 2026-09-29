@@ -14,9 +14,11 @@ def test_generate_one_structure():
     mock_result.text = "garde cet article https://example.com"
     mock_result.args = "https://example.com"
     mock_predict = MagicMock(return_value=mock_result)
+    always_ok = lambda text, intention: True
 
-    entry = generate_one(mock_predict, "wiki_capture", "familier", "url_seule", "/c")
+    entry, accepted = generate_one(mock_predict, always_ok, "wiki_capture", "familier", "url_seule", "/c")
 
+    assert accepted is True
     assert entry["text"] == "garde cet article https://example.com"
     assert entry["intention"] == "wiki_capture"
     assert entry["registre"] == "familier"
@@ -31,8 +33,9 @@ def test_generate_one_null_command():
     mock_result.text = "commande une pizza"
     mock_result.args = ""
     mock_predict = MagicMock(return_value=mock_result)
+    always_ok = lambda text, intention: True
 
-    entry = generate_one(mock_predict, "out_of_scope", "familier", "action_impossible", None)
+    entry, accepted = generate_one(mock_predict, always_ok, "out_of_scope", "familier", "action_impossible", None)
     assert entry["action"]["command"] is None
 
 
@@ -42,9 +45,44 @@ def test_generate_one_normalizes_literal_empty_quotes():
     mock_result.text = "état wiki ?"
     mock_result.args = '""'
     mock_predict = MagicMock(return_value=mock_result)
+    always_ok = lambda text, intention: True
 
-    entry = generate_one(mock_predict, "wiki_status", "abrégé", "sans_args", "/wikistatus")
+    entry, accepted = generate_one(mock_predict, always_ok, "wiki_status", "abrégé", "sans_args", "/wikistatus")
     assert entry["action"]["args"] == ""
+
+
+def test_generate_one_retries_until_fidelity_ok():
+    from generate_corpus import generate_one
+    mock_result = MagicMock()
+    mock_result.text = "lis le mail 123"
+    mock_result.args = "123"
+    mock_predict = MagicMock(return_value=mock_result)
+    calls = {"n": 0}
+
+    def flaky_check(text, intention):
+        calls["n"] += 1
+        return calls["n"] >= 2  # échoue une fois, réussit à la 2e tentative
+
+    entry, accepted = generate_one(mock_predict, flaky_check, "gog_get", "familier",
+                                    "avec_id_explicite", "/lire", max_attempts=3)
+    assert accepted is True
+    assert calls["n"] == 2
+    assert mock_predict.call_count == 2
+
+
+def test_generate_one_keeps_entry_after_max_attempts_exhausted():
+    from generate_corpus import generate_one
+    mock_result = MagicMock()
+    mock_result.text = "texte toujours rejeté"
+    mock_result.args = ""
+    mock_predict = MagicMock(return_value=mock_result)
+    never_ok = lambda text, intention: False
+
+    entry, accepted = generate_one(mock_predict, never_ok, "gog_get", "familier",
+                                    "avec_id_explicite", "/lire", max_attempts=3)
+    assert accepted is False
+    assert entry["text"] == "texte toujours rejeté"
+    assert mock_predict.call_count == 3
 
 
 def test_convert_entry_chatML():

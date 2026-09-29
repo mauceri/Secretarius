@@ -67,17 +67,76 @@ def _build_signature(prompt_text: str):
     return GenerateExample
 
 
-def generate_one(predict, intention: str, registre: str, variante: str, command: str | None) -> dict:
+# Descriptions courtes pour le juge de fidélité texte↔intention — mêmes
+# définitions que dans promptGenGEPA.py (dupliquées, chaque script gen_corpus
+# reste indépendant et exécutable seul).
+INTENTION_DESCRIPTIONS = {
+    "wiki_capture": "capturer une URL ou une note dans le wiki",
+    "wiki_ingest": "lancer l'ingestion des captures en attente du wiki",
+    "wiki_status": "consulter l'état de l'ingestion du wiki",
+    "wiki_query": "poser une question au wiki et obtenir une réponse synthétisée par un LLM",
+    "source_read": "lire une page web externe immédiatement, sans la sauvegarder",
+    "gog_search": "rechercher des emails Gmail par mot-clé, expéditeur ou période",
+    "gog_connect": "autoriser l'accès au compte Google",
+    "gog_inbox": "lister les emails récents de la boîte de réception",
+    "gog_reply": "préparer un brouillon de réponse à un email, sans l'envoyer",
+    "gog_drive": "rechercher des fichiers sur Google Drive",
+    "wiki_search": "rechercher par mots-clés dans le wiki, résultats bruts SANS synthèse ni résumé LLM (différent de wiki_query qui synthétise une réponse)",
+    "wiki_tags": "lister les tags disponibles dans le wiki",
+    "wiki_kb_update": "reconstruire la base de connaissances du wiki depuis le dernier clustering",
+    "gog_get": "lire le contenu d'un email précis (par identifiant, ou le dernier/un email récent) — UNIQUEMENT un email, jamais une page wiki, une capture, un document Drive ou l'état du wiki",
+    "wiki_delete": "supprimer une page du wiki (par son slug)",
+    "wiki_reread": "obtenir la prochaine page du wiki à relire",
+    "wiki_verify": "marquer une page du wiki comme vérifiée (par son slug)",
+    "out_of_scope": "demande hors périmètre de Tiron (aucune des commandes ci-dessus ne s'applique)",
+}
+
+
+class EvalFidelite(dspy.Signature):
+    """Ce message correspond-il vraiment à l'intention décrite, et à elle seule
+    (pas à une intention voisine ni à une autre commande) ? Répondre 1 si le
+    message décrit sans ambiguïté cette intention précise, 0 sinon — y compris
+    si le message est plausible pour une AUTRE intention que celle donnée.
+    Répondre avec 0 ou 1 uniquement, sans commentaire."""
+    text: str = dspy.InputField(desc="Message utilisateur généré")
+    intention_description: str = dspy.InputField(desc="Description de l'intention que le message doit illustrer")
+    score: int = dspy.OutputField(desc="0 ou 1")
+
+
+def make_fidelity_check(eval_lm: "dspy.LM"):
+    fidelite_pred = dspy.Predict(EvalFidelite)
+
+    def check(text: str, intention: str) -> bool:
+        desc = INTENTION_DESCRIPTIONS.get(intention, intention)
+        try:
+            with dspy.settings.context(lm=eval_lm):
+                out = fidelite_pred(text=text, intention_description=desc)
+            return int(out.score) == 1
+        except Exception:
+            return True  # échec du juge lui-même : ne pas bloquer la génération
+
+    return check
+
+
+def generate_one(predict, fidelity_check, intention: str, registre: str, variante: str,
+                  command: str | None, max_attempts: int = 3) -> tuple[dict, bool]:
     # La commande est déterminée par l'intention (intentions.json), pas par le LLM :
     # demander au modèle de la re-choisir introduit du bruit d'étiquetage quand deux
     # commandes sont sémantiquement proches (ex. /q vs /r — constaté ~99% d'erreur
     # sur wiki_search lors de l'ajout de /r). Seuls text/args restent générés.
-    result = predict(intention=intention, registre=registre, variante=variante)
+    result = None
+    accepted = False
+    for attempt in range(max_attempts):
+        result = predict(intention=intention, registre=registre, variante=variante)
+        accepted = fidelity_check(result.text, intention)
+        if accepted:
+            break
     args = result.args.strip()
     if args in ('""', "''"):
         args = ""
-    return {"text": result.text, "intention": intention, "registre": registre,
-            "variante": variante, "action": {"command": command, "args": args}}
+    entry = {"text": result.text, "intention": intention, "registre": registre,
+             "variante": variante, "action": {"command": command, "args": args}}
+    return entry, accepted
 
 
 def main(argv=None) -> int:
@@ -88,7 +147,10 @@ def main(argv=None) -> int:
     base = os.getenv("DEEPSEEK_API_BASE", cfg.deepseek_api_base)
     lm = dspy.LM(model=cfg.generator_model, api_key=api_key, api_base=base,
                  model_type="chat", temperature=cfg.temperature, max_tokens=256, cache=False)
+    eval_lm = dspy.LM(model=cfg.generator_model, api_key=api_key, api_base=base,
+                       model_type="chat", temperature=0.0, max_tokens=16, cache=False)
     dspy.settings.configure(lm=lm)
+    fidelity_check = make_fidelity_check(eval_lm)
 
     prompt_p = Path(cfg.prompt_path)
     prompt_text = (prompt_p if prompt_p.exists() else Path(cfg.prompt_fallback)).read_text(encoding="utf-8")
@@ -100,12 +162,19 @@ def main(argv=None) -> int:
     stime = time.time()
     consecutive_errors = 0
     max_consecutive = max(10, cfg.count // 10)
+    rejected_kept = 0  # exemples gardés malgré un échec de fidélité après max_attempts
     with open(cfg.output, "w", encoding="utf-8") as fout:
         for i in range(cfg.count):
             obj = random.choice(intentions)
             try:
-                entry = generate_one(predict, obj["intention"], random.choice(registres),
-                                     random.choice(obj["variantes"]), obj["command"])
+                entry, accepted = generate_one(predict, fidelity_check, obj["intention"],
+                                                random.choice(registres), random.choice(obj["variantes"]),
+                                                obj["command"])
+                entry["fidelity_ok"] = accepted  # retiré au post-traitement, jamais lu en aval
+                if not accepted:
+                    rejected_kept += 1
+                    print(f"[{i+1}] Fidélité non confirmée après relances (gardé quand même) : "
+                          f"{obj['intention']} — {entry['text'][:80]!r}", flush=True)
                 buffer.append(entry)
                 consecutive_errors = 0
             except Exception as e:
@@ -122,7 +191,7 @@ def main(argv=None) -> int:
                 print(f"[{i+1}/{cfg.count}] {time.time()-stime:.1f}s", flush=True)
         for e in buffer:
             fout.write(json.dumps(e, ensure_ascii=False) + "\n")
-    print(f"Corpus sauvegardé dans {cfg.output}")
+    print(f"Corpus sauvegardé dans {cfg.output} ({rejected_kept}/{cfg.count} exemples gardés malgré un échec de fidélité)")
     return 0
 
 

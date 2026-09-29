@@ -2088,5 +2088,665 @@
       "command": "/c",
       "args": "ref:colbert-paper les embeddings multi-vecteurs sont plus précis"
     }
+  },
+  {
+    "text": "cherche wiki clustering, juste les résultats bruts, pas de résumé",
+    "intention": "wiki_search",
+    "registre": "télégraphique",
+    "variante": "mots_cles_simples",
+    "action": {
+      "command": "/r",
+      "args": "clustering"
+    }
+  },
+  {
+    "text": "/r gestion de projet agile",
+    "intention": "wiki_search",
+    "registre": "télégraphique",
+    "variante": "mots_cles_simples",
+    "action": {
+      "command": "/r",
+      "args": "gestion de projet agile"
+    }
+  },
+  {
+    "text": "Tiron, fais-moi une recherche par mots-clés dans le wiki sur le chiffrement RSA, sans synthèse, je veux juste les extraits.",
+    "intention": "wiki_search",
+    "registre": "poli",
+    "variante": "mots_cles_simples",
+    "action": {
+      "command": "/r",
+      "args": "chiffrement RSA"
+    }
+  },
+  {
+    "text": "vite, cherche wiki rapport ventes, pas besoin de résumé, juste les liens",
+    "intention": "wiki_search",
+    "registre": "familier",
+    "variante": "recherche_urgente",
+    "action": {
+      "command": "/r",
+      "args": "rapport ventes"
+    }
+  },
+  {
+    "text": "Urgent : recherche brute dans le wiki sur le protocole OAuth, je n'ai pas le temps de lire une synthèse, donne-moi juste les résultats.",
+    "intention": "wiki_search",
+    "registre": "formel",
+    "variante": "recherche_urgente",
+    "action": {
+      "command": "/r",
+      "args": "protocole OAuth"
+    }
+  },
+  {
+    "text": "recherche mots-clés wiki : télétravail, sans résumé stp",
+    "intention": "wiki_search",
+    "registre": "abrégé",
+    "variante": "mots_cles_simples",
+    "action": {
+      "command": "/r",
+      "args": "télétravail"
+    }
+  },
+  {
+    "text": "Pourriez-vous rechercher rapidement, résultats bruts, sur le sujet des panneaux solaires dans le wiki ? Pas de synthèse nécessaire, je veux les extraits directement.",
+    "intention": "wiki_search",
+    "registre": "poli",
+    "variante": "recherche_urgente",
+    "action": {
+      "command": "/r",
+      "args": "panneaux solaires"
+    }
+  },
+  {
+    "text": "/r machine learning clustering",
+    "intention": "wiki_search",
+    "registre": "télégraphique",
+    "variante": "mots_cles_simples",
+    "action": {
+      "command": "/r",
+      "args": "machine learning clustering"
+    }
+  },
+  {
+    "text": "cherche mots-clés wiki agile scrum, format brut, sans résumé LLM",
+    "intention": "wiki_search",
+    "registre": "abrégé",
+    "variante": "mots_cles_simples",
+    "action": {
+      "command": "/r",
+      "args": "agile scrum"
+    }
+  },
+  {
+    "text": "Là tout de suite, recherche brute dans le wiki sur le protocole HTTP/3, je veux les résultats directs, pas de résumé, je suis pressé.",
+    "intention": "wiki_search",
+    "registre": "familier",
+    "variante": "recherche_urgente",
+    "action": {
+      "command": "/r",
+      "args": "protocole HTTP/3"
+    }
+  },
+  {
+    "text": "Peux-tu me lire le contenu du mail 9fc21ab ?",
+    "intention": "gog_get",
+    "registre": "familier",
+    "variante": "avec_id_explicite",
+    "action": {
+      "command": "/lire",
+      "args": "9fc21ab"
+    }
+  },
+  {
+    "text": "Pourriez-vous afficher le contenu de l'email dont l'identifiant est 4d8e001 ?",
+    "intention": "gog_get",
+    "registre": "poli",
+    "variante": "avec_id_explicite",
+    "action": {
+      "command": "/lire",
+      "args": "4d8e001"
+    }
+  },
+  {
+    "text": "lis email 7ab221c",
+    "intention": "gog_get",
+    "registre": "télégraphique",
+    "variante": "avec_id_explicite",
+    "action": {
+      "command": "/lire",
+      "args": "7ab221c"
+    }
+  },
+  {
+    "text": "Je souhaiterais consulter le contenu du courriel identifié par 3fa9902, s'il vous plaît.",
+    "intention": "gog_get",
+    "registre": "formel",
+    "variante": "avec_id_explicite",
+    "action": {
+      "command": "/lire",
+      "args": "3fa9902"
+    }
+  },
+  {
+    "text": "montre-moi le mail que je viens de recevoir de Marc à l'instant",
+    "intention": "gog_get",
+    "registre": "familier",
+    "variante": "reference_email_recu_recemment",
+    "action": {
+      "command": "/lire",
+      "args": ""
+    }
+  },
+  {
+    "text": "Pourriez-vous ouvrir le dernier email reçu dans ma boîte, celui de ce matin de la part du service comptabilité ?",
+    "intention": "gog_get",
+    "registre": "poli",
+    "variante": "reference_email_recu_recemment",
+    "action": {
+      "command": "/lire",
+      "args": ""
+    }
+  },
+  {
+    "text": "lis le dernier mail reçu",
+    "intention": "gog_get",
+    "registre": "abrégé",
+    "variante": "reference_email_recu_recemment",
+    "action": {
+      "command": "/lire",
+      "args": ""
+    }
+  },
+  {
+    "text": "Bonjour Tiron, pourriez-vous consulter le courriel que je viens de recevoir de Mme Petit au sujet du contrat, et m'en montrer le contenu ?",
+    "intention": "gog_get",
+    "registre": "poli",
+    "variante": "reference_email_recu_recemment",
+    "action": {
+      "command": "/lire",
+      "args": ""
+    }
+  },
+  {
+    "text": "affiche le mail reçu il y a deux minutes de la part de Sophie",
+    "intention": "gog_get",
+    "registre": "familier",
+    "variante": "reference_email_recu_recemment",
+    "action": {
+      "command": "/lire",
+      "args": ""
+    }
+  },
+  {
+    "text": "Tiron, le mail avec l'identifiant a12bc34, tu peux me le lire ?",
+    "intention": "gog_get",
+    "registre": "familier",
+    "variante": "avec_id_explicite",
+    "action": {
+      "command": "/lire",
+      "args": "a12bc34"
+    }
+  },
+  {
+    "text": "/tags",
+    "intention": "wiki_tags",
+    "registre": "télégraphique",
+    "variante": "sans_args",
+    "action": {
+      "command": "/tags",
+      "args": ""
+    }
+  },
+  {
+    "text": "Quels sont les tags disponibles dans le wiki ?",
+    "intention": "wiki_tags",
+    "registre": "formel",
+    "variante": "sans_args",
+    "action": {
+      "command": "/tags",
+      "args": ""
+    }
+  },
+  {
+    "text": "montre-moi tous les tags du wiki",
+    "intention": "wiki_tags",
+    "registre": "familier",
+    "variante": "sans_args",
+    "action": {
+      "command": "/tags",
+      "args": ""
+    }
+  },
+  {
+    "text": "Pourriez-vous, s'il vous plaît, me lister l'ensemble des tags présents dans le wiki ?",
+    "intention": "wiki_tags",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/tags",
+      "args": ""
+    }
+  },
+  {
+    "text": "liste tags wiki stp",
+    "intention": "wiki_tags",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": "/tags",
+      "args": ""
+    }
+  },
+  {
+    "text": "Tiron, c'est quoi les tags qui existent dans le wiki en ce moment ?",
+    "intention": "wiki_tags",
+    "registre": "familier",
+    "variante": "sans_args",
+    "action": {
+      "command": "/tags",
+      "args": ""
+    }
+  },
+  {
+    "text": "/kbupdate",
+    "intention": "wiki_kb_update",
+    "registre": "télégraphique",
+    "variante": "sans_args",
+    "action": {
+      "command": "/kbupdate",
+      "args": ""
+    }
+  },
+  {
+    "text": "Pourriez-vous mettre à jour la base de connaissances depuis le dernier clustering ?",
+    "intention": "wiki_kb_update",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/kbupdate",
+      "args": ""
+    }
+  },
+  {
+    "text": "reconstruis la base de connaissances stp",
+    "intention": "wiki_kb_update",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": "/kbupdate",
+      "args": ""
+    }
+  },
+  {
+    "text": "Tiron, il faudrait rafraîchir la base de connaissances du wiki avec le dernier clustering, tu peux faire ça ?",
+    "intention": "wiki_kb_update",
+    "registre": "familier",
+    "variante": "sans_args",
+    "action": {
+      "command": "/kbupdate",
+      "args": ""
+    }
+  },
+  {
+    "text": "Je vous prie de bien vouloir mettre à jour la base de connaissances à partir du dernier clustering effectué.",
+    "intention": "wiki_kb_update",
+    "registre": "formel",
+    "variante": "sans_args",
+    "action": {
+      "command": "/kbupdate",
+      "args": ""
+    }
+  },
+  {
+    "text": "cherche mails de Julie sur le contrat",
+    "intention": "gog_search",
+    "registre": "abrégé",
+    "variante": "par_expediteur",
+    "action": {
+      "command": "/chercher",
+      "args": "de:Julie contrat"
+    }
+  },
+  {
+    "text": "Pourriez-vous rechercher les emails reçus la semaine dernière contenant le mot facture ?",
+    "intention": "gog_search",
+    "registre": "poli",
+    "variante": "par_periode",
+    "action": {
+      "command": "/chercher",
+      "args": "facture semaine dernière"
+    }
+  },
+  {
+    "text": "trouve-moi les mails avec 'budget' dans le sujet",
+    "intention": "gog_search",
+    "registre": "familier",
+    "variante": "par_mot_cle",
+    "action": {
+      "command": "/chercher",
+      "args": "budget"
+    }
+  },
+  {
+    "text": "Je souhaiterais que vous recherchiez tous les courriels envoyés par M. Dupont au cours du mois dernier.",
+    "intention": "gog_search",
+    "registre": "formel",
+    "variante": "par_expediteur",
+    "action": {
+      "command": "/chercher",
+      "args": "de:Dupont mois dernier"
+    }
+  },
+  {
+    "text": "cherche emails 'réunion projet alpha'",
+    "intention": "gog_search",
+    "registre": "télégraphique",
+    "variante": "par_mot_cle",
+    "action": {
+      "command": "/chercher",
+      "args": "réunion projet alpha"
+    }
+  },
+  {
+    "text": "Bonjour Tiron, pourriez-vous rechercher les emails reçus entre le 1er et le 15 mars concernant la facturation ?",
+    "intention": "gog_search",
+    "registre": "poli",
+    "variante": "par_periode",
+    "action": {
+      "command": "/chercher",
+      "args": "facturation 1-15 mars"
+    }
+  },
+  {
+    "text": "/connecter",
+    "intention": "gog_connect",
+    "registre": "télégraphique",
+    "variante": "sans_args",
+    "action": {
+      "command": "/connecter",
+      "args": ""
+    }
+  },
+  {
+    "text": "Pourriez-vous m'aider à connecter mon compte Google ?",
+    "intention": "gog_connect",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/connecter",
+      "args": ""
+    }
+  },
+  {
+    "text": "connecte mon compte google stp",
+    "intention": "gog_connect",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": "/connecter",
+      "args": ""
+    }
+  },
+  {
+    "text": "Tiron, il faut que j'autorise l'accès à mon compte Google, comment on fait ?",
+    "intention": "gog_connect",
+    "registre": "familier",
+    "variante": "sans_args",
+    "action": {
+      "command": "/connecter",
+      "args": ""
+    }
+  },
+  {
+    "text": "Je vous prie de bien vouloir procéder à la connexion de mon compte Google.",
+    "intention": "gog_connect",
+    "registre": "formel",
+    "variante": "sans_args",
+    "action": {
+      "command": "/connecter",
+      "args": ""
+    }
+  },
+  {
+    "text": "/inbox",
+    "intention": "gog_inbox",
+    "registre": "télégraphique",
+    "variante": "sans_args",
+    "action": {
+      "command": "/inbox",
+      "args": ""
+    }
+  },
+  {
+    "text": "montre-moi mes 10 derniers emails",
+    "intention": "gog_inbox",
+    "registre": "familier",
+    "variante": "avec_nombre",
+    "action": {
+      "command": "/inbox",
+      "args": "10"
+    }
+  },
+  {
+    "text": "Pourriez-vous m'afficher les emails les plus récents de ma boîte de réception ?",
+    "intention": "gog_inbox",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/inbox",
+      "args": ""
+    }
+  },
+  {
+    "text": "inbox 5 stp",
+    "intention": "gog_inbox",
+    "registre": "abrégé",
+    "variante": "avec_nombre",
+    "action": {
+      "command": "/inbox",
+      "args": "5"
+    }
+  },
+  {
+    "text": "Je souhaiterais consulter la liste de mes vingt derniers courriels reçus.",
+    "intention": "gog_inbox",
+    "registre": "formel",
+    "variante": "avec_nombre",
+    "action": {
+      "command": "/inbox",
+      "args": "20"
+    }
+  },
+  {
+    "text": "prépare une réponse au mail de Julie pour confirmer la réunion de demain",
+    "intention": "gog_reply",
+    "registre": "familier",
+    "variante": "avec_contexte",
+    "action": {
+      "command": "/repondre",
+      "args": "confirmer réunion demain, mail de Julie"
+    }
+  },
+  {
+    "text": "Pourriez-vous rédiger un brouillon de réponse à l'email de M. Martin concernant le report du projet ?",
+    "intention": "gog_reply",
+    "registre": "poli",
+    "variante": "avec_contexte",
+    "action": {
+      "command": "/repondre",
+      "args": "report du projet, mail de M. Martin"
+    }
+  },
+  {
+    "text": "réponds au dernier mail pour dire que c'est validé",
+    "intention": "gog_reply",
+    "registre": "abrégé",
+    "variante": "avec_contexte",
+    "action": {
+      "command": "/repondre",
+      "args": "validé"
+    }
+  },
+  {
+    "text": "Je vous prie de bien vouloir préparer une réponse au courriel reçu ce matin, indiquant que la demande est acceptée.",
+    "intention": "gog_reply",
+    "registre": "formel",
+    "variante": "avec_contexte",
+    "action": {
+      "command": "/repondre",
+      "args": "demande acceptée"
+    }
+  },
+  {
+    "text": "supprime la page src-vieux-brouillon-obsolete du wiki",
+    "intention": "wiki_delete",
+    "registre": "familier",
+    "variante": "avec_slug",
+    "action": {
+      "command": "/supprimer",
+      "args": "src-vieux-brouillon-obsolete"
+    }
+  },
+  {
+    "text": "Pourriez-vous supprimer la page dont le slug est c-notes-temporaires ?",
+    "intention": "wiki_delete",
+    "registre": "poli",
+    "variante": "avec_slug",
+    "action": {
+      "command": "/supprimer",
+      "args": "c-notes-temporaires"
+    }
+  },
+  {
+    "text": "/supprimer! src-test-a-effacer",
+    "intention": "wiki_delete",
+    "registre": "télégraphique",
+    "variante": "avec_slug",
+    "action": {
+      "command": "/supprimer",
+      "args": "src-test-a-effacer"
+    }
+  },
+  {
+    "text": "Je souhaiterais que vous supprimiez définitivement la page e-ancienne-entite-erronee du wiki.",
+    "intention": "wiki_delete",
+    "registre": "formel",
+    "variante": "avec_slug",
+    "action": {
+      "command": "/supprimer",
+      "args": "e-ancienne-entite-erronee"
+    }
+  },
+  {
+    "text": "vire la page c-doublon-a-nettoyer stp",
+    "intention": "wiki_delete",
+    "registre": "abrégé",
+    "variante": "avec_slug",
+    "action": {
+      "command": "/supprimer",
+      "args": "c-doublon-a-nettoyer"
+    }
+  },
+  {
+    "text": "/relire",
+    "intention": "wiki_reread",
+    "registre": "télégraphique",
+    "variante": "sans_args",
+    "action": {
+      "command": "/relire",
+      "args": ""
+    }
+  },
+  {
+    "text": "Quelle est la prochaine page du wiki à relire ?",
+    "intention": "wiki_reread",
+    "registre": "formel",
+    "variante": "sans_args",
+    "action": {
+      "command": "/relire",
+      "args": ""
+    }
+  },
+  {
+    "text": "donne-moi une page à relire",
+    "intention": "wiki_reread",
+    "registre": "familier",
+    "variante": "sans_args",
+    "action": {
+      "command": "/relire",
+      "args": ""
+    }
+  },
+  {
+    "text": "Pourriez-vous me proposer la prochaine page non vérifiée à relire, s'il vous plaît ?",
+    "intention": "wiki_reread",
+    "registre": "poli",
+    "variante": "sans_args",
+    "action": {
+      "command": "/relire",
+      "args": ""
+    }
+  },
+  {
+    "text": "relire stp",
+    "intention": "wiki_reread",
+    "registre": "abrégé",
+    "variante": "sans_args",
+    "action": {
+      "command": "/relire",
+      "args": ""
+    }
+  },
+  {
+    "text": "marque la page src-article-clustering comme vérifiée",
+    "intention": "wiki_verify",
+    "registre": "familier",
+    "variante": "avec_slug",
+    "action": {
+      "command": "/verifie",
+      "args": "src-article-clustering"
+    }
+  },
+  {
+    "text": "Pourriez-vous confirmer que la page c-notes-reunion a bien été vérifiée ?",
+    "intention": "wiki_verify",
+    "registre": "poli",
+    "variante": "avec_slug",
+    "action": {
+      "command": "/verifie",
+      "args": "c-notes-reunion"
+    }
+  },
+  {
+    "text": "/verifie e-projet-alpha",
+    "intention": "wiki_verify",
+    "registre": "télégraphique",
+    "variante": "avec_slug",
+    "action": {
+      "command": "/verifie",
+      "args": "e-projet-alpha"
+    }
+  },
+  {
+    "text": "Je vous prie de bien vouloir marquer la page src-rapport-q3 comme vérifiée.",
+    "intention": "wiki_verify",
+    "registre": "formel",
+    "variante": "avec_slug",
+    "action": {
+      "command": "/verifie",
+      "args": "src-rapport-q3"
+    }
+  },
+  {
+    "text": "valide la page c-veille-ia stp",
+    "intention": "wiki_verify",
+    "registre": "abrégé",
+    "variante": "avec_slug",
+    "action": {
+      "command": "/verifie",
+      "args": "c-veille-ia"
+    }
   }
 ]
