@@ -98,15 +98,15 @@ fi
 
 mkdir -p "$OPENCLAW_PATH"
 
-# Fichier secret clé Euria (monté en lecture seule dans le conteneur wiki)
+# Fichier secret clé Infomaniak (monté en lecture seule dans le conteneur wiki)
 mkdir -p "${OPENCLAW_PATH}/secrets"
 chmod 700 "${OPENCLAW_PATH}/secrets"
-if [[ -n "${EURIA_API_KEY:-}" ]]; then
-  printf '%s' "$EURIA_API_KEY" > "${OPENCLAW_PATH}/secrets/euria-key"
-  chmod 600 "${OPENCLAW_PATH}/secrets/euria-key"
-  info "Fichier secrets/euria-key créé (600)"
+if [[ -n "${INFOMANIAK_API_KEY:-}" ]]; then
+  printf '%s' "$INFOMANIAK_API_KEY" > "${OPENCLAW_PATH}/secrets/infomaniak-key"
+  chmod 600 "${OPENCLAW_PATH}/secrets/infomaniak-key"
+  info "Fichier secrets/infomaniak-key créé (600)"
 else
-  warn "EURIA_API_KEY absent — secrets/euria-key non créé (l'agent wiki échouera)"
+  warn "INFOMANIAK_API_KEY absent — secrets/infomaniak-key non créé (l'agent wiki échouera)"
 fi
 
 # Note : l'auth par agent (clés API) est configurée plus bas, APRÈS la génération
@@ -125,8 +125,8 @@ else
   if [[ -f "$TARGET" && "$FORCE" != "true" ]]; then
     warn "openclaw.json présent mais sans agents (config d'onboarding) — régénération"
   fi
-  export HOME HOSTNAME OBSIDIAN_PATH ASSISTANT_NAME OPENCLAW_GATEWAY_TOKEN EURIA_API_KEY EURIA_PRODUCT_ID OPENCLAW_DIR OPENCLAW_PORT GOG_ACCOUNT
-  envsubst '${HOME} ${HOSTNAME} ${OBSIDIAN_PATH} ${ASSISTANT_NAME} ${OPENCLAW_GATEWAY_TOKEN} ${EURIA_API_KEY} ${EURIA_PRODUCT_ID} ${OPENCLAW_DIR} ${OPENCLAW_PORT} ${GOG_ACCOUNT}' \
+  export HOME HOSTNAME OBSIDIAN_PATH ASSISTANT_NAME OPENCLAW_GATEWAY_TOKEN INFOMANIAK_API_KEY INFOMANIAK_PRODUCT_ID OPENCLAW_DIR OPENCLAW_PORT GOG_ACCOUNT
+  envsubst '${HOME} ${HOSTNAME} ${OBSIDIAN_PATH} ${ASSISTANT_NAME} ${OPENCLAW_GATEWAY_TOKEN} ${INFOMANIAK_API_KEY} ${INFOMANIAK_PRODUCT_ID} ${OPENCLAW_DIR} ${OPENCLAW_PORT} ${GOG_ACCOUNT}' \
     < "${SCRIPT_DIR}/openclaw.json.template" > "$TARGET"
   # Sync .bak pour éviter que le gateway détecte notre écriture comme un "clobber"
   # et restaure silencieusement l'ancienne config au démarrage suivant.
@@ -163,7 +163,7 @@ fi
 # agent et IGNORE un auth-profiles.json écrit à la main → "No API key found for
 # provider". La commande officielle `models auth paste-api-key` écrit le profil ET
 # met à jour la config. La clé est passée sur stdin. Chaque agent a son store isolé.
-if [[ -f "$TARGET" && ( -n "${EURIA_API_KEY:-}" || -n "${DEEPSEEK_API_KEY:-}" ) ]]; then
+if [[ -f "$TARGET" && ( -n "${INFOMANIAK_API_KEY:-}" || -n "${DEEPSEEK_API_KEY:-}" ) ]]; then
   export OPENCLAW_GATEWAY_TOKEN   # éviter que la commande régénère le token gateway
   _set_auth() {  # $1=agent  $2=provider  $3=clé
     [[ -n "$3" ]] || return 0
@@ -174,9 +174,9 @@ if [[ -f "$TARGET" && ( -n "${EURIA_API_KEY:-}" || -n "${DEEPSEEK_API_KEY:-}" ) 
       warn "auth ${2} → agent ${1} échouée"
     fi
   }
-  _set_auth main  euria    "${EURIA_API_KEY:-}"
-  _set_auth wiki  euria    "${EURIA_API_KEY:-}"
-  _set_auth gog   euria    "${EURIA_API_KEY:-}"
+  _set_auth main  infomaniak    "${INFOMANIAK_API_KEY:-}"
+  _set_auth wiki  infomaniak    "${INFOMANIAK_API_KEY:-}"
+  _set_auth gog   infomaniak    "${INFOMANIAK_API_KEY:-}"
   _set_auth main  deepseek "${DEEPSEEK_API_KEY:-}"
   _set_auth scout deepseek "${DEEPSEEK_API_KEY:-}"
   unset -f _set_auth
@@ -190,7 +190,7 @@ fi
 _LLM_MODEL=""
 case "${LLM_BACKEND:-}" in
   deepseek) _LLM_MODEL="deepseek/deepseek-chat" ;;
-  euria)    _LLM_MODEL="euria/mistralai/Mistral-Small-4-119B-2603" ;;
+  infomaniak)    _LLM_MODEL="infomaniak/mistralai/Mistral-Small-4-119B-2603" ;;
 esac
 if [[ -n "$_LLM_MODEL" && -f "$TARGET" ]]; then
   _LLM_MODEL="$_LLM_MODEL" python3 - "$TARGET" <<'PYEOF'
@@ -198,9 +198,7 @@ import json, os, sys
 path, model = sys.argv[1], os.environ['_LLM_MODEL']
 d = json.load(open(path))
 d['agents']['defaults']['model']['primary'] = model
-for a in d['agents'].get('list', []):
-    if isinstance(a, dict) and a.get('id') == 'main' and 'model' in a:
-        a['model']['primary'] = model
+d['agents']['entries']['main']['model'] = {'primary': model}
 json.dump(d, open(path, 'w'), indent=1)
 PYEOF
   cp "$TARGET" "${OPENCLAW_PATH}/openclaw.json.bak" 2>/dev/null || true
@@ -217,10 +215,10 @@ else
   # Génère gateway.systemd.env avec les secrets fournis (env/--env-file).
   # Variables manquantes = chaîne vide ; on avertit pour les indispensables.
   [[ -z "${TELEGRAM_BOT_TOKEN:-}" ]] && warn "TELEGRAM_BOT_TOKEN non défini — à renseigner dans ${ENV_TARGET} avant de démarrer"
-  [[ -z "${EURIA_API_KEY:-}" ]] && warn "EURIA_API_KEY non défini — à renseigner dans ${ENV_TARGET} avant de démarrer"
-  [[ -z "${EURIA_PRODUCT_ID:-}" ]] && warn "EURIA_PRODUCT_ID non défini — l'URL Euria sera invalide (erreur '404 method_not_found' sur tous les appels). À renseigner dans ${ENV_TARGET} (et ~/.config/secrets.env)."
-  export TELEGRAM_BOT_TOKEN OPENCLAW_GATEWAY_TOKEN GATEWAY_PASSWORD OPENCLAW_BIN GOG_ACCOUNT EURIA_API_KEY EURIA_PRODUCT_ID DEEPSEEK_API_KEY
-  envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD} ${OPENCLAW_BIN} ${HOME} ${GOG_ACCOUNT} ${EURIA_API_KEY} ${EURIA_PRODUCT_ID} ${DEEPSEEK_API_KEY}' \
+  [[ -z "${INFOMANIAK_API_KEY:-}" ]] && warn "INFOMANIAK_API_KEY non défini — à renseigner dans ${ENV_TARGET} avant de démarrer"
+  [[ -z "${INFOMANIAK_PRODUCT_ID:-}" ]] && warn "INFOMANIAK_PRODUCT_ID non défini — l'URL Infomaniak sera invalide (erreur '404 method_not_found' sur tous les appels). À renseigner dans ${ENV_TARGET} (et ~/.config/secrets.env)."
+  export TELEGRAM_BOT_TOKEN OPENCLAW_GATEWAY_TOKEN GATEWAY_PASSWORD OPENCLAW_BIN GOG_ACCOUNT INFOMANIAK_API_KEY INFOMANIAK_PRODUCT_ID DEEPSEEK_API_KEY
+  envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD} ${OPENCLAW_BIN} ${HOME} ${GOG_ACCOUNT} ${INFOMANIAK_API_KEY} ${INFOMANIAK_PRODUCT_ID} ${DEEPSEEK_API_KEY}' \
     < "$_env_tpl" \
     > "$ENV_TARGET"
   chmod 600 "$ENV_TARGET"
@@ -526,7 +524,7 @@ systemctl --user enable "${_gw_svc_final}" 2>/dev/null && \
   info "${_gw_svc_final} activé" || \
   warn "Activation échouée — lancer manuellement"
 info "Installation terminée."
-info "Modèles Euria disponibles (agent main) :"
+info "Modèles Infomaniak disponibles (agent main) :"
 info "  - mistralai/Mistral-Small-4-119B-2603  [défaut si Qwen397 indispo]"
 info "  - Qwen/Qwen3.5-397B-A17B-FP8           [recommandé — meilleur routage wiki]"
 info "  - Qwen/Qwen3.5-122B-A10B-FP8"

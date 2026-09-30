@@ -286,7 +286,7 @@ class TestSwitchWikiModel:
 
         q = self._Q()
         monkeypatch.setattr(server, "_wq", q)
-        monkeypatch.setenv("EURIA_API_KEY", "the-real-key")
+        monkeypatch.setenv("INFOMANIAK_API_KEY", "the-real-key")
         monkeypatch.setattr(
             server,
             "op_switch_model",
@@ -295,7 +295,7 @@ class TestSwitchWikiModel:
                 "backend": "openai",
                 "model": "m",
                 "base_url": "https://api.infomaniak.com/2/ai/109005/openai/v1",
-                "api_key_env": "EURIA_API_KEY",
+                "api_key_env": "INFOMANIAK_API_KEY",
             },
         )
         captured = {}

@@ -13,7 +13,7 @@ def _wiki(monkeypatch, tmp_path):
 
 
 def test_bootstrap_api_key_from_file(monkeypatch, tmp_path):
-    key_file = tmp_path / "euria-key"
+    key_file = tmp_path / "infomaniak-key"
     key_file.write_text("secret-xyz\n")
     monkeypatch.setenv("OPENAI_API_KEY_FILE", str(key_file))
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
@@ -22,7 +22,7 @@ def test_bootstrap_api_key_from_file(monkeypatch, tmp_path):
 
 
 def test_bootstrap_keeps_existing_api_key(monkeypatch, tmp_path):
-    key_file = tmp_path / "euria-key"
+    key_file = tmp_path / "infomaniak-key"
     key_file.write_text("from-file\n")
     monkeypatch.setenv("OPENAI_API_KEY_FILE", str(key_file))
     monkeypatch.setenv("OPENAI_API_KEY", "already-set")
@@ -229,7 +229,7 @@ def test_switch_model_replaces_existing_keys(monkeypatch, tmp_path):
         "backend": "openai",
         "model": "mistralai/Mistral-Small-4-119B-2603",
         "base_url": "https://api.infomaniak.com/2/ai/109005/openai/v1",
-        "api_key_env": "EURIA_API_KEY",
+        "api_key_env": "INFOMANIAK_API_KEY",
     }
 
 

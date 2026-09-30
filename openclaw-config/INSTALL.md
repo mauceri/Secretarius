@@ -41,24 +41,24 @@ Telegram
     ▼
 openclaw-gateway  (port 18789, service systemd user)
     │
-    ├── agent main   (Euria — Mistral-Small-4 ou Qwen3.5-397B)
+    ├── agent main   (Infomaniak — Mistral-Small-4 ou Qwen3.5-397B)
     │       │  workspace : ~/.openclaw/workspace/
     │       │  sandbox   : image Docker secretarius-tiron:latest
     │       │              monte ~/.openclaw/workspace/.gog-config → /workspace/.gog-config
     │       │
-    │       ├── agent wiki   (Euria — Mistral-Small-4)
+    │       ├── agent wiki   (Infomaniak — Mistral-Small-4)
     │       │       workspace : ~/.openclaw/workspace-wiki/
     │       │       sandbox   : image Docker secretarius-wiki:latest
     │       │                   monte ~/Documents/Arbath/Wiki_LM → /Wiki_LM  (rw)
     │       │                   monte ~/Secretarius/Wiki_LM/tools → /wiki-tools  (ro)
-    │       │                   monte ~/.openclaw/secrets/euria-key → /run/euria-key  (ro)
+    │       │                   monte ~/.openclaw/secrets/infomaniak-key → /run/infomaniak-key  (ro)
     │       │                   monte ~/Secretarius/Wiki_LM/zim → /zim  (ro) ← ZIM Wikipedia FR
     │       │
     │       ├── agent scout  (DeepSeek — deepseek-chat)
     │       │       workspace : ~/.openclaw/workspace-scout/
     │       │       sans sandbox Docker (outils read/write/process uniquement)
     │       │
-    │       └── agent gog    (Euria — Mistral-Small-4)
+    │       └── agent gog    (Infomaniak — Mistral-Small-4)
     │               workspace : ~/.openclaw/workspace-gog/
     │               sandbox   : image Docker secretarius-gog:latest
     │                           monte ~/.openclaw/workspace/.gog-config → /gog-config  (rw)
@@ -120,9 +120,9 @@ Créer `~/.config/secrets.env` (sourcé automatiquement par `.bashrc` via `set -
 # Bot Telegram de cette instance
 TELEGRAM_BOT_TOKEN=<token>      # sanroque = bot dev, santiago = bot prod
 
-# Euria (Infomaniak AI) — backend principal
-EURIA_API_KEY=<clé 80 chars>    # vérifier longueur : echo -n "$EURIA_API_KEY" | wc -c
-EURIA_PRODUCT_ID=109005
+# Infomaniak AI — backend principal
+INFOMANIAK_API_KEY=<clé 80 chars>    # vérifier longueur : echo -n "$INFOMANIAK_API_KEY" | wc -c
+INFOMANIAK_PRODUCT_ID=109005
 
 # DeepSeek — agent scout uniquement
 DEEPSEEK_API_KEY=<clé>
@@ -238,21 +238,21 @@ bash install.sh
 
 | Alias | ID complet | Agent | Notes |
 |-------|-----------|-------|-------|
-| `Euria` | `euria/mistralai/Mistral-Small-4-119B-2603` | main, wiki, gog | Défaut si Qwen397 indispo |
-| `Qwen397` | `euria/Qwen/Qwen3.5-397B-A17B-FP8` | main | Recommandé : meilleur routage wiki |
-| `Qwen122` | `euria/Qwen/Qwen3.5-122B-A10B-FP8` | main | Variante légère |
-| `Gemma4` | `euria/google/gemma-4-31B-it` | main | — |
-| `Nemotron3` | `euria/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8` | main | — |
+| `Infomaniak` | `infomaniak/mistralai/Mistral-Small-4-119B-2603` | main, wiki, gog | Défaut si Qwen397 indispo |
+| `Qwen397` | `infomaniak/Qwen/Qwen3.5-397B-A17B-FP8` | main | Recommandé : meilleur routage wiki |
+| `Qwen122` | `infomaniak/Qwen/Qwen3.5-122B-A10B-FP8` | main | Variante légère |
+| `Gemma4` | `infomaniak/google/gemma-4-31B-it` | main | — |
+| `Nemotron3` | `infomaniak/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8` | main | — |
 | — | `deepseek/deepseek-chat` | scout | DEEPSEEK_API_KEY requis |
 
 Changer le modèle de l'agent main :
 
 ```bash
-switch-model Qwen397   # ou Euria, Qwen122, etc.
+switch-model Qwen397   # ou Infomaniak, Qwen122, etc.
 systemctl --user restart openclaw-gateway
 ```
 
-> **Santiago** : `Qwen3.5-397B` est indisponible sur ce compte Euria (product_id 109005).
+> **Santiago** : `Qwen3.5-397B` est indisponible sur ce compte Infomaniak (product_id 109005).
 > L'agent main tourne sur Mistral-Small-4. Surveiller la qualité du routage `/c`→wiki.
 
 ---
@@ -274,8 +274,8 @@ for a in main wiki gog scout; do
   echo "=== $a ==="; cat ~/.openclaw/agents/$a/agent/auth-profiles.json 2>/dev/null || echo "(absent)"
 done
 
-# Clé Euria : doit faire 80 chars
-echo -n "$EURIA_API_KEY" | wc -c
+# Clé Infomaniak : doit faire 80 chars
+echo -n "$INFOMANIAK_API_KEY" | wc -c
 ```
 
 ---

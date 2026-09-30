@@ -532,14 +532,14 @@ export default definePluginEntry({
                     }
                 }
                 // Fichiers secret bruts montés dans un sandbox (convention Docker
-                // _FILE, pas un .env) — incident du 29/09/2026 : euria-key périmé
+                // _FILE, pas un .env) — incident du 29/09/2026 : infomaniak-key périmé
                 // dans le sandbox wiki, 401 sur /q. Lu à chaque appel par wiki.py
                 // (subprocess), donc aucun redémarrage requis après écriture.
                 const secretFiles = [
                     {
-                        path: join(HOME, ".openclaw", "secrets", "euria-key"),
-                        label: "secrets/euria-key",
-                        envKey: "EURIA_API_KEY",
+                        path: join(HOME, ".openclaw", "secrets", "infomaniak-key"),
+                        label: "secrets/infomaniak-key",
+                        envKey: "INFOMANIAK_API_KEY",
                     },
                 ];
                 for (const sf of secretFiles) {

@@ -47,7 +47,7 @@ export function applyEnvDiff(content, diffs) {
     return out;
 }
 // Fichiers secret bruts (convention Docker _FILE, pas un .env) — ex.
-// ~/.openclaw/secrets/euria-key monté dans le sandbox wiki en
+// ~/.openclaw/secrets/infomaniak-key monté dans le sandbox wiki en
 // OPENAI_API_KEY_FILE. Retourne le nouveau contenu si la source diffère du
 // fichier actuel (comparé sans espace de fin), ou null si rien à écrire.
 export function syncSecretFile(sourceValue, currentFileContent) {

@@ -123,8 +123,8 @@ ls -l gog-bin        # le fichier doit exister
 
 ```
 TELEGRAM_BOT_TOKEN=<token BotFather>
-EURIA_API_KEY=<clé Infomaniak, 80 caractères>
-EURIA_PRODUCT_ID=<identifiant produit Infomaniak>
+INFOMANIAK_API_KEY=<clé Infomaniak, 80 caractères>
+INFOMANIAK_PRODUCT_ID=<identifiant produit Infomaniak>
 DEEPSEEK_API_KEY=<clé DeepSeek — agent scout>
 GOG_ACCOUNT=<adresse gmail>
 ```

@@ -1,8 +1,8 @@
 {
  "auth": {
   "profiles": {
-   "euria:default": {
-    "provider": "euria",
+   "infomaniak:default": {
+    "provider": "infomaniak",
     "mode": "api_key"
    },
    "deepseek:default": {
@@ -14,13 +14,13 @@
  "models": {
   "mode": "merge",
   "providers": {
-   "euria": {
-    "baseUrl": "https://api.infomaniak.com/2/ai/${EURIA_PRODUCT_ID}/openai/v1",
+   "infomaniak": {
+    "baseUrl": "https://api.infomaniak.com/2/ai/${INFOMANIAK_PRODUCT_ID}/openai/v1",
     "api": "openai-completions",
     "models": [
      {
       "id": "mistralai/Mistral-Small-4-119B-2603",
-      "name": "Mistral Small 4 (Euria)",
+      "name": "Mistral Small 4 (Infomaniak)",
       "api": "openai-completions",
       "reasoning": false,
       "input": ["text"],
@@ -29,7 +29,7 @@
      },
      {
       "id": "Qwen/Qwen3.5-397B-A17B-FP8",
-      "name": "Qwen3.5 397B-A17B (Euria)",
+      "name": "Qwen3.5 397B-A17B (Infomaniak)",
       "api": "openai-completions",
       "reasoning": false,
       "input": ["text"],
@@ -38,7 +38,7 @@
      },
      {
       "id": "google/gemma-4-31B-it",
-      "name": "Gemma 4 31B (Euria)",
+      "name": "Gemma 4 31B (Infomaniak)",
       "api": "openai-completions",
       "reasoning": false,
       "input": ["text"],
@@ -47,7 +47,7 @@
      },
      {
       "id": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8",
-      "name": "Nemotron 3 Nano 30B-A3B (Euria)",
+      "name": "Nemotron 3 Nano 30B-A3B (Infomaniak)",
       "api": "openai-completions",
       "reasoning": false,
       "input": ["text"],
@@ -56,7 +56,7 @@
      },
      {
       "id": "Qwen/Qwen3.5-122B-A10B-FP8",
-      "name": "Qwen3.5 122B-A10B (Euria)",
+      "name": "Qwen3.5 122B-A10B (Infomaniak)",
       "api": "openai-completions",
       "reasoning": false,
       "input": ["text"],
@@ -91,14 +91,14 @@
    "systemAgent": { "agentId": "main" },
    "heartbeat": { "every": "0m" },
    "model": {
-    "primary": "euria/mistralai/Mistral-Small-4-119B-2603"
+    "primary": "infomaniak/mistralai/Mistral-Small-4-119B-2603"
    },
    "models": {
-    "euria/mistralai/Mistral-Small-4-119B-2603": { "alias": "Infomaniak" },
-    "euria/Qwen/Qwen3.5-397B-A17B-FP8": { "alias": "Qwen397" },
-    "euria/google/gemma-4-31B-it": { "alias": "Gemma4" },
-    "euria/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8": { "alias": "Nemotron3" },
-    "euria/Qwen/Qwen3.5-122B-A10B-FP8": { "alias": "Qwen122" }
+    "infomaniak/mistralai/Mistral-Small-4-119B-2603": { "alias": "Infomaniak" },
+    "infomaniak/Qwen/Qwen3.5-397B-A17B-FP8": { "alias": "Qwen397" },
+    "infomaniak/google/gemma-4-31B-it": { "alias": "Gemma4" },
+    "infomaniak/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8": { "alias": "Nemotron3" },
+    "infomaniak/Qwen/Qwen3.5-122B-A10B-FP8": { "alias": "Qwen122" }
    },
    "workspace": "${HOME}/${OPENCLAW_DIR}/workspace",
    "compaction": {
@@ -136,7 +136,7 @@
    },
    "wiki": {
     "model": {
-     "primary": "euria/mistralai/Mistral-Small-4-119B-2603"
+     "primary": "infomaniak/mistralai/Mistral-Small-4-119B-2603"
     },
     "workspace": "${HOME}/${OPENCLAW_DIR}/workspace-wiki",
     "sandbox": {
@@ -147,14 +147,14 @@
       "binds": [
        "${HOME}/Secretarius/Wiki_LM/tools:/wiki-tools:ro",
        "${OBSIDIAN_PATH}/Wiki_LM:/Wiki_LM:rw",
-       "${HOME}/${OPENCLAW_DIR}/secrets/euria-key:/run/euria-key:ro",
+       "${HOME}/${OPENCLAW_DIR}/secrets/infomaniak-key:/run/infomaniak-key:ro",
        "${HOME}/Secretarius/Wiki_LM/zim:/zim:ro"
       ],
       "env": {
        "WIKI_PATH": "/Wiki_LM",
        "WIKI_LLM_BACKEND": "openai",
-       "OPENAI_BASE_URL": "https://api.infomaniak.com/2/ai/${EURIA_PRODUCT_ID}/openai/v1",
-       "OPENAI_API_KEY_FILE": "/run/euria-key",
+       "OPENAI_BASE_URL": "https://api.infomaniak.com/2/ai/${INFOMANIAK_PRODUCT_ID}/openai/v1",
+       "OPENAI_API_KEY_FILE": "/run/infomaniak-key",
        "OPENAI_MODEL": "mistralai/Mistral-Small-4-119B-2603",
        "HF_HUB_OFFLINE": "1",
        "TRANSFORMERS_OFFLINE": "1",
@@ -204,7 +204,7 @@
    },
    "gog": {
     "model": {
-     "primary": "euria/mistralai/Mistral-Small-4-119B-2603"
+     "primary": "infomaniak/mistralai/Mistral-Small-4-119B-2603"
     },
     "workspace": "${HOME}/${OPENCLAW_DIR}/workspace-gog",
     "sandbox": {

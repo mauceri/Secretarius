@@ -440,7 +440,7 @@ def test_prepend_note_empty_noop():
 
 def test_errored_file_not_marked_for_retry(ingestor, raw_dir):
     # Un échec transitoire ne doit PAS marquer le fichier ingéré : il reste en
-    # attente pour un réessai (sinon un phi-4/Euria momentanément KO = skip permanent).
+    # attente pour un réessai (sinon un phi-4/Infomaniak momentanément KO = skip permanent).
     (raw_dir / "a.txt").write_text("contenu", encoding="utf-8")
 
     def boom(*a, **k):

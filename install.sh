@@ -125,13 +125,13 @@ if [[ "$INTERACTIVE" == true ]]; then
   done
   unset _c v
   read -rp "Nom de l'assistant [${ASSISTANT_NAME}]: " v; ASSISTANT_NAME="${v:-$ASSISTANT_NAME}"
-  read -rp "LLM (euria|deepseek|ollama|claude) [${LLM_BACKEND}]: " v; LLM_BACKEND="${v:-$LLM_BACKEND}"
+  read -rp "LLM (infomaniak|deepseek|ollama|claude) [${LLM_BACKEND}]: " v; LLM_BACKEND="${v:-$LLM_BACKEND}"
   read -rp "Config OpenClaw [${OPENCLAW_PATH}]: " v; OPENCLAW_PATH="${v:-$OPENCLAW_PATH}"
   unset v
 fi
 
 # Charger les secrets — set -a pour EXPORTER toutes les variables du fichier
-# (sinon EURIA_API_KEY, EURIA_PRODUCT_ID, GOG_ACCOUNT ne sont pas transmis au
+# (sinon INFOMANIAK_API_KEY, INFOMANIAK_PRODUCT_ID, GOG_ACCOUNT ne sont pas transmis au
 # sous-script openclaw-config/install.sh, et l'agent wiki/gog échoue).
 if [[ -n "$ENV_FILE" ]]; then
   [[ -f "$ENV_FILE" ]] || { error "Fichier introuvable: $ENV_FILE"; exit 1; }
@@ -187,7 +187,7 @@ if [[ ! -f "$WIKI_ENV" || "$FORCE" == "true" ]]; then
   cp "$WIKI_ENV_TEMPLATE" "$WIKI_ENV"
   sed -i "s|^WIKI_PATH=.*|WIKI_PATH=${WIKI_PATH}|" "$WIKI_ENV"
   case "$LLM_BACKEND" in
-    euria|deepseek) sed -i "s|^WIKI_LLM_BACKEND=.*|WIKI_LLM_BACKEND=openai|" "$WIKI_ENV" ;;
+    infomaniak|deepseek) sed -i "s|^WIKI_LLM_BACKEND=.*|WIKI_LLM_BACKEND=openai|" "$WIKI_ENV" ;;
     ollama)
       sed -i "s|^WIKI_LLM_BACKEND=.*|WIKI_LLM_BACKEND=ollama|" "$WIKI_ENV"
       sed -i "s|^OPENAI_BASE_URL=.*|# OPENAI_BASE_URL=https://api.deepseek.com/v1|" "$WIKI_ENV"
@@ -328,8 +328,8 @@ if ! grep -q "^TELEGRAM_BOT_TOKEN=.\+" "${OPENCLAW_PATH}/gateway.systemd.env" 2>
   echo "  1. Renseigner les secrets dans ${OPENCLAW_PATH}/gateway.systemd.env :"
   echo ""
   echo "       TELEGRAM_BOT_TOKEN=<token BotFather>"
-  echo "       EURIA_API_KEY=<clé API Euria/Infomaniak — 80 chars>"
-  echo "       EURIA_PRODUCT_ID=<identifiant produit Infomaniak>"
+  echo "       INFOMANIAK_API_KEY=<clé API Infomaniak — 80 chars>"
+  echo "       INFOMANIAK_PRODUCT_ID=<identifiant produit Infomaniak>"
   echo "       DEEPSEEK_API_KEY=<clé API DeepSeek — agent scout uniquement>"
   echo "       GATEWAY_PASSWORD=<mot de passe optionnel pour l'interface web>"
   echo ""

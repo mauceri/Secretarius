@@ -7,7 +7,7 @@ description: Déléguer toute opération Wiki_LM (capture / ingest / status / qu
 
 ## Rôle
 
-Tiron ne porte **aucune** logique wiki dans son contexte. Il **délègue** à l'agent `wiki` (sous-agent Euria, conteneur `secretarius-wiki`) via `sessions_spawn`, puis relaie la réponse.
+Tiron ne porte **aucune** logique wiki dans son contexte. Il **délègue** à l'agent `wiki` (sous-agent Infomaniak, conteneur `secretarius-wiki`) via `sessions_spawn`, puis relaie la réponse.
 
 ## Déclencheurs → opération
 

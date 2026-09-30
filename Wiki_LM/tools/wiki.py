@@ -14,7 +14,7 @@ from pathlib import Path
 
 def _bootstrap_api_key() -> None:
     # OpenClaw 6.1 efface les valeurs de secret du templating de sandbox.docker.env :
-    # ${EURIA_API_KEY} arrive vide dans le conteneur. La clé est donc fournie via un
+    # ${INFOMANIAK_API_KEY} arrive vide dans le conteneur. La clé est donc fournie via un
     # fichier monté (convention Docker _FILE), lu ici avant toute construction de LLM.
     key_file = os.environ.get("OPENAI_API_KEY_FILE")
     if key_file and not os.environ.get("OPENAI_API_KEY"):
@@ -145,7 +145,7 @@ MODEL_ALIASES: dict[str, dict[str, str]] = {
         "backend": "openai",
         "model": "mistralai/Mistral-Small-4-119B-2603",
         "base_url": "https://api.infomaniak.com/2/ai/109005/openai/v1",
-        "api_key_env": "EURIA_API_KEY",
+        "api_key_env": "INFOMANIAK_API_KEY",
     },
     "obfusque": {
         "backend": "openai",
