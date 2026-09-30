@@ -102,7 +102,7 @@ def build_example_generator(prompt_text: str) -> dspy.Module:
         registre:  str = dspy.InputField(desc="Registre du message: formel, familier, télégraphique, poli, abrégé")
         variante:  str = dspy.InputField(desc="Type de variante (ex: url_avec_tags, question_courte, sans_args…)")
         text:    str = dspy.OutputField(desc="Message utilisateur réaliste en français")
-        command: str = dspy.OutputField(desc="Commande Tiron (/c /ingest /wiki-status /q /source /mail /agenda /drive /help) ou null")
+        command: str = dspy.OutputField(desc=f"Commande Tiron ({' '.join(sorted(COMMANDS_KNOWN))}) ou null")
         args:    str = dspy.OutputField(desc="Arguments bruts de la commande (chaîne vide si pas d'args)")
 
     class ExampleGenerator(dspy.Module):
@@ -277,6 +277,15 @@ def main(argv=None) -> int:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(filename="gepa_llm_calls.log", filemode="a", level=logging.INFO,
-                        format="%(asctime)s %(levelname)s: %(message)s")
+    # logging.basicConfig() ne suffit pas : le logger "dspy" a propagate=False
+    # et son propre StreamHandler (stdout) — les messages n'atteignent jamais
+    # le logger racine, donc jamais gepa_llm_calls.log. Constaté le 30/09/2026,
+    # fichier resté à 0 octet malgré des passages réels. Handler attaché
+    # directement sur le logger "dspy" pour contourner.
+    _dspy_logger = logging.getLogger("dspy")
+    _dspy_logger.handlers.clear()
+    _fh = logging.FileHandler("gepa_llm_calls.log", mode="a")
+    _fh.setFormatter(logging.Formatter("%(asctime)s %(levelname)s: %(message)s"))
+    _dspy_logger.addHandler(_fh)
+    _dspy_logger.setLevel(logging.INFO)
     raise SystemExit(main())

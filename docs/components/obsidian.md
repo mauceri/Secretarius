@@ -244,9 +244,13 @@ de `/c`, sans quitter Obsidian), depuis desktop ou mobile. Source :
 ## Exécution en lot de commandes wiki
 
 Exécuter une liste de commandes `/` Wiki_LM (`/q`, `/c`, `/tags`, `/ingest`,
-`/wikistatus`, `/r`, `/kbupdate`, `/relire`, `/verifie` — `/supprimer` est
-volontairement exclue) depuis une seule note Obsidian, en une action, avec les
-résultats insérés directement dans la note. Utilise le nouvel endpoint
+`/wikistatus`, `/r`, `/kbupdate`, `/relire`, `/verifie`, `/supprimer?`,
+`/supprimer!`, `/lint`, `/repair?`, `/repair!`, `/switch-wiki-model`, `/help`
+— seule la forme `/supprimer` sans suffixe est volontairement exclue :
+Telegram est le seul chemin qui peut supprimer sans `!` explicite, via son
+essai à blanc puis `/confirm`) depuis une seule note Obsidian, en une action,
+avec les résultats insérés directement dans la note. Liste faisant foi :
+`_RUN_OPS` dans `Wiki_LM/tools/server.py`. Utilise le nouvel endpoint
 `POST /run` du même `wiki-lm-server` (voir `docs/components/wiki-lm.md`) —
 même prérequis que le plugin de capture : le service doit tourner et être
 joignable.

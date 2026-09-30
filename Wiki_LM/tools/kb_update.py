@@ -21,10 +21,10 @@ from pathlib import Path
 
 import frontmatter
 import numpy as np
-from wiki_paths import embeddings_dir
+from wiki_paths import embeddings_dir, knowledge_base_dir
 
 _DEFAULT_EMBED_DIR = embeddings_dir()
-_DEFAULT_KB_DIR = Path.home() / "Documents" / "Secretarius" / "Wiki_LM" / "knowledge_base"
+_DEFAULT_KB_DIR = knowledge_base_dir()
 FUSION_THRESHOLD = 0.85
 MIN_SIZE = 3
 

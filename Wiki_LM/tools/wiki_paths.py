@@ -50,6 +50,12 @@ def embeddings_dir() -> Path:
     return wiki_root() / "embeddings"
 
 
+def knowledge_base_dir() -> Path:
+    """Base de connaissances (axes, embeddings, index) — même raisonnement
+    que embeddings_dir() : dérivée, donc dans le coffre ($WIKI_PATH)."""
+    return wiki_root() / "knowledge_base"
+
+
 CONTENT_SUBDIRS: list[str] = ["sources", "concepts", "entités"]
 CLUSTERING_SUBDIR: str = "clusterings"
 
