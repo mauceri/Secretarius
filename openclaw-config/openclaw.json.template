@@ -79,22 +79,6 @@
       "maxTokens": 8192
      }
     ]
-   },
-   "tiron-llm": {
-    "baseUrl": "${TIRON_LLM_URL}/v1",
-    "apiKey": "${TIRON_LLM_KEY}",
-    "api": "openai-completions",
-    "models": [
-     {
-      "id": "tiron-router",
-      "name": "Tiron Router (SLM local)",
-      "api": "openai-completions",
-      "reasoning": false,
-      "input": ["text"],
-      "contextWindow": 4096,
-      "maxTokens": 1024
-     }
-    ]
    }
   }
  },
@@ -110,7 +94,7 @@
     "primary": "euria/mistralai/Mistral-Small-4-119B-2603"
    },
    "models": {
-    "euria/mistralai/Mistral-Small-4-119B-2603": { "alias": "Euria" },
+    "euria/mistralai/Mistral-Small-4-119B-2603": { "alias": "Infomaniak" },
     "euria/Qwen/Qwen3.5-397B-A17B-FP8": { "alias": "Qwen397" },
     "euria/google/gemma-4-31B-it": { "alias": "Gemma4" },
     "euria/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8": { "alias": "Nemotron3" },
@@ -130,12 +114,8 @@
     "scope": "session"
    }
   },
-  "list": [
-   {
-    "id": "main",
-    "model": {
-     "primary": "tiron-llm/tiron-router"
-    },
+  "entries": {
+   "main": {
     "subagents": {
      "allowAgents": ["wiki", "scout", "gog"]
     },
@@ -154,8 +134,7 @@
      "exec": { "host": "sandbox" }
     }
    },
-   {
-    "id": "wiki",
+   "wiki": {
     "model": {
      "primary": "euria/mistralai/Mistral-Small-4-119B-2603"
     },
@@ -204,8 +183,7 @@
      }
     }
    },
-   {
-    "id": "scout",
+   "scout": {
     "model": {
      "primary": "deepseek/deepseek-chat"
     },
@@ -224,8 +202,7 @@
      }
     }
    },
-   {
-    "id": "gog",
+   "gog": {
     "model": {
      "primary": "euria/mistralai/Mistral-Small-4-119B-2603"
     },
@@ -261,7 +238,7 @@
      }
     }
    }
-  ]
+  }
  },
  "tools": {
   "exec": {

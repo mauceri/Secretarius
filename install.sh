@@ -354,9 +354,9 @@ echo ""
 echo "  4. Tester Wiki_LM :"
 echo "       cd ${WIKI_LM_PATH} && .venv/bin/python -m pytest tests/"
 echo ""
-echo "  5. Cerveau Tiron actif : défini par TIRON_LLM_URL à l'installation."
-echo "       Pour basculer : ./switch-brain.sh <sanroque|modal>"
-echo "       (URLs éditables dans ~/.openclaw/brains.env)"
+echo "  5. Cerveau de l'agent principal choisi automatiquement selon la RAM"
+echo "       disponible (ollama local | infomaniak | modal obfusqué)."
+echo "       Pour changer : relancer avec MAIN_BRAIN=<ollama|infomaniak|modal> ./install.sh --force"
 
 # Si docker inaccessible, rappeler la correction avant Milvus
 if [[ "$DOCKER_OK" != true ]]; then

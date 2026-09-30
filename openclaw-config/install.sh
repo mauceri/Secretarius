@@ -12,6 +12,7 @@ WIKI_PATH="${WIKI_PATH:-${OBSIDIAN_PATH}/Wiki_LM}"
 ASSISTANT_NAME="${ASSISTANT_NAME:-Tiron}"
 LLM_BACKEND="${LLM_BACKEND:-deepseek}"
 FORCE="${FORCE:-false}"
+INTERACTIVE="${INTERACTIVE:-false}"
 _i=0; _args=("$@")
 while [[ $_i -lt ${#_args[@]} ]]; do
   case "${_args[$_i]}" in
@@ -124,8 +125,8 @@ else
   if [[ -f "$TARGET" && "$FORCE" != "true" ]]; then
     warn "openclaw.json présent mais sans agents (config d'onboarding) — régénération"
   fi
-  export HOME HOSTNAME OBSIDIAN_PATH ASSISTANT_NAME OPENCLAW_GATEWAY_TOKEN EURIA_API_KEY EURIA_PRODUCT_ID OPENCLAW_DIR OPENCLAW_PORT GOG_ACCOUNT TIRON_LLM_URL TIRON_LLM_KEY
-  envsubst '${HOME} ${HOSTNAME} ${OBSIDIAN_PATH} ${ASSISTANT_NAME} ${OPENCLAW_GATEWAY_TOKEN} ${EURIA_API_KEY} ${EURIA_PRODUCT_ID} ${OPENCLAW_DIR} ${OPENCLAW_PORT} ${GOG_ACCOUNT} ${TIRON_LLM_URL} ${TIRON_LLM_KEY}' \
+  export HOME HOSTNAME OBSIDIAN_PATH ASSISTANT_NAME OPENCLAW_GATEWAY_TOKEN EURIA_API_KEY EURIA_PRODUCT_ID OPENCLAW_DIR OPENCLAW_PORT GOG_ACCOUNT
+  envsubst '${HOME} ${HOSTNAME} ${OBSIDIAN_PATH} ${ASSISTANT_NAME} ${OPENCLAW_GATEWAY_TOKEN} ${EURIA_API_KEY} ${EURIA_PRODUCT_ID} ${OPENCLAW_DIR} ${OPENCLAW_PORT} ${GOG_ACCOUNT}' \
     < "${SCRIPT_DIR}/openclaw.json.template" > "$TARGET"
   # Sync .bak pour éviter que le gateway détecte notre écriture comme un "clobber"
   # et restaure silencieusement l'ancienne config au démarrage suivant.
@@ -304,15 +305,109 @@ fi
 python3 -m pip install --user --break-system-packages -q "laya[onnx]" 2>/dev/null && \
   info "laya[onnx] installé" || \
   warn "Installation de laya échouée — installez manuellement : python3 -m pip install --user --break-system-packages 'laya[onnx]'"
-# Registre des cerveaux (éditable) — non écrasé s'il existe, sauf --force.
-if [[ ! -f "${HOME}/.openclaw/brains.env" || "$FORCE" == "true" ]]; then
-  cat > "${HOME}/.openclaw/brains.env" <<EOF
-BRAIN_SANROQUE_URL=http://100.100.126.7:8998
-BRAIN_SANROQUE_KEY=
-BRAIN_MODAL_URL=${BRAIN_MODAL_URL:-}
-BRAIN_MODAL_KEY_FILE=${HOME}/.openclaw/secrets/tiron-llm-key
-EOF
+# Cerveau de l'agent main (conversation Telegram, indépendant du routeur de
+# commandes ci-dessus) : choix automatique selon la RAM disponible, sauf si
+# MAIN_BRAIN est déjà fixé (install.conf ou variable d'environnement).
+if [[ -z "${MAIN_BRAIN}" ]]; then
+  AVAIL_MB="$(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo)"
+  if [[ "$AVAIL_MB" -ge "$MAIN_BRAIN_RAM_THRESHOLD_MB" ]]; then
+    MAIN_BRAIN="ollama"
+  elif [[ "$INTERACTIVE" == "true" ]]; then
+    echo "RAM disponible : ${AVAIL_MB} Mo (< ${MAIN_BRAIN_RAM_THRESHOLD_MB} Mo) — un modèle local n'est pas recommandé pour l'agent principal."
+    read -rp "Cerveau agent principal (infomaniak|modal) [infomaniak]: " _mb || true
+    MAIN_BRAIN="${_mb:-infomaniak}"
+  else
+    MAIN_BRAIN="infomaniak"
+    warn "RAM < ${MAIN_BRAIN_RAM_THRESHOLD_MB} Mo : cerveau agent principal = infomaniak par défaut (--interactive pour choisir modal)"
+  fi
 fi
+info "Cerveau agent principal : ${MAIN_BRAIN}"
+
+_set_main_model_provider() {  # provider_json_key model_id
+  OPENCLAW_JSON="${HOME}/.openclaw/openclaw.json" PROVIDER_KEY="$1" MODEL_ID="$2" PROVIDER_JSON="$3" \
+    python3 - <<'PYEOF'
+import json, os
+p = os.environ["OPENCLAW_JSON"]
+key, model = os.environ["PROVIDER_KEY"], os.environ["MODEL_ID"]
+provider = json.loads(os.environ["PROVIDER_JSON"])
+c = json.load(open(p))
+c["models"]["providers"][key] = provider
+c["agents"]["entries"]["main"]["model"] = {"primary": f"{key}/{model}"}
+json.dump(c, open(p, "w"), indent=1, ensure_ascii=False)
+open(p, "a").write("\n")
+PYEOF
+}
+
+case "$MAIN_BRAIN" in
+  ollama)
+    _set_main_model_provider ollama "$OLLAMA_MAIN_MODEL" "$(cat <<EOF
+{"baseUrl": "http://127.0.0.1:11434", "apiKey": "ollama-local", "api": "ollama",
+ "models": [{"id": "${OLLAMA_MAIN_MODEL}", "name": "${OLLAMA_MAIN_MODEL} (Ollama local)",
+             "reasoning": true, "input": ["text"], "contextTokens": 32768,
+             "params": {"thinking": false, "num_ctx": 32768}}]}
+EOF
+)"
+    if ! curl -s -o /dev/null "http://127.0.0.1:11434/api/tags"; then
+      warn "Ollama injoignable sur 127.0.0.1:11434 — installez/démarrez Ollama, puis : ollama pull ${OLLAMA_MAIN_MODEL}"
+    fi
+    ;;
+  modal)
+    OBF_DIR="${HOME}/obfuscator"
+    if [[ ! -d "$OBF_DIR" ]]; then
+      info "Clonage de ${OBF_DIR} (proxy obfusqué, dépôt séparé de Secretarius)"
+      git clone https://github.com/mauceri/obfuscator.git "$OBF_DIR" || \
+        { warn "Clonage échoué — cerveau agent principal laissé à Infomaniak par défaut"; MAIN_BRAIN="infomaniak"; }
+    fi
+    if [[ "$MAIN_BRAIN" == "modal" ]]; then
+      PROXY_VENV="${WIKI_LM_PATH}/.venv"
+      "${PROXY_VENV}/bin/pip" install -q fastapi uvicorn requests 2>/dev/null || \
+        warn "Installation des dépendances du proxy échouée (fastapi/uvicorn/requests dans ${PROXY_VENV})"
+      if [[ ! -f "${OBF_DIR}/artifacts/obfuscation_keys.json" ]]; then
+        info "Régénération de la clé de permutation (déterministe, seed documentée)"
+        mkdir -p "${OBF_DIR}/artifacts"
+        "${PROXY_VENV}/bin/python" - <<PYEOF
+import json
+V = 151936
+import random
+rng = random.Random(0)
+permuted = list(range(V)); rng.shuffle(permuted)
+perm = dict(zip(range(V), permuted))
+unperm = {v: k for k, v in perm.items()}
+json.dump({"vocab_permutation": {str(k): v for k, v in perm.items()},
+           "vocab_unpermute": {str(k): v for k, v in unperm.items()},
+           "seed": 0}, open("${OBF_DIR}/artifacts/obfuscation_keys.json", "w"))
+PYEOF
+      fi
+      if [[ -z "$ALOEPRI_API_KEY" ]]; then
+        warn "ALOEPRI_API_KEY absente — cerveau agent principal laissé à Infomaniak (fixez ALOEPRI_API_KEY et relancez avec --force pour activer Modal)"
+        MAIN_BRAIN="infomaniak"
+      else
+        mkdir -p "${HOME}/.config/obfuscator"
+        printf 'ALOEPRI_API_KEY=%s\n' "$ALOEPRI_API_KEY" > "${HOME}/.config/obfuscator/proxy.env"
+        chmod 600 "${HOME}/.config/obfuscator/proxy.env"
+        cp "${OBF_DIR}/systemd/obfuscator-proxy.service" "${SYSTEMD_USER_DIR}/obfuscator-proxy.service"
+        systemctl --user daemon-reload
+        systemctl --user enable --now obfuscator-proxy.service
+        _ready=false
+        for _ in $(seq 1 6); do
+          curl -s -o /dev/null "http://127.0.0.1:8001/health" && { _ready=true; break; }
+          sleep 5
+        done
+        if [[ "$_ready" != "true" ]]; then
+          warn "Proxy obfusqué pas encore prêt après 30s (cold start Modal possible, jusqu'à quelques minutes) — configuré quand même, réessayez plus tard : curl http://127.0.0.1:8001/health"
+        fi
+        _set_main_model_provider modal-obfusque qwen3-14b-h128-a1-h02 \
+          '{"baseUrl": "http://127.0.0.1:8001/v1", "apiKey": "local", "api": "openai-completions",
+            "models": [{"id": "qwen3-14b-h128-a1-h02", "name": "Qwen3-14B obfusqué (Modal)",
+                        "api": "openai-completions", "reasoning": false, "input": ["text"],
+                        "contextWindow": 32768, "maxTokens": 4096}]}'
+      fi
+    fi
+    ;;
+  infomaniak|*)
+    info "Cerveau agent principal : Infomaniak (provider par défaut, aucune config supplémentaire)"
+    ;;
+esac
 # Le service tiron-router est copié ci-dessus ; son activation + démarrage
 # (enable --now) est faite par le top-level install.sh APRÈS la création du venv
 # (ici le venv n'existe pas encore, l'activation serait sautée à tort).

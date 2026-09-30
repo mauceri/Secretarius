@@ -6,7 +6,7 @@ OpenClaw est un agent IA puissant, mais risqué dans sa configuration standard :
 
 Trois principes fondateurs :
 - **Indépendance** : hébergé sur votre propre machine ou serveur.
-- **Frugalité** : backend cloud léger (Euria/Infomaniak), pas de GPU requis.
+- **Frugalité** : backend cloud léger (Infomaniak), pas de GPU requis.
 - **Confidentialité** : vos données restent sous votre contrôle.
 
 → `docs/Secretarius.md` — présentation complète du projet  
@@ -21,18 +21,18 @@ Quatre agents spécialisés, un plugin, des sandboxes Docker isolés :
 ```
 Telegram ──► openclaw-gateway
                   │
-                  ├── Tiron (main)   Euria/Qwen3.5-397B ou Mistral-Small-4
+                  ├── Tiron (main)   Infomaniak (Qwen3.5-397B ou Mistral-Small-4)
                   │       sandbox Docker secretarius-tiron
                   │       15 skills déterministes (/inbox /c /q /ingest …)
                   │
-                  ├── wiki           Euria/Mistral-Small-4
+                  ├── wiki           Infomaniak (Mistral-Small-4)
                   │       sandbox Docker secretarius-wiki
                   │       outils Python Wiki_LM + ZIM Wikipedia FR offline
                   │
                   ├── scout          DeepSeek
                   │       fetch sécurisé de contenus externes (anti-injection)
                   │
-                  └── gog            Euria/Mistral-Small-4
+                  └── gog            Infomaniak (Mistral-Small-4)
                           sandbox Docker secretarius-gog
                           CLI Google (email, agenda, drive)
 
@@ -95,7 +95,7 @@ Plugin derisk-deleg : fournit gog_* et wiki_* aux agents ; intercepte /confirm e
 - `envsubst` : `apt install gettext`
 - `gog-bin` : binaire [gogcli](https://gogcli.sh/) (CLI Google Workspace) — télécharger le binaire Linux depuis [github.com/openclaw/gogcli](https://github.com/openclaw/gogcli/releases), renommer en `gog-bin` et placer à la racine du dépôt ; ou copier depuis une machine déjà configurée via `scp`
 - Bot Telegram (token via [@BotFather](https://t.me/botfather))
-- Clé API **Euria/Infomaniak** (backend principal)
+- Clé API **Infomaniak** (backend principal)
 - Clé API **DeepSeek** (agent scout)
 
 ---
@@ -123,7 +123,7 @@ ls -l gog-bin        # le fichier doit exister
 
 ```
 TELEGRAM_BOT_TOKEN=<token BotFather>
-EURIA_API_KEY=<clé Euria, 80 caractères>
+EURIA_API_KEY=<clé Infomaniak, 80 caractères>
 EURIA_PRODUCT_ID=<identifiant produit Infomaniak>
 DEEPSEEK_API_KEY=<clé DeepSeek — agent scout>
 GOG_ACCOUNT=<adresse gmail>
@@ -153,20 +153,19 @@ Répondre aux 4 questions (coffre Obsidian, nom de l'assistant, LLM, chemin Open
 
 → attendu : `Installation terminée` et `token gateway réconcilié`.
 
-> **Cerveau distant (VPS sans GPU, ex. santiago).** Le « cerveau » de Tiron — le
-> modèle qui alimente le provider `tiron-llm` (agent de conversation principal,
-> indépendant du routeur de commandes `tiron-router`, qui utilise Laya en
-> process, cf. `docs/superpowers/specs/2026-09-28-routeur-laya-design.md`) —
-> est local par défaut (`http://127.0.0.1:8998`). Pour le servir ailleurs (Modal, ou le llama de
-> sanroque via Tailscale), passez l'URL et la clé à l'install :
+> **Cerveau de l'agent principal (VPS sans GPU, ex. santiago).** Le modèle qui
+> alimente la conversation Telegram de Tiron — indépendant du routeur de
+> commandes `tiron-router`, qui utilise Laya en process, cf.
+> `docs/superpowers/specs/2026-09-28-routeur-laya-design.md` — est choisi
+> **automatiquement selon la RAM disponible** : Ollama local au-dessus du
+> seuil (`MAIN_BRAIN_RAM_THRESHOLD_MB`, 12 Go par défaut), sinon choix
+> interactif entre Infomaniak et un proxy Qwen3-14B obfusqué servi sur Modal
+> (confidentialité préservée, cf. `~/obfuscator/docs/acces-openai.md`). Pour
+> forcer un choix :
 > ```bash
-> TIRON_LLM_URL=https://<user>--tiron-llm-modal-serve.modal.run \
-> TIRON_LLM_KEY=<clé Secret Modal> \
-> BRAIN_MODAL_URL=https://<user>--tiron-llm-modal-serve.modal.run \
+> MAIN_BRAIN=modal ALOEPRI_API_KEY=<clé du secret Modal aloepri-api-key> \
 > ./install.sh --env-file ~/.config/secrets.env
 > ```
-> Voir `docs/components/modal.md` (déployer l'app Modal) et la section
-> [Basculer le cerveau](#basculer-le-cerveau-de-tiron-local--modal).
 
 **6. Copier le plugin derisk-deleg**
 
@@ -316,59 +315,48 @@ Il vérifie le binaire openclaw, contrôle que `TELEGRAM_BOT_TOKEN` est renseign
 
 ## Changer de modèle
 
-L'agent principal (`main`) utilise par défaut `Mistral-Small-4` (Euria). Pour basculer sur un autre modèle :
+L'agent principal (`main`) utilise par défaut `Mistral-Small-4` (Infomaniak). Pour basculer sur un autre modèle :
 
 ```bash
-switch-model Qwen397    # Qwen3.5-397B — meilleur routage wiki, recommandé
-switch-model Euria      # Mistral-Small-4 (défaut)
-switch-model Qwen122    # Qwen3.5-122B — variante légère
+switch-model Qwen397      # Qwen3.5-397B — meilleur routage wiki, recommandé
+switch-model Infomaniak   # Mistral-Small-4 (défaut)
+switch-model Qwen122      # Qwen3.5-122B — variante légère
 systemctl --user restart openclaw-gateway
 ```
 
-Modèles disponibles via Euria/Infomaniak :
+Modèles disponibles via Infomaniak :
 
 | Alias | Modèle | Notes |
 |-------|--------|-------|
-| `Euria` | Mistral-Small-4-119B-2603 | Défaut — fiable, rapide |
+| `Infomaniak` | Mistral-Small-4-119B-2603 | Défaut — fiable, rapide |
 | `Qwen397` | Qwen3.5-397B-A17B-FP8 | Recommandé : meilleur routage `/c`→wiki |
 | `Qwen122` | Qwen3.5-122B-A10B-FP8 | Variante légère de Qwen397 |
 | `Gemma4` | google/gemma-4-31B-it | — |
 | `Nemotron3` | nvidia/Nemotron-3-Nano-30B-A3B | — |
 
-> **Note** : Qwen3.5-397B n'est pas disponible sur tous les comptes Euria. Si l'agent ne répond pas après un `switch-model Qwen397`, revenir à `Euria` (Mistral-Small-4).
+> **Note** : Qwen3.5-397B n'est pas disponible sur tous les comptes Infomaniak. Si l'agent ne répond pas après un `switch-model Qwen397`, revenir à `Infomaniak` (Mistral-Small-4).
 
 L'agent `scout` utilise toujours DeepSeek (`deepseek-chat`) — non modifiable via `switch-model`.
 
 ---
 
-## Basculer le cerveau de Tiron (local ↔ Modal)
+## Cerveau de l'agent principal (Ollama local / Infomaniak / Modal obfusqué)
 
-Distinct de `switch-model` (qui change le modèle **de conversation** de l'agent main) :
-`switch-brain` change l'**endpoint du « cerveau »** — le modèle qui alimente le
-provider `tiron-llm` et le routeur de commandes `tiron-router`. Utile quand une
-machine n'a pas de GPU (VPS) et doit servir ce cerveau ailleurs.
+Distinct de `switch-model` (qui change le modèle de conversation *parmi les
+modèles Infomaniak*) et du routeur de commandes `tiron-router` (Laya, en
+process, indépendant). `install.sh` choisit automatiquement ce cerveau selon
+la RAM disponible (`MAIN_BRAIN_RAM_THRESHOLD_MB`, 12 Go par défaut) : Ollama
+local au-dessus du seuil, sinon choix interactif entre Infomaniak et un proxy
+Qwen3-14B obfusqué servi sur Modal (confidentialité préservée — clé de
+permutation et tokenizer restent locaux, cf. `~/obfuscator/docs/acces-openai.md`).
 
-Deux consommateurs sont repointés d'un coup (le provider dans `openclaw.json` **et**
-le routeur via `~/.openclaw/tiron-router.env`), puis les services redémarrent :
+Pour forcer un choix (et redéployer si besoin le proxy Modal) :
 
 ```bash
-./switch-brain.sh modal       # cerveau sur Modal
-./switch-brain.sh sanroque    # cerveau = llama de sanroque (via Tailscale)
+MAIN_BRAIN=ollama    ./install.sh --force   # Qwen3:8b local (OLLAMA_MAIN_MODEL)
+MAIN_BRAIN=infomaniak ./install.sh --force  # provider par défaut, rien à déployer
+MAIN_BRAIN=modal ALOEPRI_API_KEY=<clé> ./install.sh --force
 ```
-
-Les cibles nommées vivent dans **`~/.openclaw/brains.env`** (posé par `install.sh`,
-éditable) :
-
-```
-BRAIN_SANROQUE_URL=http://100.100.126.7:8998        # IP Tailscale de sanroque
-BRAIN_SANROQUE_KEY=
-BRAIN_MODAL_URL=https://<user>--tiron-llm-modal-serve.modal.run
-BRAIN_MODAL_KEY_FILE=~/.openclaw/secrets/tiron-llm-key
-```
-
-Prérequis pour la cible `modal` : l'app Modal déployée et la clé présente dans le
-fichier `BRAIN_MODAL_KEY_FILE`. Déploiement de l'app, arrêt, coûts, chargement d'un
-autre LLM : voir **`docs/components/modal.md`**.
 
 ---
 
@@ -391,7 +379,6 @@ bash install.sh
 ```
 Secretarius/
 ├── install.sh, start.sh                # installation / démarrage (racine)
-├── switch-brain.sh                     # bascule le cerveau LLM (local ↔ Modal)
 ├── gog-connect.sh                      # (ré)autorisation Google de l'agent gog (shell)
 ├── openclaw-config/
 │   ├── INSTALL.md                      # Procédure d'installation détaillée
@@ -400,7 +387,7 @@ Secretarius/
 │   ├── openclaw.json.template          # Configuration OpenClaw (4 agents + plugin)
 │   ├── gateway.systemd.env.template
 │   ├── openclaw-gateway.service        # Service systemd user
-│   ├── tiron-router.service            # Service routeur de commandes (BGE-M3)
+│   ├── tiron-router.service            # Service routeur de commandes (Laya)
 │   ├── Dockerfile.tiron                # Sandbox agent principal
 │   ├── Dockerfile.wiki                 # Sandbox agent wiki
 │   ├── Dockerfile.gog                  # Sandbox agent gog
