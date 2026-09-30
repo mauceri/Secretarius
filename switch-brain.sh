@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# switch-brain — bascule le cerveau LLM de Tiron (provider + routeur) vers un
-# endpoint nommé du registre ~/.openclaw/brains.env, puis redémarre.
+# switch-brain — bascule le cerveau LLM de Tiron (provider de chat principal)
+# vers un endpoint nommé du registre ~/.openclaw/brains.env, puis redémarre.
+# Ne touche plus au routeur : depuis le passage à Laya (classifieur calibré
+# en process, cf. router_service/laya_classifier.py), le routage ne dépend
+# plus d'aucun cerveau LLM basculable.
 set -euo pipefail
 
 BRAINS_ENV="${BRAINS_ENV:-$HOME/.openclaw/brains.env}"
 OPENCLAW_JSON="${OPENCLAW_JSON:-$HOME/.openclaw/openclaw.json}"
-ROUTER_ENV="${ROUTER_ENV:-$HOME/.openclaw/tiron-router.env}"
 
 usage() { echo "Usage: switch-brain <sanroque|modal>" >&2; exit 1; }
 [ $# -eq 1 ] || usage
@@ -40,25 +42,10 @@ open(p, "a").write("\n")
 shutil.copy(p, p + ".bak")
 PY
 
-# 2. routeur : maj des 2 vars, préserve le reste (WIKI_PATH…)
-touch "$ROUTER_ENV"
-_set() {  # fichier clé valeur
-  local f="$1" k="$2" v="$3" tmp
-  tmp="$(mktemp)"
-  awk -v k="$k" -v v="$v" '
-    $0 ~ "^" k "=" { print k "=" v; done=1; next }
-    { print }
-    END { if (!done) print k "=" v }
-  ' "$f" > "$tmp"
-  mv "$tmp" "$f"
-}
-_set "$ROUTER_ENV" TIRON_LLAMA_BASE "$URL"
-_set "$ROUTER_ENV" TIRON_LLAMA_KEY "$KEY"
-
 echo "Cerveau actif : $NAME ($URL)"
 
-# 3. restart (sautable en test)
+# 2. restart (sautable en test)
 if [ "${SWITCH_BRAIN_NO_RESTART:-}" != "1" ]; then
-  systemctl --user restart openclaw-gateway tiron-router 2>/dev/null || \
-    echo "Redémarrez manuellement : systemctl --user restart openclaw-gateway tiron-router" >&2
+  systemctl --user restart openclaw-gateway 2>/dev/null || \
+    echo "Redémarrez manuellement : systemctl --user restart openclaw-gateway" >&2
 fi

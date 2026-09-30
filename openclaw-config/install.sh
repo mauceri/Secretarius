@@ -290,17 +290,20 @@ fi
 # Routeur Tiron (tiron-router) — versionné, câblé au cerveau via tiron-router.env.
 ROUTER_DST="${SYSTEMD_USER_DIR}/tiron-router.service"
 cp "${SCRIPT_DIR}/tiron-router.service" "$ROUTER_DST"
-# Env du routeur : endpoint LLM initial (depuis TIRON_LLM_URL/KEY) + FAQ_PATH.
-# Non écrasé s'il existe déjà (préserve un cerveau choisi via switch-brain).
+# Env du routeur : checkpoint Laya (classifieur en process, indépendant du
+# cerveau tiron-llm ci-dessus) + FAQ_PATH.
+# Non écrasé s'il existe déjà.
 if [[ ! -f "${HOME}/.openclaw/tiron-router.env" || "$FORCE" == "true" ]]; then
   cat > "${HOME}/.openclaw/tiron-router.env" <<EOF
-TIRON_LLAMA_BASE=${TIRON_LLM_URL}
-TIRON_LLAMA_KEY=${TIRON_LLM_KEY}
+LAYA_CHECKPOINT=${LAYA_CHECKPOINT}
 FAQ_PATH=${WIKI_PATH}/faits/faits.md
 EOF
 else
-  info "tiron-router.env déjà présent — conservé (cerveau actif préservé)"
+  info "tiron-router.env déjà présent — conservé"
 fi
+python3 -m pip install --user --break-system-packages -q "laya[onnx]" 2>/dev/null && \
+  info "laya[onnx] installé" || \
+  warn "Installation de laya échouée — installez manuellement : python3 -m pip install --user --break-system-packages 'laya[onnx]'"
 # Registre des cerveaux (éditable) — non écrasé s'il existe, sauf --force.
 if [[ ! -f "${HOME}/.openclaw/brains.env" || "$FORCE" == "true" ]]; then
   cat > "${HOME}/.openclaw/brains.env" <<EOF

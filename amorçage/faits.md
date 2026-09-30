@@ -18,7 +18,7 @@ Secretarius tourne sur sanroque, un ordinateur portable : processeur AMD Ryzen 9
 
 ## Quels services tournent pour Secretarius ?
 ## Quels sont les services actifs et leurs ports ?
-Quatre services systemd : slm-llama_cpp (port 8998, Phi-4-mini + adaptateur de routage, accéléré ROCm), tiron-router (port 8999, routage des messages), openclaw-gateway (passerelle Telegram qui exécute Tiron), et l'extracteur llama.cpp Wikipédia FR (port 8989).
+Trois services systemd : tiron-router (port 8999, classifieur Laya calibré en process pour le routage des messages), openclaw-gateway (passerelle Telegram qui exécute Tiron), et l'extracteur llama.cpp Wikipédia FR (port 8989). Le service phi-4-mini/llama.cpp (port 8998) a été décommissionné le 2026-09-30 avec le passage à Laya.
 
 ## Qu'est-ce que le wiki de Secretarius ?
 ## C'est quoi Wiki_LM ?

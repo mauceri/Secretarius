@@ -154,8 +154,10 @@ Répondre aux 4 questions (coffre Obsidian, nom de l'assistant, LLM, chemin Open
 → attendu : `Installation terminée` et `token gateway réconcilié`.
 
 > **Cerveau distant (VPS sans GPU, ex. santiago).** Le « cerveau » de Tiron — le
-> modèle qui alimente le provider `tiron-llm` et le routeur de commandes — est local
-> par défaut (`http://127.0.0.1:8998`). Pour le servir ailleurs (Modal, ou le llama de
+> modèle qui alimente le provider `tiron-llm` (agent de conversation principal,
+> indépendant du routeur de commandes `tiron-router`, qui utilise Laya en
+> process, cf. `docs/superpowers/specs/2026-09-28-routeur-laya-design.md`) —
+> est local par défaut (`http://127.0.0.1:8998`). Pour le servir ailleurs (Modal, ou le llama de
 > sanroque via Tailscale), passez l'URL et la clé à l'install :
 > ```bash
 > TIRON_LLM_URL=https://<user>--tiron-llm-modal-serve.modal.run \
