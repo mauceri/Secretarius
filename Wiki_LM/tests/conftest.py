@@ -90,6 +90,10 @@ class MockLLM:
 
     def __init__(self) -> None:
         self.calls: list[str] = []
+        # Réponse à la ré-extraction de reingest_source() (_PROMPT_REEXTRACT_ITEMS) —
+        # vide par défaut (rien à ajouter) ; à définir explicitement par les tests
+        # qui en ont besoin.
+        self.reextract_response = ""
 
     def complete(self, prompt: str, system: str = "", max_tokens: int = 2000) -> str:
         self.calls.append(prompt[:80])
@@ -101,6 +105,8 @@ class MockLLM:
             return _ENTITY_PAGE.format(name=name)
         if "note personnelle" in prompt.lower():
             return "TITRE: Ma note de test\n- concept: zettelkasten\n- entité: Vannevar Bush\n"
+        if "déjà rédigée" in prompt.lower():
+            return self.reextract_response
         return _SOURCE_PAGE
 
 

@@ -221,6 +221,74 @@ class TestCheckUnlinkedMentions:
         assert mentions[0].target == "- concept: guerre-psychologique"
 
 
+class TestCheckUnresolvedSuggestions:
+    """Slugs nus sous "## Liens internes suggérés", jamais matérialisés en
+    page ni en lien — cas dégradé distinct d'unlinked-mention (format
+    "- concept: X"), rencontré sur src-jade-divers-of-big-sur-county-
+    highway-dispatch (30/09/2026)."""
+
+    def test_bare_slug_reported(self, wiki_root, wiki_dir):
+        _write_page(
+            wiki_dir, "sources", "src-a", title="A", category="source",
+            body="## Liens internes suggérés\n\n- e-don-wobber\n",
+        )
+
+        report = WikiLint(wiki_root).run()
+
+        found = [i for i in report.warnings if i.code == "unresolved-suggestion"]
+        assert len(found) == 1
+        assert found[0].slug == "src-a"
+        assert found[0].target == "- e-don-wobber"
+
+    def test_bare_slug_with_annotation_reported(self, wiki_root, wiki_dir):
+        _write_page(
+            wiki_dir, "sources", "src-a", title="A", category="source",
+            body="## Liens internes suggérés\n\n- src-jade-beneath-the-sea (œuvre de Don Wobber)\n",
+        )
+
+        report = WikiLint(wiki_root).run()
+
+        assert any(i.code == "unresolved-suggestion" for i in report.warnings)
+
+    def test_already_linked_suggestion_not_reported(self, wiki_root, wiki_dir):
+        _write_page(
+            wiki_dir, "sources", "src-a", title="A", category="source",
+            body="## Liens internes suggérés\n\n- [[c-big-sur]]\n",
+        )
+        _write_page(wiki_dir, "concepts", "c-big-sur", title="Big Sur", category="concept")
+
+        report = WikiLint(wiki_root).run()
+
+        assert not any(i.code == "unresolved-suggestion" for i in report.warnings)
+
+    def test_bare_item_outside_section_not_reported(self, wiki_root, wiki_dir):
+        """Distinct d'unlinked-mention : ne signale que sous le titre
+        "Liens internes suggérés", pas n'importe quelle puce du corps."""
+        _write_page(
+            wiki_dir, "sources", "src-a", title="A", category="source",
+            body="## Points clés\n\n- don wobber a extrait du jade\n",
+        )
+
+        report = WikiLint(wiki_root).run()
+
+        assert not any(i.code == "unresolved-suggestion" for i in report.warnings)
+
+    def test_stops_at_next_heading(self, wiki_root, wiki_dir):
+        _write_page(
+            wiki_dir, "sources", "src-a", title="A", category="source",
+            body=(
+                "## Liens internes suggérés\n\n- e-don-wobber\n\n"
+                "## Une autre section\n\n- pas une suggestion\n"
+            ),
+        )
+
+        report = WikiLint(wiki_root).run()
+
+        found = [i for i in report.warnings if i.code == "unresolved-suggestion"]
+        assert len(found) == 1
+        assert found[0].target == "- e-don-wobber"
+
+
 class TestCheckOrphans:
     def test_page_with_no_incoming_link_is_orphan(self, wiki_root, wiki_dir):
         _write_page(wiki_dir, "sources", "src-a", title="A", category="source")

@@ -936,3 +936,95 @@ class TestIngestRawDirMirrorsToVault:
         manifest = ingestor._load_manifest()
         assert "note.md" in manifest
         assert manifest["note.md"]["slug"].startswith("src-")
+
+
+def _write_source_page(wiki_dir: Path, slug: str, body: str, *, status: str = "") -> Path:
+    path = wiki_dir / "sources" / f"{slug}.md"
+    status_line = f"status: {status}\n" if status else ""
+    path.write_text(
+        f"---\ntitle: Jade\ncategory: source\n{status_line}---\n\n{body}\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+class TestReingestSource:
+    """Réingestion non-destructive (cas src-jade-divers-of-big-sur-county-
+    highway-dispatch, 30/09/2026) : n'ajoute que les concepts/entités
+    manquants, ne touche jamais au contenu déjà présent."""
+
+    def test_rejects_non_source_slug(self, ingestor):
+        result = ingestor.reingest_source("c-jade")
+        assert "error" in result
+
+    def test_rejects_missing_page(self, ingestor):
+        result = ingestor.reingest_source("src-introuvable")
+        assert "error" in result
+
+    def test_dry_run_previews_without_writing(self, ingestor, mock_llm, wiki_dir):
+        path = _write_source_page(
+            wiki_dir, "src-jade",
+            "## Résumé\n\nLe jade à Big Sur.\n\n## Concepts et entités mentionnés\n\n",
+        )
+        original = path.read_text(encoding="utf-8")
+        mock_llm.reextract_response = "- concept: jade\n- entité: Don Wobber\n"
+
+        result = ingestor.reingest_source("src-jade", dry_run=True)
+
+        assert path.read_text(encoding="utf-8") == original
+        assert result["status"] == "preview"
+        assert result["concepts_to_add"] == ["jade"]
+        assert result["entities_to_add"] == ["Don Wobber"]
+
+    def test_apply_adds_missing_links_without_touching_existing_body(
+        self, ingestor, mock_llm, wiki_dir
+    ):
+        path = _write_source_page(
+            wiki_dir, "src-jade",
+            "## Résumé\n\nLe jade à Big Sur.\n\n## Concepts et entités mentionnés\n\n"
+            "## Liens internes suggérés\n\n- c-big-sur\n",
+        )
+        mock_llm.reextract_response = "- concept: jade\n- entité: Don Wobber\n"
+
+        result = ingestor.reingest_source("src-jade", dry_run=False)
+
+        content = path.read_text(encoding="utf-8")
+        assert "Le jade à Big Sur." in content  # corps existant intact
+        assert "- c-big-sur" in content  # section non touchée, même non résolue
+        assert "[[c-jade]]" in content
+        assert "[[e-don-wobber]]" in content
+        assert result["status"] == "applied"
+        assert (wiki_dir / "concepts" / "c-jade.md").exists()
+        assert (wiki_dir / "entités" / "e-don-wobber.md").exists()
+
+    def test_apply_skips_items_already_linked(self, ingestor, mock_llm, wiki_dir):
+        path = _write_source_page(
+            wiki_dir, "src-jade",
+            "## Concepts et entités mentionnés\n\n- concept: [[c-jade]]\n",
+        )
+        mock_llm.reextract_response = "- concept: jade\n"
+
+        result = ingestor.reingest_source("src-jade", dry_run=False)
+
+        assert result["status"] == "nothing_to_add"
+        assert path.read_text(encoding="utf-8").count("[[c-jade]]") == 1
+
+    def test_immuable_page_never_overwritten(self, ingestor, mock_llm, wiki_dir):
+        path = _write_source_page(
+            wiki_dir, "src-jade",
+            "## Concepts et entités mentionnés\n\n", status="immuable",
+        )
+        original = path.read_text(encoding="utf-8")
+        mock_llm.reextract_response = "- concept: jade\n"
+
+        ingestor.reingest_source("src-jade", dry_run=False)
+
+        assert path.read_text(encoding="utf-8") == original
+
+    def test_nothing_to_add_when_extraction_is_empty(self, ingestor, mock_llm, wiki_dir):
+        _write_source_page(wiki_dir, "src-jade", "## Concepts et entités mentionnés\n\n")
+        mock_llm.reextract_response = ""
+
+        result = ingestor.reingest_source("src-jade", dry_run=True)
+
+        assert result == {"status": "nothing_to_add", "slug": "src-jade"}

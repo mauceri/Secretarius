@@ -117,6 +117,10 @@ _META_PAGES = {"index", "log", "schema"}
 _LINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 _REQUIRED_FRONTMATTER = {"title", "category"}
 _UNLINKED_ITEM_RE = re.compile(r"^-\s+(?:concept|entit[eé]):\s+(?!\[\[).+$", re.MULTILINE | re.IGNORECASE)
+_SUGGESTION_SECTION_RE = re.compile(
+    r"^## Liens internes suggérés\s*\n(.*?)(?=\n## |\Z)", re.MULTILINE | re.DOTALL,
+)
+_SUGGESTION_ITEM_RE = re.compile(r"^-\s+(?!\[\[).+$", re.MULTILINE)
 
 
 class WikiLint:
@@ -135,6 +139,7 @@ class WikiLint:
         self._check_frontmatter(pages, report)
         self._check_links(pages, report)
         self._check_unlinked_mentions(pages, report)
+        self._check_unresolved_suggestions(pages, report)
         self._check_orphans(pages, report)
         self._check_index(pages, report)
         self._append_log(report)
@@ -198,6 +203,26 @@ class WikiLint:
                 report.add(
                     "warning", "unlinked-mention", slug,
                     f"Mention non liée : {line}",
+                    target=line,
+                )
+
+    def _check_unresolved_suggestions(self, pages: dict, report: LintReport) -> None:
+        """Détecte les entrées de "## Liens internes suggérés" jamais
+        résolues en vrai [[lien]] — cas dégradé distinct d'unlinked-mention
+        (format "- concept: X") : des slugs nus suggérés par le LLM mais
+        jamais matérialisés en page ni en lien, rencontré sur des pages à
+        l'extraction non standard (ex. src-jade-divers-of-big-sur-county-
+        highway-dispatch, 30/09/2026), invisibles pour
+        _check_unlinked_mentions."""
+        for slug, info in pages.items():
+            section = _SUGGESTION_SECTION_RE.search(info.get("body", ""))
+            if not section:
+                continue
+            for m in _SUGGESTION_ITEM_RE.finditer(section.group(1)):
+                line = m.group(0).strip()
+                report.add(
+                    "warning", "unresolved-suggestion", slug,
+                    f"Suggestion de lien jamais résolue : {line}",
                     target=line,
                 )
 

@@ -487,6 +487,32 @@ def _linkify_concepts_section(
     return "\n".join(out_lines) + ("\n" if content.endswith("\n") else "")
 
 
+def _append_lines_after_heading(content: str, heading: str, new_lines: list[str]) -> str:
+    """Ajoute des lignes juste après `heading`, avant la section suivante
+    (prochain `## `) ou en fin de fichier — sans toucher au reste du
+    contenu. Utilisé par reingest_source() pour un ajout pur, jamais une
+    réécriture de section existante."""
+    if not new_lines:
+        return content
+    addition = "\n".join(new_lines)
+    if heading not in content:
+        sep = "" if content.endswith("\n") else "\n"
+        return content + f"{sep}\n{heading}\n\n{addition}\n"
+
+    idx = content.index(heading) + len(heading)
+    rest = content[idx:]
+    m = re.search(r"\n## ", rest)
+    insert_at = idx + (m.start() if m else len(rest))
+
+    before = content[:insert_at].rstrip("\n")
+    after = content[insert_at:].lstrip("\n")
+    last_line = before.rsplit("\n", 1)[-1]
+    sep = "\n" if last_line.strip().startswith("-") else "\n\n"
+    if after:
+        return f"{before}{sep}{addition}\n\n{after}"
+    return f"{before}{sep}{addition}\n"
+
+
 _YAML_UNSAFE = re.compile(r":\s|[#{}[\]]")
 
 
@@ -652,6 +678,25 @@ TITRE: <titre court résumant le sujet de la note>
 
 Une ligne par concept/entité. S'il n'y en a aucun, n'écris que la ligne TITRE.
 """
+
+
+_PROMPT_REEXTRACT_ITEMS = """\
+Voici le contenu d'une page de wiki déjà rédigée. Identifie les concepts \
+abstraits et entités (personnes, outils, organisations) importants qui y \
+sont mentionnés — y compris ceux qui ne sont pas encore liés dans une \
+section dédiée.
+
+Contenu :
+---
+{content}
+---
+
+Réponds UNIQUEMENT avec des lignes au format :
+- concept: <nom du concept>
+- entité: <nom de l'entité>
+
+Une ligne par concept/entité. N'invente rien qui ne soit pas mentionné \
+dans le contenu ci-dessus."""
 
 
 _WIKI_ANCHOR_RE = re.compile(
@@ -1392,6 +1437,66 @@ class Ingestor:
 
         print(f"[ingest] Terminé → wiki/{src_slug}.md")
         return src_slug
+
+    def reingest_source(self, slug: str, max_concepts: int = 5, dry_run: bool = True) -> dict:
+        """Réingestion non-destructive d'une page source existante : ré-extrait
+        les concepts/entités depuis son propre contenu et n'AJOUTE que ceux
+        qui manquent encore (nouvelle page de concept/entité + lien dans
+        "## Concepts et entités mentionnés") — ne régénère ni ne supprime
+        jamais rien du contenu déjà présent sur la page source elle-même.
+        Cas d'origine : src-jade-divers-of-big-sur-county-highway-dispatch,
+        dont l'extraction initiale a échoué (section vide), 30/09/2026.
+
+        dry_run=True (défaut) : ne modifie rien, retourne juste ce qui
+        serait ajouté."""
+        if not slug.startswith("src-"):
+            return {"error": f"réingestion réservée aux pages source (préfixe src-) : {slug!r}"}
+        path = slug_to_path(self.wiki_dir, slug)
+        if not path.exists():
+            return {"error": f"page introuvable : {slug}"}
+
+        raw_content = path.read_text(encoding="utf-8")
+        post = frontmatter.loads(raw_content)
+        body = post.content
+        source_title = str(post.get("title", "")) or slug
+
+        already_linked = {m.split("|", 1)[0].split("#", 1)[0].strip() for m in _LINK_RE.findall(body)}
+
+        extraction = self.llm.complete(
+            _PROMPT_REEXTRACT_ITEMS.format(content=body[:6000]),
+            system=_SYSTEM_INGEST, max_tokens=500,
+        )
+        concepts = [c for c in _extract_items(extraction, "concept")[:max_concepts]
+                    if f"c-{_slugify(c)}" not in already_linked]
+        entities = [e for e in _extract_items(extraction, "entité")[:max_concepts]
+                    if f"e-{_slugify(e)}" not in already_linked]
+
+        if not concepts and not entities:
+            return {"status": "nothing_to_add", "slug": slug}
+
+        if dry_run:
+            return {
+                "status": "preview", "slug": slug,
+                "concepts_to_add": concepts, "entities_to_add": entities,
+            }
+
+        for concept in concepts:
+            self._update_concept_page(concept, source_title, slug, body)
+        for entity in entities:
+            self._update_entity_page(entity, source_title, slug, body)
+
+        new_lines = [f"- concept: [[c-{_slugify(c)}]]" for c in concepts]
+        new_lines += [f"- entité: [[e-{_slugify(e)}]]" for e in entities]
+        updated = _append_lines_after_heading(
+            raw_content, "## Concepts et entités mentionnés", new_lines
+        )
+        self._write_wiki_page(slug, updated)
+        self._append_log("reingest", source_title)
+
+        return {
+            "status": "applied", "slug": slug,
+            "concepts_added": concepts, "entities_added": entities,
+        }
 
     # ------------------------------------------------------------------
     # Helpers internes

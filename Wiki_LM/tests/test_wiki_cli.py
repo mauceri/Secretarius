@@ -916,7 +916,9 @@ class TestOpRepair:
         out = wiki.op_repair_preview("")
         assert out == {
             "status": "families",
-            "available": ["broken-link", "missing-frontmatter", "unlinked-mention"],
+            "available": [
+                "broken-link", "missing-frontmatter", "unlinked-mention", "unresolved-suggestion",
+            ],
         }
 
     def test_empty_family_lists_available_families_apply(self, monkeypatch, tmp_path):
@@ -962,3 +964,82 @@ class TestOpRepair:
         assert calls == [True]
         assert out["family"] == "unlinked-mention"
         assert out["before_count"] == 15
+
+    def test_dispatches_unresolved_suggestion_family(self, monkeypatch, tmp_path):
+        wiki = _wiki(monkeypatch, tmp_path)
+        calls = []
+
+        class _FakeReport:
+            family = "unresolved-suggestion"
+            dry_run = True
+            before_count = 7
+            after_count = 0
+            changes = ["src-jade : 7 suggestion(s) non résolue(s) retirée(s)"]
+
+        class _FakeRepair:
+            def __init__(self, wiki_path):
+                pass
+
+            def repair_unresolved_suggestions(self, dry_run):
+                calls.append(dry_run)
+                return _FakeReport()
+
+        monkeypatch.setattr(wiki, "WikiRepair", _FakeRepair, raising=False)
+        out = wiki.op_repair_preview("unresolved-suggestion")
+
+        assert calls == [True]
+        assert out["family"] == "unresolved-suggestion"
+        assert out["before_count"] == 7
+
+
+class TestOpReingest:
+    def test_preview_calls_dry_run(self, monkeypatch, tmp_path):
+        wiki = _wiki(monkeypatch, tmp_path)
+        calls = []
+
+        class _FakeIngestor:
+            def __init__(self, wiki_path, raw_path=None):
+                pass
+
+            def reingest_source(self, slug, dry_run):
+                calls.append((slug, dry_run))
+                return {"status": "preview", "slug": slug, "concepts_to_add": ["jade"], "entities_to_add": []}
+
+        monkeypatch.setattr(wiki, "Ingestor", _FakeIngestor, raising=False)
+        out = wiki.op_reingest_preview("src-jade")
+
+        assert calls == [("src-jade", True)]
+        assert out["status"] == "preview"
+        assert out["concepts_to_add"] == ["jade"]
+
+    def test_apply_calls_real_run(self, monkeypatch, tmp_path):
+        wiki = _wiki(monkeypatch, tmp_path)
+        calls = []
+
+        class _FakeIngestor:
+            def __init__(self, wiki_path, raw_path=None):
+                pass
+
+            def reingest_source(self, slug, dry_run):
+                calls.append((slug, dry_run))
+                return {"status": "applied", "slug": slug, "concepts_added": [], "entities_added": []}
+
+        monkeypatch.setattr(wiki, "Ingestor", _FakeIngestor, raising=False)
+        out = wiki.op_reingest("src-jade")
+
+        assert calls == [("src-jade", False)]
+        assert out["status"] == "applied"
+
+    def test_empty_slug_returns_error_without_constructing_ingestor(self, monkeypatch, tmp_path):
+        wiki = _wiki(monkeypatch, tmp_path)
+        calls = []
+
+        class _FakeIngestor:
+            def __init__(self, wiki_path, raw_path=None):
+                calls.append("constructed")
+
+        monkeypatch.setattr(wiki, "Ingestor", _FakeIngestor, raising=False)
+        out = wiki.op_reingest_preview("")
+
+        assert "error" in out
+        assert calls == []

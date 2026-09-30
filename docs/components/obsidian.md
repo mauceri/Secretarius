@@ -245,7 +245,8 @@ de `/c`, sans quitter Obsidian), depuis desktop ou mobile. Source :
 
 Exécuter une liste de commandes `/` Wiki_LM (`/q`, `/c`, `/tags`, `/ingest`,
 `/wikistatus`, `/r`, `/kbupdate`, `/relire`, `/verifie`, `/supprimer?`,
-`/supprimer!`, `/lint`, `/repair?`, `/repair!`, `/switch-wiki-model`, `/help`
+`/supprimer!`, `/lint`, `/repair?`, `/repair!`, `/reingerer?`, `/reingerer!`,
+`/switch-wiki-model`, `/help`
 — seule la forme `/supprimer` sans suffixe est volontairement exclue :
 Telegram est le seul chemin qui peut supprimer sans `!` explicite, via son
 essai à blanc puis `/confirm`) depuis une seule note Obsidian, en une action,

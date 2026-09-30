@@ -227,7 +227,8 @@ _HELP_TEXT = """\
 - **/relire** — page source la plus ancienne, non vérifiée et déjà résumée, à relire.
 - **/supprimer? `<slug>`** — essai à blanc d'une suppression en cascade (rien n'est modifié).
 - **/lint** — audite le wiki (liens cassés, frontmatter manquant, pages orphelines...).
-- **/repair? `<famille>`** — essai à blanc d'une réparation (`broken-link`, `missing-frontmatter` ou `unlinked-mention`). Sans argument : liste les familles disponibles.
+- **/repair? `<famille>`** — essai à blanc d'une réparation (`broken-link`, `missing-frontmatter`, `unlinked-mention` ou `unresolved-suggestion`). Sans argument : liste les familles disponibles.
+- **/reingerer? `<slug>`** — essai à blanc d'une réingestion (concepts/entités qui seraient ajoutés, rien n'est modifié).
 - **/help** — cette aide.
 
 ## Modification
@@ -238,7 +239,8 @@ _HELP_TEXT = """\
 - **/kbupdate** — reconstruit la base de connaissances depuis le dernier clustering.
 - **/verifie `<slug>`** — marque une page comme vérifiée.
 - **/supprimer! `<slug>`** — supprime réellement (déplace vers la poubelle), en cascade.
-- **/repair! `<famille>`** — applique réellement la réparation (`broken-link`, `missing-frontmatter` ou `unlinked-mention`). Sans argument : liste les familles disponibles.
+- **/repair! `<famille>`** — applique réellement la réparation (`broken-link`, `missing-frontmatter`, `unlinked-mention` ou `unresolved-suggestion`). Sans argument : liste les familles disponibles.
+- **/reingerer! `<slug>`** — réingère réellement une page source : n'ajoute que les concepts/entités manquants (nouvelle page + lien), ne touche jamais au contenu déjà présent.
 - **/switch-wiki-model `<alias>`** — bascule le LLM du wiki (`deepseek`, `infomaniak`, `obfusque`). Sans argument : affiche le modèle actuel (lecture seule).
 """
 
@@ -440,7 +442,7 @@ def op_lint() -> dict:
     }
 
 
-_REPAIR_FAMILIES = {"broken-link", "missing-frontmatter", "unlinked-mention"}
+_REPAIR_FAMILIES = {"broken-link", "missing-frontmatter", "unlinked-mention", "unresolved-suggestion"}
 
 
 def _repair(family: str, dry_run: bool) -> dict:
@@ -454,6 +456,8 @@ def _repair(family: str, dry_run: bool) -> dict:
         report = repairer.repair_broken_links(dry_run=dry_run)
     elif family == "unlinked-mention":
         report = repairer.repair_unlinked_mentions(dry_run=dry_run)
+    elif family == "unresolved-suggestion":
+        report = repairer.repair_unresolved_suggestions(dry_run=dry_run)
     else:
         report = repairer.repair_frontmatter(dry_run=dry_run)
     return {
@@ -492,6 +496,21 @@ def op_delete_preview(slug: str) -> dict:
 
 def op_delete(slug: str) -> dict:
     return _delete(slug, dry_run=False)
+
+
+def _reingest(slug: str, dry_run: bool) -> dict:
+    if not slug:
+        return {"error": "slug manquant"}
+    ingestor = Ingestor(_wiki_root(), raw_path=_raw_dir())
+    return ingestor.reingest_source(slug, dry_run=dry_run)
+
+
+def op_reingest_preview(slug: str) -> dict:
+    return _reingest(slug, dry_run=True)
+
+
+def op_reingest(slug: str) -> dict:
+    return _reingest(slug, dry_run=False)
 
 
 def _pending_review(sources_dir: Path) -> list[Path]:

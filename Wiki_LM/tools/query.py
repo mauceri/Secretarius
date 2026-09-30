@@ -174,7 +174,22 @@ class WikiQuery:
         prompt = _PROMPT_QUERY.format(question=question, pages_block=pages_block)
         synthesis = self.llm.complete(prompt, system=_SYSTEM_QUERY, max_tokens=2000)
 
-        # 4. Extraire les slugs effectivement cités dans la réponse
+        # 4. Le LLM peut citer des slugs absents des pages fournies (repris
+        # tels quels d'une section "Liens internes suggérés" non résolue
+        # dans une page source, ou inventés) -> liens morts. On efface ces
+        # citations plutôt que de les dénuder en texte brut (cf. retour
+        # d'expérience /repair! broken-link : un slug fantôme sans
+        # crochets n'apporte rien de plus qu'un lien mort).
+        known = set(slugs)
+
+        def _drop_unknown(match: re.Match) -> str:
+            return match.group(0) if match.group(1) in known else ""
+
+        synthesis = re.sub(r"\[\[([^\]]+)\]\]", _drop_unknown, synthesis)
+        synthesis = re.sub(r"[ \t]{2,}", " ", synthesis)
+        synthesis = re.sub(r"[ \t]+([.,;:!?])", r"\1", synthesis)
+
+        # Extraire les slugs effectivement cités dans la réponse (nettoyée)
         cited = re.findall(r"\[\[([^\]]+)\]\]", synthesis)
         references = list(dict.fromkeys(cited or slugs))  # ordre de première apparition
 

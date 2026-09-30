@@ -33,7 +33,11 @@ Endpoint :
             les seules formes de suppression exposées ici. /lint liste les
             anomalies du wiki. /repair? (essai à blanc) et /repair!
             (réparation réelle immédiate, même logique de ! que
-            /supprimer!) réparent une famille d'anomalies.
+            /supprimer!) réparent une famille d'anomalies. /reingerer?
+            (essai à blanc) et /reingerer! (application réelle) réingèrent
+            une page source existante de façon non destructive : n'ajoutent
+            que les concepts/entités manquants, ne touchent jamais au
+            contenu déjà présent.
 
     GET /health
     Reply : {"status": "ok", "pages": <n>}
@@ -64,6 +68,8 @@ from wiki import (
     op_kb_update,
     op_lint,
     op_query,
+    op_reingest,
+    op_reingest_preview,
     op_repair,
     op_repair_preview,
     op_review,
@@ -155,6 +161,11 @@ _RUN_OPS = {
     # explicite (réparation du wiki, 2026-09-22).
     "/repair?": lambda arg, vault: op_repair_preview(arg),
     "/repair!": lambda arg, vault: op_repair(arg),
+    # /reingerer! n'ajoute jamais que des concepts/entités manquants à une
+    # page source existante — jamais destructif, contrairement à /repair!
+    # (réingestion non-destructive, 30/09/2026).
+    "/reingerer?": lambda arg, vault: op_reingest_preview(arg),
+    "/reingerer!": lambda arg, vault: op_reingest(arg),
     "/switch-wiki-model": lambda arg, vault: _switch_wiki_model(arg),
     "/help": lambda arg, vault: op_help(),
 }

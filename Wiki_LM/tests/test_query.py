@@ -7,15 +7,17 @@ from query import WikiQuery
 
 
 class _StubLLM:
-    def __init__(self, brief: str = "Résumé bref.", fail_brief: bool = False) -> None:
+    def __init__(self, brief: str = "Résumé bref.", fail_brief: bool = False,
+                 synthesis: str = "Synthèse test avec [[c-test]].") -> None:
         self.calls: list[dict] = []
         self._brief = brief
         self._fail_brief = fail_brief
+        self._synthesis = synthesis
 
     def complete(self, prompt: str = "", *, messages=None, system: str = "", max_tokens: int = 2048) -> str:
         self.calls.append({"prompt": prompt, "system": system, "max_tokens": max_tokens})
         if len(self.calls) == 1:
-            return "Synthèse test avec [[c-test]]."
+            return self._synthesis
         if self._fail_brief:
             raise RuntimeError("LLM indisponible")
         return self._brief
@@ -140,6 +142,26 @@ def test_query_save_flag_unaffected(tmp_path):
 
     assert result.saved_slug
     assert (tmp_path / "wiki" / f"{result.saved_slug}.md").exists()
+
+
+def test_query_drops_citations_to_pages_not_provided(tmp_path):
+    """Cas jade (30/09/2026) : le LLM cite un slug absent des pages fournies
+    (repris d'une section "Liens internes suggérés" non résolue dans une
+    page source, ou inventé) -> ce n'est pas un lien mort qu'on dénude en
+    texte brut, on l'efface, avec l'espace/ponctuation autour."""
+    llm = _StubLLM(synthesis=(
+        "Le sujet est décrit dans [[c-test]] . Une piste annexe "
+        "[[e-inconnu]]  mais non documentée."
+    ))
+    wq = _make_query(tmp_path, llm=llm)
+
+    result = wq.query("Question test ?")
+
+    assert "[[e-inconnu]]" not in result.text
+    assert "[[c-test]]" in result.text
+    assert result.references == ["c-test"]
+    assert "  " not in result.text
+    assert " ." not in result.text
 
 
 def test_query_no_results_still_writes_history(tmp_path):
