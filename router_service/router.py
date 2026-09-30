@@ -10,6 +10,10 @@ import torch.nn.functional as F
 from transformers import AutoModel, AutoTokenizer
 
 WIKI_CMDS = {"/c", "/q", "/ingest", "/source", "/wikistatus", "/r", "/tags", "/kbupdate", "/supprimer", "/relire", "/verifie"}
+# /r reste dans WIKI_CMDS (préfixe explicite, chemin déterministe) mais est
+# absente de COMMAND_CRITERIA : indiscernable de /q en langage naturel sans
+# préfixe (0% des exemples réels n'en portent, mesuré 2026-09-30 — /r à 13%
+# d'exactitude malgré un corpus corrigé), retirée de l'inférence NL de Laya.
 GOG_CMDS = {"/chercher", "/connecter", "/inbox", "/drive", "/repondre", "/lire"}
 
 COMMAND_CRITERIA: dict[str, str] = {
@@ -18,7 +22,6 @@ COMMAND_CRITERIA: dict[str, str] = {
     "/ingest": "lancer l'ingestion des sources en attente",
     "/source": "déléguer une recherche web à Scout",
     "/wikistatus": "connaître l'état de l'ingestion du wiki",
-    "/r": "rechercher par mots-clés dans le wiki, sans synthèse",
     "/tags": "lister les tags du wiki",
     "/kbupdate": "mettre à jour la base de connaissances du wiki",
     "/supprimer": "supprimer une page du wiki",
