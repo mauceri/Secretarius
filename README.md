@@ -157,11 +157,12 @@ Répondre aux 4 questions (coffre Obsidian, nom de l'assistant, LLM, chemin Open
 > alimente la conversation Telegram de Tiron — indépendant du routeur de
 > commandes `tiron-router`, qui utilise Laya en process, cf.
 > `docs/superpowers/specs/2026-09-28-routeur-laya-design.md` — est choisi
-> **automatiquement selon la RAM disponible** : Ollama local au-dessus du
-> seuil (`MAIN_BRAIN_RAM_THRESHOLD_MB`, 12 Go par défaut), sinon choix
-> interactif entre Infomaniak et un proxy Qwen3-14B obfusqué servi sur Modal
-> (confidentialité préservée, cf. `~/obfuscator/docs/acces-openai.md`). Pour
-> forcer un choix :
+> **automatiquement selon la RAM disponible** : Ollama local (Qwen3-8B)
+> au-dessus du seuil (`MAIN_BRAIN_RAM_THRESHOLD_MB`, 12 Go par défaut),
+> sinon un proxy Qwen3-8B obfusqué servi sur Modal (confidentialité
+> préservée, cf. `~/obfuscator/docs/acces-openai.md`) — Infomaniak n'est
+> jamais un choix automatique, uniquement manuel (`switch-model`), cf.
+> `docs/Secretarius.md` § Utilisation des LLMs. Pour forcer un choix :
 > ```bash
 > MAIN_BRAIN=modal ALOEPRI_API_KEY=<clé du secret Modal aloepri-api-key> \
 > ./install.sh --env-file ~/.config/secrets.env
@@ -340,22 +341,26 @@ L'agent `scout` utilise toujours DeepSeek (`deepseek-chat`) — non modifiable v
 
 ---
 
-## Cerveau de l'agent principal (Ollama local / Infomaniak / Modal obfusqué)
+## Cerveau de l'agent principal (Ollama local / Modal obfusqué / Infomaniak)
 
 Distinct de `switch-model` (qui change le modèle de conversation *parmi les
-modèles Infomaniak*) et du routeur de commandes `tiron-router` (Laya, en
-process, indépendant). `install.sh` choisit automatiquement ce cerveau selon
-la RAM disponible (`MAIN_BRAIN_RAM_THRESHOLD_MB`, 12 Go par défaut) : Ollama
-local au-dessus du seuil, sinon choix interactif entre Infomaniak et un proxy
-Qwen3-14B obfusqué servi sur Modal (confidentialité préservée — clé de
-permutation et tokenizer restent locaux, cf. `~/obfuscator/docs/acces-openai.md`).
+modèles Infomaniak*, resté utile pour basculer manuellement dessus si décidé
+pour une raison ou une autre) et du routeur de commandes `tiron-router`
+(Laya, en process, indépendant). Politique de confidentialité (cf.
+`docs/Secretarius.md` § Utilisation des LLMs) : toujours préférer un modèle
+obfusqué sur Modal à Infomaniak, jamais choisi automatiquement. `install.sh`
+choisit ce cerveau selon la RAM disponible
+(`MAIN_BRAIN_RAM_THRESHOLD_MB`, 12 Go par défaut) : Ollama local (Qwen3-8B)
+au-dessus du seuil, sinon un proxy Qwen3-8B obfusqué servi sur Modal
+(confidentialité préservée — clé de permutation et tokenizer restent
+locaux, cf. `~/obfuscator/docs/acces-openai.md`).
 
 Pour forcer un choix (et redéployer si besoin le proxy Modal) :
 
 ```bash
 MAIN_BRAIN=ollama    ./install.sh --force   # Qwen3:8b local (OLLAMA_MAIN_MODEL)
-MAIN_BRAIN=infomaniak ./install.sh --force  # provider par défaut, rien à déployer
-MAIN_BRAIN=modal ALOEPRI_API_KEY=<clé> ./install.sh --force
+MAIN_BRAIN=modal ALOEPRI_API_KEY=<clé> ./install.sh --force   # Qwen3-8B obfusqué
+MAIN_BRAIN=infomaniak ./install.sh --force  # manuel seulement, provider par défaut
 ```
 
 ---

@@ -163,7 +163,12 @@
        "WIKI_INGEST_LLM_BACKEND": "ollama",
        "WIKI_INGEST_LLM_MODEL": "qwen3:8b",
        "OLLAMA_BASE_URL": "http://172.17.0.1:11434",
-       "OLLAMA_NUM_GPU": "0"
+       "OLLAMA_NUM_GPU": "0",
+       "WIKI_INGEST_LLM_FALLBACK_BACKEND": "openai",
+       "WIKI_INGEST_LLM_FALLBACK_MODEL": "qwen3-14b-h128-a1-h02",
+       "WIKI_INGEST_LLM_FALLBACK_BASE_URL": "http://172.17.0.1:8001/v1",
+       "WIKI_INGEST_LLM_FALLBACK_API_KEY": "local",
+       "DEEPSEEK_API_KEY": "${DEEPSEEK_API_KEY}"
       }
      }
     },

@@ -466,8 +466,13 @@ class TestIngestLocalNote:
         assert "## Concepts et entités mentionnés" in page    # liens conservés
 
     def test_note_creates_entity_link(self, ingestor, wiki_dir, tmp_path):
+        # Texte volontairement > SHORT_NOTE_MAX_CHARS (sinon l'extraction
+        # concepts/entités est sautée, cf. TestShortNoteSkipsExtraction).
         note = tmp_path / "note.md"
-        note.write_text("Note sur Vannevar Bush.", encoding="utf-8")
+        note.write_text(
+            "Note sur Vannevar Bush. " * 15 + "Il a inspiré le zettelkasten.",
+            encoding="utf-8",
+        )
         ingestor.ingest(str(note), local_note=True)
         assert (wiki_dir / "entités" / "e-vannevar-bush.md").exists()
 
@@ -534,6 +539,42 @@ class TestIngestLocalNote:
         ingestor.ingest_raw_dir()
         assert captured.get("local_note") is False
 
+    def test_url_source_uses_web_llm_when_set(self, ingestor, raw_dir):
+        # Politique LLM Secretarius (2026-09-30) : contenu web → web_llm
+        # (DeepSeek en prod), pas le llm par défaut (local, réservé au
+        # contenu personnel/confidentiel).
+        default_llm = ingestor.llm
+        web_llm = object()  # sentinelle : seule l'identité importe ici
+        ingestor.web_llm = web_llm
+        (raw_dir / "test.url").write_text("https://example.com\n", encoding="utf-8")
+        seen = {}
+
+        def fake_ingest(source, **kwargs):
+            seen["llm_during_call"] = ingestor.llm
+            return "src-test"
+
+        ingestor.ingest = fake_ingest
+        ingestor.ingest_raw_dir()
+
+        assert seen["llm_during_call"] is web_llm
+        assert ingestor.llm is default_llm  # restauré après l'appel
+
+    def test_md_source_ignores_web_llm(self, ingestor, wiki_dir, raw_dir):
+        default_llm = ingestor.llm
+        ingestor.web_llm = object()  # ne doit jamais être utilisé ici
+        (raw_dir / "note.md").write_text(
+            "Note sur Vannevar Bush.", encoding="utf-8")
+        seen = {}
+
+        def fake_ingest(source, **kwargs):
+            seen["llm_during_call"] = ingestor.llm
+            return "src-test"
+
+        ingestor.ingest = fake_ingest
+        ingestor.ingest_raw_dir()
+
+        assert seen["llm_during_call"] is default_llm
+
     def test_extract_embedded_url_trouve_une_ligne_url(self):
         from ingest import Ingestor
         texte = "Dessin du Christ en une seule ligne:\n\nhttps://x.com/trad_west_/status/1\n"
@@ -591,6 +632,50 @@ class TestIngestLocalNote:
         pages = list((wiki_dir / "sources").glob("src-*.md"))
         assert pages, "aucune page source créée"
         assert "lien_source: https://x.com/trad_west_/status/1" in pages[0].read_text()
+
+
+class TestShortNoteSkipsExtraction:
+    """Politique LLM Secretarius (2026-09-30) : sous SHORT_NOTE_MAX_CHARS, une
+    note locale saute l'extraction concepts/entités — même si le LLM en
+    propose, ils ne doivent jamais atteindre la page ni déclencher de
+    création de page concept/entité (coût réel de l'ingestion)."""
+
+    def test_short_note_page_has_no_concepts(self, ingestor, wiki_dir, tmp_path):
+        from ingest import SHORT_NOTE_MAX_CHARS
+
+        note = tmp_path / "note.md"
+        texte = "Coco est le perroquet de Madame Michu."
+        assert len(texte) < SHORT_NOTE_MAX_CHARS
+        note.write_text(texte, encoding="utf-8")
+
+        slug = ingestor.ingest(str(note), local_note=True)
+
+        page = (wiki_dir / "sources" / f"{slug}.md").read_text()
+        assert texte in page  # texte conservé tel quel
+        assert "## Concepts et entités mentionnés\n\nAucun" in page
+
+    def test_short_note_creates_no_entity_page(self, ingestor, wiki_dir, tmp_path):
+        # Le MockLLM propose toujours "Vannevar Bush" pour une note personnelle
+        # (conftest.py) — sur une note courte, cette proposition ne doit jamais
+        # se traduire en page entité créée.
+        note = tmp_path / "note.md"
+        note.write_text("Note sur Vannevar Bush.", encoding="utf-8")
+
+        ingestor.ingest(str(note), local_note=True)
+
+        assert not (wiki_dir / "entités" / "e-vannevar-bush.md").exists()
+
+    def test_note_above_threshold_still_extracts(self, ingestor, wiki_dir, tmp_path):
+        from ingest import SHORT_NOTE_MAX_CHARS
+
+        note = tmp_path / "note.md"
+        texte = "Note sur Vannevar Bush et le zettelkasten. " * 10
+        assert len(texte) > SHORT_NOTE_MAX_CHARS
+        note.write_text(texte, encoding="utf-8")
+
+        ingestor.ingest(str(note), local_note=True)
+
+        assert (wiki_dir / "entités" / "e-vannevar-bush.md").exists()
 
 
 class TestParseRawTags:
@@ -772,8 +857,10 @@ class TestIngestTracksRelatedSlugs:
     def test_last_related_slugs_populated_with_concepts_and_entities(
         self, ingestor, wiki_dir, tmp_path
     ):
+        # Texte > SHORT_NOTE_MAX_CHARS, sinon l'extraction concepts/entités
+        # est sautée (politique LLM Secretarius, 2026-09-30).
         note = tmp_path / "note.md"
-        note.write_text("Note sur Vannevar Bush.", encoding="utf-8")
+        note.write_text("Note sur Vannevar Bush. " * 15, encoding="utf-8")
         # mock_llm (fixture ingestor) répond, pour une note personnelle :
         # "TITRE: Ma note de test\n- concept: zettelkasten\n- entité: Vannevar Bush\n"
         ingestor.ingest(str(note), local_note=True)
@@ -800,8 +887,11 @@ class TestIngestRawDirMirrorsToVault:
         from wiki_paths import mirror_page
         mirror = tmp_path / "mirror-vault"
         monkeypatch.setenv("WIKI_VAULT_MIRRORS", f"Arbath={mirror}")
+        # Texte > SHORT_NOTE_MAX_CHARS, sinon l'extraction concepts/entités
+        # est sautée (politique LLM Secretarius, 2026-09-30).
         (raw_dir / "note.md").write_text(
-            "---\nvault: Arbath\n---\n\nNote sur Vannevar Bush.", encoding="utf-8"
+            "---\nvault: Arbath\n---\n\n" + "Note sur Vannevar Bush. " * 15,
+            encoding="utf-8",
         )
 
         ingestor.ingest_raw_dir()

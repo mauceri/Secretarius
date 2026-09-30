@@ -628,6 +628,13 @@ importants, un par ligne, au format :
 """
 
 
+# Notes courtes (typiquement Telegram sans URL) : sous ce seuil, on saute
+# l'extraction concepts/entités — coût réel de l'ingestion d'une note
+# (jusqu'à 5+5 appels LLM en aval dans _update_concept_page/_update_entity_page,
+# pas l'appel d'extraction lui-même). Politique LLM Secretarius, 2026-09-30.
+SHORT_NOTE_MAX_CHARS = 300
+
+
 _PROMPT_NOTE_ITEMS = """\
 Voici une note personnelle. Tu ne dois PAS la résumer ni la reformuler : \
 son texte sera conservé tel quel. Tu dois seulement l'analyser pour en extraire \
@@ -833,6 +840,7 @@ class Ingestor:
         wiki_path: str | Path,
         llm: LLM | None = None,
         raw_path: str | Path | None = None,
+        web_llm: LLM | None = None,
     ) -> None:
         self.wiki_root = Path(wiki_path)
         self.wiki_dir = self.wiki_root / "wiki"
@@ -851,6 +859,11 @@ class Ingestor:
             (self.wiki_dir / subdir).mkdir(parents=True, exist_ok=True)
 
         self.llm = llm or LLM()
+        # Politique LLM Secretarius (2026-09-30) : le contenu web n'est pas
+        # confidentiel par définition, donc pas besoin du même modèle local
+        # que les notes personnelles — self.llm reste utilisé si absent
+        # (comportement inchangé pour tout appelant qui ne le fournit pas).
+        self.web_llm = web_llm
         self.today = _today()
         self._wiki_lookup = WikiLookup(wiki_path)
         self._kb_dir = _DEFAULT_KB_DIR
@@ -1136,7 +1149,17 @@ class Ingestor:
                     user_tags = self._parse_raw_tags(path)
                     simple = self._parse_raw_simple(path)
                     note = _parse_note_from_url_file(path)
-                    slug = self.ingest(url, max_concepts=max_concepts, extra_tags=user_tags or None, rename_raw=False, note=note, local_note=simple)
+                    # Contenu web, pas confidentiel par définition (politique LLM
+                    # Secretarius, 2026-09-30) : bascule temporaire sur web_llm
+                    # si fourni, restaurée après l'appel (self.llm est partagé
+                    # par toutes les méthodes internes, pas un paramètre passé).
+                    _prev_llm = self.llm
+                    if self.web_llm is not None:
+                        self.llm = self.web_llm
+                    try:
+                        slug = self.ingest(url, max_concepts=max_concepts, extra_tags=user_tags or None, rename_raw=False, note=note, local_note=simple)
+                    finally:
+                        self.llm = _prev_llm
                 else:
                     user_tags = self._parse_raw_tags(path)
                     # .md = note en texte libre → page verbatim (pas de résumé) ;
@@ -1512,6 +1535,13 @@ class Ingestor:
                     title = candidate
             elif re.match(r"^-\s*(concept|entit[eé])\s*:", stripped, re.IGNORECASE):
                 item_lines.append(stripped)
+        # Note courte : jamais de concepts/entités dans la page, même si le LLM
+        # en a proposé — sinon _extract_items() les retrouverait et déclencherait
+        # les 5+5 appels _update_concept_page/_update_entity_page qu'on veut
+        # justement éviter (et laisser la section sans les lister éviterait un
+        # texte fantôme jamais linkifié, cf. mentions fantômes du 28/09/2026).
+        if len(content.strip()) < SHORT_NOTE_MAX_CHARS:
+            item_lines = []
         items_block = "\n".join(item_lines) if item_lines else "Aucun"
         tags_str = ", ".join(extra_tags or [])
         return (

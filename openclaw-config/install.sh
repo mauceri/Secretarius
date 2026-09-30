@@ -125,8 +125,8 @@ else
   if [[ -f "$TARGET" && "$FORCE" != "true" ]]; then
     warn "openclaw.json présent mais sans agents (config d'onboarding) — régénération"
   fi
-  export HOME HOSTNAME OBSIDIAN_PATH ASSISTANT_NAME OPENCLAW_GATEWAY_TOKEN INFOMANIAK_API_KEY INFOMANIAK_PRODUCT_ID OPENCLAW_DIR OPENCLAW_PORT GOG_ACCOUNT
-  envsubst '${HOME} ${HOSTNAME} ${OBSIDIAN_PATH} ${ASSISTANT_NAME} ${OPENCLAW_GATEWAY_TOKEN} ${INFOMANIAK_API_KEY} ${INFOMANIAK_PRODUCT_ID} ${OPENCLAW_DIR} ${OPENCLAW_PORT} ${GOG_ACCOUNT}' \
+  export HOME HOSTNAME OBSIDIAN_PATH ASSISTANT_NAME OPENCLAW_GATEWAY_TOKEN INFOMANIAK_API_KEY INFOMANIAK_PRODUCT_ID OPENCLAW_DIR OPENCLAW_PORT GOG_ACCOUNT DEEPSEEK_API_KEY
+  envsubst '${HOME} ${HOSTNAME} ${OBSIDIAN_PATH} ${ASSISTANT_NAME} ${OPENCLAW_GATEWAY_TOKEN} ${INFOMANIAK_API_KEY} ${INFOMANIAK_PRODUCT_ID} ${OPENCLAW_DIR} ${OPENCLAW_PORT} ${GOG_ACCOUNT} ${DEEPSEEK_API_KEY}' \
     < "${SCRIPT_DIR}/openclaw.json.template" > "$TARGET"
   # Sync .bak pour éviter que le gateway détecte notre écriture comme un "clobber"
   # et restaure silencieusement l'ancienne config au démarrage suivant.
@@ -306,17 +306,20 @@ python3 -m pip install --user --break-system-packages -q "laya[onnx]" 2>/dev/nul
 # Cerveau de l'agent main (conversation Telegram, indépendant du routeur de
 # commandes ci-dessus) : choix automatique selon la RAM disponible, sauf si
 # MAIN_BRAIN est déjà fixé (install.conf ou variable d'environnement).
+# Politique de confidentialité (cf. docs/Secretarius.md § Utilisation des LLMs) :
+# toujours préférer un modèle obfusqué sur Modal à Infomaniak. Infomaniak reste
+# joignable en manuel (switch-model) mais n'est jamais un choix automatique ici.
 if [[ -z "${MAIN_BRAIN}" ]]; then
   AVAIL_MB="$(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo)"
   if [[ "$AVAIL_MB" -ge "$MAIN_BRAIN_RAM_THRESHOLD_MB" ]]; then
     MAIN_BRAIN="ollama"
   elif [[ "$INTERACTIVE" == "true" ]]; then
     echo "RAM disponible : ${AVAIL_MB} Mo (< ${MAIN_BRAIN_RAM_THRESHOLD_MB} Mo) — un modèle local n'est pas recommandé pour l'agent principal."
-    read -rp "Cerveau agent principal (infomaniak|modal) [infomaniak]: " _mb || true
-    MAIN_BRAIN="${_mb:-infomaniak}"
+    read -rp "Cerveau agent principal (modal|infomaniak) [modal]: " _mb || true
+    MAIN_BRAIN="${_mb:-modal}"
   else
-    MAIN_BRAIN="infomaniak"
-    warn "RAM < ${MAIN_BRAIN_RAM_THRESHOLD_MB} Mo : cerveau agent principal = infomaniak par défaut (--interactive pour choisir modal)"
+    MAIN_BRAIN="modal"
+    warn "RAM < ${MAIN_BRAIN_RAM_THRESHOLD_MB} Mo : cerveau agent principal = modal (Qwen3-8B obfusqué) par défaut (--interactive pour choisir infomaniak)"
   fi
 fi
 info "Cerveau agent principal : ${MAIN_BRAIN}"
@@ -383,20 +386,22 @@ PYEOF
         mkdir -p "${HOME}/.config/obfuscator"
         printf 'ALOEPRI_API_KEY=%s\n' "$ALOEPRI_API_KEY" > "${HOME}/.config/obfuscator/proxy.env"
         chmod 600 "${HOME}/.config/obfuscator/proxy.env"
-        cp "${OBF_DIR}/systemd/obfuscator-proxy.service" "${SYSTEMD_USER_DIR}/obfuscator-proxy.service"
+        # 8B, pas 14B : même taille que le choix Ollama local (OLLAMA_MAIN_MODEL),
+        # Modal n'est qu'un relais quand la RAM manque pour le faire tourner ici.
+        cp "${OBF_DIR}/systemd/obfuscator-proxy-8b.service" "${SYSTEMD_USER_DIR}/obfuscator-proxy-8b.service"
         systemctl --user daemon-reload
-        systemctl --user enable --now obfuscator-proxy.service
+        systemctl --user enable --now obfuscator-proxy-8b.service
         _ready=false
         for _ in $(seq 1 6); do
-          curl -s -o /dev/null "http://127.0.0.1:8001/health" && { _ready=true; break; }
+          curl -s -o /dev/null "http://127.0.0.1:8002/health" && { _ready=true; break; }
           sleep 5
         done
         if [[ "$_ready" != "true" ]]; then
-          warn "Proxy obfusqué pas encore prêt après 30s (cold start Modal possible, jusqu'à quelques minutes) — configuré quand même, réessayez plus tard : curl http://127.0.0.1:8001/health"
+          warn "Proxy obfusqué pas encore prêt après 30s (cold start Modal possible, jusqu'à quelques minutes) — configuré quand même, réessayez plus tard : curl http://127.0.0.1:8002/health"
         fi
-        _set_main_model_provider modal-obfusque qwen3-14b-h128-a1-h02 \
-          '{"baseUrl": "http://127.0.0.1:8001/v1", "apiKey": "local", "api": "openai-completions",
-            "models": [{"id": "qwen3-14b-h128-a1-h02", "name": "Qwen3-14B obfusqué (Modal)",
+        _set_main_model_provider modal-obfusque qwen3-8b-ft-h128-a1-h02 \
+          '{"baseUrl": "http://127.0.0.1:8002/v1", "apiKey": "local", "api": "openai-completions",
+            "models": [{"id": "qwen3-8b-ft-h128-a1-h02", "name": "Qwen3-8B obfusqué (Modal)",
                         "api": "openai-completions", "reasoning": false, "input": ["text"],
                         "contextWindow": 32768, "maxTokens": 4096}]}'
       fi

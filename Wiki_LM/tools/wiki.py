@@ -376,13 +376,30 @@ def _ingest_llm() -> LLM | None:
     )
 
 
+def _ingest_web_llm() -> LLM | None:
+    """Backend pour le contenu web (source avec URL) : DeepSeek par défaut —
+    politique LLM Secretarius (2026-09-30), un document web n'est pas
+    confidentiel par définition, inutile de réserver le modèle local pour lui.
+    Surchargeable (WIKI_INGEST_WEB_LLM_BACKEND vide = désactive la bascule,
+    retombe sur WIKI_INGEST_LLM_BACKEND comme avant cette politique)."""
+    backend = os.environ.get("WIKI_INGEST_WEB_LLM_BACKEND", "openai")
+    if not backend:
+        return None
+    return LLM(
+        backend=backend,
+        model=os.environ.get("WIKI_INGEST_WEB_LLM_MODEL", "deepseek-v4-flash"),
+        base_url=os.environ.get("WIKI_INGEST_WEB_LLM_BASE_URL", "https://api.deepseek.com/v1"),
+        api_key=os.environ.get("WIKI_INGEST_WEB_LLM_API_KEY", "") or os.environ.get("DEEPSEEK_API_KEY", ""),
+    )
+
+
 def _do_ingest() -> dict:
     # ingest_raw_dir ne renvoie que les slugs des fichiers ingérés avec succès ;
     # les échecs sont marqués au manifeste mais absents de la liste. On dérive
     # donc le total des fichiers en attente avant traitement.
     raw = _raw_dir()
     queued = len(_pending_files(raw))
-    ingestor = Ingestor(_wiki_root(), raw_path=raw, llm=_ingest_llm())
+    ingestor = Ingestor(_wiki_root(), raw_path=raw, llm=_ingest_llm(), web_llm=_ingest_web_llm())
     slugs = ingestor.ingest_raw_dir()
     ingested = sum(1 for s in slugs if s)
     return {"status": "done", "ingested": ingested, "errors": queued - ingested, "total": queued}
