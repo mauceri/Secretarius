@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import urllib.request
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from tiron_cron.syntax import Job, SyntaxeInvalide, parse_command
 
@@ -19,6 +19,12 @@ add <quand> [<canal>] <type> <contenu>
 - <canal> (facultatif, seulement si la demande le précise) : telegram, whatsapp, sms ou obsidian.
 - <type> : rappel (un texte à rappeler), commande (une commande Tiron commençant par /), consigne (une tâche confiée à l'assistant).
 - <contenu> : le texte du rappel, la commande, ou la consigne.
+Le <contenu> ne reprend jamais l'indication de moment. « lundi prochain », « demain », « dans … » sont ponctuels (date ISO ou durée) ; seuls « chaque … », « tous les … » sont récurrents (cron).
+Exemples :
+« rappelle-moi lundi prochain vers 8 heures de sortir les poubelles » → add {lundi}T08:00 rappel sortir les poubelles
+« chaque lundi à 8h rappelle-moi de payer le loyer » → add "0 8 * * 1" rappel payer le loyer
+« dans une demi-heure rappelle-moi le four » → add 30m rappel le four
+« tous les soirs à 21h résume le wiki par SMS » → add "0 21 * * *" sms consigne résume le wiki
 Maintenant : {now} ({jour}). Réponds par la ligne seule, sans commentaire.
 Si la demande n'est pas une planification, réponds : AUCUNE"""
 
@@ -39,7 +45,8 @@ def normalize_with_model(text: str, now: datetime, env: Mapping[str, str], http=
         "options": {"temperature": 0},
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT.format(
-                now=now.strftime("%Y-%m-%dT%H:%M"), jour=_JOURS[now.weekday()])},
+                now=now.strftime("%Y-%m-%dT%H:%M"), jour=_JOURS[now.weekday()],
+                lundi=(now + timedelta(days=7 - now.weekday())).strftime("%Y-%m-%d"))},
             {"role": "user", "content": text},
         ],
     }

@@ -44,3 +44,11 @@ def test_aucune_syntaxe_invalide_gestion_erreur_reseau():
     assert normalize_with_model("x", NOW, {}, _http("add demain rappel x")) is None
     assert normalize_with_model("x", NOW, {}, _http("rm 1234")) is None
     assert normalize_with_model("x", NOW, {}, _http(OSError("refused"))) is None
+
+
+def test_prompt_contient_des_exemples_ponctuel_et_recurrent():
+    http = _http("AUCUNE")
+    normalize_with_model("x", NOW, {}, http)
+    system = http.calls[0][1]["messages"][0]["content"]
+    assert "lundi prochain" in system and "chaque lundi" in system
+    assert "add 2026-10-05T08:00 rappel sortir les poubelles" in system
