@@ -1652,6 +1652,157 @@ git commit -m "feat(derisk-deleg): /cron — aperçu, /confirm, langage naturel,
 
 ---
 
+### Task 10b: derisk-deleg — exécution des tâches planifiées (ajoutée après l'essai préalable)
+
+L'essai du 2026-10-02 a montré qu'OpenClaw transmet un tour planifié sous la forme
+`[cron:<id> <nom>] <message>\nCurrent time: …` (préambule). derisk-deleg doit
+reconnaître cette enveloppe pour nos tâches (nom `tiron-…`, cf. `--name` de la tâche 4) :
+commande de la liste blanche → exécutée comme si elle était tapée ; consigne → le hook
+ne répond pas, le modèle de `main` prend le tour. Autres tâches `cron:` (système) :
+comportement inchangé.
+
+**Files:**
+- Create: `derisk-deleg/src/cron-envelope.ts`, `derisk-deleg/src/cron-envelope.test.ts`
+- Modify: `derisk-deleg/src/index.ts` (début du hook `before_agent_reply`)
+- Test: `derisk-deleg/src/index.test.ts`
+
+**Interfaces:**
+- Produces: `unwrapCronEnvelope(text: string): { jobName: string; message: string } | null` ; `CRON_COMMANDS: ReadonlySet<string>` (miroir de `COMMANDES_PLANIFIABLES`, tâche 2).
+
+- [ ] **Step 1: Tests de l'enveloppe**
+
+```ts
+// derisk-deleg/src/cron-envelope.test.ts
+import { describe, expect, it } from "vitest";
+import { CRON_COMMANDS, unwrapCronEnvelope } from "./cron-envelope.js";
+
+const PREAMBULE = "\nCurrent time: Friday, October 2nd, 2026 - 21:40 (Europe/Paris)\nThis is an unattended scheduled run.";
+
+describe("unwrapCronEnvelope", () => {
+  it("extrait nom et message d'origine, sans le préambule", () => {
+    expect(unwrapCronEnvelope(`[cron:da77e597-8482 tiron-abcd1234] /wikistatus${PREAMBULE}`))
+      .toEqual({ jobName: "tiron-abcd1234", message: "/wikistatus" });
+  });
+  it("message multiligne conservé", () => {
+    expect(unwrapCronEnvelope(`[cron:1 tiron-x] résume\nle wiki${PREAMBULE}`)?.message).toBe("résume\nle wiki");
+  });
+  it("sans préambule", () => {
+    expect(unwrapCronEnvelope("[cron:1 tiron-x] /tags")).toEqual({ jobName: "tiron-x", message: "/tags" });
+  });
+  it("message ordinaire -> null", () => {
+    expect(unwrapCronEnvelope("bonjour [cron:1 x] /tags")).toBeNull();
+  });
+  it("liste blanche alignée sur tiron_cron", () => {
+    expect([...CRON_COMMANDS].sort()).toEqual(["/ingest", "/kbupdate", "/q", "/r", "/relire", "/tags", "/wikistatus"]);
+  });
+});
+```
+
+- [ ] **Step 2: Vérifier l'échec** — `cd ~/Secretarius/derisk-deleg && npx vitest run src/cron-envelope.test.ts` → FAIL.
+
+- [ ] **Step 3: Implémenter**
+
+```ts
+// derisk-deleg/src/cron-envelope.ts
+// Enveloppe d'un tour planifié OpenClaw (constatée le 2026-10-02) :
+// "[cron:<id> <nom>] <message>\nCurrent time: …préambule…".
+// CRON_COMMANDS reflète COMMANDES_PLANIFIABLES de tiron_cron/syntax.py.
+export const CRON_COMMANDS: ReadonlySet<string> = new Set([
+  "/wikistatus", "/tags", "/relire", "/q", "/r", "/ingest", "/kbupdate",
+]);
+
+const ENVELOPE = /^\[cron:[^\s\]]+ ([^\]]+)\] ([\s\S]*?)(?:\nCurrent time:[\s\S]*)?$/;
+
+export function unwrapCronEnvelope(text: string): { jobName: string; message: string } | null {
+  const m = ENVELOPE.exec(text);
+  return m ? { jobName: m[1], message: m[2].trim() } : null;
+}
+```
+
+- [ ] **Step 4: Vérifier** — `npx vitest run src/cron-envelope.test.ts` → PASS.
+
+- [ ] **Step 5: Tests d'intégration** (dans `index.test.ts`, bloc `describe("before_agent_reply — /cron", …)`)
+
+```ts
+  it("tâche tiron planifiée : commande exécutée comme tapée, sans Laya", async () => {
+    const fetchSpy = vi.fn(async (_u: any, init: any) => ({
+      ok: true,
+      json: async () => ({ status: "ok", command: "/tags", args: "" }),
+    }));
+    vi.stubGlobal("fetch", fetchSpy);
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    await hooks["before_agent_reply"].handler(
+      { cleanedBody: "[cron:1 tiron-abcd1234] /tags\nCurrent time: x\nThis is an unattended scheduled run." }, {});
+    expect(JSON.parse(fetchSpy.mock.calls[0][1].body).message).toBe("/tags");
+  });
+
+  it("tâche tiron planifiée : consigne laissée au modèle de main", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    const res = await hooks["before_agent_reply"].handler(
+      { cleanedBody: "[cron:1 tiron-abcd1234] résume le wiki\nCurrent time: x" }, {});
+    expect(res).toBeUndefined();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("tâche tiron planifiée : commande hors liste blanche refusée", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    const res = await hooks["before_agent_reply"].handler(
+      { cleanedBody: "[cron:1 tiron-abcd1234] /supprimer! src-x\nCurrent time: x" }, {});
+    expect(res.reply.text).toBe("Commande non planifiable : /supprimer!");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+```
+
+(Vérifier dans `callRouter`, l.14-40 de `index.ts`, la forme exacte du corps envoyé au routeur et adapter l'assertion `JSON.parse(...).message` si le champ diffère.)
+
+- [ ] **Step 6: Vérifier l'échec** — `npx vitest run src/index.test.ts -t "planifiée"` → FAIL.
+
+- [ ] **Step 7: Implémenter dans `index.ts`**
+
+Import : `import { CRON_COMMANDS, unwrapCronEnvelope } from "./cron-envelope.js";`
+
+Au début du hook, remplacer `const text = String(event?.cleanedBody ?? "");` par :
+```ts
+      let text = String(event?.cleanedBody ?? "");
+
+      // Tour planifié d'une tâche /cron (nom tiron-…) : OpenClaw l'enveloppe
+      // ("[cron:<id> <nom>] <message>\nCurrent time: …"). Commande de la liste
+      // blanche -> traitée comme tapée ; consigne -> laissée au modèle de main.
+      const envelope = unwrapCronEnvelope(text);
+      if (envelope && envelope.jobName.startsWith("tiron-")) {
+        if (!envelope.message.startsWith("/")) return;
+        const cmd0 = envelope.message.split(/\s+/)[0];
+        if (!CRON_COMMANDS.has(cmd0)) {
+          return { handled: true, reply: { text: `Commande non planifiable : ${cmd0}` } };
+        }
+        text = envelope.message;
+      }
+```
+
+- [ ] **Step 8: Vérifier** — `npm test && npm run build` → PASS, build OK.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add derisk-deleg/src/cron-envelope.ts derisk-deleg/src/cron-envelope.test.ts derisk-deleg/src/index.ts derisk-deleg/src/index.test.ts
+git commit -m "feat(derisk-deleg): exécution des tâches /cron planifiées (enveloppe OpenClaw)"
+```
+
+---
+
 ### Task 11: Obsidian — `/cron?`, `/cron!`, `/cron`
 
 **Files:**
@@ -2004,7 +2155,7 @@ git commit -m "chore(cron): variables de destinataires dans le modèle d'environ
 - [ ] Telegram, langage naturel : « dans 2 minutes rappelle-moi de tester par SMS » → aperçu (canal sms) → `/confirm` → SMS reçu.
 - [ ] WhatsApp : `/cron add 2m whatsapp rappel essai whatsapp` → reçu.
 - [ ] Commande : `/cron add 2m commande /wikistatus` → l'état du wiki arrive sur Telegram.
-- [ ] Consigne : `/cron add 2m consigne donne-moi une citation de Sénèque` → réponse de `main` reçue.
+- [ ] Consigne : `/cron add 2m consigne donne-moi une citation de Sénèque` → réponse de `main` reçue (vérifie que le hook laisse bien passer le tour au modèle — non testable hors réel).
 - [ ] Obsidian : bloc `/cron?` puis `/cron!` avec `add 2m rappel essai obsidian` → note créée dans `TIRON_RAPPELS_DIR`, visible après synchronisation.
 - [ ] `/cron list` → les tâches récurrentes éventuelles, aucune tâche système. `/cron rm <id8>` → supprimée.
 - [ ] Repli : « lundi prochain vers 8 heures rappelle-moi x » → aperçu (`source: modele` visible dans les journaux), texte resté local.
