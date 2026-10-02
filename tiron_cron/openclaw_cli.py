@@ -5,6 +5,7 @@ modifiables d'ici : toute résolution d'id se fait parmi les tâches tiron:*."""
 from __future__ import annotations
 
 import json
+import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -52,7 +53,12 @@ def build_add_argv(job: Job, canal: str | None, tz: str, env: Mapping[str, str],
 
 
 def _run(argv: list[str], runner) -> str:
-    p = runner(argv, capture_output=True, text=True, timeout=60)
+    try:
+        p = runner(argv, capture_output=True, text=True, timeout=60)
+    except FileNotFoundError as e:
+        raise OpenClawError(f"openclaw introuvable ({e})") from e
+    except subprocess.TimeoutExpired as e:
+        raise OpenClawError("openclaw ne répond pas (délai dépassé) ; vérifiez /cron list avant de recommencer") from e
     if p.returncode != 0:
         raise OpenClawError((p.stderr or p.stdout or "échec openclaw").strip())
     return p.stdout

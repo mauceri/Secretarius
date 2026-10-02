@@ -95,7 +95,9 @@ def parse_command(args: str) -> Job | Gestion:
     contenu = rest.strip()
     if not contenu:
         raise SyntaxeInvalide("contenu vide")
-    if type_ == "commande" and contenu.split()[0] not in COMMANDES_PLANIFIABLES:
+    # Une consigne qui commence par / serait exécutée comme une commande au
+    # déclenchement (derisk-deleg) : même liste blanche que le type commande.
+    if (type_ == "commande" or contenu.startswith("/")) and contenu.split()[0] not in COMMANDES_PLANIFIABLES:
         raise SyntaxeInvalide(
             f"commande non planifiable : {contenu.split()[0]} "
             f"(autorisées : {', '.join(sorted(COMMANDES_PLANIFIABLES))})")

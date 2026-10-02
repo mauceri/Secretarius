@@ -84,3 +84,8 @@ def test_to_args_aller_retour():
                  "add 2026-10-02T09:00 consigne résume le wiki",
                  "add 20m rappel d'appeler l'école"]:
         assert to_args(parse_command(args)) == args
+
+
+def test_consigne_commencant_par_une_commande_hors_liste_refusee():
+    with pytest.raises(SyntaxeInvalide, match="non planifiable"):
+        parse_command("add 20m consigne /supprimer! src-x")

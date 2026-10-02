@@ -31,7 +31,12 @@ def _origine(origin: str) -> str | None:
     return o if o in CANAUX else None
 
 
-def _apercu(job: Job, origin: str, tz: str, env, job_key: str) -> tuple[str, list[str]]:
+def _apercu(job: Job, origin: str, tz: str, env, job_key: str, now: datetime) -> tuple[str, list[str]]:
+    # Jamais une tâche dans le passé, quelle que soit la source (syntaxe tapée,
+    # analyseur, repli) ; revérifié à la création (/confirm jusqu'à 10 min après).
+    if job.quand_kind == "at" and "T" in job.quand and \
+            datetime.fromisoformat(job.quand).replace(tzinfo=ZoneInfo(tz)) <= now:
+        raise SyntaxeInvalide(f"date déjà passée : {job.quand}")
     canal = job.canal or _origine(origin)
     argv = build_add_argv(job, canal, tz, env, job_key)  # valide canal + destinataire dès l'aperçu
     return describe(job, canal, tz), argv
@@ -58,11 +63,11 @@ def main(argv=None, runner=subprocess.run, env=None, now=None, http=None, job_ke
     try:
         if a.cmd == "preview":
             job = _job_from_args(a.args)
-            text, _ = _apercu(job, a.origin, tz, env, job_key)
+            text, _ = _apercu(job, a.origin, tz, env, job_key, now)
             out = {"ok": True, "text": text, "args": to_args(job)}
         elif a.cmd == "add":
             job = _job_from_args(a.args)
-            text, cmd = _apercu(job, a.origin, tz, env, job_key)
+            text, cmd = _apercu(job, a.origin, tz, env, job_key, now)
             try:
                 full = add_job(cmd, job_key, runner)
             except OpenClawError as e:
@@ -77,7 +82,8 @@ def main(argv=None, runner=subprocess.run, env=None, now=None, http=None, job_ke
             if job is None:
                 out = {"ok": False, "text": "Planification non comprise. Syntaxe : /cron " + USAGE_ADD.split("/cron ", 1)[1]}
             else:
-                text, _ = _apercu(job, a.origin, tz, env, job_key)
+                job = _job_from_args(to_args(job))  # même validation que la syntaxe tapée
+                text, _ = _apercu(job, a.origin, tz, env, job_key, now)
                 out = {"ok": True, "text": text, "args": to_args(job), "source": source}
         elif a.cmd == "manage":
             g = parse_command(a.args)

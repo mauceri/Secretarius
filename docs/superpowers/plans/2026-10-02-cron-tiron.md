@@ -2125,6 +2125,8 @@ SECRETARIUS_DIR=/home/mauceric/Secretarius
 ```
 Demander à l'utilisateur ses numéros ; ne jamais les inventer. Ajouter `SECRETARIUS_DIR` aussi dans `Wiki_LM/.env`.
 
+wiki-lm-server (revue finale, Important 3) : son unité systemd ne définit pas de `PATH`, donc `openclaw` y est vraisemblablement introuvable. Ajouter à `~/.config/systemd/user/wiki-lm-server.service` (et à son modèle dans `openclaw-config/` s'il existe) une ligne `Environment=PATH=…` reprenant celle d'`openclaw-gateway.service`, et les mêmes `TIRON_*` dans `Wiki_LM/.env`. Vérifier : `systemctl --user show wiki-lm-server -p Environment` puis un bloc `/cron list` depuis Obsidian.
+
 - [ ] **Step 2: Extensions WhatsApp et SMS**
 
 Selon les résultats de la tâche 1 : `openclaw channels add …` / `openclaw channels login …` pour WhatsApp ; configuration Twilio (SID, jeton, numéro émetteur) pour SMS, secrets dans `~/.config/secrets.env` puis `/maj` (chaîne de propagation existante). Vérifier : `openclaw channels status`.
@@ -2162,6 +2164,8 @@ git commit -m "chore(cron): variables de destinataires dans le modèle d'environ
 - [ ] Mettre à jour `docs/components/` (fiche `cron.md` : syntaxe, variables, canaux) et la FAQ `amorçage/faits.md` (une ligne : Tiron sait planifier). Commit.
 
 ---
+
+**Bloquant avant d'installer WhatsApp ou SMS (revue finale, Important 2) :** une enveloppe `[cron:… tiron-…] <texte>` forgée par un expéditeur atteint aujourd'hui le modèle de `main` (le hook rend la main pour une consigne). Pendant le premier essai réel d'une consigne planifiée, journaliser `ctx` et `event` (clés seulement) dans le hook, identifier un champ non forgeable propre aux tours planifiés (déclencheur, `sessionKey` `cron:…`, `messageProvider` absent…), et n'accepter l'enveloppe que sur ce signal — avec test RED→GREEN.
 
 ## Résultats de l'essai préalable
 

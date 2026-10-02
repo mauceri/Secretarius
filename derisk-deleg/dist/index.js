@@ -669,11 +669,13 @@ export default definePluginEntry({
             if (action.kind === "cron") {
                 const origin = String(ctx?.messageProvider ?? "");
                 const sub = routed.args.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
-                if (explicitCommand && sub !== "add") {
+                const gestion = ["list", "rm", "pause", "reprendre"].includes(sub);
+                if (explicitCommand && gestion) {
                     const r = await runTironCron(["manage", "--args", routed.args]);
                     return { handled: true, reply: { text: r.text.slice(0, 4000) } };
                 }
-                const r = explicitCommand
+                // "/cron demain à 9h …" : ni add ni gestion -> langage naturel.
+                const r = explicitCommand && sub === "add"
                     ? await runTironCron(["preview", "--origin", origin, "--args", routed.args])
                     : await runTironCron(["nl", "--origin", origin, "--text", routed.args]);
                 if (!r.ok || !r.args) {

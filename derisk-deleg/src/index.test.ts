@@ -1169,4 +1169,17 @@ describe("before_agent_reply — /cron", () => {
     expect(res.reply.text).toBe("Commande non planifiable : /supprimer!");
     expect(fetchSpy).not.toHaveBeenCalled();
   });
+
+  it("/cron suivi de langage naturel : passe par nl, pas par manage", async () => {
+    const runTironCron = vi.fn().mockResolvedValueOnce({ ok: true, text: "Le 03/10/2026 à 09:00 …", args: "add 2026-10-03T09:00 rappel x" });
+    vi.doMock("./cron-ops.js", () => ({ runTironCron }));
+    routerReturns("/cron", "demain à 9h rappelle-moi de x");
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    const r = await hooks["before_agent_reply"].handler({ cleanedBody: "/cron demain à 9h rappelle-moi de x" }, { messageProvider: "telegram" });
+    expect(runTironCron).toHaveBeenCalledWith(["nl", "--origin", "telegram", "--text", "demain à 9h rappelle-moi de x"]);
+    expect(r.reply.text).toMatch(/^Tâche à créer/);
+  });
 });

@@ -75,3 +75,35 @@ def test_manage_refuse_add(capsys):
 def test_deliver_obsidian(capsys, tmp_path):
     out = _call(capsys, ["deliver-obsidian", "--text", "payer"], env={"TIRON_RAPPELS_DIR": str(tmp_path)})
     assert out["ok"] and out["text"].endswith("payer.md")
+
+
+def test_date_passee_refusee_en_syntaxe(capsys):
+    out = _call(capsys, ["preview", "--origin", "telegram", "--args", "add 2020-01-01T09:00 rappel x"])
+    assert out["ok"] is False and "passé" in out["text"]
+
+
+def test_date_passee_du_modele_refusee(capsys):
+    http = lambda url, body, timeout: {"message": {"content": "add 2026-10-02T08:00 rappel appeler"}}
+    out = _call(capsys, ["nl", "--origin", "telegram", "--text", "ce matin vers 8 heures x"], http=http)
+    assert out["ok"] is False and "passé" in out["text"]
+
+
+def test_nl_regles_revalidees_duree_nulle(capsys):
+    out = _call(capsys, ["nl", "--origin", "telegram", "--text", "dans 0 minutes rappelle-moi de x"])
+    assert out["ok"] is False
+
+
+def test_openclaw_introuvable_reste_du_json(capsys):
+    def run(argv, **kw):
+        raise FileNotFoundError("openclaw")
+    out = _call(capsys, ["add", "--origin", "sms", "--args", "add 20m rappel x"], runner=run)
+    assert out["ok"] is False and out["text"].startswith("Échec de la création")
+
+
+def test_delai_openclaw_depasse_reste_du_json(capsys):
+    import subprocess
+
+    def run(argv, **kw):
+        raise subprocess.TimeoutExpired(argv, 60)
+    out = _call(capsys, ["manage", "--args", "list"], runner=run)
+    assert out["ok"] is False and out["text"].startswith("Échec")
