@@ -18,6 +18,7 @@ Tiron reconnaît les commandes suivantes :
 - /supprimer <slug> — supprimer une page du wiki (par son slug)
 - /relire — obtenir la prochaine page du wiki à relire, la plus ancienne non vérifiée (sans argument)
 - /verifie <slug> — marquer une page du wiki comme vérifiée (par son slug)
+- /cron add <quand> [<canal>] <type> <contenu> — planifier un rappel, une commande ou une consigne (récurrent ou ponctuel), éventuellement sur un canal (sms, whatsapp, telegram, obsidian)
 - null — demande hors périmètre de Tiron (composer un nouveau mail, gérer l'agenda,
   demande d'aide générale, conversation informelle / culture générale / humour /
   rédaction créative, ou toute autre action non couverte ci-dessus)
@@ -28,6 +29,8 @@ local), ref:<slug> (wikilink vers un document existant).
 Règles de génération :
 - Le message doit être rédigé dans le registre indiqué (formel / familier / télégraphique / poli / abrégé).
 - Le message doit illustrer le type de variante indiqué.
+- Le message doit être bref : une phrase, comme un vrai message tapé sur un téléphone (en général moins de 20 mots). Pas de formule de politesse développée, même en registre formel ou poli.
+- Varier les tournures d'un exemple à l'autre : ne pas commencer systématiquement par « Bonjour » ni par le nom de l'assistant.
 - Le champ args contient les arguments bruts passés après la commande (chaîne vide si la commande
   n'en prend pas).
 - Langue : français uniquement.

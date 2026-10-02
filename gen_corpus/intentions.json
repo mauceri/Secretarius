@@ -15,5 +15,6 @@
   {"intention": "wiki_delete",    "command": "/supprimer",  "variantes": ["avec_slug"]},
   {"intention": "wiki_reread",    "command": "/relire",     "variantes": ["sans_args"]},
   {"intention": "wiki_verify",    "command": "/verifie",    "variantes": ["avec_slug"]},
+  {"intention": "cron_schedule",  "command": "/cron",       "variantes": ["rappel_recurrent","rappel_ponctuel_date","rappel_relatif","commande_recurrente","consigne_recurrente","avec_canal"]},
   {"intention": "out_of_scope",   "command": null,          "variantes": ["action_impossible","envoi_mail_nouveau","agenda","aide_generale","conversation_libre"]}
 ]

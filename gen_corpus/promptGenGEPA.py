@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import random
 import json
 import logging
 import os
@@ -22,11 +23,12 @@ dspy.settings.cache = None
 COMMANDS_KNOWN = {
     "/c", "/ingest", "/wikistatus", "/q", "/source", "/r", "/tags", "/kbupdate",
     "/supprimer", "/relire", "/verifie", "/chercher", "/connecter", "/inbox",
-    "/drive", "/repondre", "/lire",
+    "/drive", "/repondre", "/lire", "/cron",
 }
 REQUIRES_ARGS = {
     "wiki_capture", "wiki_query", "source_read", "gog_search", "gog_reply",
     "gog_drive", "wiki_search", "gog_get", "wiki_delete", "wiki_verify",
+    "cron_schedule",
 }
 
 
@@ -53,6 +55,7 @@ class Config:
     deepseek_api_base: str = "https://api.deepseek.com"
     reflection_temperature: float = 1.0
     max_metric_calls: int = 300
+    valset_size: int = 40
 
 
 def parse_args(argv=None) -> Config:
@@ -65,11 +68,13 @@ def parse_args(argv=None) -> Config:
     p.add_argument("--deepseek-api-base", default="https://api.deepseek.com")
     p.add_argument("--temperature", type=float, default=1.0)
     p.add_argument("--max-metric-calls", type=int, default=300)
+    p.add_argument("--valset-size", type=int, default=40)
     a = p.parse_args(argv)
     return Config(seed_path=a.seed, prompt_path=a.prompt, gepa_prompt_path=a.gepa_prompt,
                   generator_model=a.generator_model, eval_model=a.eval_model,
                   deepseek_api_base=a.deepseek_api_base,
-                  reflection_temperature=a.temperature, max_metric_calls=a.max_metric_calls)
+                  reflection_temperature=a.temperature, max_metric_calls=a.max_metric_calls,
+                  valset_size=a.valset_size)
 
 
 def _ensure_key() -> str:
@@ -118,6 +123,18 @@ def build_example_generator(prompt_text: str) -> dspy.Module:
     return ExampleGenerator()
 
 
+def split_trainset(examples: list, n_val: int, seed: int = 0) -> tuple[list, list]:
+    """Valset séparé et petit : GEPA dépense sinon son budget max_metric_calls à
+    réévaluer tout le trainset au lieu de réfléchir (piste du 2026-09-30)."""
+    n_val = min(n_val, len(examples) // 2)
+    idx = list(range(len(examples)))
+    random.Random(seed).shuffle(idx)
+    val_idx = set(idx[:n_val])
+    train = [e for i, e in enumerate(examples) if i not in val_idx]
+    val = [e for i, e in enumerate(examples) if i in val_idx]
+    return train, val
+
+
 def build_trainset(seed: list[dict]) -> list[dspy.Example]:
     return [
         dspy.Example(
@@ -160,6 +177,7 @@ INTENTION_DESCRIPTIONS = {
     "wiki_delete": "supprimer une page du wiki (par son slug)",
     "wiki_reread": "obtenir la prochaine page du wiki à relire",
     "wiki_verify": "marquer une page du wiki comme vérifiée (par son slug)",
+    "cron_schedule": "planifier un rappel, une commande Tiron ou une consigne à une date donnée ou de façon récurrente (chaque lundi, tous les jours, demain, dans 20 minutes), éventuellement sur un canal précis (SMS, WhatsApp, Telegram, Obsidian)",
     "out_of_scope": "demande hors périmètre de Tiron (aucune des commandes ci-dessus ne s'applique)",
 }
 
@@ -260,7 +278,7 @@ def main(argv=None) -> int:
     configure_lm(cfg.generator_model, cfg.reflection_temperature, cfg.deepseek_api_base)
     eval_lm = configure_eval_lm(cfg.eval_model, cfg.deepseek_api_base)
     generator = build_example_generator(initial_prompt)
-    trainset = build_trainset(seed)
+    trainset, valset = split_trainset(build_trainset(seed), cfg.valset_size)
     teleprompter = dspy.GEPA(
         metric=make_metric(eval_lm),
         reflection_lm=dspy.settings.lm,
@@ -269,7 +287,7 @@ def main(argv=None) -> int:
         track_best_outputs=True,
         num_threads=2,  # sanroque déjà proche de la limite mémoire (autres services actifs)
     )
-    compiled = teleprompter.compile(generator, trainset=trainset)
+    compiled = teleprompter.compile(generator, trainset=trainset, valset=valset)
     best_prompt = _extract_best_prompt(compiled, teleprompter, initial_prompt)
     Path(cfg.gepa_prompt_path).write_text(best_prompt, encoding="utf-8")
     print(f"Prompt optimisé sauvegardé dans {cfg.gepa_prompt_path}")

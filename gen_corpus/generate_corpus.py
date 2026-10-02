@@ -88,6 +88,7 @@ INTENTION_DESCRIPTIONS = {
     "wiki_delete": "supprimer une page du wiki (par son slug)",
     "wiki_reread": "obtenir la prochaine page du wiki à relire",
     "wiki_verify": "marquer une page du wiki comme vérifiée (par son slug)",
+    "cron_schedule": "planifier un rappel, une commande Tiron ou une consigne à une date donnée ou de façon récurrente (chaque lundi, tous les jours, demain, dans 20 minutes), éventuellement sur un canal précis (SMS, WhatsApp, Telegram, Obsidian)",
     "out_of_scope": "demande hors périmètre de Tiron (aucune des commandes ci-dessus ne s'applique)",
 }
 
