@@ -2016,6 +2016,8 @@ git commit -m "chore(cron): variables de destinataires dans le modèle d'environ
 
 (À remplir pendant la tâche 1.)
 
-- Step 1 (`--command-argv` + `--announce`) :
-- Step 2 (hook `before_agent_reply` sur message planifié) :
-- Step 3 (identifiants de canal, SMS/Twilio, WhatsApp) :
+Essai du 2026-10-02 (sanroque, OpenClaw 2026.8.2, destinataire Telegram 220537738 = `commands.ownerAllowFrom`) :
+
+- Step 1 (`--command-argv` + `--announce`) : **OUI**. Run `ok`, `deliveryStatus: delivered`, texte « essai rappel tiron (ignorez) » livré sur Telegram. Aucun modèle.
+- Step 2 (hook `before_agent_reply` sur message planifié) : **OUI, mais message enveloppé**. Le hook de derisk-deleg intercepte bien le tour planifié, mais OpenClaw lui transmet `[cron:<id> <nom>] /wikistatus` suivi d'un long préambule (« Current time: … This is an unattended scheduled run… »). Le routeur a classé ce texte comme `/repondre` → brouillon de réponse absurde livré. Conséquence : ni `commande` ni `consigne` ne fonctionnent tels quels.
+- Step 3 : SMS = extension officielle `clawhub:@openclaw/sms` (Twilio, v2026.9.7). WhatsApp = extension officielle `clawhub:@openclaw/whatsapp` (liaison WhatsApp Web par QR : envoie depuis le compte lié). Identifiants de canal à confirmer après installation.
