@@ -5,7 +5,7 @@ import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from router_service.router import WIKI_CMDS, GOG_CMDS, embed_bge_m3
+from router_service.router import WIKI_CMDS, GOG_CMDS, CRON_CMDS, embed_bge_m3
 from router_service.faq import FaqIndex, FAQ_PATH
 from router_service.laya_classifier import LayaClassifier
 
@@ -14,7 +14,7 @@ SEUIL_GOG = 0.50
 
 # Commandes qui exigent un argument : un appel sans argument est une erreur
 # d'usage, pas une capture/requête vide à déléguer.
-NEEDS_ARG = {"/c", "/q", "/source", "/chercher", "/repondre", "/r", "/lire", "/supprimer", "/verifie"}
+NEEDS_ARG = {"/c", "/q", "/source", "/chercher", "/repondre", "/r", "/lire", "/supprimer", "/verifie", "/cron"}
 
 _classifier = None  # chargé au démarrage (Step 5)
 _faq = None         # FaqIndex, chargé au démarrage
@@ -28,7 +28,7 @@ def route_message(message: str) -> dict:
     if stripped.startswith("/"):
         parts = stripped.split(None, 1)
         cmd = parts[0]
-        if cmd in WIKI_CMDS or cmd in GOG_CMDS:
+        if cmd in WIKI_CMDS or cmd in GOG_CMDS or cmd in CRON_CMDS:
             args = parts[1] if len(parts) > 1 else ""
             if cmd in NEEDS_ARG and not args.strip():
                 return {"status": "answer", "reply": f"Usage : {cmd} <argument>"}

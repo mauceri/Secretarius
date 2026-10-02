@@ -171,3 +171,19 @@ def test_wiki_command_from_slm_does_not_use_confidence_threshold(monkeypatch):
     monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("/q", 0.10))
     r = router_server.route_message("dis-moi ce que dit le wiki sur X")
     assert r == {"status": "ok", "command": "/q", "args": "dis-moi ce que dit le wiki sur X"}
+
+
+def test_explicit_cron_bypasses_slm(monkeypatch):
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("boom"))
+    r = router_server.route_message('/cron add "0 8 * * 1" rappel x')
+    assert r == {"status": "ok", "command": "/cron", "args": 'add "0 8 * * 1" rappel x'}
+
+
+def test_explicit_cron_empty_arg_returns_usage(monkeypatch):
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("boom"))
+    assert router_server.route_message("/cron") == {"status": "answer", "reply": "Usage : /cron <argument>"}
+
+
+def test_cron_cmds_disjoint():
+    from router_service.router import CRON_CMDS
+    assert CRON_CMDS.isdisjoint(WIKI_CMDS | GOG_CMDS)

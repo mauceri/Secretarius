@@ -15,6 +15,7 @@ WIKI_CMDS = {"/c", "/q", "/ingest", "/source", "/wikistatus", "/r", "/tags", "/k
 # préfixe (0% des exemples réels n'en portent, mesuré 2026-09-30 — /r à 13%
 # d'exactitude malgré un corpus corrigé), retirée de l'inférence NL de Laya.
 GOG_CMDS = {"/chercher", "/connecter", "/inbox", "/drive", "/repondre", "/lire"}
+CRON_CMDS = {"/cron"}
 
 COMMAND_CRITERIA: dict[str, str] = {
     "/c": "capturer une note ou une URL dans le wiki",
