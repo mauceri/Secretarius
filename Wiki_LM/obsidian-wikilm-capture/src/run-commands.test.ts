@@ -290,10 +290,13 @@ describe("SUPPORTED_COMMANDS", () => {
     expect(SUPPORTED_COMMANDS).not.toContain("/supprimer");
   });
 
-  it("contains exactly the sixteen wiki commands from the spec", () => {
+  it("contains exactly the nineteen commands from the specs (wiki + cron)", () => {
     expect([...SUPPORTED_COMMANDS].sort()).toEqual(
       [
         "/c",
+        "/cron",
+        "/cron!",
+        "/cron?",
         "/help",
         "/ingest",
         "/kbupdate",
@@ -335,5 +338,22 @@ describe("applyWikiResults", () => {
     expect(marks).toHaveLength(1);
     expect(secondPass).toContain("nouveau résultat");
     expect(secondPass).not.toContain("ancien résultat");
+  });
+});
+
+describe("formatWikiResult — /cron", () => {
+  it("liste les trois commandes cron", () => {
+    expect(SUPPORTED_COMMANDS).toEqual(expect.arrayContaining(["/cron?", "/cron!", "/cron"]));
+  });
+  it("aperçu : invite à remplacer par /cron!", () => {
+    expect(formatWikiResult("/cron?", { text: "Chaque lundi à 08:00 (Europe/Paris), obsidian, rappel : loyer" }, true))
+      .toBe("Chaque lundi à 08:00 (Europe/Paris), obsidian, rappel : loyer\n\nRien n'a été créé. Remplacez par /cron! pour créer la tâche.");
+  });
+  it("création et gestion : texte relayé", () => {
+    expect(formatWikiResult("/cron!", { text: "Tâche créée (aaaa1111) : …" }, true)).toBe("Tâche créée (aaaa1111) : …");
+    expect(formatWikiResult("/cron", { text: "Aucune tâche planifiée." }, true)).toBe("Aucune tâche planifiée.");
+  });
+  it("erreur", () => {
+    expect(formatWikiResult("/cron!", { error: "contenu vide" }, true)).toBe("**Erreur :** contenu vide");
   });
 });

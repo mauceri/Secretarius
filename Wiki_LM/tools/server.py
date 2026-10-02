@@ -46,6 +46,7 @@ Endpoint :
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -135,6 +136,19 @@ def handle_capture():
     return jsonify({"status": "ok", "filename": path.name})
 
 
+def _tiron_cron(argv: list[str]) -> dict:
+    """Délègue à la CLI JSON tiron_cron (même cœur que Tiron, cf. spec cron).
+    Python système (stdlib seulement), cwd = racine du dépôt Secretarius."""
+    cwd = os.environ.get("SECRETARIUS_DIR") or str(Path.home() / "Secretarius")
+    p = subprocess.run(["python3", "-m", "tiron_cron", *argv], cwd=cwd,
+                       capture_output=True, text=True, timeout=150)
+    try:
+        data = json.loads(p.stdout)
+    except ValueError:
+        return {"error": (p.stderr or p.stdout or "tiron_cron indisponible").strip()[:500]}
+    return {"text": data.get("text", "")} if data.get("ok") else {"error": data.get("text", "")}
+
+
 _RUN_OPS = {
     # Chaque entrée reçoit (arg, vault_name) de façon uniforme — un seul
     # protocole d'appel dans la table de dispatch. Seules /c et /q
@@ -167,6 +181,11 @@ _RUN_OPS = {
     "/reingerer?": lambda arg, vault: op_reingest_preview(arg),
     "/reingerer!": lambda arg, vault: op_reingest(arg),
     "/switch-wiki-model": lambda arg, vault: _switch_wiki_model(arg),
+    # Planification (spec cron 2026-10-01) : /cron? aperçu, /cron! création
+    # (le ! tient lieu de /confirm), /cron list|rm|pause|reprendre.
+    "/cron?": lambda arg, vault: _tiron_cron(["preview", "--origin", "obsidian", "--args", arg]),
+    "/cron!": lambda arg, vault: _tiron_cron(["add", "--origin", "obsidian", "--args", arg]),
+    "/cron": lambda arg, vault: _tiron_cron(["manage", "--args", arg]),
     "/help": lambda arg, vault: op_help(),
 }
 

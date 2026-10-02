@@ -309,3 +309,35 @@ class TestSwitchWikiModel:
         client.post("/run", json={"command": "/switch-wiki-model", "arg": "infomaniak"})
 
         assert captured["api_key"] == "the-real-key"
+
+
+class TestHandleRunCron:
+    def _fake(self, monkeypatch, out):
+        import server
+        calls = []
+
+        def run(argv, **kw):
+            calls.append((argv, kw))
+            import subprocess
+            return subprocess.CompletedProcess(argv, 0, stdout=out, stderr="")
+        monkeypatch.setattr(server.subprocess, "run", run)
+        return calls
+
+    def test_apercu(self, client, monkeypatch):
+        calls = self._fake(monkeypatch, '{"ok": true, "text": "Chaque lundi…", "args": "add …"}')
+        r = client.post("/run", json={"command": "/cron?", "arg": 'add "0 8 * * 1" rappel x'})
+        assert r.status_code == 200 and r.get_json() == {"text": "Chaque lundi…"}
+        argv, kw = calls[0]
+        assert argv[:3] == ["python3", "-m", "tiron_cron"]
+        assert argv[3:] == ["preview", "--origin", "obsidian", "--args", 'add "0 8 * * 1" rappel x']
+
+    def test_creation_et_gestion(self, client, monkeypatch):
+        calls = self._fake(monkeypatch, '{"ok": true, "text": "ok"}')
+        client.post("/run", json={"command": "/cron!", "arg": "add 20m rappel x"})
+        client.post("/run", json={"command": "/cron", "arg": "list"})
+        assert calls[0][0][3:5] == ["add", "--origin"] and calls[1][0][3:] == ["manage", "--args", "list"]
+
+    def test_erreur_relayee(self, client, monkeypatch):
+        self._fake(monkeypatch, '{"ok": false, "text": "contenu vide"}')
+        r = client.post("/run", json={"command": "/cron!", "arg": "add 20m rappel"})
+        assert r.status_code == 200 and r.get_json() == {"error": "contenu vide"}

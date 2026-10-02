@@ -14,6 +14,9 @@ export const SUPPORTED_COMMANDS = [
   "/repair?",
   "/repair!",
   "/switch-wiki-model",
+  "/cron?",
+  "/cron!",
+  "/cron",
   "/help",
 ] as const;
 
@@ -142,6 +145,11 @@ export function formatWikiResult(
       }
       return `Modèle du wiki basculé sur ${data.alias} (${data.model}).`;
     }
+    case "/cron?":
+      return `${String(data.text ?? "")}\n\nRien n'a été créé. Remplacez par /cron! pour créer la tâche.`;
+    case "/cron!":
+    case "/cron":
+      return String(data.text ?? "");
     case "/help":
       return String(data.help ?? "");
     default:
