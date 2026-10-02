@@ -1128,4 +1128,45 @@ describe("before_agent_reply — /cron", () => {
     expect(r.reply.text).toBe("Aucune tâche planifiée.");
     expect(runTironCron).toHaveBeenCalledWith(["manage", "--args", "list"]);
   });
+
+  it("tâche tiron planifiée : commande exécutée comme tapée, sans Laya", async () => {
+    const fetchSpy = vi.fn(async (_u: any, init: any) => ({
+      ok: true,
+      json: async () => ({ status: "ok", command: "/tags", args: "" }),
+    }));
+    vi.stubGlobal("fetch", fetchSpy);
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    await hooks["before_agent_reply"].handler(
+      { cleanedBody: "[cron:1 tiron-abcd1234] /tags\nCurrent time: x\nThis is an unattended scheduled run." }, {});
+    expect(JSON.parse(fetchSpy.mock.calls[0][1].body).message).toBe("/tags");
+  });
+
+  it("tâche tiron planifiée : consigne laissée au modèle de main", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    const res = await hooks["before_agent_reply"].handler(
+      { cleanedBody: "[cron:1 tiron-abcd1234] résume le wiki\nCurrent time: x" }, {});
+    expect(res).toBeUndefined();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("tâche tiron planifiée : commande hors liste blanche refusée", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    const res = await hooks["before_agent_reply"].handler(
+      { cleanedBody: "[cron:1 tiron-abcd1234] /supprimer! src-x\nCurrent time: x" }, {});
+    expect(res.reply.text).toBe("Commande non planifiable : /supprimer!");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });
