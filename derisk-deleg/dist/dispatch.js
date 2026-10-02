@@ -19,6 +19,7 @@ const TABLE = {
     "/supprimer": { kind: "wiki", op: "delete" },
     "/relire": { kind: "wiki", op: "review" },
     "/verifie": { kind: "wiki", op: "verify" },
+    "/cron": { kind: "cron" },
 };
 export function commandToAction(command) {
     return TABLE[command] ?? null;

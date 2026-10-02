@@ -80,6 +80,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
   vi.useRealTimers();
   vi.doUnmock("./wiki-ops.js");
+  vi.doUnmock("./cron-ops.js");
 });
 
 describe("outils gog_* — délégation au sous-agent gog", () => {
@@ -1058,5 +1059,73 @@ describe("before_agent_reply — commande / tapée explicitement vs intention de
 
     expect(runWikiOpSpy).toHaveBeenCalledWith(api, "ingest", "", undefined, "brief");
     expect(res.reply.text).not.toContain("/confirm");
+  });
+});
+
+describe("before_agent_reply — /cron", () => {
+  function routerReturns(command: string, args: string) {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ status: "ok", command, args }) })));
+  }
+
+  it("/cron add tapé : aperçu puis /confirm crée la tâche", async () => {
+    const runTironCron = vi.fn()
+      .mockResolvedValueOnce({ ok: true, text: "Chaque lundi à 08:00 (Europe/Paris), telegram, rappel : loyer", args: 'add "0 8 * * 1" rappel loyer' })
+      .mockResolvedValueOnce({ ok: true, text: "Tâche créée (aaaa1111) : …" });
+    vi.doMock("./cron-ops.js", () => ({ runTironCron }));
+    routerReturns("/cron", 'add "0 8 * * 1" rappel loyer');
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+    const ctx = { messageProvider: "telegram" };
+
+    const r1 = await hooks["before_agent_reply"].handler({ cleanedBody: '/cron add "0 8 * * 1" rappel loyer' }, ctx);
+    expect(r1.reply.text).toMatch(/^Tâche à créer : Chaque lundi.*\/confirm/s);
+    expect(runTironCron).toHaveBeenNthCalledWith(1, ["preview", "--origin", "telegram", "--args", 'add "0 8 * * 1" rappel loyer']);
+
+    const r2 = await hooks["before_agent_reply"].handler({ cleanedBody: "/confirm" }, ctx);
+    expect(r2.reply.text).toBe("Tâche créée (aaaa1111) : …");
+    expect(runTironCron).toHaveBeenNthCalledWith(2, ["add", "--origin", "telegram", "--args", 'add "0 8 * * 1" rappel loyer']);
+  });
+
+  it("langage naturel : passe par nl, puis /annuler ne crée rien", async () => {
+    const runTironCron = vi.fn().mockResolvedValueOnce({ ok: true, text: "Dans 20 min …", args: "add 20m rappel x" });
+    vi.doMock("./cron-ops.js", () => ({ runTironCron }));
+    routerReturns("/cron", "dans 20 minutes rappelle-moi de x");
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    await hooks["before_agent_reply"].handler({ cleanedBody: "dans 20 minutes rappelle-moi de x" }, { messageProvider: "telegram" });
+    expect(runTironCron).toHaveBeenCalledWith(["nl", "--origin", "telegram", "--text", "dans 20 minutes rappelle-moi de x"]);
+    const r = await hooks["before_agent_reply"].handler({ cleanedBody: "/annuler" }, {});
+    expect(r.reply.text).toBe("Planification abandonnée. Rien n'a été créé.");
+    expect(runTironCron).toHaveBeenCalledTimes(1);
+  });
+
+  it("aperçu en erreur : message relayé, rien en attente", async () => {
+    const runTironCron = vi.fn().mockResolvedValueOnce({ ok: false, text: "destinataire sms non configuré (TIRON_SMS_TO)" });
+    vi.doMock("./cron-ops.js", () => ({ runTironCron }));
+    routerReturns("/cron", "add 20m sms rappel x");
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    const r = await hooks["before_agent_reply"].handler({ cleanedBody: "/cron add 20m sms rappel x" }, {});
+    expect(r.reply.text).toBe("destinataire sms non configuré (TIRON_SMS_TO)");
+    const c = await hooks["before_agent_reply"].handler({ cleanedBody: "/confirm" }, {});
+    expect(c.reply.text).toMatch(/^Rien à confirmer/);
+  });
+
+  it("/cron list tapé : exécuté directement par manage", async () => {
+    const runTironCron = vi.fn().mockResolvedValueOnce({ ok: true, text: "Aucune tâche planifiée." });
+    vi.doMock("./cron-ops.js", () => ({ runTironCron }));
+    routerReturns("/cron", "list");
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    const r = await hooks["before_agent_reply"].handler({ cleanedBody: "/cron list" }, {});
+    expect(r.reply.text).toBe("Aucune tâche planifiée.");
+    expect(runTironCron).toHaveBeenCalledWith(["manage", "--args", "list"]);
   });
 });

@@ -2,6 +2,7 @@ import { Type } from "typebox";
 import { definePluginEntry } from "openclaw/plugin-sdk/core";
 import { parseReply } from "./parse.js";
 import { commandToAction } from "./dispatch.js";
+import { runTironCron } from "./cron-ops.js";
 import { fetchWikiOpJson, runWikiOp } from "./wiki-ops.js";
 import { readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync, copyFileSync, mkdirSync } from "node:fs";
 import { homedir, hostname } from "node:os";
@@ -589,6 +590,9 @@ export default definePluginEntry({
                 else if (p.kind === "reply") {
                     out = await delegateGog(api, "reply", `id=${p.messageId}; body=${p.body}`);
                 }
+                else if (p.kind === "cron") {
+                    out = (await runTironCron(["add", "--origin", p.origin, "--args", p.args])).text;
+                }
                 else {
                     out = await runWikiOp(api, p.op, p.args);
                 }
@@ -605,6 +609,10 @@ export default definePluginEntry({
                         handled: true,
                         reply: { text: `Action wiki abandonnée (${op}). Rien n'a été exécuté.` },
                     };
+                }
+                if (pending.kind === "cron") {
+                    pending = null;
+                    return { handled: true, reply: { text: "Planification abandonnée. Rien n'a été créé." } };
                 }
                 const dest = pending.kind === "send" ? pending.to : `réponse à ${pending.messageId}`;
                 pending = null;
@@ -642,6 +650,27 @@ export default definePluginEntry({
             const typed = text.trim().toLowerCase();
             const routedCmd = routed.command.toLowerCase();
             const explicitCommand = typed === routedCmd || typed.startsWith(routedCmd + " ");
+            // /cron : la création passe TOUJOURS par aperçu + /confirm (tapée ou
+            // inférée — cf. spec cron) ; list/rm/pause/reprendre tapés s'exécutent.
+            if (action.kind === "cron") {
+                const origin = String(ctx?.messageProvider ?? "");
+                const sub = routed.args.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
+                if (explicitCommand && sub !== "add") {
+                    const r = await runTironCron(["manage", "--args", routed.args]);
+                    return { handled: true, reply: { text: r.text.slice(0, 4000) } };
+                }
+                const r = explicitCommand
+                    ? await runTironCron(["preview", "--origin", origin, "--args", routed.args])
+                    : await runTironCron(["nl", "--origin", origin, "--text", routed.args]);
+                if (!r.ok || !r.args) {
+                    return { handled: true, reply: { text: r.text.slice(0, 4000) } };
+                }
+                pending = { kind: "cron", args: r.args, origin, ts: Date.now() };
+                return {
+                    handled: true,
+                    reply: { text: `Tâche à créer : ${r.text}\n\nTapez /confirm pour la créer (valable 10 min), ou /annuler pour abandonner.` },
+                };
+            }
             if (action.kind === "wiki") {
                 // Suppression : toujours un essai à blanc puis /confirm, MÊME tapée
                 // explicitement — contrairement aux autres écritures, l'ampleur

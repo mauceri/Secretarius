@@ -45,4 +45,8 @@ describe("commandToAction", () => {
   it("mappe /verifie vers wiki verify", () => {
     expect(commandToAction("/verifie")).toEqual({ kind: "wiki", op: "verify" });
   });
+
+  it("mappe /cron vers cron", () => {
+    expect(commandToAction("/cron")).toEqual({ kind: "cron" });
+  });
 });

@@ -5,13 +5,15 @@
 export type RouterCommand =
   | "/c" | "/q" | "/ingest" | "/wikistatus" | "/source"
   | "/chercher" | "/connecter" | "/inbox" | "/drive" | "/repondre"
-  | "/r" | "/tags" | "/kbupdate" | "/lire" | "/supprimer" | "/relire" | "/verifie";
+  | "/r" | "/tags" | "/kbupdate" | "/lire" | "/supprimer" | "/relire" | "/verifie"
+  | "/cron";
 
 export type ActionKind =
   | { kind: "wiki"; op: "capture" | "query" | "ingest" | "status" | "search" | "tags" | "kb_update" | "delete" | "review" | "verify" }
   | { kind: "scout" }
   | { kind: "gog"; op: "search" | "auth_start" | "inbox" | "drive_search" | "get" }
-  | { kind: "gog-reply" };
+  | { kind: "gog-reply" }
+  | { kind: "cron" };
 
 const TABLE: Record<RouterCommand, ActionKind> = {
   "/c": { kind: "wiki", op: "capture" },
@@ -31,6 +33,7 @@ const TABLE: Record<RouterCommand, ActionKind> = {
   "/supprimer": { kind: "wiki", op: "delete" },
   "/relire": { kind: "wiki", op: "review" },
   "/verifie": { kind: "wiki", op: "verify" },
+  "/cron": { kind: "cron" },
 };
 
 export function commandToAction(command: string): ActionKind | null {
