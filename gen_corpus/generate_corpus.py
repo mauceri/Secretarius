@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import random
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,6 +20,9 @@ try:
 except Exception:
     pass
 dspy.settings.cache = None
+
+from chaine import EvalFidelite, INTENTION_DESCRIPTIONS, est_quasi_doublon, tirer_contraintes  # noqa: E402
+from promptGenGEPA import build_example_generator  # noqa: E402
 
 
 @dataclass
@@ -34,6 +38,9 @@ class Config:
     generator_model: str = "openai/deepseek-chat"
     deepseek_api_base: str = "https://api.deepseek.com"
     temperature: float = 0.9
+    seed_path: str = "seed.json"
+    program_path: str = "gepa_program.json"
+    sondage_every: int = 50
 
 
 def parse_args(argv=None) -> Config:
@@ -48,60 +55,15 @@ def parse_args(argv=None) -> Config:
     p.add_argument("--model", default="openai/deepseek-chat")
     p.add_argument("--deepseek-api-base", default="https://api.deepseek.com")
     p.add_argument("--temperature", type=float, default=0.9)
+    p.add_argument("--seed", default="seed.json")
+    p.add_argument("--program", default="gepa_program.json")
+    p.add_argument("--sondage-every", type=int, default=50)
     a = p.parse_args(argv)
     return Config(count=a.count, batch_size=a.batch_size, report_every=a.report_every,
                   prompt_path=a.prompt, intentions_path=a.intentions, registres_path=a.registres,
                   output=a.output, generator_model=a.model,
-                  deepseek_api_base=a.deepseek_api_base, temperature=a.temperature)
-
-
-def _build_signature(prompt_text: str):
-    class GenerateExample(dspy.Signature):
-        __doc__ = prompt_text
-        intention: str = dspy.InputField(desc="Intention Tiron à illustrer")
-        registre:  str = dspy.InputField(desc="Registre du message")
-        variante:  str = dspy.InputField(desc="Type de variante")
-        text:    str = dspy.OutputField(desc="Message utilisateur réaliste en français")
-        command: str = dspy.OutputField(desc="Commande Tiron ou null")
-        args:    str = dspy.OutputField(desc="Arguments bruts (chaîne vide si sans args)")
-    return GenerateExample
-
-
-# Descriptions courtes pour le juge de fidélité texte↔intention — mêmes
-# définitions que dans promptGenGEPA.py (dupliquées, chaque script gen_corpus
-# reste indépendant et exécutable seul).
-INTENTION_DESCRIPTIONS = {
-    "wiki_capture": "capturer une URL ou une note dans le wiki",
-    "wiki_ingest": "lancer l'ingestion des captures en attente du wiki",
-    "wiki_status": "consulter l'état de l'ingestion du wiki",
-    "wiki_query": "poser une question au wiki et obtenir une réponse synthétisée par un LLM",
-    "source_read": "lire une page web externe immédiatement, sans la sauvegarder",
-    "gog_search": "rechercher des emails Gmail par mot-clé, expéditeur ou période",
-    "gog_connect": "autoriser l'accès au compte Google",
-    "gog_inbox": "lister les emails récents de la boîte de réception",
-    "gog_reply": "préparer un brouillon de réponse à un email, sans l'envoyer",
-    "gog_drive": "rechercher des fichiers sur Google Drive",
-    "wiki_search": "rechercher par mots-clés dans le wiki, résultats bruts SANS synthèse ni résumé LLM (différent de wiki_query qui synthétise une réponse)",
-    "wiki_tags": "lister les tags disponibles dans le wiki",
-    "wiki_kb_update": "reconstruire la base de connaissances du wiki depuis le dernier clustering",
-    "gog_get": "lire le contenu d'un email précis (par identifiant, ou le dernier/un email récent) — UNIQUEMENT un email, jamais une page wiki, une capture, un document Drive ou l'état du wiki",
-    "wiki_delete": "supprimer une page du wiki (par son slug)",
-    "wiki_reread": "obtenir la prochaine page du wiki à relire",
-    "wiki_verify": "marquer une page du wiki comme vérifiée (par son slug)",
-    "cron_schedule": "planifier un rappel, une commande Tiron ou une consigne à une date donnée ou de façon récurrente (chaque lundi, tous les jours, demain, dans 20 minutes), éventuellement sur un canal précis (SMS, WhatsApp, Telegram, Obsidian)",
-    "out_of_scope": "demande hors périmètre de Tiron (aucune des commandes ci-dessus ne s'applique)",
-}
-
-
-class EvalFidelite(dspy.Signature):
-    """Ce message correspond-il vraiment à l'intention décrite, et à elle seule
-    (pas à une intention voisine ni à une autre commande) ? Répondre 1 si le
-    message décrit sans ambiguïté cette intention précise, 0 sinon — y compris
-    si le message est plausible pour une AUTRE intention que celle donnée.
-    Répondre avec 0 ou 1 uniquement, sans commentaire."""
-    text: str = dspy.InputField(desc="Message utilisateur généré")
-    intention_description: str = dspy.InputField(desc="Description de l'intention que le message doit illustrer")
-    score: int = dspy.OutputField(desc="0 ou 1")
+                  deepseek_api_base=a.deepseek_api_base, temperature=a.temperature,
+                  seed_path=a.seed, program_path=a.program, sondage_every=a.sondage_every)
 
 
 def make_fidelity_check(eval_lm: "dspy.LM"):
@@ -120,24 +82,94 @@ def make_fidelity_check(eval_lm: "dspy.LM"):
 
 
 def generate_one(predict, fidelity_check, intention: str, registre: str, variante: str,
-                  command: str | None, max_attempts: int = 3) -> tuple[dict, bool]:
+                 command: str | None, max_attempts: int = 3, *, contraintes: str = "",
+                 deja_vus: list[str] | None = None) -> tuple[dict | None, bool]:
     # La commande est déterminée par l'intention (intentions.json), pas par le LLM :
     # demander au modèle de la re-choisir introduit du bruit d'étiquetage quand deux
     # commandes sont sémantiquement proches (ex. /q vs /r — constaté ~99% d'erreur
     # sur wiki_search lors de l'ajout de /r). Seuls text/args restent générés.
+    # Un quasi-doublon d'un exemple déjà gardé compte comme un essai raté ; s'il
+    # persiste, l'exemple est écarté (None) plutôt que gardé (D4).
     result = None
     accepted = False
+    doublon = False
     for attempt in range(max_attempts):
-        result = predict(intention=intention, registre=registre, variante=variante)
-        accepted = fidelity_check(result.text, intention)
+        result = predict(intention=intention, registre=registre, variante=variante, contraintes=contraintes)
+        text = result["text"] if isinstance(result, dict) else result.text
+        doublon = bool(deja_vus) and est_quasi_doublon(text, deja_vus)
+        if doublon:
+            continue
+        accepted = fidelity_check(text, intention)
         if accepted:
             break
-    args = result.args.strip()
+    if doublon:
+        return None, False
+    raw_args = result["args"] if isinstance(result, dict) else result.args
+    args = str(raw_args or "").strip()
     if args in ('""', "''"):
         args = ""
-    entry = {"text": result.text, "intention": intention, "registre": registre,
-             "variante": variante, "action": {"command": command, "args": args}}
+    entry = {"text": text, "intention": intention, "registre": registre,
+             "variante": variante, "contraintes": contraintes,
+             "action": {"command": command, "args": args}}
     return entry, accepted
+
+
+def charger_programme(prompt_path: str, fallback: str, program_path: str,
+                      seed: list[dict], rng: random.Random):
+    """Recharge le programme optimisé par GEPA tel quel (D5) ; à défaut, le
+    construit depuis GEPAPrompt.txt, puis prompt-init.txt."""
+    p = Path(prompt_path)
+    texte = (p if p.exists() else Path(fallback)).read_text(encoding="utf-8")
+    prog = build_example_generator(texte, seed, rng)
+    if Path(program_path).exists():
+        prog.load(program_path)
+    return prog
+
+
+_MARQUEURS = [(j, rf"\b{j}") for j in ("lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")] + [
+    ("tous les jours", r"tous les jours|chaque jour"), ("chaque matin", r"chaque matin|tous les matins"),
+    ("soir", r"\bsoir"), ("demain", r"\bdemain"), ("dans …", r"\bdans \d|\bdans (une|un|deux|trois)\b"),
+    ("date (le N)", r"\ble \d"), ("mois", r"\bmois\b"),
+]
+
+
+def _compte_marqueurs(textes: list[str]) -> list[tuple[str, int]]:
+    return [(nom, sum(bool(re.search(rx, t.lower())) for t in textes)) for nom, rx in _MARQUEURS]
+
+
+def rapport_diversite(entries: list[dict]) -> str:
+    par_intention: dict[str, list[str]] = {}
+    for e in entries:
+        par_intention.setdefault(e["intention"], []).append(e["text"])
+    lignes = []
+    for intention, textes in sorted(par_intention.items()):
+        n = len(textes)
+        moy = sum(len(t.split()) for t in textes) / n
+        attaques = sum(t.lower().startswith(("bonjour", "tiron")) for t in textes)
+        doublons = n - len(set(textes))
+        lignes.append(f"{intention} ({n}) : {moy:.1f} mots en moyenne ; Bonjour/Tiron : {attaques} ; doublons exacts : {doublons}")
+        if intention == "cron_schedule":
+            for nom, c in sorted(_compte_marqueurs(textes), key=lambda x: -x[1]):
+                if c:
+                    lignes.append(f"  {nom} : {c}/{n} ({100 * c / n:.0f} %)")
+    return "\n".join(lignes)
+
+
+def sonder(entries: list[dict], rejets_fidelite: int, random_: random.Random, k: int = 5) -> tuple[str, str | None]:
+    """Sondage en cours de génération (demande de l'utilisateur, 2026-10-05) :
+    rapport + échantillon, et alerte de dérive qui arrête la génération."""
+    echantillon = random_.sample(entries, min(k, len(entries)))
+    texte = rapport_diversite(entries) + "\n\nÉchantillon :" + "".join(f"\n- {e['text']}" for e in echantillon)
+    alerte = None
+    cron = [e["text"] for e in entries if e["intention"] == "cron_schedule"]
+    if len(cron) >= 50:
+        for nom, c in _compte_marqueurs(cron):
+            if c / len(cron) > 0.4:
+                alerte = f"« {nom} » dans {c}/{len(cron)} exemples cron ({100 * c / len(cron):.0f} %)"
+                break
+    if alerte is None and entries and rejets_fidelite / len(entries) > 0.3:
+        alerte = f"rejets de fidélité : {rejets_fidelite}/{len(entries)} ({100 * rejets_fidelite / len(entries):.0f} %)"
+    return texte, alerte
 
 
 def main(argv=None) -> int:
@@ -149,13 +181,13 @@ def main(argv=None) -> int:
     lm = dspy.LM(model=cfg.generator_model, api_key=api_key, api_base=base,
                  model_type="chat", temperature=cfg.temperature, max_tokens=256, cache=False)
     eval_lm = dspy.LM(model=cfg.generator_model, api_key=api_key, api_base=base,
-                       model_type="chat", temperature=0.0, max_tokens=16, cache=False)
+                       model_type="chat", temperature=0.0, max_tokens=128, cache=False)  # le juge écrit aussi une raison
     dspy.settings.configure(lm=lm)
     fidelity_check = make_fidelity_check(eval_lm)
 
-    prompt_p = Path(cfg.prompt_path)
-    prompt_text = (prompt_p if prompt_p.exists() else Path(cfg.prompt_fallback)).read_text(encoding="utf-8")
-    predict = dspy.Predict(_build_signature(prompt_text))
+    seed = json.loads(Path(cfg.seed_path).read_text(encoding="utf-8"))
+    rng = random.Random()
+    predict = charger_programme(cfg.prompt_path, cfg.prompt_fallback, cfg.program_path, seed, rng)
     intentions = json.loads(Path(cfg.intentions_path).read_text(encoding="utf-8"))
     registres = json.loads(Path(cfg.registres_path).read_text(encoding="utf-8"))
 
@@ -164,13 +196,25 @@ def main(argv=None) -> int:
     consecutive_errors = 0
     max_consecutive = max(10, cfg.count // 10)
     rejected_kept = 0  # exemples gardés malgré un échec de fidélité après max_attempts
+    ecartes_doublons = 0
+    deja_vus: dict[str, list[str]] = {}
+    gardes: list[dict] = []
     with open(cfg.output, "w", encoding="utf-8") as fout:
         for i in range(cfg.count):
             obj = random.choice(intentions)
             try:
+                vus = deja_vus.setdefault(obj["intention"], [])
                 entry, accepted = generate_one(predict, fidelity_check, obj["intention"],
                                                 random.choice(registres), random.choice(obj["variantes"]),
-                                                obj["command"])
+                                                obj["command"],
+                                                contraintes=tirer_contraintes(obj["intention"], rng),
+                                                deja_vus=vus)
+                if entry is None:
+                    ecartes_doublons += 1
+                    print(f"[{i+1}] Quasi-doublon persistant, écarté ({obj['intention']})", flush=True)
+                    continue
+                vus.append(entry["text"])
+                gardes.append(entry)
                 entry["fidelity_ok"] = accepted  # retiré au post-traitement, jamais lu en aval
                 if not accepted:
                     rejected_kept += 1
@@ -190,9 +234,17 @@ def main(argv=None) -> int:
                 buffer = []
             if (i + 1) % cfg.report_every == 0:
                 print(f"[{i+1}/{cfg.count}] {time.time()-stime:.1f}s", flush=True)
+            if cfg.sondage_every and (i + 1) % cfg.sondage_every == 0 and gardes:
+                texte, alerte = sonder(gardes, rejected_kept, rng)
+                print(f"--- Sondage à {i+1} ---\n{texte}", flush=True)
+                if alerte:
+                    print(f"ARRÊT : dérive — {alerte}", flush=True)
+                    break
         for e in buffer:
             fout.write(json.dumps(e, ensure_ascii=False) + "\n")
-    print(f"Corpus sauvegardé dans {cfg.output} ({rejected_kept}/{cfg.count} exemples gardés malgré un échec de fidélité)")
+    print(f"Corpus sauvegardé dans {cfg.output} ({rejected_kept}/{cfg.count} exemples gardés malgré un échec de fidélité, "
+          f"{ecartes_doublons} quasi-doublons écartés)")
+    print(rapport_diversite(gardes))
     return 0
 
 

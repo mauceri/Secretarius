@@ -121,3 +121,63 @@ def test_split_90_10(tmp_path):
     for line in out.read_text().strip().splitlines():
         msg = json.loads(line)
         assert len(msg["messages"]) == 3
+
+
+def test_generate_one_transmet_les_contraintes_et_les_garde():
+    from generate_corpus import generate_one
+    res = MagicMock(text="rappel jeudi 18h bac vert", args="x")
+    pred = MagicMock(return_value=res)
+    entry, ok = generate_one(pred, lambda t, i: True, "cron_schedule", "abrégé", "x", "/cron",
+                             contraintes="moment : chaque jeudi")
+    assert pred.call_args.kwargs["contraintes"] == "moment : chaque jeudi"
+    assert entry["contraintes"] == "moment : chaque jeudi"
+
+
+def test_generate_one_ecarte_un_quasi_doublon_persistant():
+    from generate_corpus import generate_one
+    pred = MagicMock(return_value=MagicMock(text="rappelle-moi chaque lundi à 8h de payer le loyer", args=""))
+    entry, ok = generate_one(pred, lambda t, i: True, "cron_schedule", "familier", "x", "/cron",
+                             deja_vus=["Rappelle-moi chaque lundi à 8h de payer le loyer."])
+    assert entry is None and ok is False and pred.call_count == 3
+
+
+def test_charger_programme_sans_fichier_retombe_sur_le_prompt(tmp_path):
+    import random
+    from generate_corpus import charger_programme
+    (tmp_path / "prompt-init.txt").write_text("Consigne initiale assez longue pour une instruction.", encoding="utf-8")
+    prog = charger_programme(str(tmp_path / "GEPAPrompt.txt"), str(tmp_path / "prompt-init.txt"),
+                             str(tmp_path / "gepa_program.json"), [], random.Random(0))
+    assert prog.generate.signature.instructions.startswith("Consigne initiale")
+
+
+def test_rapport_diversite_compte_les_moments():
+    from generate_corpus import rapport_diversite
+    entries = [{"intention": "cron_schedule", "text": t} for t in
+               ["rappel lundi 8h", "chaque lundi 9h x", "demain 7h y", "dans 20 min z"]]
+    r = rapport_diversite(entries)
+    assert "lundi : 2/4 (50 %)" in r
+
+def test_sondage_alerte_sur_derive_de_moment():
+    import random
+    from generate_corpus import sonder
+    entries = [{"intention": "cron_schedule", "text": f"rappel lundi {h}h x{h}"} for h in range(30)] + \
+              [{"intention": "cron_schedule", "text": f"demain {h}h y{h}"} for h in range(20)]
+    texte, alerte = sonder(entries, rejets_fidelite=0, random_=random.Random(0))
+    assert "lundi : 30/50" in texte and texte.count("\n- ") == 5
+    assert alerte and "lundi" in alerte
+
+
+def test_sondage_alerte_sur_rejets_de_fidelite():
+    import random
+    from generate_corpus import sonder
+    entries = [{"intention": "wiki_tags", "text": f"tags {i}"} for i in range(50)]
+    _, alerte = sonder(entries, rejets_fidelite=20, random_=random.Random(0))
+    assert alerte and "fidélité" in alerte
+
+
+def test_sondage_sans_alerte():
+    import random
+    from generate_corpus import sonder
+    entries = [{"intention": "cron_schedule", "text": t} for t in
+               ["rappel lundi 8h a", "demain 9h b", "dans 20 min c", "tous les jours 7h d", "le 3 mars e"] * 10]
+    assert sonder(entries, rejets_fidelite=2, random_=random.Random(0))[1] is None
