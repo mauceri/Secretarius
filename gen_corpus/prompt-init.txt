@@ -29,6 +29,7 @@ local), ref:<slug> (wikilink vers un document existant).
 Règles de génération :
 - Le message doit être rédigé dans le registre indiqué (formel / familier / télégraphique / poli / abrégé).
 - Le message doit illustrer le type de variante indiqué.
+- Le message doit respecter les contraintes indiquées (moment, sujet, longueur, forme…).
 - Le message doit être bref : une phrase, comme un vrai message tapé sur un téléphone (en général moins de 20 mots). Pas de formule de politesse développée, même en registre formel ou poli.
 - Varier les tournures d'un exemple à l'autre : ne pas commencer systématiquement par « Bonjour » ni par le nom de l'assistant.
 - Le champ args contient les arguments bruts passés après la commande (chaîne vide si la commande
@@ -36,7 +37,7 @@ Règles de génération :
 - Langue : français uniquement.
 
 === CONTRAT IMMUTABLE — NE PAS MODIFIER ===
-Entrées : intention, registre, variante
+Entrées : intention, registre, variante, contraintes
 Sorties : text (message utilisateur), command (commande Tiron ou null), args (arguments bruts ou "")
 Les prompts intermédiaires doivent être rédigés en français.
 === FIN CONTRAT IMMUTABLE ===

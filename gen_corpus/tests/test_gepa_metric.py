@@ -54,3 +54,15 @@ def test_generateur_montre_des_exemples_et_les_contraintes(monkeypatch):
     gen(intention="cron_schedule", registre="poli", variante="x", contraintes="moment : demain")
     kw = fake.call_args.kwargs
     assert kw["contraintes"] == "moment : demain" and len(kw["demos"]) == 1
+
+
+def test_reflexion_peut_reecrire_toute_l_instruction():
+    # Le 2026-10-05, max_tokens=512 a tronqué l'instruction proposée par la réflexion.
+    import promptGenGEPA as g
+    instruction = (Path(__file__).parent.parent / "prompt-init.txt").read_text(encoding="utf-8")
+    assert g.REFLECTION_MAX_TOKENS >= 4 * len(instruction.split())
+
+
+def test_contrat_du_prompt_mentionne_les_contraintes():
+    texte = (Path(__file__).parent.parent / "prompt-init.txt").read_text(encoding="utf-8")
+    assert "Entrées : intention, registre, variante, contraintes" in texte

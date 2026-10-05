@@ -92,6 +92,11 @@ def _ensure_key() -> str:
     return key
 
 
+# La réflexion réécrit l'instruction ENTIÈRE (~900 jetons) : à 512, elle était
+# tronquée (constaté le 2026-10-05, règles de génération perdues).
+REFLECTION_MAX_TOKENS = 4096
+
+
 def make_lm(model: str, temperature: float, api_base: str, max_tokens: int = 512) -> dspy.LM:
     key = _ensure_key()
     base = os.getenv("DEEPSEEK_API_BASE", api_base)
@@ -210,7 +215,8 @@ def main(argv=None) -> int:
     # Générateur évalué (température modérée) et réflexion (température haute)
     # séparés : un seul LM à 1,0 rendait les scores trop bruités (D3).
     dspy.settings.configure(lm=make_lm(cfg.generator_model, cfg.student_temperature, cfg.deepseek_api_base))
-    reflection_lm = make_lm(cfg.generator_model, cfg.reflection_temperature, cfg.deepseek_api_base)
+    reflection_lm = make_lm(cfg.generator_model, cfg.reflection_temperature, cfg.deepseek_api_base,
+                            max_tokens=REFLECTION_MAX_TOKENS)
     eval_lm = make_lm(cfg.eval_model, 0.0, cfg.deepseek_api_base, max_tokens=128)
     rng = random.Random(0)
     generator = build_example_generator(initial_prompt, seed, rng)
