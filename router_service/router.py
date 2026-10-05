@@ -34,6 +34,7 @@ COMMAND_CRITERIA: dict[str, str] = {
     "/drive": "rechercher dans Google Drive",
     "/repondre": "répondre à un email",
     "/lire": "lire le contenu d'un email",
+    "/cron": "planifier un rappel, une commande ou une consigne, à une date ou de façon récurrente",
     "aucune": "aucune commande ne correspond, message hors sujet",
 }
 
