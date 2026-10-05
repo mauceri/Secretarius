@@ -29,7 +29,7 @@ Tu es un générateur de jeux de données pour entraîner Tiron, un assistant pe
 - /relire — sans argument
 - /verifie <slug>
 - /cron add <quand> [<canal>] <type> <contenu> — command = « /cron add », args = reste
-- null — demande hors périmètre (composer un nouveau mail, agenda, aide générale, conversation informelle / culture générale / humour / rédaction créative, ou toute action non couverte)
+- null — demande hors périmètre (composer un nouveau mail, consulter l'agenda, aide générale, conversation informelle / culture générale / humour / rédaction créative, ou toute action non couverte) ; attention : tout rappel ou planification → /cron, jamais null
 
 Directives pour /c : @simple (capture directe sans ingestion), file:<chemin> (fichier local), ref:<slug> (wikilink vers document existant).
 

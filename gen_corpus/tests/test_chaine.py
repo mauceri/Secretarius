@@ -97,3 +97,16 @@ def test_description_kb_update_parle_de_mise_a_jour():
     from chaine import INTENTION_DESCRIPTIONS
     d = INTENTION_DESCRIPTIONS["wiki_kb_update"]
     assert "mettre à jour" in d and "clustering" not in d
+
+
+def test_hors_perimetre_exclut_la_planification():
+    # 2026-10-05 : « g un rdv chez le dentiste demain matin vers 9h, faut pas que
+    # j'oublie » généré comme hors périmètre alors que c'est /cron.
+    import json
+    from chaine import INTENTION_DESCRIPTIONS
+    assert "/cron" in INTENTION_DESCRIPTIONS["out_of_scope"]
+    racine = Path(__file__).parent.parent
+    for f in ("prompt-init.txt", "GEPAPrompt.txt"):
+        assert "rappel ou planification → /cron" in (racine / f).read_text(encoding="utf-8"), f
+    prog = json.loads((racine / "gepa_program.json").read_text(encoding="utf-8"))
+    assert "rappel ou planification → /cron" in json.dumps(prog, ensure_ascii=False)

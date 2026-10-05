@@ -27,7 +27,7 @@ INTENTION_DESCRIPTIONS = {
     "wiki_reread": "obtenir la prochaine page du wiki à relire",
     "wiki_verify": "marquer une page du wiki comme vérifiée (par son slug)",
     "cron_schedule": "planifier un rappel, une commande Tiron ou une consigne à une date donnée ou de façon récurrente (chaque lundi, tous les jours, demain, dans 20 minutes), éventuellement sur un canal précis (SMS, WhatsApp, Telegram, Obsidian)",
-    "out_of_scope": "demande hors périmètre de Tiron (aucune des commandes ci-dessus ne s'applique)",
+    "out_of_scope": "demande hors périmètre de Tiron. Tiron sait UNIQUEMENT : gérer le wiki personnel (capturer, interroger, chercher, ingérer, relire, vérifier, supprimer, tags, état), lire/chercher/répondre à des emails reçus, chercher dans Google Drive, lire une page web, planifier un rappel ou une tâche (/cron). Tout le reste est hors périmètre (réserver, acheter, écrire un NOUVEAU mail, culture générale, conversation, domotique…) ; un rappel ou une planification n'est JAMAIS hors périmètre",
 }
 
 

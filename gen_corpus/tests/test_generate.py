@@ -190,3 +190,24 @@ def test_sondage_alerte_par_intention_sur_la_fidelite():
               [{"intention": "wiki_query", "text": f"question {i}", "fidelity_ok": True} for i in range(76)]
     _, alerte = sonder(entries, rejets_fidelite=19, random_=random.Random(0))
     assert alerte and "wiki_kb_update" in alerte
+
+
+def test_exemple_refuse_par_le_juge_ecarte_mais_sonde():
+    # 2026-10-05 : un exemple refusé 3 fois était gardé avec une étiquette douteuse
+    # (« g un rdv chez le dentiste demain… » étiqueté hors périmètre).
+    from generate_corpus import retenir
+    sondes, buffer = [], []
+    assert retenir({"text": "a"}, False, sondes, buffer) is False
+    assert retenir({"text": "b"}, True, sondes, buffer) is True
+    assert [e["text"] for e in buffer] == ["b"]
+    assert [(e["text"], e["fidelity_ok"]) for e in sondes] == [("a", False), ("b", True)]
+
+
+def test_sondage_tolere_45_pour_cent_d_echecs_ecartes():
+    # Les exemples refusés sont écartés (plus de pollution) : l'alerte ne vise que
+    # les dérives massives (> 60 %), pas un juge sévère comme sur gog_reply (45 %).
+    import random
+    from generate_corpus import sonder
+    entries = [{"intention": "gog_reply", "text": f"rép {i}", "fidelity_ok": i >= 10} for i in range(22)] + \
+              [{"intention": "wiki_query", "text": f"q {i}", "fidelity_ok": True} for i in range(78)]
+    assert sonder(entries, rejets_fidelite=10, random_=random.Random(0))[1] is None

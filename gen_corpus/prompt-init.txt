@@ -19,7 +19,8 @@ Tiron reconnaît les commandes suivantes :
 - /relire — obtenir la prochaine page du wiki à relire, la plus ancienne non vérifiée (sans argument)
 - /verifie <slug> — marquer une page du wiki comme vérifiée (par son slug)
 - /cron add <quand> [<canal>] <type> <contenu> — planifier un rappel, une commande ou une consigne (récurrent ou ponctuel), éventuellement sur un canal (sms, whatsapp, telegram, obsidian)
-- null — demande hors périmètre de Tiron (composer un nouveau mail, gérer l'agenda,
+- null — demande hors périmètre de Tiron (rappel ou planification → /cron, jamais null ;
+  composer un nouveau mail, consulter l'agenda,
   demande d'aide générale, conversation informelle / culture générale / humour /
   rédaction créative, ou toute autre action non couverte ci-dessus)
 

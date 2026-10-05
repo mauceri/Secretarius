@@ -114,6 +114,17 @@ def generate_one(predict, fidelity_check, intention: str, registre: str, variant
     return entry, accepted
 
 
+def retenir(entry: dict, accepted: bool, sondes: list[dict], buffer: list[dict]) -> bool:
+    """Un exemple refusé par le juge après toutes les relances est écarté du
+    corpus (étiquette douteuse, 2026-10-05) mais reste compté dans le sondage,
+    pour que l'alerte de fidélité par intention fonctionne toujours."""
+    entry["fidelity_ok"] = accepted
+    sondes.append(entry)
+    if accepted:
+        buffer.append(entry)
+    return accepted
+
+
 def charger_programme(prompt_path: str, fallback: str, program_path: str,
                       seed: list[dict], rng: random.Random):
     """Recharge le programme optimisé par GEPA tel quel (D5) ; à défaut, le
@@ -176,7 +187,8 @@ def sonder(entries: list[dict], rejets_fidelite: int, random_: random.Random, k:
                 par_intention.setdefault(e["intention"], []).append(bool(e["fidelity_ok"]))
         for intention, oks in sorted(par_intention.items()):
             echecs = oks.count(False)
-            if len(oks) >= 20 and echecs / len(oks) > 0.4:
+            # 60 % : les refusés sont écartés, seule une dérive massive doit arrêter.
+            if len(oks) >= 20 and echecs / len(oks) > 0.6:
                 alerte = f"fidélité de {intention} : {echecs}/{len(oks)} échecs ({100 * echecs / len(oks):.0f} %)"
                 break
     if alerte is None and entries and rejets_fidelite / len(entries) > 0.3:
@@ -207,7 +219,7 @@ def main(argv=None) -> int:
     stime = time.time()
     consecutive_errors = 0
     max_consecutive = max(10, cfg.count // 10)
-    rejected_kept = 0  # exemples gardés malgré un échec de fidélité après max_attempts
+    rejected_kept = 0  # exemples écartés pour échec de fidélité après max_attempts
     ecartes_doublons = 0
     deja_vus: dict[str, list[str]] = {}
     gardes: list[dict] = []
@@ -225,14 +237,12 @@ def main(argv=None) -> int:
                     ecartes_doublons += 1
                     print(f"[{i+1}] Quasi-doublon persistant, écarté ({obj['intention']})", flush=True)
                     continue
-                vus.append(entry["text"])
-                gardes.append(entry)
-                entry["fidelity_ok"] = accepted  # retiré au post-traitement, jamais lu en aval
-                if not accepted:
+                if retenir(entry, accepted, gardes, buffer):
+                    vus.append(entry["text"])
+                else:
                     rejected_kept += 1
-                    print(f"[{i+1}] Fidélité non confirmée après relances (gardé quand même) : "
+                    print(f"[{i+1}] Fidélité non confirmée après relances (écarté) : "
                           f"{obj['intention']} — {entry['text'][:80]!r}", flush=True)
-                buffer.append(entry)
                 consecutive_errors = 0
             except Exception as e:
                 print(f"[{i+1}] Erreur: {e}", flush=True)
@@ -254,9 +264,9 @@ def main(argv=None) -> int:
                     break
         for e in buffer:
             fout.write(json.dumps(e, ensure_ascii=False) + "\n")
-    print(f"Corpus sauvegardé dans {cfg.output} ({rejected_kept}/{cfg.count} exemples gardés malgré un échec de fidélité, "
+    print(f"Corpus sauvegardé dans {cfg.output} ({rejected_kept}/{cfg.count} exemples écartés pour échec de fidélité, "
           f"{ecartes_doublons} quasi-doublons écartés)")
-    print(rapport_diversite(gardes))
+    print(rapport_diversite([e for e in gardes if e["fidelity_ok"]]))
     return 0
 
 
