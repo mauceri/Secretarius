@@ -181,3 +181,12 @@ def test_sondage_sans_alerte():
     entries = [{"intention": "cron_schedule", "text": t} for t in
                ["rappel lundi 8h a", "demain 9h b", "dans 20 min c", "tous les jours 7h d", "le 3 mars e"] * 10]
     assert sonder(entries, rejets_fidelite=2, random_=random.Random(0))[1] is None
+
+
+def test_sondage_alerte_par_intention_sur_la_fidelite():
+    import random
+    from generate_corpus import sonder
+    entries = [{"intention": "wiki_kb_update", "text": f"maj kb {i}", "fidelity_ok": i < 5} for i in range(24)] + \
+              [{"intention": "wiki_query", "text": f"question {i}", "fidelity_ok": True} for i in range(76)]
+    _, alerte = sonder(entries, rejets_fidelite=19, random_=random.Random(0))
+    assert alerte and "wiki_kb_update" in alerte

@@ -77,3 +77,15 @@ def test_seed_cron_varie():
     for marqueur in ["lundi", "demain", "dans "]:
         assert sum(marqueur in t for t in cron) <= len(cron) * 0.2, marqueur
     assert sum(bool(re.search(r"\b(sms|whatsapp|telegram|obsidian)\b", t)) for t in cron) >= 6
+
+
+def test_intentions_sans_argument_sans_sujet():
+    # 2026-10-05 : un sujet imposé à /kbupdate donnait « maj la kb pr mon rdv médical »
+    # (21/24 exemples infidèles).
+    from chaine import SANS_ARGUMENT, tirer_contraintes
+    assert {"wiki_kb_update", "wiki_ingest", "wiki_status", "wiki_tags", "wiki_reread",
+            "gog_connect", "gog_inbox"} <= SANS_ARGUMENT
+    for intention in SANS_ARGUMENT:
+        c = tirer_contraintes(intention, random.Random(0))
+        assert "sujet :" not in c and "longueur :" in c
+    assert "sujet :" in tirer_contraintes("wiki_query", random.Random(0))

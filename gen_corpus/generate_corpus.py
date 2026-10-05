@@ -167,6 +167,18 @@ def sonder(entries: list[dict], rejets_fidelite: int, random_: random.Random, k:
             if c / len(cron) > 0.4:
                 alerte = f"« {nom} » dans {c}/{len(cron)} exemples cron ({100 * c / len(cron):.0f} %)"
                 break
+    if alerte is None:
+        # Ventilé par intention : un taux global sous le seuil peut masquer une
+        # intention presque entièrement infidèle (wiki_kb_update, 2026-10-05).
+        par_intention: dict[str, list[bool]] = {}
+        for e in entries:
+            if "fidelity_ok" in e:
+                par_intention.setdefault(e["intention"], []).append(bool(e["fidelity_ok"]))
+        for intention, oks in sorted(par_intention.items()):
+            echecs = oks.count(False)
+            if len(oks) >= 20 and echecs / len(oks) > 0.4:
+                alerte = f"fidélité de {intention} : {echecs}/{len(oks)} échecs ({100 * echecs / len(oks):.0f} %)"
+                break
     if alerte is None and entries and rejets_fidelite / len(entries) > 0.3:
         alerte = f"rejets de fidélité : {rejets_fidelite}/{len(entries)} ({100 * rejets_fidelite / len(entries):.0f} %)"
     return texte, alerte

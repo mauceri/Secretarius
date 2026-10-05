@@ -92,8 +92,16 @@ GRILLES: dict[str, dict[str, list[str]]] = {
 }
 
 
+# Intentions dont la commande ne prend pas d'objet : leur imposer un sujet fait
+# inventer un argument absurde (« maj la kb pr mon rdv médical », 2026-10-05).
+SANS_ARGUMENT = frozenset({"wiki_kb_update", "wiki_ingest", "wiki_status", "wiki_tags",
+                           "wiki_reread", "gog_connect", "gog_inbox"})
+GRILLES["sans_argument"] = {k: v for k, v in GRILLES["*"].items() if k != "sujet"}
+
+
 def tirer_contraintes(intention: str, rng: random.Random) -> str:
-    grille = GRILLES.get(intention, GRILLES["*"])
+    defaut = GRILLES["sans_argument"] if intention in SANS_ARGUMENT else GRILLES["*"]
+    grille = GRILLES.get(intention, defaut)
     parts = []
     for cle, valeurs in grille.items():
         v = rng.choice(valeurs).replace("N", str(rng.randint(2, 28)))
