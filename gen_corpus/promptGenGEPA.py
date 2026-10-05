@@ -14,6 +14,9 @@ from pathlib import Path
 import dspy
 from dspy.clients import configure_cache as dspy_configure_cache
 
+from chaine import (EvalFidelite, EvalRealisme, INTENTION_DESCRIPTIONS, build_signature,
+                    tirer_contraintes, tirer_demos)
+
 try:
     dspy_configure_cache(enable_disk_cache=False, enable_memory_cache=False)
 except Exception:
@@ -54,6 +57,8 @@ class Config:
     eval_model: str = "openai/deepseek-chat"
     deepseek_api_base: str = "https://api.deepseek.com"
     reflection_temperature: float = 1.0
+    student_temperature: float = 0.7
+    program_path: str = "gepa_program.json"
     max_metric_calls: int = 300
     valset_size: int = 40
 
@@ -69,12 +74,15 @@ def parse_args(argv=None) -> Config:
     p.add_argument("--temperature", type=float, default=1.0)
     p.add_argument("--max-metric-calls", type=int, default=300)
     p.add_argument("--valset-size", type=int, default=40)
+    p.add_argument("--student-temperature", type=float, default=0.7)
+    p.add_argument("--program", default="gepa_program.json")
     a = p.parse_args(argv)
     return Config(seed_path=a.seed, prompt_path=a.prompt, gepa_prompt_path=a.gepa_prompt,
                   generator_model=a.generator_model, eval_model=a.eval_model,
                   deepseek_api_base=a.deepseek_api_base,
                   reflection_temperature=a.temperature, max_metric_calls=a.max_metric_calls,
-                  valset_size=a.valset_size)
+                  valset_size=a.valset_size, student_temperature=a.student_temperature,
+                  program_path=a.program)
 
 
 def _ensure_key() -> str:
@@ -84,39 +92,24 @@ def _ensure_key() -> str:
     return key
 
 
-def configure_lm(model: str, temperature: float, api_base: str) -> dspy.LM:
-    key = _ensure_key()
-    base = os.getenv("DEEPSEEK_API_BASE", api_base)
-    lm = dspy.LM(model=model, api_key=key, api_base=base, model_type="chat",
-                 temperature=temperature, max_tokens=512, cache=False)
-    dspy.settings.configure(lm=lm)
-    return lm
-
-
-def configure_eval_lm(model: str, api_base: str) -> dspy.LM:
+def make_lm(model: str, temperature: float, api_base: str, max_tokens: int = 512) -> dspy.LM:
     key = _ensure_key()
     base = os.getenv("DEEPSEEK_API_BASE", api_base)
     return dspy.LM(model=model, api_key=key, api_base=base, model_type="chat",
-                   temperature=0.0, max_tokens=16, cache=False)
+                   temperature=temperature, max_tokens=max_tokens, cache=False)
 
 
-def build_example_generator(prompt_text: str) -> dspy.Module:
-    class GenerateExample(dspy.Signature):
-        __doc__ = prompt_text
-        intention: str = dspy.InputField(desc="Intention Tiron à illustrer (ex: wiki_capture)")
-        registre:  str = dspy.InputField(desc="Registre du message: formel, familier, télégraphique, poli, abrégé")
-        variante:  str = dspy.InputField(desc="Type de variante (ex: url_avec_tags, question_courte, sans_args…)")
-        text:    str = dspy.OutputField(desc="Message utilisateur réaliste en français")
-        command: str = dspy.OutputField(desc=f"Commande Tiron ({' '.join(sorted(COMMANDS_KNOWN))}) ou null")
-        args:    str = dspy.OutputField(desc="Arguments bruts de la commande (chaîne vide si pas d'args)")
-
+def build_example_generator(prompt_text: str, seed: list[dict], rng: random.Random) -> dspy.Module:
     class ExampleGenerator(dspy.Module):
         def __init__(self):
             super().__init__()
-            self.generate = dspy.Predict(GenerateExample)
+            self.generate = dspy.Predict(build_signature(prompt_text))
 
-        def forward(self, intention, registre, variante):
-            r = self.generate(intention=intention, registre=registre, variante=variante)
+        def forward(self, intention, registre, variante, contraintes):
+            # Exemples de départ de la même intention montrés au générateur (D1),
+            # tirés à chaque appel ; les contraintes imposent la diversité (D4).
+            r = self.generate(intention=intention, registre=registre, variante=variante,
+                              contraintes=contraintes, demos=tirer_demos(seed, intention, 3, rng))
             return {"text": r.text, "intention": intention, "command": r.command,
                     "args": r.args, "registre": registre, "variante": variante}
 
@@ -135,162 +128,107 @@ def split_trainset(examples: list, n_val: int, seed: int = 0) -> tuple[list, lis
     return train, val
 
 
-def build_trainset(seed: list[dict]) -> list[dspy.Example]:
+def build_trainset(seed: list[dict], rng: random.Random | None = None) -> list[dspy.Example]:
+    rng = rng or random.Random(0)
     return [
         dspy.Example(
             intention=ex["intention"],
             registre=ex.get("registre", "poli"),
             variante=ex.get("variante", "sans_args"),
-            text=ex["text"],
+            contraintes=tirer_contraintes(ex["intention"], rng),
+            text=ex["text"],  # référence conservée (piste : juge de ressemblance)
             command=ex["action"]["command"] if ex["action"]["command"] is not None else "null",
             args=ex["action"]["args"],
-        ).with_inputs("intention", "registre", "variante")
+        ).with_inputs("intention", "registre", "variante", "contraintes")
         for ex in seed
     ]
 
 
-class EvalRealisme(dspy.Signature):
-    """Ce message ressemble-t-il à une vraie requête utilisateur adressée à un assistant ?
-    Répondre avec un entier 1..5 uniquement, sans commentaire."""
-    text:  str = dspy.InputField(desc="Message utilisateur généré")
-    score: int = dspy.OutputField(desc="Entier 1..5")
-
-
-# Descriptions courtes utilisées uniquement pour juger la fidélité sémantique
-# texte↔intention — indépendantes de GEPAPrompt.txt (qui, lui, est optimisé),
-# pour ne jamais faire dépendre le juge du texte qu'il évalue indirectement.
-INTENTION_DESCRIPTIONS = {
-    "wiki_capture": "capturer une URL ou une note dans le wiki",
-    "wiki_ingest": "lancer l'ingestion des captures en attente du wiki",
-    "wiki_status": "consulter l'état de l'ingestion du wiki",
-    "wiki_query": "poser une question au wiki et obtenir une réponse synthétisée par un LLM",
-    "source_read": "lire une page web externe immédiatement, sans la sauvegarder",
-    "gog_search": "rechercher des emails Gmail par mot-clé, expéditeur ou période",
-    "gog_connect": "autoriser l'accès au compte Google",
-    "gog_inbox": "lister les emails récents de la boîte de réception",
-    "gog_reply": "préparer un brouillon de réponse à un email, sans l'envoyer",
-    "gog_drive": "rechercher des fichiers sur Google Drive",
-    "wiki_search": "rechercher par mots-clés dans le wiki, résultats bruts SANS synthèse ni résumé LLM (différent de wiki_query qui synthétise une réponse)",
-    "wiki_tags": "lister les tags disponibles dans le wiki",
-    "wiki_kb_update": "reconstruire la base de connaissances du wiki depuis le dernier clustering",
-    "gog_get": "lire le contenu d'un email précis (par identifiant, ou le dernier/un email récent) — UNIQUEMENT un email, jamais une page wiki, une capture, un document Drive ou l'état du wiki",
-    "wiki_delete": "supprimer une page du wiki (par son slug)",
-    "wiki_reread": "obtenir la prochaine page du wiki à relire",
-    "wiki_verify": "marquer une page du wiki comme vérifiée (par son slug)",
-    "cron_schedule": "planifier un rappel, une commande Tiron ou une consigne à une date donnée ou de façon récurrente (chaque lundi, tous les jours, demain, dans 20 minutes), éventuellement sur un canal précis (SMS, WhatsApp, Telegram, Obsidian)",
-    "out_of_scope": "demande hors périmètre de Tiron (aucune des commandes ci-dessus ne s'applique)",
-}
-
-
-class EvalFidelite(dspy.Signature):
-    """Ce message correspond-il vraiment à l'intention décrite, et à elle seule
-    (pas à une intention voisine ni à une autre commande) ? Répondre 1 si le
-    message décrit sans ambiguïté cette intention précise, 0 sinon — y compris
-    si le message est plausible pour une AUTRE intention que celle donnée.
-    Répondre avec 0 ou 1 uniquement, sans commentaire."""
-    text: str = dspy.InputField(desc="Message utilisateur généré")
-    intention_description: str = dspy.InputField(desc="Description de l'intention que le message doit illustrer")
-    score: int = dspy.OutputField(desc="0 ou 1")
+def construire_feedback(text: str, s_struct: float, s_real: float, raison_real: str,
+                        s_fidele: float, raison_fidele: str) -> str:
+    """Retour écrit pour la réflexion de GEPA (D2) : sans lui, GEPA ne voit
+    qu'un nombre et ne sait pas quoi corriger dans l'instruction."""
+    remarques = []
+    if s_fidele < 1:
+        remarques.append(f"Infidèle à l'intention : {raison_fidele}")
+    if s_real < 0.8:
+        remarques.append(f"Peu réaliste ({s_real * 5:.0f}/5) : {raison_real}")
+    if s_struct < 1:
+        remarques.append("Commande ou arguments manquants ou inconnus.")
+    n = len(text.split())
+    if n > 20:
+        remarques.append(f"Trop long : {n} mots (viser moins de 20).")
+    if text.lower().startswith(("bonjour", "tiron")):
+        remarques.append("Commence par « Bonjour » ou « Tiron » : varier l'attaque.")
+    return "Parfait." if not remarques else " ".join(remarques)
 
 
 def make_metric(eval_lm: dspy.LM):
-    class Evaluator(dspy.Module):
-        def __init__(self):
-            super().__init__()
-            self.pred = dspy.Predict(EvalRealisme)
-
-        def forward(self, text: str) -> int:
-            with dspy.settings.context(lm=eval_lm):
-                out = self.pred(text=text)
-            try:
-                return max(1, min(5, int(out.score)))
-            except Exception:
-                return 3
-
-    class FideliteEvaluator(dspy.Module):
-        def __init__(self):
-            super().__init__()
-            self.pred = dspy.Predict(EvalFidelite)
-
-        def forward(self, text: str, intention_description: str) -> int:
-            with dspy.settings.context(lm=eval_lm):
-                out = self.pred(text=text, intention_description=intention_description)
-            try:
-                return max(0, min(1, int(out.score)))
-            except Exception:
-                return 0
-
-    evaluator = Evaluator()
-    fidelite_evaluator = FideliteEvaluator()
+    real_pred = dspy.Predict(EvalRealisme)
+    fid_pred = dspy.Predict(EvalFidelite)
     counter = {"n": 0}
+
+    def juger(pred, defaut: int, borne: tuple[int, int], **kw) -> tuple[int, str]:
+        try:
+            with dspy.settings.context(lm=eval_lm):
+                out = pred(**kw)
+        except Exception:
+            return defaut, "réponse du juge illisible"
+        try:
+            return max(borne[0], min(borne[1], int(out.score))), str(getattr(out, "raison", "") or "")
+        except (TypeError, ValueError):
+            return defaut, "réponse du juge illisible"
 
     def metric(gold, pred, trace=None, pred_name=None, pred_trace=None):
         text = str((pred or {}).get("text") or "")
         if not text:
-            return 0.0
+            return dspy.Prediction(score=0.0, feedback="Aucun texte produit.")
         s_struct = structural_score(pred, gold)
-        try:
-            s_real = evaluator(text=text) / 5.0
-        except Exception:
-            s_real = 0.6
+        note, raison_real = juger(real_pred, 3, (1, 5), text=text)
+        s_real = note / 5.0
         intention = str(gold.get("intention") or "")
         desc = INTENTION_DESCRIPTIONS.get(intention, intention)
-        try:
-            s_fidele = float(fidelite_evaluator(text=text, intention_description=desc))
-        except Exception:
-            s_fidele = 0.5
+        s_fidele, raison_fidele = juger(fid_pred, 0, (0, 1), text=text, intention_description=desc)
         counter["n"] += 1
         if counter["n"] % 10 == 0:
             print(f"[métrique] appel {counter['n']} struct={s_struct:.2f} réalisme={s_real:.2f} fidélité={s_fidele:.2f}")
         # La fidélité pèse le plus lourd : un texte hors-sujet mais bien formé
         # et réaliste (ex. exemple /lire parlant d'une capture wiki) est le
         # défaut qui a motivé cet ajout — cf. mémoire projet routage Laya.
-        return 0.25 * s_real + 0.25 * s_struct + 0.5 * s_fidele
+        return dspy.Prediction(
+            score=0.25 * s_real + 0.25 * s_struct + 0.5 * s_fidele,
+            feedback=construire_feedback(text, s_struct, s_real, raison_real, float(s_fidele), raison_fidele),
+        )
 
     return metric
-
-
-def _extract_best_prompt(compiled, teleprompter, initial: str) -> str:
-    candidates = []
-    for attr in ("best_prompt", "best_prompt_str", "best_prompt_text"):
-        v = getattr(teleprompter, attr, None)
-        if v:
-            candidates.append(str(v))
-    bp = getattr(teleprompter, "best_prompts", None)
-    if isinstance(bp, dict):
-        candidates.extend(str(v) for v in bp.values() if v)
-    sig = getattr(getattr(compiled, "generate", None), "signature", None)
-    if sig:
-        instr = getattr(sig, "instructions", None) or getattr(sig, "__doc__", None)
-        if instr:
-            candidates.append(str(instr))
-    candidates.append(initial)
-    for c in candidates:
-        if c and len(c.strip()) > 40 and "given the fields" not in c.lower():
-            return c
-    return initial
 
 
 def main(argv=None) -> int:
     cfg = parse_args(argv)
     initial_prompt = Path(cfg.prompt_path).read_text(encoding="utf-8")
     seed = json.loads(Path(cfg.seed_path).read_text(encoding="utf-8"))
-    configure_lm(cfg.generator_model, cfg.reflection_temperature, cfg.deepseek_api_base)
-    eval_lm = configure_eval_lm(cfg.eval_model, cfg.deepseek_api_base)
-    generator = build_example_generator(initial_prompt)
-    trainset, valset = split_trainset(build_trainset(seed), cfg.valset_size)
+    # Générateur évalué (température modérée) et réflexion (température haute)
+    # séparés : un seul LM à 1,0 rendait les scores trop bruités (D3).
+    dspy.settings.configure(lm=make_lm(cfg.generator_model, cfg.student_temperature, cfg.deepseek_api_base))
+    reflection_lm = make_lm(cfg.generator_model, cfg.reflection_temperature, cfg.deepseek_api_base)
+    eval_lm = make_lm(cfg.eval_model, 0.0, cfg.deepseek_api_base, max_tokens=128)
+    rng = random.Random(0)
+    generator = build_example_generator(initial_prompt, seed, rng)
+    trainset, valset = split_trainset(build_trainset(seed, rng), cfg.valset_size)
     teleprompter = dspy.GEPA(
         metric=make_metric(eval_lm),
-        reflection_lm=dspy.settings.lm,
+        reflection_lm=reflection_lm,
         max_metric_calls=cfg.max_metric_calls,
         track_stats=True,
         track_best_outputs=True,
         num_threads=2,  # sanroque déjà proche de la limite mémoire (autres services actifs)
     )
     compiled = teleprompter.compile(generator, trainset=trainset, valset=valset)
-    best_prompt = _extract_best_prompt(compiled, teleprompter, initial_prompt)
-    Path(cfg.gepa_prompt_path).write_text(best_prompt, encoding="utf-8")
-    print(f"Prompt optimisé sauvegardé dans {cfg.gepa_prompt_path}")
+    # Le programme entier est transmis à generate_corpus.py (D5) ; GEPAPrompt.txt
+    # reste écrit pour lecture humaine et comme repli.
+    compiled.save(cfg.program_path)
+    Path(cfg.gepa_prompt_path).write_text(compiled.generate.signature.instructions, encoding="utf-8")
+    print(f"Programme optimisé sauvegardé dans {cfg.program_path} (instruction : {cfg.gepa_prompt_path})")
     return 0
 
 
