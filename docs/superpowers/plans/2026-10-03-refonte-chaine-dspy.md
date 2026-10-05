@@ -487,6 +487,43 @@ Les tests existants de `generate_one` doivent passer sans modification.
 
 Le prédicteur passé à `generate_one` est `prog`, le module entier (`prog(intention=…, …)`), qui rend un dict. Pour un accès uniforme, `generate_one` lit `result["text"]` et `result["args"]` quand le résultat est un dict, et `result.text`/`result.args` sinon (cas des tests existants, qui passent un `MagicMock`).
 
+- [ ] **Step 3b: Sondage en cours de génération (demande de l'utilisateur, 2026-10-05)**
+
+Test d'abord (dans `test_generate.py`) :
+```python
+def test_sondage_alerte_sur_derive_de_moment():
+    import random
+    from generate_corpus import sonder
+    entries = [{"intention": "cron_schedule", "text": f"rappel lundi {h}h x{h}"} for h in range(30)] + \
+              [{"intention": "cron_schedule", "text": f"demain {h}h y{h}"} for h in range(20)]
+    texte, alerte = sonder(entries, rejets_fidelite=0, random_=random.Random(0))
+    assert "lundi : 30/50" in texte and texte.count("\n- ") == 5
+    assert alerte and "lundi" in alerte
+
+
+def test_sondage_alerte_sur_rejets_de_fidelite():
+    import random
+    from generate_corpus import sonder
+    entries = [{"intention": "wiki_tags", "text": f"tags {i}"} for i in range(50)]
+    _, alerte = sonder(entries, rejets_fidelite=20, random_=random.Random(0))
+    assert alerte and "fidélité" in alerte
+
+
+def test_sondage_sans_alerte():
+    import random
+    from generate_corpus import sonder
+    entries = [{"intention": "cron_schedule", "text": t} for t in
+               ["rappel lundi 8h a", "demain 9h b", "dans 20 min c", "tous les jours 7h d", "le 3 mars e"] * 10]
+    assert sonder(entries, rejets_fidelite=2, random_=random.Random(0))[1] is None
+```
+Implémentation : `sonder(entries, rejets_fidelite, random_, k=5) -> tuple[str, str | None]`. Elle renvoie `rapport_diversite(entries)` suivi de `k` textes tirés au hasard (lignes `"\n- …"`), et une alerte si :
+- un marqueur de moment dépasse 40 % des exemples `cron_schedule` (au moins 50 exemples) ;
+- ou les exemples gardés malgré un échec de fidélité dépassent 30 % du total.
+
+Dans `main`, l'option `--sondage-every` (défaut 50) déclenche l'affichage tous les N exemples. Une alerte arrête la génération proprement : le tampon est écrit, et le message affiché est `ARRÊT : dérive — <alerte>`. On analyse alors avant toute relance.
+
+Note : l'ancien juge de ressemblance au texte de départ (`~/gen_corpus_gepa_codex/promptGenGEPA.py:376`) corrigeait, selon l'utilisateur, une dérive constatée. Si le sondage révèle une dérive de fond (hors sujet, ton), c'est la première piste à rétablir.
+
 - [ ] **Step 4: Vérifier** — `… pytest gen_corpus/tests -q` → PASS (tous, anciens compris).
 
 - [ ] **Step 5: Commit** — `git commit -m "fix(corpus): génération avec le programme GEPA, contraintes de diversité, rejet des quasi-doublons"`
