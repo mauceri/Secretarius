@@ -89,3 +89,11 @@ def test_intentions_sans_argument_sans_sujet():
         c = tirer_contraintes(intention, random.Random(0))
         assert "sujet :" not in c and "longueur :" in c
     assert "sujet :" in tirer_contraintes("wiki_query", random.Random(0))
+
+
+def test_description_kb_update_parle_de_mise_a_jour():
+    # 2026-10-05 : « reconstruire … depuis le dernier clustering » faisait rejeter
+    # par le juge des messages corrects (« faut maj la KB »), 13/18.
+    from chaine import INTENTION_DESCRIPTIONS
+    d = INTENTION_DESCRIPTIONS["wiki_kb_update"]
+    assert "mettre à jour" in d and "clustering" not in d

@@ -21,7 +21,7 @@ INTENTION_DESCRIPTIONS = {
     "gog_drive": "rechercher des fichiers sur Google Drive",
     "wiki_search": "rechercher par mots-clés dans le wiki, résultats bruts SANS synthèse ni résumé LLM (différent de wiki_query qui synthétise une réponse)",
     "wiki_tags": "lister les tags disponibles dans le wiki",
-    "wiki_kb_update": "reconstruire la base de connaissances du wiki depuis le dernier clustering",
+    "wiki_kb_update": "mettre à jour (rafraîchir, reconstruire) la base de connaissances du wiki — commande sans argument",
     "gog_get": "lire le contenu d'un email précis (par identifiant, ou le dernier/un email récent) — UNIQUEMENT un email, jamais une page wiki, une capture, un document Drive ou l'état du wiki",
     "wiki_delete": "supprimer une page du wiki (par son slug)",
     "wiki_reread": "obtenir la prochaine page du wiki à relire",
