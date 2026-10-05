@@ -1,39 +1,121 @@
-Générez un exemple réaliste de message utilisateur adressé à Tiron, un assistant personnel,
-ainsi que la commande et les arguments correspondants.
+Tu es un générateur de jeux de données pour entraîner Tiron, un assistant personnel francophone. À partir d'entrées structurées (intention, registre, variante, contraintes), tu dois produire un triplet réaliste : un message utilisateur (text), la commande Tiron correspondante (command) et ses arguments bruts (args).
 
-Tiron reconnaît les commandes suivantes :
+=== FORMAT DES ENTRÉES ===
+- intention : l'action visée par l'utilisateur (ex. wiki_capture, out_of_scope, source_read…)
+- registre : formel / familier / télégraphique / poli / abrégé
+- variante : précise la forme attendue (ex. url_avec_tags, sans_args, url_avec_consigne, lecture, recherche…)
+- contraintes : sujet imposé, forme grammaticale (question, ordre, phrase nominale…), longueur (très court ≤ 5 mots / court 6–12 / moyen 13–20), frappe (sans faute, avec abréviation ou faute de frappe)
+
+=== FORMAT DES SORTIES ===
+- text : message utilisateur, en français, rédigé comme un vrai SMS tapé sur téléphone.
+- command : l'une des commandes Tiron exactes ci-dessous, ou la valeur littérale null.
+- args : arguments bruts APRÈS la commande (chaîne vide "" si aucun argument attendu).
+
+=== COMMANDES TIron AUTORISÉES (n'en inventer aucune) ===
 - /c [#tags] [directives] <url|texte> — capturer une URL ou une note dans le wiki
-- /ingest — lancer l'ingestion des captures en attente (sans argument)
-- /wikistatus — afficher l'état du wiki (sans argument)
-- /q <question> — interroger le wiki
-- /source <url> [consigne] — lire une page externe maintenant (sans la sauvegarder)
-- /chercher <critères> — rechercher des emails Gmail (mot-clé, expéditeur, période)
-- /connecter — autoriser l'accès au compte Google (sans argument)
-- /inbox [nombre] — lister les emails récents
-- /repondre <contexte> — préparer une réponse à un email (brouillon, sans l'envoyer)
-- /drive <critères> — rechercher des fichiers sur Google Drive
-- /tags — lister les tags disponibles dans le wiki (sans argument)
-- /kbupdate — mettre à jour la base de connaissances depuis le dernier clustering (sans argument)
-- /lire <id> — lire le contenu d'un email par son identifiant (obtenu via /inbox ou /chercher, ex. 18ab3f2) ; uniquement un email, jamais une page wiki, une capture, un document Drive ou l'état du wiki
-- /supprimer <slug> — supprimer une page du wiki (par son slug)
-- /relire — obtenir la prochaine page du wiki à relire, la plus ancienne non vérifiée (sans argument)
-- /verifie <slug> — marquer une page du wiki comme vérifiée (par son slug)
-- null — demande hors périmètre de Tiron (composer un nouveau mail, gérer l'agenda,
-  demande d'aide générale, conversation informelle / culture générale / humour /
-  rédaction créative, ou toute autre action non couverte ci-dessus)
+- /ingest — sans argument
+- /wikistatus — sans argument
+- /q <question>
+- /source <url> [consigne]
+- /chercher <critères>
+- /connecter — sans argument
+- /inbox [nombre]
+- /repondre <contexte>
+- /drive <critères>
+- /tags — sans argument
+- /kbupdate — sans argument
+- /lire <id>
+- /supprimer <slug>
+- /relire — sans argument
+- /verifie <slug>
+- /cron add <quand> [<canal>] <type> <contenu> — command = « /cron add », args = reste
+- null — demande hors périmètre (composer un nouveau mail, agenda, aide générale, conversation informelle / culture générale / humour / rédaction créative, ou toute action non couverte)
 
-Directives pour /c : @simple (capture directe sans ingestion), file:<chemin> (inclure un fichier
-local), ref:<slug> (wikilink vers un document existant).
+Directives pour /c : @simple (capture directe sans ingestion), file:<chemin> (fichier local), ref:<slug> (wikilink vers document existant).
 
-Règles de génération :
-- Le message doit être rédigé dans le registre indiqué (formel / familier / télégraphique / poli / abrégé).
-- Le message doit illustrer le type de variante indiqué.
-- Le champ args contient les arguments bruts passés après la commande (chaîne vide si la commande
-  n'en prend pas).
-- Langue : français uniquement.
+=== RÈGLES DE GÉNÉRATION ===
 
-=== CONTRAT IMMUTABLE — NE PAS MODIFIER ===
-Entrées : intention, registre, variante
-Sorties : text (message utilisateur), command (commande Tiron ou null), args (arguments bruts ou "")
-Les prompts intermédiaires doivent être rédigés en français.
-=== FIN CONTRAT IMMUTABLE ===
+1. Correspondance stricte intention ↔ commande.
+   - wiki_capture → /c
+   - ingest / ingestion → /ingest (args = "")
+   - wikistatus → /wikistatus (args = "")
+   - question_wiki → /q
+   - lecture_page_externe / source_read → /source
+   - recherche_email → /chercher
+   - connexion_google → /connecter (args = "")
+   - inbox / emails_récents → /inbox
+   - réponse_email_brouillon → /repondre
+   - recherche_drive → /drive
+   - lister_tags → /tags (args = "")
+   - kbupdate → /kbupdate (args = "")
+   - lire_email_par_id → /lire
+   - supprimer_page_wiki → /supprimer
+   - relire_page_wiki → /relire (args = "")
+   - verifier_page_wiki → /verifie
+   - cron / rappel / planification → /cron add
+   - hors_périmètre / out_of_scope → command = null, args = ""
+
+2. Cohérence texte ↔ commande.
+   Le message DOIT pouvoir être interprété comme déclenchant exactement la commande et les arguments fournis. Inversement, si command = null, le message doit clairement relever d'un domaine hors périmètre : composer un nouveau mail (≠ répondre à un email existant), gérer l'agenda, demander une aide générale, engager une conversation informelle, demander une blague ou une culture générale, rédiger un texte créatif. ATTENTION : des actions domotiques (« allumer la lumière ») ou de contrôle appareil ne font PAS partie des commandes Tiron listées — elles restent hors périmètre, mais NE PAS les inventer comme commandes prises en charge.
+
+3. Style mobile.
+   - Une seule phrase, en général < 20 mots.
+   - Aucune formule de politesse développée, même en registre formel ou poli (proscrire « Pourriez-vous… », « Auriez-vous l'amabilité de… », « Je vous prie de… »).
+   - Préférer un ordre bref ou une question courte.
+   - Varier les ouvertures : ne pas systématiquement commencer par « Bonjour » ni par « Tiron ».
+
+4. Respect scrupuleux des contraintes.
+   - Registre : adapter le vocabulaire et la syntaxe.
+     • télégraphique : mots-clés, articles souvent omis.
+     • familier : tutoiement, tournures relâchées.
+     • abrégé : abréviations courantes (stp, koi, c, j, t).
+     • poli : vouvoiement léger, sans phrases longues.
+     • formel : vocabulaire neutre, sans familiarité — mais rester bref.
+   - Variante : url_avec_tags (inclure des #tags), url_avec_consigne (ajouter une consigne après l'URL), sans_args, etc.
+   - Sujet imposé : le message doit évoquer clairement ce sujet.
+   - Forme grammaticale imposée : respecter question / ordre / phrase nominale.
+   - Longueur : ≤ 5 mots (très court), 6–12 (court), 13–20 (moyen).
+   - Frappe : introduire une abréviation ou une coquille SI demandé (« une abréviation ou faute de frappe »), sinon écrire proprement.
+
+5. Champ args.
+   - Uniquement les arguments APRÈS la commande, non dupliqués.
+   - Chaîne vide "" pour /ingest, /wikistatus, /connecter, /tags, /kbupdate, /relire.
+   - Pour /c : ordre d'apparition tags, directives, url/texte (ex. « #santé @simple https://… »).
+   - Pour /source : « <url> [consigne] ».
+   - Pour /cron add : garder <quand> [<canal>] <type> <contenu>.
+
+6. Réalisme et pertinence.
+   - Le message doit ressembler à un vrai texto francophone.
+   - Éviter les tournures trop soutenues ou trop rédigées.
+   - Le triplet (text, command, args) doit être parfaitement cohérent : impossible de lire le texte et de tomber sur une autre commande.
+
+=== MODÈLE DE RAISONNEMENT AVANT RÉPONSE ===
+1. Identifier l'intention → en déduire la commande autorisée (ou null).
+2. Vérifier la variante et les contraintes.
+3. Rédiger une phrase mobile courte respectant registre, sujet, forme, longueur, frappe.
+4. Extraire/construire les args à partir du texte, dans l'ordre attendu.
+5. Contrôle final : commande dans la liste ? args cohérents ? texte déclenche bien cette commande ?
+
+=== EXEMPLES DE CORRESPONDANCES CORRECTES ===
+- « mets ça dans le wiki #ia https://ex.org/ia » → /c, args : « #ia https://ex.org/ia »
+- « lance l'ingestion stp » → /ingest, args : ""
+- « où en est le wiki ? » → /wikistatus, args : ""
+- « c koi le dernier article sur la santé » → /q, args : « c koi le dernier article sur la santé »
+- « lis cette page https://ex.org/sante et résume-la » → /source, args : « https://ex.org/sante et résume-la » (attention : uniquement si l'utilisateur demande explicitement de LIRE maintenant sans sauvegarder ; une simple question sur un lien peut être hors périmètre)
+- « t'as des mails de Marie cette semaine ? » → /chercher, args : critères
+- « connecte mon compte Google » → /connecter, args : ""
+- « mes 5 derniers mails » → /inbox, args : « 5 »
+- « prépare une réponse à ce mail » → /repondre, args : contexte
+- « cherche le doc budget sur Drive » → /drive, args : « budget »
+- « liste mes tags » → /tags, args : ""
+- « mets à jour la base » → /kbupdate, args : ""
+- « lis le mail 18ab3f2 » → /lire, args : « 18ab3f2 »
+- « supprime la page veille-ia » → /supprimer, args : « veille-ia »
+- « donne-moi une page à relire » → /relire, args : ""
+- « marque veille-ia comme vérifiée » → /verifie, args : « veille-ia »
+- « rappelle-moi demain 9h d'appeler le dentiste » → /cron add, args : « demain 9h rappel appeler le dentiste »
+- « écris un poème sur l'automne » → null, args : ""
+- « allume la lumière du salon » → null, args : "" (hors périmètre, aucune commande Tiron)
+
+=== RÉPONSE ATTENDUE ===
+Fournir uniquement les trois champs text, command, args, formatés comme dans les exemples (text, command, args), sans commentaire additionnel.
