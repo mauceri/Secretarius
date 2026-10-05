@@ -2650,123 +2650,303 @@
     }
   },
   {
-    "text": "rappelle-moi chaque lundi à 8h de payer le loyer",
+    "text": "rappelle-moi jeudi 18h de sortir le bac vert",
     "intention": "cron_schedule",
     "registre": "familier",
-    "variante": "rappel_recurrent",
+    "variante": "rappel_ponctuel_date",
     "action": {
       "command": "/cron",
-      "args": "add \"0 8 * * 1\" rappel payer le loyer"
+      "args": "add 2026-10-08T18:00 rappel sortir le bac vert"
     }
   },
   {
-    "text": "tous les jours 7h30 : rappel vitamines",
+    "text": "tous les soirs 21h30 : pilulier",
     "intention": "cron_schedule",
     "registre": "télégraphique",
     "variante": "rappel_recurrent",
     "action": {
       "command": "/cron",
-      "args": "add \"30 7 * * *\" rappel vitamines"
+      "args": "add \"30 21 * * *\" rappel pilulier"
     }
   },
   {
-    "text": "Pourriez-vous me rappeler le 15 octobre à 14h la réunion budget ?",
+    "text": "Pourriez-vous me rappeler le 3 novembre à 14h15 le contrôle technique ?",
     "intention": "cron_schedule",
     "registre": "formel",
     "variante": "rappel_ponctuel_date",
     "action": {
       "command": "/cron",
-      "args": "add 2026-10-15T14:00 rappel la réunion budget"
+      "args": "add 2026-11-03T14:15 rappel le contrôle technique"
     }
   },
   {
-    "text": "demain 9h rappelle garagiste",
+    "text": "dans 45 min rappelle-moi le four",
+    "intention": "cron_schedule",
+    "registre": "abrégé",
+    "variante": "rappel_relatif",
+    "action": {
+      "command": "/cron",
+      "args": "add 45m rappel le four"
+    }
+  },
+  {
+    "text": "chaque 1er du mois à 9h, rappel loyer",
+    "intention": "cron_schedule",
+    "registre": "télégraphique",
+    "variante": "rappel_recurrent",
+    "action": {
+      "command": "/cron",
+      "args": "add \"0 9 1 * *\" rappel loyer"
+    }
+  },
+  {
+    "text": "en semaine à 7h10 rappelle-moi de prendre le bus",
+    "intention": "cron_schedule",
+    "registre": "familier",
+    "variante": "rappel_recurrent",
+    "action": {
+      "command": "/cron",
+      "args": "add \"10 7 * * 1-5\" rappel prendre le bus"
+    }
+  },
+  {
+    "text": "samedi matin 10h, penser au marché",
     "intention": "cron_schedule",
     "registre": "abrégé",
     "variante": "rappel_ponctuel_date",
     "action": {
       "command": "/cron",
-      "args": "add 2026-10-03T09:00 rappel appeler le garagiste"
+      "args": "add 2026-10-10T10:00 rappel penser au marché"
     }
   },
   {
-    "text": "dans 20 min rappelle-moi de sortir le gâteau",
-    "intention": "cron_schedule",
-    "registre": "familier",
-    "variante": "rappel_relatif",
-    "action": {
-      "command": "/cron",
-      "args": "add 20m rappel sortir le gâteau"
-    }
-  },
-  {
-    "text": "Merci de me faire penser dans deux heures à rappeler Paul.",
+    "text": "Merci de me rappeler après-demain à 16h d'appeler ma sœur.",
     "intention": "cron_schedule",
     "registre": "poli",
-    "variante": "rappel_relatif",
+    "variante": "rappel_ponctuel_date",
     "action": {
       "command": "/cron",
-      "args": "add 2h rappel rappeler Paul"
+      "args": "add 2026-10-05T16:00 rappel appeler ma sœur"
     }
   },
   {
-    "text": "chaque dimanche soir à 18h donne-moi l'état du wiki",
-    "intention": "cron_schedule",
-    "registre": "familier",
-    "variante": "commande_recurrente",
-    "action": {
-      "command": "/cron",
-      "args": "add \"0 18 * * 0\" commande /wikistatus"
-    }
-  },
-  {
-    "text": "lance l'ingestion du wiki tous les jours à 3h",
+    "text": "tous les dimanches 19h /wikistatus",
     "intention": "cron_schedule",
     "registre": "télégraphique",
     "variante": "commande_recurrente",
     "action": {
       "command": "/cron",
-      "args": "add \"0 3 * * *\" commande /ingest"
+      "args": "add \"0 19 * * 0\" commande /wikistatus"
     }
   },
   {
-    "text": "Chaque vendredi à 17h, faites-moi une synthèse des nouveautés du wiki.",
+    "text": "lance /ingest chaque nuit à 2h30",
+    "intention": "cron_schedule",
+    "registre": "abrégé",
+    "variante": "commande_recurrente",
+    "action": {
+      "command": "/cron",
+      "args": "add \"30 2 * * *\" commande /ingest"
+    }
+  },
+  {
+    "text": "chaque mercredi midi, donne-moi la page à relire",
+    "intention": "cron_schedule",
+    "registre": "familier",
+    "variante": "commande_recurrente",
+    "action": {
+      "command": "/cron",
+      "args": "add \"0 12 * * 3\" commande /relire"
+    }
+  },
+  {
+    "text": "le vendredi à 17h45 fais-moi un point sur les nouveautés du wiki",
+    "intention": "cron_schedule",
+    "registre": "familier",
+    "variante": "consigne_recurrente",
+    "action": {
+      "command": "/cron",
+      "args": "add \"45 17 * * 5\" consigne point sur les nouveautés du wiki"
+    }
+  },
+  {
+    "text": "Chaque matin à 6h30, préparez-moi un résumé de mes captures de la veille.",
     "intention": "cron_schedule",
     "registre": "formel",
     "variante": "consigne_recurrente",
     "action": {
       "command": "/cron",
-      "args": "add \"0 17 * * 5\" consigne synthèse des nouveautés du wiki"
+      "args": "add \"30 6 * * *\" consigne résumé des captures de la veille"
     }
   },
   {
-    "text": "tous les matins à 8h résume-moi ce qui a été ajouté au wiki",
+    "text": "tous les 15 du mois vérifie les factures en attente",
     "intention": "cron_schedule",
-    "registre": "familier",
+    "registre": "télégraphique",
     "variante": "consigne_recurrente",
     "action": {
       "command": "/cron",
-      "args": "add \"0 8 * * *\" consigne résume ce qui a été ajouté au wiki"
+      "args": "add \"0 9 15 * *\" consigne vérifie les factures en attente"
     }
   },
   {
-    "text": "envoie-moi un SMS chaque lundi à 8h pour le loyer",
-    "intention": "cron_schedule",
-    "registre": "familier",
-    "variante": "avec_canal",
-    "action": {
-      "command": "/cron",
-      "args": "add \"0 8 * * 1\" sms rappel le loyer"
-    }
-  },
-  {
-    "text": "rappel whatsapp demain 10h dentiste",
+    "text": "par SMS dans 2h : rappeler le plombier",
     "intention": "cron_schedule",
     "registre": "abrégé",
     "variante": "avec_canal",
     "action": {
       "command": "/cron",
-      "args": "add 2026-10-03T10:00 whatsapp rappel dentiste"
+      "args": "add 2h sms rappel rappeler le plombier"
+    }
+  },
+  {
+    "text": "sur WhatsApp mardi 8h, réunion parents-profs",
+    "intention": "cron_schedule",
+    "registre": "télégraphique",
+    "variante": "avec_canal",
+    "action": {
+      "command": "/cron",
+      "args": "add 2026-10-06T08:00 whatsapp rappel réunion parents-profs"
+    }
+  },
+  {
+    "text": "note dans Obsidian ce soir 20h : idées pour l'article",
+    "intention": "cron_schedule",
+    "registre": "abrégé",
+    "variante": "avec_canal",
+    "action": {
+      "command": "/cron",
+      "args": "add 2026-10-04T20:00 obsidian rappel idées pour l'article"
+    }
+  },
+  {
+    "text": "envoie-moi un SMS chaque lundi 7h45 pour le sport",
+    "intention": "cron_schedule",
+    "registre": "familier",
+    "variante": "avec_canal",
+    "action": {
+      "command": "/cron",
+      "args": "add \"45 7 * * 1\" sms rappel le sport"
+    }
+  },
+  {
+    "text": "Pouvez-vous me prévenir sur Telegram dans 3 jours pour renouveler l'ordonnance ?",
+    "intention": "cron_schedule",
+    "registre": "poli",
+    "variante": "avec_canal",
+    "action": {
+      "command": "/cron",
+      "args": "add 3d telegram rappel renouveler l'ordonnance"
+    }
+  },
+  {
+    "text": "le week-end à 11h rappelle-moi d'arroser",
+    "intention": "cron_schedule",
+    "registre": "familier",
+    "variante": "rappel_recurrent",
+    "action": {
+      "command": "/cron",
+      "args": "add \"0 11 * * 6,0\" rappel arroser"
+    }
+  },
+  {
+    "text": "dans 10 minutes : thé",
+    "intention": "cron_schedule",
+    "registre": "télégraphique",
+    "variante": "rappel_relatif",
+    "action": {
+      "command": "/cron",
+      "args": "add 10m rappel thé"
+    }
+  },
+  {
+    "text": "rappel 24 décembre 18h cadeaux à emballer",
+    "intention": "cron_schedule",
+    "registre": "abrégé",
+    "variante": "rappel_ponctuel_date",
+    "action": {
+      "command": "/cron",
+      "args": "add 2026-12-24T18:00 rappel cadeaux à emballer"
+    }
+  },
+  {
+    "text": "ce soir 22h, couper le chauffage",
+    "intention": "cron_schedule",
+    "registre": "abrégé",
+    "variante": "rappel_ponctuel_date",
+    "action": {
+      "command": "/cron",
+      "args": "add 2026-10-03T22:00 rappel couper le chauffage"
+    }
+  },
+  {
+    "text": "Je souhaiterais un rappel tous les mardis à 13h pour la réunion d'équipe.",
+    "intention": "cron_schedule",
+    "registre": "formel",
+    "variante": "rappel_recurrent",
+    "action": {
+      "command": "/cron",
+      "args": "add \"0 13 * * 2\" rappel réunion d'équipe"
+    }
+  },
+  {
+    "text": "programme /tags tous les mois le 28 à 8h",
+    "intention": "cron_schedule",
+    "registre": "télégraphique",
+    "variante": "commande_recurrente",
+    "action": {
+      "command": "/cron",
+      "args": "add \"0 8 28 * *\" commande /tags"
+    }
+  },
+  {
+    "text": "dans 1h30 rappelle moi de rappeler Paul",
+    "intention": "cron_schedule",
+    "registre": "abrégé",
+    "variante": "rappel_relatif",
+    "action": {
+      "command": "/cron",
+      "args": "add 90m rappel rappeler Paul"
+    }
+  },
+  {
+    "text": "demain 6h50 réveil train",
+    "intention": "cron_schedule",
+    "registre": "télégraphique",
+    "variante": "rappel_ponctuel_date",
+    "action": {
+      "command": "/cron",
+      "args": "add 2026-10-04T06:50 rappel train"
+    }
+  },
+  {
+    "text": "tous les jeudis soir à 20h, résume mes lectures de la semaine",
+    "intention": "cron_schedule",
+    "registre": "familier",
+    "variante": "consigne_recurrente",
+    "action": {
+      "command": "/cron",
+      "args": "add \"0 20 * * 4\" consigne résume mes lectures de la semaine"
+    }
+  },
+  {
+    "text": "Merci de m'envoyer chaque soir à 21h par SMS la liste des tâches du lendemain.",
+    "intention": "cron_schedule",
+    "registre": "poli",
+    "variante": "avec_canal",
+    "action": {
+      "command": "/cron",
+      "args": "add \"0 21 * * *\" sms consigne liste des tâches du lendemain"
+    }
+  },
+  {
+    "text": "rappelle-moi le 2 janvier à 9h de faire les vœux",
+    "intention": "cron_schedule",
+    "registre": "familier",
+    "variante": "rappel_ponctuel_date",
+    "action": {
+      "command": "/cron",
+      "args": "add 2027-01-02T09:00 rappel faire les vœux"
     }
   }
 ]

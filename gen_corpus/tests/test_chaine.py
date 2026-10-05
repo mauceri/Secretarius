@@ -67,3 +67,13 @@ def test_demo_sans_contraintes_formatable():
     msgs = ChatAdapter().format(sig, demos, {"intention": "cron_schedule", "registre": "poli",
                                              "variante": "avec_canal", "contraintes": "moment : demain"})
     assert any("rappelle-moi jeudi" in m["content"] for m in msgs)
+
+
+def test_seed_cron_varie():
+    import json, re
+    seed = json.loads((Path(__file__).parent.parent / "seed.json").read_text(encoding="utf-8"))
+    cron = [e["text"].lower() for e in seed if e["intention"] == "cron_schedule"]
+    assert len(cron) >= 30
+    for marqueur in ["lundi", "demain", "dans "]:
+        assert sum(marqueur in t for t in cron) <= len(cron) * 0.2, marqueur
+    assert sum(bool(re.search(r"\b(sms|whatsapp|telegram|obsidian)\b", t)) for t in cron) >= 6
