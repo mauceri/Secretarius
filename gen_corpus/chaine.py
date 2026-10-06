@@ -97,6 +97,18 @@ GRILLES: dict[str, dict[str, list[str]]] = {
 SANS_ARGUMENT = frozenset({"wiki_kb_update", "wiki_ingest", "wiki_status", "wiki_tags",
                            "wiki_reread", "gog_connect", "gog_inbox"})
 GRILLES["sans_argument"] = {k: v for k, v in GRILLES["*"].items() if k != "sujet"}
+# /lire attend un mail désigné (identifiant, dernier reçu…), pas un sujet : « le mail
+# sur les courses » est une recherche (/chercher) — /lire tombé à 25 % le 2026-10-06.
+GRILLES["gog_get"] = {
+    "désignation du mail": ["identifiant hexadécimal de 6 ou 7 caractères, à inventer"] * 4
+                           + ["le dernier mail reçu", "le mail de ce matin", "l'avant-dernier mail",
+                              "le mail que je viens de recevoir"]
+                           + [f"le dernier mail de {qui}" for qui in ("Julien", "Marie", "Paul", "Léa",
+                                                                      "ma sœur", "la banque", "l'école")],
+    "forme": GRILLES["*"]["forme"],
+    "longueur": GRILLES["*"]["longueur"],
+    "frappe": GRILLES["*"]["frappe"],
+}
 
 
 def tirer_contraintes(intention: str, rng: random.Random) -> str:

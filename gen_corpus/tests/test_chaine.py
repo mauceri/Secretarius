@@ -110,3 +110,15 @@ def test_hors_perimetre_exclut_la_planification():
         assert "rappel ou planification → /cron" in (racine / f).read_text(encoding="utf-8"), f
     prog = json.loads((racine / "gepa_program.json").read_text(encoding="utf-8"))
     assert "rappel ou planification → /cron" in json.dumps(prog, ensure_ascii=False)
+
+
+def test_lire_un_mail_le_designe_sans_sujet():
+    # 2026-10-06 : un sujet imposé à gog_get donnait « ouvre le mail sur les courses »,
+    # en réalité une recherche (/chercher) — /lire tombé à 25 %.
+    from chaine import tirer_contraintes
+    vus = set()
+    for s in range(60):
+        c = tirer_contraintes("gog_get", random.Random(s))
+        assert "sujet :" not in c and "désignation du mail :" in c
+        vus.add(c.split("désignation du mail : ")[1].split(" ;")[0])
+    assert any("identifiant" in v for v in vus) and any("dernier" in v for v in vus)
