@@ -32,7 +32,8 @@ def metriques(classements: list[tuple[set[str], Classement]], seuil: float) -> d
             justes_decides += ok
         else:
             questions += 1
-            ok = any(_norm(c) in attendu for c, _ in ranking[:2])
+            from router_service.server import options_proposees  # même règle que le routeur
+            ok = any(_norm(o["command"]) in attendu for o in options_proposees(ranking))
         justes_ou_q += ok
         for a in attendu:
             par_cmd[a][0] += ok
@@ -64,12 +65,14 @@ def attendu_validation(row: dict) -> set[str]:
 
 def _route_vers_classement(r: dict) -> Classement:
     """Traduit une réponse de route_message en classement fictif, pour
-    réutiliser `metriques` : ok/no_match = décision (p=1), clarify = question (p=0)."""
+    réutiliser `metriques` : ok/no_match = décision (p=1), clarify = question (p=0,05)."""
     if r["status"] == "ok":
         return [(r["command"], 1.0)]
     if r["status"] in ("no_match", "answer"):
         return [(None, 1.0)]
-    return [(o["command"], 0.0) for o in r["options"]]
+    # P_MIN_OPTION : sous le seuil de décision, mais assez pour que toutes les
+    # options proposées soient conservées par options_proposees.
+    return [(o["command"], 0.05) for o in r["options"]]
 
 
 def _afficher(titre: str, m: dict) -> None:

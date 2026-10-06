@@ -39,11 +39,45 @@ def test_nl_aucune_au_dessus_du_seuil(monkeypatch):
     assert router_server.route_message("il fait beau") == {"status": "no_match"}
 
 
+def test_seuil_est_0_75():
+    assert router_server.SEUIL == 0.75
+
+
+def test_jusqu_a_trois_options_les_improbables_ecartees(monkeypatch):
+    monkeypatch.setattr(router_server, "_classifier",
+                        _FakeClassifier([("/chercher", 0.5), ("/lire", 0.3), (None, 0.15), ("/q", 0.04)]))
+    r = router_server.route_message("un mail de Paul ?")
+    assert [o["command"] for o in r["options"]] == ["/chercher", "/lire", None]
+
+
+def test_toujours_au_moins_deux_options(monkeypatch):
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([("/q", 0.70), ("/c", 0.02)]))
+    assert len(router_server.route_message("x")["options"]) == 2
+
+
+def test_faq_dans_le_chemin_de_q(monkeypatch):
+    class _Faq:
+        def lookup(self, message):
+            return {"answer": "Je suis animé par qwen3:8b."}
+    monkeypatch.setattr(router_server, "_faq", _Faq())
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([("/q", 0.9)]))
+    assert router_server.route_message("quel modèle t'anime ?") == {"status": "answer", "reply": "Je suis animé par qwen3:8b."}
+
+
+def test_q_sans_reponse_faq_va_au_wiki(monkeypatch):
+    class _Faq:
+        def lookup(self, message):
+            return None
+    monkeypatch.setattr(router_server, "_faq", _Faq())
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([("/q", 0.9)]))
+    assert router_server.route_message("c koi SPLADE")["command"] == "/q"
+
+
 def test_nl_sous_le_seuil_demande_precision(monkeypatch):
     monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([("/lire", 0.45), ("/chercher", 0.40), (None, 0.1)]))
     r = router_server.route_message("le dernier mail de ma sœur")
     assert r["status"] == "clarify" and r["args"] == "le dernier mail de ma sœur"
-    assert [o["command"] for o in r["options"]] == ["/lire", "/chercher"]
+    assert [o["command"] for o in r["options"]] == ["/lire", "/chercher", None]
     assert r["options"][0]["label"].startswith("lire un email")
 
 

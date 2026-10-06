@@ -1201,7 +1201,7 @@ describe("before_agent_reply — demande de précision", () => {
     routerClarify();
     const plugin = await freshPlugin(); const { api, hooks } = makeApi(); plugin.register(api);
     const r = await hooks["before_agent_reply"].handler({ cleanedBody: "le dernier mail de ma sœur" }, {});
-    expect(r.reply.text).toBe("Je ne suis pas sûr :\n1) lire un email précis (identifiant, le dernier reçu)\n2) rien de tout ça\nRépondez 1 ou 2.");
+    expect(r.reply.text).toBe("Je ne suis pas sûr :\n1) /lire — lire un email précis (identifiant, le dernier reçu)\n2) rien de tout ça\nRépondez par le numéro.");
   });
 
   it("« 1 » exécute la commande avec le message d'origine", async () => {
@@ -1255,7 +1255,26 @@ describe("before_agent_reply — demande de précision", () => {
     const plugin = await freshPlugin(); const { api, hooks, run } = makeApi(); plugin.register(api);
     await hooks["before_agent_reply"].handler({ cleanedBody: "le dernier mail de ma sœur" }, {});
     const r = await hooks["before_agent_reply"].handler({ cleanedBody: "/confirm" }, {});
-    expect(r.reply.text).toBe("Rien à confirmer : répondez 1 ou 2 au choix proposé.");
+    expect(r.reply.text).toBe("Rien à confirmer : répondez par le numéro du choix proposé.");
     expect(run).not.toHaveBeenCalled();
+  });
+
+  it("trois options : « 3 » choisit la troisième", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (_u: any, init: any) => {
+      const msg = JSON.parse(init.body).message;
+      if (msg === "un mail de Paul ?") {
+        return { ok: true, json: async () => ({ status: "clarify", args: msg, options: [
+          { command: "/chercher", label: "rechercher des emails" },
+          { command: "/lire", label: "lire un email précis" },
+          { command: "/inbox", label: "lister les emails récents" }] }) };
+      }
+      return { ok: true, json: async () => ({ status: "no_match" }) };
+    }));
+    const plugin = await freshPlugin(); const { api, hooks, run } = makeApi(); plugin.register(api);
+    const r = await hooks["before_agent_reply"].handler({ cleanedBody: "un mail de Paul ?" }, {});
+    expect(r.reply.text).toContain("3) /inbox — lister les emails récents");
+    await hooks["before_agent_reply"].handler({ cleanedBody: "3" }, {});
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(run.mock.calls[0][0].message).toContain("op: inbox");
   });
 });

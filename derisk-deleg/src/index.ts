@@ -665,7 +665,7 @@ export default definePluginEntry({
           return { handled: true, reply: { text: "Brouillon expiré (plus de 10 min) — rien envoyé. Recomposez si besoin." } };
         }
         if (pending.kind === "choix") {
-          return { handled: true, reply: { text: "Rien à confirmer : répondez 1 ou 2 au choix proposé." } };
+          return { handled: true, reply: { text: "Rien à confirmer : répondez par le numéro du choix proposé." } };
         }
         const p = pending;
         pending = null;
@@ -712,12 +712,12 @@ export default definePluginEntry({
 
       // Routage déterministe via le service Tiron : tout message qui n'est
       // pas déjà /confirm, /annuler, ou un retour OAuth.
-      // Réponse « 1 »/« 2 » à une demande de précision (spec 2026-10-06) ; tout
+      // Réponse par numéro à une demande de précision (spec 2026-10-06) ; tout
       // autre message annule le choix et suit le chemin normal.
       let routed: Awaited<ReturnType<typeof callRouter>>;
       const choix = pending?.kind === "choix" && Date.now() - pending.ts <= PENDING_TTL_MS ? pending : null;
       if (pending?.kind === "choix") pending = null;
-      const num = text.trim().match(/^([12])$/);
+      const num = text.trim().match(/^([1-9])$/);
       if (choix && num) {
         const opt = choix.options[Number(num[1]) - 1];
         routed = opt && opt.command
@@ -727,10 +727,13 @@ export default definePluginEntry({
         routed = await callRouter(text);
       }
       if (routed.status === "clarify") {
-        const options = routed.options.slice(0, 2);
+        const options = routed.options.slice(0, 3);
         pending = { kind: "choix", options, args: routed.args, ts: Date.now() };
-        const lignes = options.map((o, i) => `${i + 1}) ${o.label}`).join("\n");
-        return { handled: true, reply: { text: `Je ne suis pas sûr :\n${lignes}\nRépondez 1 ou 2.` } };
+        // Le nom de la commande est affiché pour qu'on l'apprenne (choix de l'utilisateur).
+        const lignes = options
+          .map((o, i) => `${i + 1}) ${o.command ? `${o.command} — ${o.label}` : o.label}`)
+          .join("\n");
+        return { handled: true, reply: { text: `Je ne suis pas sûr :\n${lignes}\nRépondez par le numéro.` } };
       }
 
       if (routed.status === "unavailable") {

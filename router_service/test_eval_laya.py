@@ -31,3 +31,10 @@ def test_reponse_du_routeur_traduite_en_classement():
                                               "options": [{"command": "/chercher"}, {"command": "/lire"}]}))]
     m = metriques(cl, 0.5)
     assert m["juste_ou_question"] == 1.0 and abs(m["taux_question"] - 1 / 3) < 1e-9
+
+
+def test_question_a_trois_options_toutes_comptees():
+    from router_service.eval_laya import _route_vers_classement, metriques
+    cl = [({"aucune"}, _route_vers_classement({"status": "clarify", "args": "x", "options": [
+        {"command": "/q"}, {"command": "/c"}, {"command": None}]}))]
+    assert metriques(cl, 0.5)["juste_ou_question"] == 1.0

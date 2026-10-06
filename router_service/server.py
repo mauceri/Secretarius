@@ -10,11 +10,21 @@ from router_service.faq import FaqIndex, FAQ_PATH
 from router_service.laya_classifier import LayaClassifier
 
 LAYA_CHECKPOINT = os.environ["LAYA_CHECKPOINT"]
-# Confiance jointe (domaine × commande) au-dessous de laquelle Tiron demande
-# « 1 ou 2 » au lieu de deviner. Choisi le 2026-10-06 par eval_laya sur
-# laya_val.jsonl (639) : 97,2 % de décisions justes, 3,8 % de questions ;
-# jeu manuel (71) : 81,7 % juste ou question pertinente.
-SEUIL = 0.60
+# Confiance jointe (domaine × commande) au-dessous de laquelle Tiron propose un
+# choix de commandes au lieu de deviner. 0.75 : choix de l'utilisateur
+# (2026-10-06), plus prudent que le 0.60 calculé par eval_laya sur la validation
+# (97,2 % de décisions justes, 3,8 % de questions à 0.60).
+SEUIL = 0.75
+# Options proposées : jusqu'à 3, celles sous 5 % écartées, jamais moins de 2.
+MAX_OPTIONS = 3
+P_MIN_OPTION = 0.05
+
+
+def options_proposees(ranking: list) -> list[dict]:
+    retenues = [c for c, p in ranking[:MAX_OPTIONS] if p >= P_MIN_OPTION]
+    if len(retenues) < 2:
+        retenues = [c for c, _ in ranking[:2]]
+    return [{"command": c, "label": LIBELLES[c]} for c in retenues]
 
 # Commandes qui exigent un argument : un appel sans argument est une erreur
 # d'usage, pas une capture/requête vide à déléguer.
@@ -55,10 +65,14 @@ def route_message(message: str) -> dict:
     if p >= SEUIL:
         if command is None:
             return _faq_ou_no_match(message)
+        if command == "/q":
+            # La FAQ (réponses toutes faites) sert les questions choisies par Laya.
+            faq = _faq_ou_no_match(message)
+            if faq["status"] == "answer":
+                return faq
         # args : jamais généré, toujours le message brut (décision du 2026-09-28).
         return {"status": "ok", "command": command, "args": message}
-    options = [{"command": c, "label": LIBELLES[c]} for c, _ in ranking[:2]]
-    return {"status": "clarify", "options": options, "args": message}
+    return {"status": "clarify", "options": options_proposees(ranking), "args": message}
 
 
 class Handler(BaseHTTPRequestHandler):
