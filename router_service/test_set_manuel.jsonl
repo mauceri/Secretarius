@@ -1,0 +1,71 @@
+{"text": "c koi le SPLADE déjà", "attendu": ["/q"]}
+{"text": "qu'est-ce que dit mon wiki sur Maître Eckhart ?", "attendu": ["/q"]}
+{"text": "astuce pr tomates ?", "attendu": ["/q"]}
+{"text": "comment on fait une béchamel", "attendu": ["/q"]}
+{"text": "rappelle moi ce que j'ai noté sur la domestication du chien", "attendu": ["/q"]}
+{"text": "garde ça https://arxiv.org/abs/2401.01234", "attendu": ["/c"]}
+{"text": "note : rdv chez le notaire reporté au 12, à garder dans le wiki", "attendu": ["/c"]}
+{"text": "#lecture https://lemonde.fr/article-ia ajoute au wiki", "attendu": ["/c"]}
+{"text": "capture cette page stp https://exemple.org/recette", "attendu": ["/c"]}
+{"text": "mets dans le wiki que le code du portail a changé", "attendu": ["/c"]}
+{"text": "lance l'ingestion", "attendu": ["/ingest"]}
+{"text": "ingère ce qui attend", "attendu": ["/ingest"]}
+{"text": "vas-y traite les captures en attente", "attendu": ["/ingest"]}
+{"text": "ingestion stp", "attendu": ["/ingest"]}
+{"text": "où en est le wiki ?", "attendu": ["/wikistatus"]}
+{"text": "l'ingestion est finie ?", "attendu": ["/wikistatus", "/ingest"]}
+{"text": "combien de fichiers en attente dans le wiki", "attendu": ["/wikistatus"]}
+{"text": "état du wiki", "attendu": ["/wikistatus"]}
+{"text": "quels tags j'ai dans le wiki", "attendu": ["/tags"]}
+{"text": "liste des tags", "attendu": ["/tags"]}
+{"text": "montre moi les étiquettes du wiki", "attendu": ["/tags"]}
+{"text": "mets à jour la base de connaissances", "attendu": ["/kbupdate"]}
+{"text": "maj kb", "attendu": ["/kbupdate"]}
+{"text": "refais la base du wiki", "attendu": ["/kbupdate"]}
+{"text": "supprime la page c-test-bidon", "attendu": ["/supprimer"]}
+{"text": "vire la page src-brouillon-2024 du wiki", "attendu": ["/supprimer"]}
+{"text": "efface c-domestication-des-chiens", "attendu": ["/supprimer"]}
+{"text": "une page à relire ?", "attendu": ["/relire"]}
+{"text": "donne-moi la prochaine page à vérifier", "attendu": ["/relire"]}
+{"text": "on fait un peu de relecture", "attendu": ["/relire"]}
+{"text": "c-maitre-eckhart c'est vérifié", "attendu": ["/verifie"]}
+{"text": "marque src-article-ia comme relue", "attendu": ["/verifie"]}
+{"text": "valide la page c-splade", "attendu": ["/verifie"]}
+{"text": "cherche les mails de la banque", "attendu": ["/chercher"]}
+{"text": "j'ai reçu un mail de Paul sur le chantier ?", "attendu": ["/chercher"]}
+{"text": "retrouve le mail de l'école de la semaine dernière", "attendu": ["/chercher"]}
+{"text": "mails sur la facture EDF", "attendu": ["/chercher"]}
+{"text": "connecte mon compte google", "attendu": ["/connecter"]}
+{"text": "il faut que je réautorise google", "attendu": ["/connecter"]}
+{"text": "accès gmail stp", "attendu": ["/connecter"]}
+{"text": "quoi de neuf dans ma boîte ?", "attendu": ["/inbox"]}
+{"text": "mes 5 derniers mails", "attendu": ["/inbox"]}
+{"text": "des nouveaux mails ?", "attendu": ["/inbox"]}
+{"text": "trouve le devis dans le drive", "attendu": ["/drive"]}
+{"text": "y a un doc budget 2026 sur google drive ?", "attendu": ["/drive"]}
+{"text": "cherche le pdf du contrat dans mes documents google", "attendu": ["/drive"]}
+{"text": "réponds au mail 18ab3f2 que c'est d'accord pour jeudi", "attendu": ["/repondre"]}
+{"text": "réponds à Paul que je passe demain", "attendu": ["/repondre"]}
+{"text": "prépare une réponse au dernier mail de l'école", "attendu": ["/repondre"]}
+{"text": "lis le mail 18ab3f2", "attendu": ["/lire"]}
+{"text": "ouvre le dernier mail", "attendu": ["/lire", "/inbox"]}
+{"text": "le dernier mail de ma sœur", "attendu": ["/lire", "/chercher"]}
+{"text": "montre-moi le contenu de 7f3e2a1", "attendu": ["/lire"]}
+{"text": "lis cette page et dis-moi l'essentiel https://exemple.org/etude", "attendu": ["/source"]}
+{"text": "lis ça https://blog.exemple.fr/post", "attendu": ["/source", "/c"]}
+{"text": "c'est quoi ce lien ? https://exemple.org/x", "attendu": ["/source"]}
+{"text": "résume moi https://exemple.org/rapport sans le garder", "attendu": ["/source"]}
+{"text": "rappelle-moi demain 9h d'appeler le garagiste", "attendu": ["/cron"]}
+{"text": "chaque lundi à 8h donne-moi l'état du wiki", "attendu": ["/cron"]}
+{"text": "dans 20 min : sortir le gâteau", "attendu": ["/cron"]}
+{"text": "tous les soirs à 21h rappel pilulier par sms", "attendu": ["/cron"]}
+{"text": "le 3 novembre à 14h rappelle-moi le contrôle technique", "attendu": ["/cron"]}
+{"text": "/cron list", "attendu": ["/cron"]}
+{"text": "réserve-moi une table pour samedi", "attendu": ["aucune"]}
+{"text": "allume la lumière du salon", "attendu": ["aucune"]}
+{"text": "commande des croquettes pour le chat", "attendu": ["aucune"]}
+{"text": "écris un nouveau mail à la mairie", "attendu": ["aucune"]}
+{"text": "merci !", "attendu": ["aucune"]}
+{"text": "tu viens dimanche ?", "attendu": ["aucune"]}
+{"text": "bonne nuit Tiron", "attendu": ["aucune"]}
+{"text": "achète-moi un billet de train pour Lyon", "attendu": ["aucune"]}
