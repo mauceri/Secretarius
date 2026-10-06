@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import uuid
+from dataclasses import replace
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -82,6 +83,8 @@ def main(argv=None, runner=subprocess.run, env=None, now=None, http=None, job_ke
             if job is None:
                 out = {"ok": False, "text": "Planification non comprise. Syntaxe : /cron " + USAGE_ADD.split("/cron ", 1)[1]}
             else:
+                if job.type == "consigne":  # jamais déduite d'une phrase (2026-10-06)
+                    job = replace(job, type="rappel")
                 job = _job_from_args(to_args(job))  # même validation que la syntaxe tapée
                 text, _ = _apercu(job, a.origin, tz, env, job_key, now)
                 out = {"ok": True, "text": text, "args": to_args(job), "source": source}

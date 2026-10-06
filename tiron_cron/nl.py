@@ -17,13 +17,22 @@ _H = r"(\d{1,2})\s*h\s*(\d{2})?"
 _I = re.IGNORECASE
 _CANAL = re.compile(r"\b(?:par|en|sur|via)\s+(sms|texto|whatsapp|telegram|obsidian)\b", _I)
 _RELATIF = re.compile(r"\bdans\s+(\d+)\s*(minutes?|min|heures?|h|jours?)\b", _I)
-_HEBDO = re.compile(r"\b(?:chaque|tous\s+les)\s+(" + "|".join(_JOURS) + r")s?\s+à\s+" + _H, _I)
+_A = r"\s+(?:à\s+)?"  # « demain 9h » autant que « demain à 9h »
+_HEBDO = re.compile(r"\b(?:chaque|tous\s+les)\s+(" + "|".join(_JOURS) + r")s?" + _A + _H, _I)
 _QUOTIDIEN = re.compile(r"\b(?:chaque\s+jour|tous\s+les\s+jours|chaque\s+matin|tous\s+les\s+matins|"
-                        r"quotidiennement)\s+à\s+" + _H, _I)
-_PROCHE = re.compile(r"\b(aujourd'hui|demain|après-demain)\s+à\s+" + _H, _I)
-_DATE = re.compile(r"\ble\s+(\d{1,2})\s+(" + "|".join(_MOIS) + r")(?:\s+(\d{4}))?\s+à\s+" + _H, _I)
+                        r"chaque\s+soir|tous\s+les\s+soirs|quotidiennement)" + _A + _H, _I)
+_PROCHE = re.compile(r"\b(aujourd'hui|demain|après-demain)" + _A + _H, _I)
+_DATE = re.compile(r"\ble\s+(\d{1,2})\s+(" + "|".join(_MOIS) + r")(?:\s+(\d{4}))?" + _A + _H, _I)
 _TIRON = re.compile(r"^\s*tiron\s*[,:]?\s*", _I)
-_RAPPEL = re.compile(r"^\s*(?:rappelle[- ]moi|rappelle[- ]nous|rappelez[- ]moi)\s*(?:de\s+|d'|que\s+|qu'|:\s*)?", _I)
+# Verbe de rappel, fautes courantes comprises (rappelez, rappellez, rapelle…) —
+# retour d'usage du 2026-10-06.
+_VERBE = (r"(?:rap{1,2}el{1,2}(?:e|es|ez|er)?[- ]?(?:moi|nous)"
+          r"|pense[rsz]?\s+à\s+me\s+(?:dire|rappeler)"
+          r"|n['’]oublie\s+pas\s+de\s+me\s+(?:dire|rappeler))")
+_VERBE_PARTOUT = re.compile(r"\b" + _VERBE, _I)
+# « rappelle-moi ce que j'ai noté… » = « redis-moi », une question, pas un rappel.
+_REDIS_MOI = re.compile(r"\b" + _VERBE + r"\s*(?:ce\s+qu|qui\b|quand\b|comment\b|où\b|combien\b|pourquoi\b|quel)", _I)
+_RAPPEL = re.compile(r"^\s*(?:" + _VERBE + r"|rap{1,2}el\b)\s*(?:de\s+|d'|que\s+|qu'|:\s*)?", _I)
 _CMD = re.compile(r"(?<!\S)(/[a-z]+)\b")
 
 
@@ -88,6 +97,18 @@ def parse_nl(text: str, now: datetime) -> Job | None:
     elif r := _RAPPEL.match(reste):
         type_, contenu = "rappel", reste[r.end():]
     else:
-        type_, contenu = "consigne", reste
+        # Une consigne n'est jamais déduite d'une phrase (syntaxe explicite seulement).
+        type_, contenu = "rappel", reste
     contenu = _nettoie(contenu)
     return Job(kind, quand, canal, type_, contenu) if contenu else None
+
+
+def detecter_planification(text: str, now: datetime) -> bool:
+    """Reconnaît une demande de planification à sa forme (verbe de rappel, ou
+    moment reconnu dans une phrase qui n'est pas une question), sans
+    classifieur. Une détection abusive reste sans effet : aperçu + /confirm."""
+    if _VERBE_PARTOUT.search(text) and not _REDIS_MOI.search(text):
+        return True
+    if text.rstrip().endswith("?"):
+        return False
+    return _quand(text, now) is not None

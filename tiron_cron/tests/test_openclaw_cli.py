@@ -23,7 +23,7 @@ def test_rappel_cron_sms():
     assert _opt(argv, "--cron") == "0 8 * * 1"
     assert _opt(argv, "--tz") == "Europe/Paris"
     assert _opt(argv, "--declaration-key") == "tiron:abcd1234"
-    assert json.loads(_opt(argv, "--command-argv")) == ["printf", "%s\n", "payer le loyer"]
+    assert json.loads(_opt(argv, "--command-argv")) == ["printf", "%s\n", "Rappel : payer le loyer"]
     assert "--announce" in argv and _opt(argv, "--channel") == "sms" and _opt(argv, "--to") == "+33600000000"
     assert "--delete-after-run" not in argv
 

@@ -69,3 +69,5 @@
 {"text": "tu viens dimanche ?", "attendu": ["aucune"]}
 {"text": "bonne nuit Tiron", "attendu": ["aucune"]}
 {"text": "achète-moi un billet de train pour Lyon", "attendu": ["aucune"]}
+{"text": "rappelez-moi dans 3 minutes de boire un verre d'eau", "attendu": ["/cron"]}
+{"text": "rappelle moi ce que j'ai noté sur Spinoza", "attendu": ["/q"]}

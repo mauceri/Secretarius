@@ -107,3 +107,9 @@ def test_delai_openclaw_depasse_reste_du_json(capsys):
         raise subprocess.TimeoutExpired(argv, 60)
     out = _call(capsys, ["manage", "--args", "list"], runner=run)
     assert out["ok"] is False and out["text"].startswith("Échec")
+
+
+def test_nl_consigne_du_modele_ramenee_a_un_rappel(capsys):
+    http = lambda url, body, timeout: {"message": {"content": "add 1d consigne résume le wiki"}}
+    out = _call(capsys, ["nl", "--origin", "telegram", "--text", "lundi prochain vers 8 heures x"], http=http)
+    assert out["ok"] and out["args"] == "add 1d rappel résume le wiki"

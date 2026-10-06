@@ -48,7 +48,8 @@ def build_add_argv(job: Job, canal: str | None, tz: str, env: Mapping[str, str],
         raise SyntaxeInvalide(f"destinataire {canal} non configuré ({var})")
     delivery = ["--announce", "--channel", CANAUX_OPENCLAW[canal], "--to", dest]
     if job.type == "rappel":
-        return argv + ["--command-argv", json.dumps(["printf", "%s\n", job.contenu])] + delivery
+        # « Rappel : » pour qu'on le reconnaisse au premier coup d'œil (2026-10-06).
+        return argv + ["--command-argv", json.dumps(["printf", "%s\n", f"Rappel : {job.contenu}"])] + delivery
     return argv + ["--agent", "main", "--session", "isolated", "--message", job.contenu] + delivery
 
 
