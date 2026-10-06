@@ -1,32 +1,24 @@
 # router_service/test_laya_classifier.py
-from router_service.laya_classifier import LayaClassifier
+from router_service.laya_classifier import classement
 
 
-def test_classify_returns_top_command_and_confidence(monkeypatch):
-    clf = LayaClassifier.__new__(LayaClassifier)  # évite de charger un vrai modèle
-    clf.checkpoint = "test"
-
-    def fake_query(self, message):
-        return {"answers": {"command": {"choice": "/q", "confidence": 0.91}}}
-
-    monkeypatch.setattr(LayaClassifier, "_query", fake_query)
-
-    command, confidence = clf.classify("qu'est-ce que le SPLADE ?")
-
-    assert command == "/q"
-    assert confidence == 0.91
+def _ans(dom, wiki=None, google=None):
+    a = {"domaine": {"probabilities": dom}}
+    if wiki:
+        a["commande_wiki"] = {"probabilities": wiki}
+    if google:
+        a["commande_google"] = {"probabilities": google}
+    return a
 
 
-def test_classify_returns_none_when_top_choice_is_aucune(monkeypatch):
-    clf = LayaClassifier.__new__(LayaClassifier)
-    clf.checkpoint = "test"
+def test_classement_joint_trie():
+    r = classement(_ans({"wiki": 0.7, "google": 0.2, "web": 0.05, "planification": 0.03, "aucune": 0.02},
+                        wiki={"/q": 0.9, "/c": 0.1}, google={"/lire": 0.6, "/chercher": 0.4}))
+    assert r[0] == ("/q", 0.63) and r[1] == ("/lire", 0.12)
+    assert ("/c", 0.07) in r and ("/source", 0.05) in r and ("/cron", 0.03) in r and (None, 0.02) in r
+    assert [p for _, p in r] == sorted((p for _, p in r), reverse=True)
 
-    def fake_query(self, message):
-        return {"answers": {"command": {"choice": "aucune", "confidence": 0.80}}}
 
-    monkeypatch.setattr(LayaClassifier, "_query", fake_query)
-
-    command, confidence = clf.classify("il fait beau aujourd'hui")
-
-    assert command is None
-    assert confidence == 0.0
+def test_classement_sans_probabilites_de_niveau_2():
+    r = classement(_ans({"wiki": 0.1, "google": 0.0, "web": 0.0, "planification": 0.9, "aucune": 0.0}))
+    assert r[0] == ("/cron", 0.9)

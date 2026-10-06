@@ -5,12 +5,15 @@ import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from router_service.router import WIKI_CMDS, GOG_CMDS, CRON_CMDS, embed_bge_m3
+from router_service.router import WIKI_CMDS, GOG_CMDS, CRON_CMDS, LIBELLES, embed_bge_m3
 from router_service.faq import FaqIndex, FAQ_PATH
 from router_service.laya_classifier import LayaClassifier
 
 LAYA_CHECKPOINT = os.environ["LAYA_CHECKPOINT"]
-SEUIL_GOG = 0.50
+# Confiance jointe (domaine × commande) au-dessous de laquelle Tiron demande
+# « 1 ou 2 » au lieu de deviner. Valeur provisoire, recalibrée à la tâche 6
+# sur le jeu de validation (≥ 97 % de décisions justes, ≤ 15 % de questions).
+SEUIL = 0.60
 
 # Commandes qui exigent un argument : un appel sans argument est une erreur
 # d'usage, pas une capture/requête vide à déléguer.
@@ -43,14 +46,15 @@ def route_message(message: str) -> dict:
 
     if _classifier is None:
         return {"status": "no_match"}
-    command, probability = _classifier.classify(message)
-    if command is None:
-        return {"status": "no_match"}
-    if command in GOG_CMDS and probability < SEUIL_GOG:
-        return {"status": "no_match"}
-    # args : jamais généré, toujours le message brut pour une commande
-    # inférée en langage naturel (cf. décision du 2026-09-28).
-    return {"status": "ok", "command": command, "args": message}
+    ranking = _classifier.classer(message)
+    command, p = ranking[0]
+    if p >= SEUIL:
+        if command is None:
+            return {"status": "no_match"}
+        # args : jamais généré, toujours le message brut (décision du 2026-09-28).
+        return {"status": "ok", "command": command, "args": message}
+    options = [{"command": c, "label": LIBELLES[c]} for c, _ in ranking[:2]]
+    return {"status": "clarify", "options": options, "args": message}
 
 
 class Handler(BaseHTTPRequestHandler):

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Ensembles de commandes du routeur Tiron, et embedding BGE-M3 partagé
-(utilisé par la FAQ — cf. router_service/faq.py). Le garde-fou de confiance
+"""Ensembles de commandes du routeur Tiron, questions Laya à deux niveaux
+(domaine puis commande, cf. docs/superpowers/specs/2026-10-06-routage-deux-niveaux-design.md),
+et embedding BGE-M3 partagé (utilisé par la FAQ — cf. router_service/faq.py). Le garde-fou de confiance
 gog par centroïdes (GogGate) a été retiré le 2026-09-28 : la confiance vient
 désormais du score calibré du classifieur Laya (router_service/laya_classifier.py),
 cf. docs/superpowers/specs/2026-09-28-routeur-laya-design.md."""
@@ -11,34 +12,57 @@ from transformers import AutoModel, AutoTokenizer
 
 WIKI_CMDS = {"/c", "/q", "/ingest", "/source", "/wikistatus", "/r", "/tags", "/kbupdate", "/supprimer", "/relire", "/verifie"}
 # /r reste dans WIKI_CMDS (préfixe explicite, chemin déterministe) mais est
-# absente de COMMAND_CRITERIA : indiscernable de /q en langage naturel sans
+# absente des questions Laya (QUESTIONS) : indiscernable de /q en langage naturel sans
 # préfixe (0% des exemples réels n'en portent, mesuré 2026-09-30 — /r à 13%
 # d'exactitude malgré un corpus corrigé), retirée de l'inférence NL de Laya.
 GOG_CMDS = {"/chercher", "/connecter", "/inbox", "/drive", "/repondre", "/lire"}
 CRON_CMDS = {"/cron"}
 
-COMMAND_CRITERIA: dict[str, str] = {
-    "/c": "capturer une note ou une URL dans le wiki",
-    "/q": "poser une question au wiki, réponse synthétisée",
-    "/ingest": "lancer l'ingestion des sources en attente",
-    "/source": "déléguer une recherche web à Scout",
-    "/wikistatus": "connaître l'état de l'ingestion du wiki",
-    "/tags": "lister les tags du wiki",
-    "/kbupdate": "mettre à jour la base de connaissances du wiki",
-    "/supprimer": "supprimer une page du wiki",
-    "/relire": "obtenir la prochaine page du wiki à relire",
-    "/verifie": "marquer une page du wiki comme vérifiée",
-    "/chercher": "rechercher dans les emails Gmail",
-    "/connecter": "démarrer la connexion au compte Google",
-    "/inbox": "lister les nouveaux emails",
-    "/drive": "rechercher dans Google Drive",
-    "/repondre": "répondre à un email",
-    "/lire": "lire le contenu d'un email",
-    "/cron": "planifier un rappel, une commande ou une consigne, à une date ou de façon récurrente",
-    "aucune": "aucune commande ne correspond, message hors sujet",
+DOMAINES: dict[str, str] = {
+    "wiki": "le wiki personnel : capturer, interroger, chercher, ingérer, relire, vérifier, supprimer ; et toute question de connaissance",
+    "google": "les emails reçus (lire, chercher, lister, répondre), Google Drive, connexion au compte Google",
+    "web": "lire une page web externe maintenant, sans la sauvegarder",
+    "planification": "planifier un rappel, une commande ou une consigne, à une date ou de façon récurrente",
+    "aucune": "action impossible pour Tiron (réserver, acheter, domotique, nouveau mail) ou simple conversation",
+}
+COMMANDES: dict[str, dict[str, str]] = {
+    "wiki": {
+        "/c": "capturer une note ou une URL dans le wiki",
+        "/q": "poser une question (au wiki ou de connaissance générale), réponse synthétisée",
+        "/ingest": "lancer l'ingestion des sources en attente",
+        "/wikistatus": "connaître l'état de l'ingestion du wiki",
+        "/tags": "lister les tags du wiki",
+        "/kbupdate": "mettre à jour la base de connaissances du wiki",
+        "/supprimer": "supprimer une page du wiki",
+        "/relire": "obtenir la prochaine page du wiki à relire",
+        "/verifie": "marquer une page du wiki comme vérifiée",
+    },
+    "google": {
+        "/chercher": "rechercher des emails (sujet, expéditeur, période)",
+        "/connecter": "connecter le compte Google",
+        "/inbox": "lister les emails récents",
+        "/drive": "rechercher dans Google Drive",
+        "/repondre": "répondre à un email",
+        "/lire": "lire un email précis (identifiant, le dernier reçu)",
+    },
+}
+DOMAINE_UNIQUE: dict[str, str] = {"web": "/source", "planification": "/cron"}
+DOMAINE_DE: dict[str, str] = {c: d for d, cs in COMMANDES.items() for c in cs} | \
+    {c: d for d, c in DOMAINE_UNIQUE.items()}
+QUESTIONS: dict = {
+    "domaine": {"type": "choice", "instructions": "De quoi relève ce message adressé à Tiron ?",
+                "criteria": DOMAINES},
+    "commande_wiki": {"type": "choice", "instructions": "Quelle commande du wiki ce message déclenche-t-il ?",
+                      "criteria": COMMANDES["wiki"]},
+    "commande_google": {"type": "choice", "instructions": "Quelle commande Google ce message déclenche-t-il ?",
+                        "criteria": COMMANDES["google"]},
+}
+LIBELLES: dict = {c: d for cs in COMMANDES.values() for c, d in cs.items()} | {
+    "/source": "lire une page web sans la sauvegarder",
+    "/cron": "planifier un rappel ou une tâche",
+    None: "rien de tout ça",
 }
 
-_INSTRUCTIONS = "Quelle commande Tiron ce message déclenche-t-il ?"
 
 _tok = None
 _mdl = None

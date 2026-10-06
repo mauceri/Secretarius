@@ -22,16 +22,52 @@ from router_service import server as router_server
 
 
 class _FakeClassifier:
-    def __init__(self, command, prob=0.9):
-        self._command = command
-        self._prob = prob
+    def __init__(self, ranking):
+        self._ranking = ranking
 
-    def classify(self, message):
-        return self._command, self._prob
+    def classer(self, message):
+        return self._ranking
+
+
+def test_nl_au_dessus_du_seuil_decide(monkeypatch):
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([("/q", 0.95), ("/c", 0.03)]))
+    assert router_server.route_message("c koi SPLADE ?") == {"status": "ok", "command": "/q", "args": "c koi SPLADE ?"}
+
+
+def test_nl_aucune_au_dessus_du_seuil(monkeypatch):
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([(None, 0.97), ("/q", 0.02)]))
+    assert router_server.route_message("il fait beau") == {"status": "no_match"}
+
+
+def test_nl_sous_le_seuil_demande_precision(monkeypatch):
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([("/lire", 0.45), ("/chercher", 0.40), (None, 0.1)]))
+    r = router_server.route_message("le dernier mail de ma sœur")
+    assert r["status"] == "clarify" and r["args"] == "le dernier mail de ma sœur"
+    assert [o["command"] for o in r["options"]] == ["/lire", "/chercher"]
+    assert r["options"][0]["label"].startswith("lire un email")
+
+
+def test_nl_option_aucune_libellee(monkeypatch):
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([("/q", 0.5), (None, 0.45)]))
+    r = router_server.route_message("astuce tomates ?")
+    assert r["options"][1] == {"command": None, "label": "rien de tout ça"}
+
+
+def test_commande_inconnue_tapee_passe_par_laya(monkeypatch):
+    called = {"n": 0}
+
+    class _Counting:
+        def classer(self, message):
+            called["n"] += 1
+            return [(None, 1.0)]
+
+    monkeypatch.setattr(router_server, "_classifier", _Counting())
+    router_server.route_message("/inconnu bla")
+    assert called["n"] == 1
 
 
 def test_route_endpoint_end_to_end():
-    router_server._classifier = _FakeClassifier(None)
+    router_server._classifier = _FakeClassifier([(None, 1.0)])
     router_server._faq = None
     httpd = __import__("http.server", fromlist=["ThreadingHTTPServer"]).ThreadingHTTPServer(
         ("127.0.0.1", 0), router_server.Handler)
@@ -128,51 +164,6 @@ def test_explicit_lire_empty_arg_returns_usage(monkeypatch):
     assert r == {"status": "answer", "reply": "Usage : /lire <argument>"}
 
 
-def test_unknown_slash_command_still_reaches_slm(monkeypatch):
-    called = {"n": 0}
-
-    class _Counting:
-        def classify(self, message):
-            called["n"] += 1
-            return None, 0.0
-
-    monkeypatch.setattr(router_server, "_classifier", _Counting())
-    router_server.route_message("/inconnu bla")
-    assert called["n"] == 1
-
-
-def test_nl_inferred_command_uses_full_message_as_args(monkeypatch):
-    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("/q", 0.92))
-    r = router_server.route_message("qu'est-ce que le SPLADE ?")
-    assert r == {"status": "ok", "command": "/q", "args": "qu'est-ce que le SPLADE ?"}
-
-
-def test_nl_no_match_returns_no_match(monkeypatch):
-    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier(None))
-    r = router_server.route_message("il fait beau aujourd'hui")
-    assert r == {"status": "no_match"}
-
-
-def test_gog_command_below_confidence_threshold_returns_no_match(monkeypatch):
-    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("/inbox", 0.30))
-    r = router_server.route_message("y a-t-il du nouveau ?")
-    assert r == {"status": "no_match"}
-
-
-def test_gog_command_above_confidence_threshold_is_ok(monkeypatch):
-    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("/inbox", 0.80))
-    r = router_server.route_message("y a-t-il du nouveau ?")
-    assert r == {"status": "ok", "command": "/inbox", "args": "y a-t-il du nouveau ?"}
-
-
-def test_wiki_command_from_slm_does_not_use_confidence_threshold(monkeypatch):
-    # Seules les commandes gog passent par le seuil de confiance — le
-    # classifieur ne renvoie de toute façon que des commandes connues.
-    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("/q", 0.10))
-    r = router_server.route_message("dis-moi ce que dit le wiki sur X")
-    assert r == {"status": "ok", "command": "/q", "args": "dis-moi ce que dit le wiki sur X"}
-
-
 def test_explicit_cron_bypasses_slm(monkeypatch):
     monkeypatch.setattr(router_server, "_classifier", _FakeClassifier("boom"))
     r = router_server.route_message('/cron add "0 8 * * 1" rappel x')
@@ -187,3 +178,21 @@ def test_explicit_cron_empty_arg_returns_usage(monkeypatch):
 def test_cron_cmds_disjoint():
     from router_service.router import CRON_CMDS
     assert CRON_CMDS.isdisjoint(WIKI_CMDS | GOG_CMDS)
+
+
+def test_domaines_et_commandes_couvrent_toutes_les_commandes_nl():
+    from router_service.router import DOMAINE_DE, QUESTIONS, LIBELLES, WIKI_CMDS, GOG_CMDS, CRON_CMDS
+    attendues = (WIKI_CMDS - {"/r"}) | GOG_CMDS | CRON_CMDS | {"/source"}
+    assert set(DOMAINE_DE) == attendues
+    assert set(QUESTIONS) == {"domaine", "commande_wiki", "commande_google"}
+    assert set(QUESTIONS["domaine"]["criteria"]) == {"wiki", "google", "web", "planification", "aucune"}
+    assert len(QUESTIONS["commande_wiki"]["criteria"]) == 9
+    assert len(QUESTIONS["commande_google"]["criteria"]) == 6
+    assert LIBELLES[None] == "rien de tout ça" and all(c in LIBELLES for c in DOMAINE_DE)
+
+
+def test_aucune_question_ne_depasse_le_budget_laya():
+    # head_max_len = 256 : au-delà, Laya tronque chaque option (constaté à 13 jetons sur 18 options).
+    from router_service.router import QUESTIONS
+    for q in QUESTIONS.values():
+        assert sum(len(f"{k}: {v}".split()) for k, v in q["criteria"].items()) < 120
