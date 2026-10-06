@@ -30,7 +30,7 @@ pose une question au lieu de deviner.
 | Domaines | `wiki`, `google` (courriel + Drive), `web`, `planification`, `aucune` |
 | Hésitation | Demande de précision avec les 2 meilleures options, réponse « 1 » ou « 2 » |
 | Questions générales | Elles vont vers `/q` (le wiki répond ou dit qu'il n'a rien) ; le hors périmètre est réservé aux actions impossibles et à la conversation |
-| Validation | Jeu de validation ≥ 40 exemples par commande, plus un jeu de test écrit à la main (pas par DeepSeek) |
+| Validation | Jeu de validation **de Laya** (`laya_val.jsonl`) ≥ 40 exemples par commande, plus un jeu de test écrit à la main (pas par DeepSeek). Sans rapport avec le valset de GEPA, qui reste à 40 exemples au total (recommandation DSPy) |
 | Seuil d'acceptation | Sur le jeu manuel : ≥ 90 % de décisions justes ou de questions pertinentes, aucune commande < 80 %, ≤ 15 % de demandes de précision |
 | Modèle | Même nom `Mauceric/laya-tiron-router`, pas de gestion de versions |
 | Commandes tapées (`/xxx`) | Inchangées, jamais soumises à Laya |
