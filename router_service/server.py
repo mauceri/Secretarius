@@ -11,8 +11,9 @@ from router_service.laya_classifier import LayaClassifier
 
 LAYA_CHECKPOINT = os.environ["LAYA_CHECKPOINT"]
 # Confiance jointe (domaine × commande) au-dessous de laquelle Tiron demande
-# « 1 ou 2 » au lieu de deviner. Valeur provisoire, recalibrée à la tâche 6
-# sur le jeu de validation (≥ 97 % de décisions justes, ≤ 15 % de questions).
+# « 1 ou 2 » au lieu de deviner. Choisi le 2026-10-06 par eval_laya sur
+# laya_val.jsonl (639) : 97,2 % de décisions justes, 3,8 % de questions ;
+# jeu manuel (71) : 81,7 % juste ou question pertinente.
 SEUIL = 0.60
 
 # Commandes qui exigent un argument : un appel sans argument est une erreur
