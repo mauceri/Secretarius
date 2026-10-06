@@ -24,6 +24,9 @@ async function callRouter(message) {
         const data = await resp.json();
         if (data.status === "answer")
             return { status: "answer", reply: data.reply ?? "" };
+        if (data.status === "clarify" && Array.isArray(data.options)) {
+            return { status: "clarify", options: data.options, args: data.args ?? "" };
+        }
         return data.status === "ok"
             ? { status: "ok", command: data.command, args: data.args ?? "" }
             : { status: "no_match" };
@@ -595,6 +598,9 @@ export default definePluginEntry({
                     pending = null;
                     return { handled: true, reply: { text: "Brouillon expiré (plus de 10 min) — rien envoyé. Recomposez si besoin." } };
                 }
+                if (pending.kind === "choix") {
+                    return { handled: true, reply: { text: "Rien à confirmer : répondez 1 ou 2 au choix proposé." } };
+                }
                 const p = pending;
                 pending = null;
                 let out;
@@ -628,6 +634,10 @@ export default definePluginEntry({
                     pending = null;
                     return { handled: true, reply: { text: "Planification abandonnée. Rien n'a été créé." } };
                 }
+                if (pending.kind === "choix") {
+                    pending = null;
+                    return { handled: true, reply: { text: "Choix abandonné." } };
+                }
                 const dest = pending.kind === "send" ? pending.to : `réponse à ${pending.messageId}`;
                 pending = null;
                 return {
@@ -637,7 +647,28 @@ export default definePluginEntry({
             }
             // Routage déterministe via le service Tiron : tout message qui n'est
             // pas déjà /confirm, /annuler, ou un retour OAuth.
-            const routed = await callRouter(text);
+            // Réponse « 1 »/« 2 » à une demande de précision (spec 2026-10-06) ; tout
+            // autre message annule le choix et suit le chemin normal.
+            let routed;
+            const choix = pending?.kind === "choix" && Date.now() - pending.ts <= PENDING_TTL_MS ? pending : null;
+            if (pending?.kind === "choix")
+                pending = null;
+            const num = text.trim().match(/^([12])$/);
+            if (choix && num) {
+                const opt = choix.options[Number(num[1]) - 1];
+                routed = opt && opt.command
+                    ? { status: "ok", command: opt.command, args: choix.args }
+                    : { status: "no_match" };
+            }
+            else {
+                routed = await callRouter(text);
+            }
+            if (routed.status === "clarify") {
+                const options = routed.options.slice(0, 2);
+                pending = { kind: "choix", options, args: routed.args, ts: Date.now() };
+                const lignes = options.map((o, i) => `${i + 1}) ${o.label}`).join("\n");
+                return { handled: true, reply: { text: `Je ne suis pas sûr :\n${lignes}\nRépondez 1 ou 2.` } };
+            }
             if (routed.status === "unavailable") {
                 return { handled: true, reply: { text: "Routeur local indisponible, réessayez dans un instant." } };
             }

@@ -1183,3 +1183,79 @@ describe("before_agent_reply — /cron", () => {
     expect(r.reply.text).toMatch(/^Tâche à créer/);
   });
 });
+
+describe("before_agent_reply — demande de précision", () => {
+  function routerClarify() {
+    vi.stubGlobal("fetch", vi.fn(async (_u: any, init: any) => {
+      const msg = JSON.parse(init.body).message;
+      if (msg === "le dernier mail de ma sœur") {
+        return { ok: true, json: async () => ({ status: "clarify", args: msg, options: [
+          { command: "/lire", label: "lire un email précis (identifiant, le dernier reçu)" },
+          { command: null, label: "rien de tout ça" }] }) };
+      }
+      return { ok: true, json: async () => ({ status: "no_match" }) };
+    }));
+  }
+
+  it("propose les deux options numérotées", async () => {
+    routerClarify();
+    const plugin = await freshPlugin(); const { api, hooks } = makeApi(); plugin.register(api);
+    const r = await hooks["before_agent_reply"].handler({ cleanedBody: "le dernier mail de ma sœur" }, {});
+    expect(r.reply.text).toBe("Je ne suis pas sûr :\n1) lire un email précis (identifiant, le dernier reçu)\n2) rien de tout ça\nRépondez 1 ou 2.");
+  });
+
+  it("« 1 » exécute la commande avec le message d'origine", async () => {
+    routerClarify();
+    const plugin = await freshPlugin(); const { api, hooks, run } = makeApi(); plugin.register(api);
+    await hooks["before_agent_reply"].handler({ cleanedBody: "le dernier mail de ma sœur" }, {});
+    await hooks["before_agent_reply"].handler({ cleanedBody: "1" }, {});
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(run.mock.calls[0][0].message).toContain("le dernier mail de ma sœur");
+  });
+
+  it("« 2 » = rien de tout ça : réponse de non-correspondance", async () => {
+    routerClarify();
+    const plugin = await freshPlugin(); const { api, hooks, run } = makeApi(); plugin.register(api);
+    await hooks["before_agent_reply"].handler({ cleanedBody: "le dernier mail de ma sœur" }, {});
+    const r = await hooks["before_agent_reply"].handler({ cleanedBody: "2" }, {});
+    expect(r.reply.text).toMatch(/^Je n'ai pas cette information/);
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it("un autre message annule le choix et est traité normalement", async () => {
+    routerClarify();
+    const plugin = await freshPlugin(); const { api, hooks } = makeApi(); plugin.register(api);
+    await hooks["before_agent_reply"].handler({ cleanedBody: "le dernier mail de ma sœur" }, {});
+    const r = await hooks["before_agent_reply"].handler({ cleanedBody: "bonjour" }, {});
+    expect(r.reply.text).toMatch(/^Je n'ai pas cette information/);
+    const r2 = await hooks["before_agent_reply"].handler({ cleanedBody: "1" }, {});
+    expect(r2.reply.text).toMatch(/^Je n'ai pas cette information/); // « 1 » n'est plus un choix
+  });
+
+  it("« 1 » sans choix en attente : message ordinaire", async () => {
+    routerClarify();
+    const plugin = await freshPlugin(); const { api, hooks, run } = makeApi(); plugin.register(api);
+    const r = await hooks["before_agent_reply"].handler({ cleanedBody: "1" }, {});
+    expect(r.reply.text).toMatch(/^Je n'ai pas cette information/);
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it("choix expiré après 10 min", async () => {
+    vi.useFakeTimers();
+    routerClarify();
+    const plugin = await freshPlugin(); const { api, hooks, run } = makeApi(); plugin.register(api);
+    await hooks["before_agent_reply"].handler({ cleanedBody: "le dernier mail de ma sœur" }, {});
+    vi.advanceTimersByTime(11 * 60 * 1000);
+    await hooks["before_agent_reply"].handler({ cleanedBody: "1" }, {});
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it("/confirm pendant un choix : rien n'est exécuté", async () => {
+    routerClarify();
+    const plugin = await freshPlugin(); const { api, hooks, run } = makeApi(); plugin.register(api);
+    await hooks["before_agent_reply"].handler({ cleanedBody: "le dernier mail de ma sœur" }, {});
+    const r = await hooks["before_agent_reply"].handler({ cleanedBody: "/confirm" }, {});
+    expect(r.reply.text).toBe("Rien à confirmer : répondez 1 ou 2 au choix proposé.");
+    expect(run).not.toHaveBeenCalled();
+  });
+});
