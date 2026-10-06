@@ -197,10 +197,3 @@ def test_aucune_question_ne_depasse_le_budget_laya():
     for q in QUESTIONS.values():
         assert sum(len(f"{k}: {v}".split()) for k, v in q["criteria"].items()) < 120
 
-
-def test_planification_detectee_avant_laya(monkeypatch):
-    # 2026-10-06 : « rappelez-moi dans 3 minutes… » classé hors périmètre par Laya ;
-    # une planification se reconnaît à sa forme, sans classifieur.
-    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([(None, 1.0)]))
-    r = router_server.route_message("rappelez-moi dans 3 minutes de boire un verre d'eau")
-    assert r == {"status": "ok", "command": "/cron", "args": "rappelez-moi dans 3 minutes de boire un verre d'eau"}

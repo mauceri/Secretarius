@@ -3,14 +3,11 @@
 """Service HTTP du routeur Tiron : POST /route {message} -> {status, command, args}."""
 import json
 import os
-from datetime import datetime
-from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from router_service.router import WIKI_CMDS, GOG_CMDS, CRON_CMDS, LIBELLES, embed_bge_m3
 from router_service.faq import FaqIndex, FAQ_PATH
 from router_service.laya_classifier import LayaClassifier
-from tiron_cron.nl import detecter_planification
 
 LAYA_CHECKPOINT = os.environ["LAYA_CHECKPOINT"]
 # Confiance jointe (domaine × commande) au-dessous de laquelle Tiron demande
@@ -40,10 +37,6 @@ def route_message(message: str) -> dict:
             if cmd in NEEDS_ARG and not args.strip():
                 return {"status": "answer", "reply": f"Usage : {cmd} <argument>"}
             return {"status": "ok", "command": cmd, "args": args}
-    # Planification reconnue à sa forme, avant tout classifieur (2026-10-06 :
-    # « rappelez-moi dans 3 minutes… » était classé hors périmètre par Laya).
-    if not stripped.startswith("/") and detecter_planification(stripped, datetime.now(ZoneInfo("Europe/Paris"))):
-        return {"status": "ok", "command": "/cron", "args": message}
     if _faq is not None and not message.lstrip().startswith("/"):
         try:
             entry = _faq.lookup(message)
