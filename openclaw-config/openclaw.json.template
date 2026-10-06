@@ -152,7 +152,8 @@
       ],
       "env": {
        "WIKI_PATH": "/Wiki_LM",
-       "WIKI_LLM_BACKEND": "openai",
+       "WIKI_LLM_BACKEND": "ollama",
+       "OLLAMA_MODEL": "qwen3:8b",
        "OPENAI_BASE_URL": "https://api.infomaniak.com/2/ai/${INFOMANIAK_PRODUCT_ID}/openai/v1",
        "OPENAI_API_KEY_FILE": "/run/infomaniak-key",
        "OPENAI_MODEL": "mistralai/Mistral-Small-4-119B-2603",
