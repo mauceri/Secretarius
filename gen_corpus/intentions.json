@@ -2,7 +2,7 @@
   {"intention": "wiki_capture",   "command": "/c",          "variantes": ["url_avec_tags","url_seule","note_sans_url","avec_directive_simple","avec_ref","avec_fichier"]},
   {"intention": "wiki_ingest",    "command": "/ingest",     "variantes": ["sans_args"]},
   {"intention": "wiki_status",    "command": "/wikistatus", "variantes": ["sans_args"]},
-  {"intention": "wiki_query",     "command": "/q",          "variantes": ["question_courte","question_longue"]},
+  {"intention": "wiki_query",     "command": "/q",          "variantes": ["question_courte","question_longue","question_culture_generale"]},
   {"intention": "source_read",    "command": "/source",     "variantes": ["url_seule","url_avec_consigne"]},
   {"intention": "gog_search",     "command": "/chercher",   "variantes": ["par_mot_cle","par_expediteur","par_periode"]},
   {"intention": "gog_connect",    "command": "/connecter",  "variantes": ["sans_args"]},
@@ -16,5 +16,5 @@
   {"intention": "wiki_reread",    "command": "/relire",     "variantes": ["sans_args"]},
   {"intention": "wiki_verify",    "command": "/verifie",    "variantes": ["avec_slug"]},
   {"intention": "cron_schedule",  "command": "/cron",       "variantes": ["rappel_recurrent","rappel_ponctuel_date","rappel_relatif","commande_recurrente","consigne_recurrente","avec_canal"]},
-  {"intention": "out_of_scope",   "command": null,          "variantes": ["action_impossible","envoi_mail_nouveau","agenda","aide_generale","conversation_libre"]}
+  {"intention": "out_of_scope",   "command": null,          "variantes": ["action_impossible","envoi_mail_nouveau","agenda","achat_reservation","domotique","conversation_libre"]}
 ]

@@ -122,3 +122,19 @@ def test_lire_un_mail_le_designe_sans_sujet():
         assert "sujet :" not in c and "désignation du mail :" in c
         vus.add(c.split("désignation du mail : ")[1].split(" ;")[0])
     assert any("identifiant" in v for v in vus) and any("dernier" in v for v in vus)
+
+
+def test_culture_generale_releve_de_q():
+    # Spec 2026-10-06 : une question de connaissance va vers /q ; le hors périmètre
+    # est réservé aux actions impossibles et à la conversation.
+    import json
+    from chaine import INTENTION_DESCRIPTIONS
+    assert "culture générale" in INTENTION_DESCRIPTIONS["wiki_query"]
+    assert "→ /q" in INTENTION_DESCRIPTIONS["out_of_scope"]
+    intents = {i["intention"]: i for i in json.load(open(Path(__file__).parent.parent / "intentions.json"))}
+    assert "question_culture_generale" in intents["wiki_query"]["variantes"]
+    assert "aide_generale" not in intents["out_of_scope"]["variantes"]
+    racine = Path(__file__).parent.parent
+    for f in ("prompt-init.txt", "GEPAPrompt.txt"):
+        assert "question de connaissance → /q" in (racine / f).read_text(encoding="utf-8"), f
+    assert "question de connaissance → /q" in (racine / "gepa_program.json").read_text(encoding="utf-8")
