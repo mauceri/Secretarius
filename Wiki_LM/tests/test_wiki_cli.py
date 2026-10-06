@@ -172,7 +172,7 @@ def test_switch_model_empty_arg_reports_current_status_without_writing(monkeypat
         "model": "deepseek-v4-flash",
         "base_url": "https://api.deepseek.com/v1",
         "alias": "deepseek",
-        "available": ["deepseek", "infomaniak", "obfusque"],
+        "available": ["deepseek", "infomaniak", "local", "obfusque"],
     }
     assert env_path.read_text(encoding="utf-8") == (
         "WIKI_LLM_BACKEND=openai\nOPENAI_MODEL=deepseek-v4-flash\n"
@@ -1043,3 +1043,25 @@ class TestOpReingest:
 
         assert "error" in out
         assert calls == []
+
+
+def test_switch_model_local_ecrit_les_variables_ollama(monkeypatch, tmp_path):
+    # Préférence de l'utilisateur (2026-10-06) : modèle local d'abord. Le moteur
+    # Ollama natif lit OLLAMA_MODEL/OLLAMA_BASE_URL (think:false indispensable
+    # pour Qwen3), pas les variables OPENAI_*.
+    wiki = _wiki(monkeypatch, tmp_path)
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "WIKI_LLM_BACKEND=openai\nOPENAI_MODEL=mistralai/Mistral-Small-4-119B-2603\n"
+        "OPENAI_BASE_URL=https://api.infomaniak.com/2/ai/109005/openai/v1\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(wiki, "_wiki_env_path", lambda: env_path)
+
+    wiki.op_switch_model("local")
+
+    content = env_path.read_text(encoding="utf-8")
+    assert "WIKI_LLM_BACKEND=ollama" in content
+    assert "OLLAMA_MODEL=qwen3:8b" in content
+    assert "OLLAMA_BASE_URL=http://localhost:11434" in content
+    assert wiki.op_switch_model("")["alias"] == "local"

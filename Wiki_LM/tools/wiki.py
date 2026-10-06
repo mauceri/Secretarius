@@ -153,7 +153,19 @@ MODEL_ALIASES: dict[str, dict[str, str]] = {
         "base_url": "http://127.0.0.1:8001/v1",
         "api_key_env": "",
     },
+    # Préférence de l'utilisateur (2026-10-06) : local > obfusqué > Infomaniak.
+    "local": {
+        "backend": "ollama",
+        "model": "qwen3:8b",
+        "base_url": "http://localhost:11434",
+        "api_key_env": "",
+    },
 }
+
+
+def _cles_env(backend: str) -> tuple[str, str]:
+    """Variables lues par le moteur : Ollama natif (OLLAMA_*) ou compatible OpenAI."""
+    return ("OLLAMA_MODEL", "OLLAMA_BASE_URL") if backend == "ollama" else ("OPENAI_MODEL", "OPENAI_BASE_URL")
 
 
 def _wiki_env_path() -> Path:
@@ -171,8 +183,9 @@ def _current_model_status() -> dict:
         return m.group(1) if m else ""
 
     backend = _read("WIKI_LLM_BACKEND")
-    model = _read("OPENAI_MODEL")
-    base_url = _read("OPENAI_BASE_URL")
+    cle_model, cle_url = _cles_env(backend)
+    model = _read(cle_model)
+    base_url = _read(cle_url)
     alias = next(
         (
             name for name, cfg in MODEL_ALIASES.items()
@@ -202,10 +215,11 @@ def op_switch_model(alias: str) -> dict:
         return {"error": f"{env_path} introuvable"}
 
     content = env_path.read_text(encoding="utf-8")
+    cle_model, cle_url = _cles_env(cfg["backend"])
     updates = {
         "WIKI_LLM_BACKEND": cfg["backend"],
-        "OPENAI_MODEL": cfg["model"],
-        "OPENAI_BASE_URL": cfg["base_url"],
+        cle_model: cfg["model"],
+        cle_url: cfg["base_url"],
     }
     for key, value in updates.items():
         pattern = re.compile(rf"^{key}=.*$", re.MULTILINE)
@@ -241,7 +255,7 @@ _HELP_TEXT = """\
 - **/supprimer! `<slug>`** — supprime réellement (déplace vers la poubelle), en cascade.
 - **/repair! `<famille>`** — applique réellement la réparation (`broken-link`, `missing-frontmatter`, `unlinked-mention` ou `unresolved-suggestion`). Sans argument : liste les familles disponibles.
 - **/reingerer! `<slug>`** — réingère réellement une page source : n'ajoute que les concepts/entités manquants (nouvelle page + lien), ne touche jamais au contenu déjà présent.
-- **/switch-wiki-model `<alias>`** — bascule le LLM du wiki (`deepseek`, `infomaniak`, `obfusque`). Sans argument : affiche le modèle actuel (lecture seule).
+- **/switch-wiki-model `<alias>`** — bascule le LLM du wiki (`local`, `obfusque`, `infomaniak`, `deepseek` — préférence dans cet ordre). Sans argument : affiche le modèle actuel (lecture seule).
 """
 
 
