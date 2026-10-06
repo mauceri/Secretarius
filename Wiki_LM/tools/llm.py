@@ -132,7 +132,9 @@ def _cle_pour(base_url: str) -> str:
     if "deepseek.com" in base_url:
         return _env("DEEPSEEK_API_KEY")
     if "infomaniak.com" in base_url:
-        return _env("INFOMANIAK_API_KEY")
+        # Hors bac à sable : INFOMANIAK_API_KEY ; dans le bac à sable wiki, la clé
+        # arrive dans OPENAI_API_KEY (lue depuis OPENAI_API_KEY_FILE).
+        return _env("INFOMANIAK_API_KEY") or _env("OPENAI_API_KEY")
     return _env("OPENAI_API_KEY", "ollama")
 
 

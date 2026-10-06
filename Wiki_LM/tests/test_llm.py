@@ -114,3 +114,15 @@ def test_cle_choisie_selon_l_adresse(monkeypatch, base_url, attendue):
     monkeypatch.setenv("OPENAI_BASE_URL", base_url)
     llm = LLM(backend="openai", model="m")
     assert llm._backend._client.api_key == attendue
+
+
+def test_bac_a_sable_cle_infomaniak_via_openai_api_key(monkeypatch):
+    # Dans le bac à sable wiki, la clé Infomaniak arrive dans OPENAI_API_KEY
+    # (lue depuis OPENAI_API_KEY_FILE) ; INFOMANIAK_API_KEY est absente. La clé
+    # DeepSeek, présente aussi, ne doit jamais partir chez Infomaniak.
+    monkeypatch.delenv("INFOMANIAK_API_KEY", raising=False)
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "clé-deepseek")
+    monkeypatch.setenv("OPENAI_API_KEY", "clé-infomaniak-du-fichier")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://api.infomaniak.com/2/ai/109005/openai/v1")
+    llm = LLM(backend="openai", model="m")
+    assert llm._backend._client.api_key == "clé-infomaniak-du-fichier"
