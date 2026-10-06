@@ -98,3 +98,19 @@ def test_openai_backend_base_url_explicite(monkeypatch):
                base_url="http://127.0.0.1:8001/v1", api_key="local")
     assert llm._backend.model == "qwen3-14b-h128-a1-h02"
     assert str(llm._backend._client.base_url).rstrip("/") == "http://127.0.0.1:8001/v1"
+
+
+@pytest.mark.parametrize("base_url,attendue", [
+    ("https://api.infomaniak.com/2/ai/109005/openai/v1", "clé-infomaniak"),
+    ("https://api.deepseek.com/v1", "clé-deepseek"),
+    ("http://127.0.0.1:8001/v1", "clé-openai"),
+])
+def test_cle_choisie_selon_l_adresse(monkeypatch, base_url, attendue):
+    # 2026-10-06 : la clé DeepSeek était envoyée à Infomaniak (401) — DeepSeek ne
+    # sert qu'à l'ingestion d'URL, sa clé ne doit jamais partir ailleurs.
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "clé-deepseek")
+    monkeypatch.setenv("INFOMANIAK_API_KEY", "clé-infomaniak")
+    monkeypatch.setenv("OPENAI_API_KEY", "clé-openai")
+    monkeypatch.setenv("OPENAI_BASE_URL", base_url)
+    llm = LLM(backend="openai", model="m")
+    assert llm._backend._client.api_key == attendue

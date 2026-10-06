@@ -125,17 +125,25 @@ class _OllamaBackend:
         return content
 
 
+def _cle_pour(base_url: str) -> str:
+    """Clé selon le fournisseur appelé : la clé DeepSeek ne part jamais ailleurs
+    que chez DeepSeek (2026-10-06 : elle était envoyée à Infomaniak → 401 ;
+    DeepSeek ne sert qu'à l'ingestion d'URL)."""
+    if "deepseek.com" in base_url:
+        return _env("DEEPSEEK_API_KEY")
+    if "infomaniak.com" in base_url:
+        return _env("INFOMANIAK_API_KEY")
+    return _env("OPENAI_API_KEY", "ollama")
+
+
 class _OpenAIBackend:
     def __init__(self, model: str, base_url: str = "", api_key: str = "") -> None:
         try:
             import openai
         except ImportError as e:
             raise ImportError("pip install openai") from e
-        api_key = api_key or _env("DEEPSEEK_API_KEY") or _env("OPENAI_API_KEY", "ollama")
-        self._client = openai.OpenAI(
-            api_key=api_key,
-            base_url=base_url or _env("OPENAI_BASE_URL", "http://localhost:11434/v1"),
-        )
+        base_url = base_url or _env("OPENAI_BASE_URL", "http://localhost:11434/v1")
+        self._client = openai.OpenAI(api_key=api_key or _cle_pour(base_url), base_url=base_url)
         self.model = model or _env("OPENAI_MODEL", "deepseek-v4-flash")
 
     def complete(self, messages: list[dict], system: str = "", max_tokens: int = 2048) -> str:
