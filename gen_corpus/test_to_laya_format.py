@@ -1,100 +1,63 @@
 import json
-from pathlib import Path
+from collections import Counter
 
-from gen_corpus.to_laya_format import COMMAND_CRITERIA, reformat
+import pytest
 
-
-def test_command_criteria_covers_all_router_commands():
-    from router_service.router import WIKI_CMDS, GOG_CMDS
-    known = WIKI_CMDS | GOG_CMDS | {"aucune"}
-    assert set(COMMAND_CRITERIA) == known
+from gen_corpus.to_laya_format import _to_laya_row, reformat
 
 
-def test_reformat_converts_one_example_with_command(tmp_path):
-    src = tmp_path / "corpus.jsonl"
-    src.write_text(json.dumps({
-        "messages": [
-            {"role": "system", "content": "ignoré"},
-            {"role": "user", "content": "cherche transformers dans le wiki"},
-            {"role": "assistant", "content": json.dumps(
-                {"command": "/r", "args": "transformers"})},
-        ]
-    }) + "\n", encoding="utf-8")
-    train_path = tmp_path / "train.jsonl"
-    val_path = tmp_path / "val.jsonl"
-
-    n_train, n_val = reformat(src, train_path, val_path, val_ratio=0.0)
-
-    assert n_train == 1
-    assert n_val == 0
-    row = json.loads(train_path.read_text(encoding="utf-8").strip())
-    assert row["state"] == "cherche transformers dans le wiki"
-    assert row["questions"]["command"]["type"] == "choice"
-    assert row["questions"]["command"]["criteria"] == COMMAND_CRITERIA
-    assert row["answers"]["command"] == "/r"
+def _ligne(text: str, command) -> str:
+    return json.dumps({"messages": [
+        {"role": "system", "content": "ignoré"},
+        {"role": "user", "content": text},
+        {"role": "assistant", "content": json.dumps({"command": command, "args": ""})},
+    ]})
 
 
-def test_reformat_converts_null_command_to_aucune(tmp_path):
-    src = tmp_path / "corpus.jsonl"
-    src.write_text(json.dumps({
-        "messages": [
-            {"role": "system", "content": "ignoré"},
-            {"role": "user", "content": "il fait beau aujourd'hui"},
-            {"role": "assistant", "content": json.dumps(
-                {"command": None, "args": ""})},
-        ]
-    }) + "\n", encoding="utf-8")
-    train_path = tmp_path / "train.jsonl"
-    val_path = tmp_path / "val.jsonl"
-
-    reformat(src, train_path, val_path, val_ratio=0.0)
-
-    row = json.loads(train_path.read_text(encoding="utf-8").strip())
-    assert row["answers"]["command"] == "aucune"
+def test_ligne_wiki_porte_deux_questions():
+    r = _to_laya_row("c koi SPLADE ?", "/q")
+    assert set(r["questions"]) == {"domaine", "commande_wiki"}
+    assert r["answers"] == {"domaine": "wiki", "commande_wiki": "/q"}
 
 
-def test_reformat_deduplicates_state_before_split(tmp_path):
-    src = tmp_path / "corpus.jsonl"
-    line = json.dumps({
-        "messages": [
-            {"role": "system", "content": "ignoré"},
-            {"role": "user", "content": "cherche transformers dans le wiki"},
-            {"role": "assistant", "content": json.dumps(
-                {"command": "/r", "args": "transformers"})},
-        ]
-    })
-    src.write_text((line + "\n") * 2, encoding="utf-8")
-    train_path = tmp_path / "train.jsonl"
-    val_path = tmp_path / "val.jsonl"
+def test_ligne_google_porte_deux_questions():
+    r = _to_laya_row("lis le mail 18ab3f2", "/lire")
+    assert r["answers"] == {"domaine": "google", "commande_google": "/lire"}
 
-    n_train, n_val = reformat(src, train_path, val_path, val_ratio=0.5, seed=0)
 
+def test_ligne_planification_web_et_aucune_une_seule_question():
+    assert _to_laya_row("rappel 8h", "/cron")["answers"] == {"domaine": "planification"}
+    assert _to_laya_row("lis https://x.fr", "/source")["answers"] == {"domaine": "web"}
+    assert _to_laya_row("allume la lumière", "aucune")["answers"] == {"domaine": "aucune"}
+
+
+def test_commande_hors_mapping_rejetee():
+    with pytest.raises(KeyError):
+        _to_laya_row("cherche X", "/r")
+
+
+def test_commande_null_devient_aucune(tmp_path):
+    src = tmp_path / "c.jsonl"
+    src.write_text(_ligne("il fait beau aujourd'hui", None) + "\n", encoding="utf-8")
+    reformat(src, tmp_path / "t.jsonl", tmp_path / "v.jsonl")
+    rows = [json.loads(l) for f in ("t.jsonl", "v.jsonl") for l in open(tmp_path / f) if l.strip()]
+    assert rows[0]["answers"] == {"domaine": "aucune"}
+
+
+def test_deduplication_avant_decoupage(tmp_path):
+    src = tmp_path / "c.jsonl"
+    src.write_text((_ligne("cherche transformers dans le wiki", "/q") + "\n") * 2, encoding="utf-8")
+    n_train, n_val = reformat(src, tmp_path / "t.jsonl", tmp_path / "v.jsonl")
     assert n_train + n_val == 1
 
 
-def test_reformat_splits_train_and_val_deterministically(tmp_path):
-    src = tmp_path / "corpus.jsonl"
-    lines = []
-    for i in range(20):
-        lines.append(json.dumps({
-            "messages": [
-                {"role": "system", "content": "ignoré"},
-                {"role": "user", "content": f"message {i}"},
-                {"role": "assistant", "content": json.dumps(
-                    {"command": "/q", "args": f"message {i}"})},
-            ]
-        }))
-    src.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    train_path = tmp_path / "train.jsonl"
-    val_path = tmp_path / "val.jsonl"
-
-    n_train, n_val = reformat(src, train_path, val_path, val_ratio=0.2, seed=0)
-
-    assert n_train == 16
-    assert n_val == 4
-    # déterministe : un deuxième run avec la même seed donne la même coupe
-    train_path2 = tmp_path / "train2.jsonl"
-    val_path2 = tmp_path / "val2.jsonl"
-    reformat(src, train_path2, val_path2, val_ratio=0.2, seed=0)
-    assert train_path.read_text() == train_path2.read_text()
-    assert val_path.read_text() == val_path2.read_text()
+def test_validation_stratifiee_et_deterministe(tmp_path):
+    src = tmp_path / "c.jsonl"
+    lignes = [_ligne(f"{cmd} msg {i}", cmd) for cmd, n in (("/q", 200), ("/cron", 100), ("/lire", 20))
+              for i in range(n)]
+    src.write_text("\n".join(lignes) + "\n", encoding="utf-8")
+    reformat(src, tmp_path / "t.jsonl", tmp_path / "v.jsonl")
+    val = Counter(json.loads(l)["state"].split()[0] for l in open(tmp_path / "v.jsonl"))
+    assert val == {"/q": 40, "/cron": 25, "/lire": 5}
+    reformat(src, tmp_path / "t2.jsonl", tmp_path / "v2.jsonl")
+    assert (tmp_path / "v.jsonl").read_text() == (tmp_path / "v2.jsonl").read_text()

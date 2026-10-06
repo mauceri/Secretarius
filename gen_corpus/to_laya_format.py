@@ -1,7 +1,8 @@
-"""Reformate gen_corpus/corpus_lora_train.jsonl (ChatML) vers le schéma Laya
-(state/questions/answers) — cf. docs/superpowers/specs/2026-09-28-routeur-laya-design.md.
-Aucune collecte de données neuve : seule la mise en forme change, et
-`args` du corpus d'origine n'est pas repris (le routeur n'en génère plus)."""
+"""Reformate gen_corpus/corpus_lora_train.jsonl (ChatML) vers le schéma Laya à deux
+niveaux : question `domaine`, plus `commande_<domaine>` pour wiki et google
+(cf. docs/superpowers/specs/2026-10-06-routage-deux-niveaux-design.md). La validation
+est stratifiée par commande : min(40, n // 4) exemples par commande. `args` du corpus
+d'origine n'est pas repris (le routeur n'en génère plus)."""
 from __future__ import annotations
 
 import json
@@ -14,7 +15,7 @@ from pathlib import Path
 # introuvable).
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from router_service.router import COMMAND_CRITERIA, _INSTRUCTIONS  # noqa: E402
+from router_service.router import DOMAINE_DE, QUESTIONS  # noqa: E402
 
 
 def _iter_examples(path: Path):
@@ -31,50 +32,36 @@ def _iter_examples(path: Path):
 
 
 def _to_laya_row(user_text: str, command: str) -> dict:
-    return {
-        "state": user_text,
-        "questions": {
-            "command": {
-                "type": "choice",
-                "instructions": _INSTRUCTIONS,
-                "criteria": COMMAND_CRITERIA,
-            }
-        },
-        "answers": {"command": command},
-    }
+    domaine = "aucune" if command == "aucune" else DOMAINE_DE[command]  # KeyError si commande inconnue
+    questions = {"domaine": QUESTIONS["domaine"]}
+    answers = {"domaine": domaine}
+    if f"commande_{domaine}" in QUESTIONS:
+        questions[f"commande_{domaine}"] = QUESTIONS[f"commande_{domaine}"]
+        answers[f"commande_{domaine}"] = command
+    return {"state": user_text, "questions": questions, "answers": answers}
 
 
-def reformat(
-    input_path: Path,
-    train_path: Path,
-    val_path: Path,
-    val_ratio: float = 0.15,
-    seed: int = 0,
-) -> tuple[int, int]:
-    rows = [_to_laya_row(text, cmd) for text, cmd in _iter_examples(Path(input_path))]
+def reformat(input_path: Path, train_path: Path, val_path: Path, seed: int = 0) -> tuple[int, int]:
     seen_states: set[str] = set()
-    deduped_rows = []
-    for row in rows:
-        if row["state"] in seen_states:
+    groupes: dict[str, list[dict]] = {}
+    for text, cmd in _iter_examples(Path(input_path)):
+        if text in seen_states:
             continue
-        seen_states.add(row["state"])
-        deduped_rows.append(row)
-    rows = deduped_rows
+        seen_states.add(text)
+        groupes.setdefault(cmd, []).append(_to_laya_row(text, cmd))
 
     rng = random.Random(seed)
-    indices = list(range(len(rows)))
-    rng.shuffle(indices)
-    n_val = round(len(rows) * val_ratio)
-    val_indices = set(indices[:n_val])
-
-    train_lines = []
-    val_lines = []
-    for i, row in enumerate(rows):
-        line = json.dumps(row, ensure_ascii=False)
-        if i in val_indices:
-            val_lines.append(line)
-        else:
-            train_lines.append(line)
+    train_lines: list[str] = []
+    val_lines: list[str] = []
+    for cmd in sorted(groupes):
+        rows = groupes[cmd]
+        idx = list(range(len(rows)))
+        rng.shuffle(idx)
+        n_val = min(40, len(rows) // 4)
+        for k, i in enumerate(idx):
+            (val_lines if k < n_val else train_lines).append(json.dumps(rows[i], ensure_ascii=False))
+    rng.shuffle(train_lines)
+    rng.shuffle(val_lines)
 
     Path(train_path).write_text(
         ("\n".join(train_lines) + "\n") if train_lines else "", encoding="utf-8"
