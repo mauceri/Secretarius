@@ -103,10 +103,34 @@ def _install_faq(tmp_path):
     router_server._faq = FaqIndex(_stub_embed, path=p, seuil=0.6)
 
 
-def test_route_faq_dabord(tmp_path):
+class _Fake:
+    def __init__(self, ranking):
+        self.ranking = ranking
+
+    def classer(self, message):
+        return self.ranking
+
+
+def test_route_faq_quand_laya_dit_aucune(tmp_path, monkeypatch):
     _install_faq(tmp_path)
+    monkeypatch.setattr(router_server, "_classifier", _Fake([(None, 0.9), ("/q", 0.1)]))
     r = router_server.route_message("parle-moi du perroquet")
     assert r == {"status": "answer", "reply": "Coco."}
+
+
+def test_route_commande_laya_passe_avant_la_faq(tmp_path, monkeypatch):
+    # 2026-10-06 : « Ai-je reçu un mail de Paul sur le chantier ? » capté par la FAQ
+    # avant Laya. La FAQ ne sert plus que lorsque Laya ne reconnaît aucune commande.
+    _install_faq(tmp_path)
+    monkeypatch.setattr(router_server, "_classifier", _Fake([("/chercher", 0.9), (None, 0.1)]))
+    r = router_server.route_message("parle-moi du perroquet")
+    assert r == {"status": "ok", "command": "/chercher", "args": "parle-moi du perroquet"}
+
+
+def test_route_hesitation_laya_pas_de_faq(tmp_path, monkeypatch):
+    _install_faq(tmp_path)
+    monkeypatch.setattr(router_server, "_classifier", _Fake([(None, 0.5), ("/q", 0.4)]))
+    assert router_server.route_message("parle-moi du perroquet")["status"] == "clarify"
 
 
 def test_route_slash_court_circuite_faq(tmp_path):

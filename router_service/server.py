@@ -24,6 +24,17 @@ _classifier = None  # chargé au démarrage (Step 5)
 _faq = None         # FaqIndex, chargé au démarrage
 
 
+def _faq_ou_no_match(message: str) -> dict:
+    if _faq is not None and not message.lstrip().startswith("/"):
+        try:
+            entry = _faq.lookup(message)
+        except Exception:
+            entry = None
+        if entry is not None:
+            return {"status": "answer", "reply": entry["answer"]}
+    return {"status": "no_match"}
+
+
 def route_message(message: str) -> dict:
     # Commande explicite (l'utilisateur a tapé /c, /q, …) : honorée telle quelle,
     # jamais soumise à Laya. Le routeur ne classe que le texte libre ; re-classer
@@ -37,21 +48,13 @@ def route_message(message: str) -> dict:
             if cmd in NEEDS_ARG and not args.strip():
                 return {"status": "answer", "reply": f"Usage : {cmd} <argument>"}
             return {"status": "ok", "command": cmd, "args": args}
-    if _faq is not None and not message.lstrip().startswith("/"):
-        try:
-            entry = _faq.lookup(message)
-        except Exception:
-            entry = None
-        if entry is not None:
-            return {"status": "answer", "reply": entry["answer"]}
-
-    if _classifier is None:
-        return {"status": "no_match"}
-    ranking = _classifier.classer(message)
+    # Laya d'abord : la FAQ ne répond que lorsqu'aucune commande ne correspond
+    # (2026-10-06 : la FAQ, consultée avant Laya, captait de vraies demandes).
+    ranking = _classifier.classer(message) if _classifier is not None else [(None, 1.0)]
     command, p = ranking[0]
     if p >= SEUIL:
         if command is None:
-            return {"status": "no_match"}
+            return _faq_ou_no_match(message)
         # args : jamais généré, toujours le message brut (décision du 2026-09-28).
         return {"status": "ok", "command": command, "args": message}
     options = [{"command": c, "label": LIBELLES[c]} for c, _ in ranking[:2]]
