@@ -67,30 +67,3 @@ def test_tous_les_soirs_et_heure_sans_a():
     assert parse_nl("tous les soirs à 21h rappel pilulier", NOW).quand == "0 21 * * *"
     assert parse_nl("demain 9h rappelle-moi le garagiste", NOW).quand == "2026-10-03T09:00"
 
-
-@pytest.mark.parametrize("text", [
-    "rappelez-moi demain à 9h d'appeler le garagiste",
-    "dans 20 min : sortir le gâteau",
-    "chaque lundi à 8h donne-moi l'état du wiki",
-    "tous les soirs à 21h rappel pilulier par sms",
-    "demain 9h rappelle garagiste",
-    "n'oublie pas de me rappeler le loyer",
-])
-def test_detecte_une_planification(text):
-    from tiron_cron.nl import detecter_planification
-    assert detecter_planification(text, NOW)
-
-
-@pytest.mark.parametrize("text", [
-    "c koi le SPLADE déjà",
-    "où en est le wiki ?",
-    "lis le mail 18ab3f2",
-    "c koi mon rdv demain à 9h ?",
-    "efface c-domestication-des-chiens",
-    "garde ça https://arxiv.org/abs/2401.01234",
-    "rappelle moi ce que j'ai noté sur la domestication du chien",
-    "rappelle-moi qui a écrit l'Éthique",
-])
-def test_ne_detecte_pas_le_reste(text):
-    from tiron_cron.nl import detecter_planification
-    assert not detecter_planification(text, NOW)

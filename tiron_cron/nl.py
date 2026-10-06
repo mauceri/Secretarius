@@ -29,9 +29,6 @@ _TIRON = re.compile(r"^\s*tiron\s*[,:]?\s*", _I)
 _VERBE = (r"(?:rap{1,2}el{1,2}(?:e|es|ez|er)?[- ]?(?:moi|nous)"
           r"|pense[rsz]?\s+à\s+me\s+(?:dire|rappeler)"
           r"|n['’]oublie\s+pas\s+de\s+me\s+(?:dire|rappeler))")
-_VERBE_PARTOUT = re.compile(r"\b" + _VERBE, _I)
-# « rappelle-moi ce que j'ai noté… » = « redis-moi », une question, pas un rappel.
-_REDIS_MOI = re.compile(r"\b" + _VERBE + r"\s*(?:ce\s+qu|qui\b|quand\b|comment\b|où\b|combien\b|pourquoi\b|quel)", _I)
 _RAPPEL = re.compile(r"^\s*(?:" + _VERBE + r"|rap{1,2}el\b)\s*(?:de\s+|d'|que\s+|qu'|:\s*)?", _I)
 _CMD = re.compile(r"(?<!\S)(/[a-z]+)\b")
 
@@ -102,13 +99,3 @@ def parse_nl(text: str, now: datetime) -> Job | None:
     contenu = _nettoie(contenu)
     return Job(kind, quand, canal, type_, contenu) if contenu else None
 
-
-def detecter_planification(text: str, now: datetime) -> bool:
-    """Reconnaît une demande de planification à sa forme (verbe de rappel, ou
-    moment reconnu dans une phrase qui n'est pas une question), sans
-    classifieur. Une détection abusive reste sans effet : aperçu + /confirm."""
-    if _VERBE_PARTOUT.search(text) and not _REDIS_MOI.search(text):
-        return True
-    if text.rstrip().endswith("?"):
-        return False
-    return _quand(text, now) is not None
