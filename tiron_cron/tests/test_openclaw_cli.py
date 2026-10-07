@@ -40,6 +40,18 @@ def test_consigne_va_a_main_en_session_isolee():
     assert _opt(argv, "--message") == "résume le wiki" and "--command-argv" not in argv
 
 
+def test_consigne_en_contexte_allege_sans_raisonnement():
+    # Essai du 2026-10-07 : ~20 s gagnées avec qwen3:8b sur le processeur.
+    argv = build_add_argv(Job("cron", "0 18 * * 5", None, "consigne", "résume le wiki"),
+                          "telegram", "UTC", ENV, "tiron:1")
+    assert "--light-context" in argv and _opt(argv, "--thinking") == "off"
+
+
+def test_rappel_sans_options_d_agent():
+    argv = build_add_argv(Job("at", "20m", None, "rappel", "x"), "telegram", "UTC", ENV, "tiron:1")
+    assert "--light-context" not in argv and "--thinking" not in argv
+
+
 def test_commande_va_a_main():
     argv = build_add_argv(Job("cron", "0 8 * * 1", None, "commande", "/wikistatus"),
                           "telegram", "UTC", ENV, "tiron:1")

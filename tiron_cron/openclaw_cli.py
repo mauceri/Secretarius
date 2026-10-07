@@ -50,7 +50,11 @@ def build_add_argv(job: Job, canal: str | None, tz: str, env: Mapping[str, str],
     if job.type == "rappel":
         # « Rappel : » pour qu'on le reconnaisse au premier coup d'œil (2026-10-06).
         return argv + ["--command-argv", json.dumps(["printf", "%s\n", f"Rappel : {job.contenu}"])] + delivery
-    return argv + ["--agent", "main", "--session", "isolated", "--message", job.contenu] + delivery
+    # Contexte allégé et raisonnement coupé : ~20 s gagnées avec qwen3:8b sur le
+    # processeur (essai du 2026-10-07). Sans effet pour une commande, que le hook
+    # de derisk-deleg traite avant le modèle.
+    return argv + ["--agent", "main", "--session", "isolated", "--light-context",
+                   "--thinking", "off", "--message", job.contenu] + delivery
 
 
 def _run(argv: list[str], runner) -> str:
