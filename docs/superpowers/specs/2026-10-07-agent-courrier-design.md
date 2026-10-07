@@ -135,6 +135,38 @@ Ces commandes s'utilisent tapées : aucun ajout au corpus de Laya.
   de commande.
 - Passe par wiki-lm-server (`_RUN_OPS`), qui appelle `tiron_mail`, comme `cron?` et `cron!`.
 
+### Livraisons vers Obsidian (décision du 2026-10-07)
+
+L'utilisateur trouve Obsidian plus naturel que Telegram. Le **contenu** produit
+périodiquement est donc livré dans le coffre ; Telegram sert à **prévenir**.
+
+- **Dossier de réception** `Secretarius/Réception/` dans le coffre : une note par
+  livraison. En-tête : origine (courrier, cron, lettre d'information, veille), date, tâche
+  d'origine.
+- **Écriture par wiki-lm-server**, qui reçoit :
+  - les résultats des tâches `/cron`, par l'option `--webhook` d'OpenClaw ;
+  - les récapitulatifs de la relève de courrier.
+
+  Une note par livraison plutôt qu'un ajout dans une note existante : on évite ainsi les
+  conflits de synchronisation quand une note est modifiée sur un autre appareil.
+- **Tâche créée depuis une note** (bloc `cron!`) : la note d'origine reçoit sous le bloc
+  un lien vers ses livraisons, comme les réponses écrites sous les blocs `wiki`.
+- **Notification** : chaque nouvelle livraison déclenche un court message Telegram, par
+  exemple « Nouvelle livraison dans Obsidian : Courrier du 07/10 (3 messages) ». Le
+  réglage du son revient à l'utilisateur, sur Android et sa montre. Le SMS prendra le
+  relais plus tard pour les alertes sonores.
+
+| Livraison | Destination par défaut |
+|---|---|
+| Rappels `/cron` | Telegram (prévenir à l'heure) |
+| Résultats de commandes et de consignes `/cron` | Obsidian, plus notification Telegram |
+| Récapitulatif de la relève des boîtes de l'utilisateur | Obsidian, plus notification Telegram |
+| Lettres d'information (expéditeurs listés par l'utilisateur) | Obsidian (une note chacune, contenu non fiable, texte seul), plus notification |
+| Veilles (plus tard) | Obsidian, plus notification |
+| Avis de sécurité (courriel refusé par la relève de tiron@…) | Telegram |
+
+Le canal reste précisable : `/cron add … telegram consigne …`, ou `obsidian` pour un rappel.
+
 ### Interblocage de la voie `main`
 
 Il faut le corriger pour gog, qui garde l'agenda et Drive. La voie à retenir est à
@@ -172,11 +204,14 @@ sur la voie de `main`, ou lancer les sous-agents sur leur propre voie.
 1. Correction de l'interblocage de la voie `main` (gog : agenda, Drive).
 2. `tiron_mail` et les commandes Telegram : Gmail d'abord ; Proton dès que le Bridge est
    installé (connexion initiale avec l'utilisateur, double authentification).
-3. Blocs Obsidian `mail?` / `mail!`.
+3. Livraisons vers Obsidian (`Réception/`, webhook des tâches `/cron`, notification Telegram), puis blocs Obsidian `mail?` / `mail!`.
 4. Relève de tiron@secretarius.co.
 5. Agent « consignes », puis bascule des consignes `/cron` vers lui.
 
 ## Hors périmètre
+
+- Extension Chrome de capture d'URL depuis le navigateur (même point d'entrée `/capture` que le plugin Obsidian) : chantier à venir.
+- Notifications sonores par SMS : après l'installation du canal SMS.
 
 - Conversation par courriel avec Tiron (réponses par courriel aux instructions).
 - Agenda hors gog (en attente d'une API calendrier chez Proton) ; Lumo à surveiller pour
