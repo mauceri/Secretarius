@@ -50,6 +50,7 @@ function makeApi(overrides: {
       hooks[event] = { handler, opts };
     },
     runtime: { subagent: { run, waitForRun, getSessionMessages } },
+    config: { agents: { entries: { gog: { sandbox: { docker: { env: { GOG_ACCOUNT: "test@gmail.com" } } } } } } },
   };
   return { api, tools, hooks, run, waitForRun, getSessionMessages };
 }
@@ -81,6 +82,7 @@ afterEach(() => {
   vi.useRealTimers();
   vi.doUnmock("./wiki-ops.js");
   vi.doUnmock("./cron-ops.js");
+  vi.doUnmock("./gog-ops.js");
 });
 
 describe("outils gog_* — délégation au sous-agent gog", () => {
@@ -133,15 +135,18 @@ describe("outils gog_* — délégation au sous-agent gog", () => {
     expect(message).toBe("op: get | 18ab");
   });
 
-  it("gog_drive_search délègue op:drive_search", async () => {
+  it("gog_drive_search appelle gog directement, sans sous-agent", async () => {
+    const gogDriveSearch = vi.fn(async () => "1. rapport");
+    vi.doMock("./gog-ops.js", () => ({ gogDriveSearch, gogAuthStart: vi.fn() }));
     const plugin = await freshPlugin();
     const { api, tools, run } = makeApi();
     plugin.register(api);
 
-    await tools["gog_drive_search"].execute("id", { command: "rapport 2026" });
+    const r = await tools["gog_drive_search"].execute("id", { command: "rapport 2026" });
 
-    const [{ message }] = run.mock.calls[0];
-    expect(message).toBe("op: drive_search | rapport 2026");
+    expect(gogDriveSearch).toHaveBeenCalledWith(api, "rapport 2026");
+    expect(r.content[0].text).toBe("1. rapport");
+    expect(run).not.toHaveBeenCalled();
   });
 
   it("un run non 'ok' préfixe la réponse par (run <status>)", async () => {
@@ -1342,5 +1347,28 @@ describe("before_agent_reply — demande de précision", () => {
       await hooks["before_agent_reply"].handler({ cleanedBody: "bonjour" }, {});
       expect(JSON.parse(spy.mock.calls[1][1].body)).toEqual({ message: "bonjour", sans_faq: false });
     });
+  });
+
+  it("/drive tapé : appel direct de gog, sans sous-agent", async () => {
+    const gogDriveSearch = vi.fn(async () => "1. Thèse (12/09/2026)");
+    vi.doMock("./gog-ops.js", () => ({ gogDriveSearch, gogAuthStart: vi.fn() }));
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ status: "ok", command: "/drive", args: "thèse" }) })));
+    const plugin = await freshPlugin(); const { api, hooks, run } = makeApi(); plugin.register(api);
+    const r = await hooks["before_agent_reply"].handler({ cleanedBody: "/drive thèse" }, {});
+    expect(r.reply.text).toBe("1. Thèse (12/09/2026)");
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it("/connecter : pont OAuth lancé directement avec le compte configuré", async () => {
+    const gogAuthStart = vi.fn(async () => ({ code: 0, stdout: "", stderr: "" }));
+    vi.doMock("./gog-ops.js", () => ({ gogDriveSearch: vi.fn(), gogAuthStart }));
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ status: "ok", command: "/connecter", args: "" }) })));
+    vi.mocked(existsSync).mockImplementation((p: any) => String(p).endsWith("auth_url"));
+    vi.mocked(readFileSync).mockReturnValue("https://accounts.google.com/o/oauth2/auth");
+    const plugin = await freshPlugin(); const { api, hooks, run } = makeApi(); plugin.register(api);
+    const r = await hooks["before_agent_reply"].handler({ cleanedBody: "/connecter" }, {});
+    expect(gogAuthStart).toHaveBeenCalledWith(api, "test@gmail.com");
+    expect(r.reply.text).toContain("https://accounts.google.com/o/oauth2/auth");
+    expect(run).not.toHaveBeenCalled();
   });
 });

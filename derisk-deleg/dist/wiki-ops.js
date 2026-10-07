@@ -18,21 +18,26 @@ const WIKI_SANDBOX_TIMEOUT_MS = 120000;
 // quel en args, ce qui exécute argv[0] avec argv[1..] comme arguments, sans
 // interpolation de texte dans le script (pas d'injection shell).
 export async function execWikiSandbox(api, argv) {
+    return execSandbox(api, WIKI_SANDBOX_SESSION_KEY, argv, undefined, "wiki");
+}
+// Même mécanisme pour tout agent à bac à sable (gog : 2026-10-07, pour éviter
+// les sous-agents lancés depuis le hook, qui se bloquent sur la voie « main »).
+// `script` facultatif : par défaut, argv exécuté tel quel ("$1" "$2" …).
+export async function execSandbox(api, sessionKey, argv, script, nom = "demandé") {
     try {
         const config = api?.config ?? api?.runtime?.config?.current?.();
         const ctx = await resolveSandboxContext({
             config,
-            sessionKey: WIKI_SANDBOX_SESSION_KEY,
+            sessionKey,
         });
         if (!ctx || !ctx.enabled || !ctx.backend) {
-            return { code: 1, stdout: "", stderr: "sandbox wiki indisponible" };
+            return { code: 1, stdout: "", stderr: `sandbox ${nom} indisponible` };
         }
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), WIKI_SANDBOX_TIMEOUT_MS);
         try {
-            const script = argv.map((_, i) => `"$${i + 1}"`).join(" ");
             const res = await ctx.backend.runShellCommand({
-                script,
+                script: script ?? argv.map((_, i) => `"$${i + 1}"`).join(" "),
                 args: argv,
                 allowFailure: true,
                 signal: controller.signal,

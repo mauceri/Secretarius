@@ -3,6 +3,7 @@ import { definePluginEntry } from "openclaw/plugin-sdk/core";
 import { parseReply } from "./parse.js";
 import { commandToAction } from "./dispatch.js";
 import { runTironCron } from "./cron-ops.js";
+import { gogAuthStart, gogDriveSearch } from "./gog-ops.js";
 import { CRON_COMMANDS, sansAvisSysteme, unwrapCronEnvelope } from "./cron-envelope.js";
 import { fetchWikiOpJson, runWikiOp } from "./wiki-ops.js";
 import { readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync, copyFileSync, mkdirSync } from "node:fs";
@@ -338,7 +339,7 @@ export default definePluginEntry({
         });
         api.registerTool({
             name: "gog_drive_search",
-            description: "Rechercher des fichiers Google Drive (délègue 'op: drive_search' à l'agent gog).",
+            description: "Rechercher des fichiers Google Drive (gog exécuté directement dans son conteneur).",
             parameters: Type.Object({
                 command: Type.Optional(Type.String({ description: "Requête Drive." })),
             }),
@@ -346,7 +347,7 @@ export default definePluginEntry({
                 const q = (params?.command ?? "").trim();
                 if (!q)
                     return { content: [{ type: "text", text: "Usage: /drive <requête>" }] };
-                const out = await delegateGog(api, "drive_search", q);
+                const out = await gogDriveSearch(api, q);
                 return { content: [{ type: "text", text: out.slice(0, 4000) }] };
             },
         });
@@ -400,48 +401,56 @@ export default definePluginEntry({
                 };
             },
         });
+        // Démarrage de l'autorisation Google, partagé par l'outil et par /connecter.
+        async function connecterGoogle() {
+            try {
+                rmSync(`${GOG_CFG}/auth_url`);
+            }
+            catch { }
+            try {
+                rmSync(`${GOG_CFG}/auth_response`);
+            }
+            catch { }
+            try {
+                rmSync(`${GOG_CFG}/auth_done`);
+            }
+            catch { }
+            const email = api?.config?.agents?.entries?.gog?.sandbox?.docker?.env?.GOG_ACCOUNT;
+            if (!email) {
+                return { content: [{ type: "text", text: "Compte Google non configuré (GOG_ACCOUNT de l'agent gog)." }] };
+            }
+            await gogAuthStart(api, email);
+            // Attendre que le bridge expose l'URL (poll court).
+            let url = "";
+            for (let i = 0; i < 60; i++) {
+                if (existsSync(`${GOG_CFG}/auth_url`)) {
+                    url = readFileSync(`${GOG_CFG}/auth_url`, "utf8").trim();
+                    if (url)
+                        break;
+                }
+                await new Promise((r) => setTimeout(r, 500));
+            }
+            if (!url) {
+                return { content: [{ type: "text", text: "Échec : URL d'autorisation non générée. Réessayez /connecter." }] };
+            }
+            pendingAuth = { ts: Date.now() };
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Pour connecter votre compte Google :\n1. Ouvrez ce lien et autorisez :\n${url}\n2. Recollez ici l'URL de redirection obtenue après autorisation.`,
+                    },
+                ],
+            };
+        }
         api.registerTool({
             name: "gog_connect_start",
-            description: "Démarre l'autorisation Google (délègue 'op: auth_start' à l'agent gog), puis renvoie l'URL d'autorisation à coller dans le navigateur.",
+            description: "Démarre l'autorisation Google (pont OAuth lancé directement dans le conteneur gog), puis renvoie l'URL d'autorisation à coller dans le navigateur.",
             parameters: Type.Object({
                 command: Type.Optional(Type.String({ description: "Inutilisé." })),
             }),
             async execute(_id, _params) {
-                try {
-                    rmSync(`${GOG_CFG}/auth_url`);
-                }
-                catch { }
-                try {
-                    rmSync(`${GOG_CFG}/auth_response`);
-                }
-                catch { }
-                try {
-                    rmSync(`${GOG_CFG}/auth_done`);
-                }
-                catch { }
-                await delegateGog(api, "auth_start", "");
-                // Attendre que le bridge expose l'URL (poll court).
-                let url = "";
-                for (let i = 0; i < 60; i++) {
-                    if (existsSync(`${GOG_CFG}/auth_url`)) {
-                        url = readFileSync(`${GOG_CFG}/auth_url`, "utf8").trim();
-                        if (url)
-                            break;
-                    }
-                    await new Promise((r) => setTimeout(r, 500));
-                }
-                if (!url) {
-                    return { content: [{ type: "text", text: "Échec : URL d'autorisation non générée. Réessayez /connecter." }] };
-                }
-                pendingAuth = { ts: Date.now() };
-                return {
-                    content: [
-                        {
-                            type: "text",
-                            text: `Pour connecter votre compte Google :\n1. Ouvrez ce lien et autorisez :\n${url}\n2. Recollez ici l'URL de redirection obtenue après autorisation.`,
-                        },
-                    ],
-                };
+                return connecterGoogle();
             },
         });
         // /confirm et /annuler : gérés au niveau MESSAGE (hook inbound_claim), AVANT
@@ -781,6 +790,14 @@ export default definePluginEntry({
             if (action.kind === "scout") {
                 const out = await delegateScout(api, routed.args.trim());
                 return { handled: true, reply: { text: out.slice(0, 4000) } };
+            }
+            if (action.kind === "gog" && action.op === "drive_search") {
+                const out = await gogDriveSearch(api, routed.args);
+                return { handled: true, reply: { text: out.slice(0, 4000) } };
+            }
+            if (action.kind === "gog" && action.op === "auth_start") {
+                const r = await connecterGoogle();
+                return { handled: true, reply: { text: r.content[0].text.slice(0, 4000) } };
             }
             if (action.kind === "gog") {
                 const out = await delegateGog(api, action.op, routed.args);
