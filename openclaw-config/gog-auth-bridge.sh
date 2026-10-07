@@ -29,6 +29,8 @@ i=0
 while [ ! -f "$RESP" ]; do
   sleep 1; i=$((i+1)); [ $i -gt 600 ] && { echo "timeout response" > "$DONE"; kill $GOGPID 2>/dev/null; exit 1; }
 done
-cat "$RESP" > "$FIFO"
+# Retour à la ligne final indispensable : gog attend « Entrée » (le tube ouvert
+# en lecture-écriture ne donne jamais de fin de fichier).
+{ cat "$RESP"; echo; } > "$FIFO"
 if wait $GOGPID; then echo ok > "$DONE"; else echo error > "$DONE"; fi
 rm -f "$FIFO"
