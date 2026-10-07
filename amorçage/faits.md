@@ -39,6 +39,10 @@ Utilisez /c <url|note> pour capturer une page web ou une note. Le traitement se 
 ## Quelle commande pour planifier une tâche ?
 Écrivez simplement « rappelle-moi demain à 9h d'appeler le garagiste » ou « chaque lundi à 8h… », ou utilisez /cron add <quand> [canal] rappel <texte>. Tiron montre la tâche comprise et la crée après /confirm. /cron list affiche les tâches, /cron rm <id> en supprime une.
 
+## Qu'est-ce qu'une consigne planifiée ?
+## Quand utiliser une consigne avec /cron ?
+Une consigne est la version en langage naturel d'une commande planifiée : vous décrivez un travail que Tiron fera lui-même avec ses commandes, par exemple /cron add "0 8 * * 1" consigne fais le point sur l'état du wiki et les pages à relire. Elle convient aux tâches qui s'appuient sur vos données (wiki, mails). Elle ne convient pas aux questions de culture générale (« Qui était Henri IV ? ») : le modèle local répond de mémoire et invente souvent. Pour une question, utilisez /q, qui répond à partir de votre wiki. Comptez deux à trois minutes de traitement après le déclenchement.
+
 ## Pourquoi Tiron me propose-t-il une liste numérotée ?
 Quand Tiron n'est pas sûr de la commande voulue, il propose les plus probables avec leur nom. Répondez par le numéro, ou reformulez.
 
