@@ -3,7 +3,7 @@ import { definePluginEntry } from "openclaw/plugin-sdk/core";
 import { parseReply } from "./parse.js";
 import { commandToAction } from "./dispatch.js";
 import { runTironCron } from "./cron-ops.js";
-import { CRON_COMMANDS, unwrapCronEnvelope } from "./cron-envelope.js";
+import { CRON_COMMANDS, sansAvisSysteme, unwrapCronEnvelope } from "./cron-envelope.js";
 import { fetchWikiOpJson, runWikiOp } from "./wiki-ops.js";
 import { readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync, copyFileSync, mkdirSync } from "node:fs";
 import { homedir, hostname } from "node:os";
@@ -499,7 +499,7 @@ export default definePluginEntry({
     // appels erratiques). L'utilisateur seul déclenche ces commandes ; le hook
     // exécute l'action, répond, et réclame le message (handled:true => pas de modèle).
     api.on("before_agent_reply", async (event: any, ctx: any) => {
-      let text = String(event?.cleanedBody ?? "");
+      let text = sansAvisSysteme(String(event?.cleanedBody ?? ""));
 
       // Tour planifié d'une tâche /cron (nom tiron-…) : OpenClaw l'enveloppe
       // ("[cron:<id> <nom>] <message>\nCurrent time: …"). Commande de la liste

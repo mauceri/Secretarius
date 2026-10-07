@@ -10,3 +10,17 @@ export function unwrapCronEnvelope(text) {
     const m = ENVELOPE.exec(text);
     return m ? { jobName: m[1], message: m[2].trim() } : null;
 }
+// Avis qu'OpenClaw place en tête du message suivant après une livraison planifiée
+// (« System: [date] A scheduled automation delivered this message… », constaté le
+// 2026-10-07) : retirés pour que le message de l'utilisateur soit traité seul.
+export function sansAvisSysteme(text) {
+    const lignes = text.split("\n");
+    let i = 0;
+    while (i < lignes.length && lignes[i].startsWith("System: "))
+        i++;
+    if (i === 0)
+        return text;
+    while (i < lignes.length && lignes[i].trim() === "")
+        i++;
+    return lignes.slice(i).join("\n");
+}

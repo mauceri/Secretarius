@@ -1277,4 +1277,19 @@ describe("before_agent_reply — demande de précision", () => {
     expect(run).toHaveBeenCalledTimes(1);
     expect(run.mock.calls[0][0].message).toContain("op: inbox");
   });
+
+  it("avis système en tête : la commande tapée reste une commande tapée", async () => {
+    const runTironCron = vi.fn().mockResolvedValueOnce({ ok: true, text: "Dans 2 min …", args: "add 2m consigne x" });
+    vi.doMock("./cron-ops.js", () => ({ runTironCron }));
+    const fetchSpy = vi.fn(async (_u: any, init: any) => {
+      const msg = JSON.parse(init.body).message;
+      return { ok: true, json: async () => ({ status: "ok", command: "/cron", args: msg.replace(/^\/cron\s*/, "") }) };
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+    const plugin = await freshPlugin(); const { api, hooks } = makeApi(); plugin.register(api);
+    const recu = "System: [2026-10-07 10:02:57 GMT+2] A scheduled automation delivered this message to this channel:\nSystem: \"x\"\n\n/cron add 2m consigne x";
+    await hooks["before_agent_reply"].handler({ cleanedBody: recu }, { messageProvider: "telegram" });
+    expect(JSON.parse(fetchSpy.mock.calls[0][1].body).message).toBe("/cron add 2m consigne x");
+    expect(runTironCron).toHaveBeenCalledWith(["preview", "--origin", "telegram", "--args", "add 2m consigne x"]);
+  });
 });

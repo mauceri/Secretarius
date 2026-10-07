@@ -21,4 +21,17 @@ describe("unwrapCronEnvelope", () => {
   it("liste blanche alignée sur tiron_cron", () => {
     expect([...CRON_COMMANDS].sort()).toEqual(["/ingest", "/kbupdate", "/q", "/r", "/relire", "/tags", "/wikistatus"]);
   });
+
+  it("retire les avis système d'OpenClaw placés en tête du message", async () => {
+    const { sansAvisSysteme } = await import("./cron-envelope.js");
+    const recu = [
+      "System: [2026-10-07 10:02:57 GMT+2] A scheduled automation delivered this message to this channel:",
+      "System: \"La vie est une série de choix.\" — Sénèque",
+      "",
+      "/cron add 2m consigne donne-moi une citation de Marc Aurèle",
+    ].join("\n");
+    expect(sansAvisSysteme(recu)).toBe("/cron add 2m consigne donne-moi une citation de Marc Aurèle");
+    expect(sansAvisSysteme("bonjour")).toBe("bonjour");
+    expect(sansAvisSysteme("une ligne\nSystem: au milieu")).toBe("une ligne\nSystem: au milieu");
+  });
 });
