@@ -34,18 +34,29 @@ _classifier = None  # chargé au démarrage (Step 5)
 _faq = None         # FaqIndex, chargé au démarrage
 
 
-def _faq_ou_no_match(message: str) -> dict:
-    if _faq is not None and not message.lstrip().startswith("/"):
-        try:
-            entry = _faq.lookup(message)
-        except Exception:
-            entry = None
-        if entry is not None:
-            return {"status": "answer", "reply": entry["answer"]}
-    return {"status": "no_match"}
+# FAQ consultée avant Laya, en deux bandes (2026-10-07). Mesures BGE-M3 :
+# questions visées 0,797–0,999 ; vraies demandes 0,309–0,738 (« cherche les
+# mails de la banque » 0,738). Marge étroite : écrire dans faits.md des
+# formulations proches de celles de l'utilisateur.
+SEUIL_FAQ_DIRECT = 0.85        # réponse donnée telle quelle
+SEUIL_FAQ_PROPOSITION = 0.75   # réponse proposée, avec « continuer » possible
 
 
-def route_message(message: str) -> dict:
+def _consulter_faq(message: str) -> dict | None:
+    if _faq is None or message.lstrip().startswith("/"):
+        return None
+    try:
+        score, entry = _faq.meilleure(message)
+    except Exception:
+        return None
+    if entry is None or score < SEUIL_FAQ_PROPOSITION:
+        return None
+    if score >= SEUIL_FAQ_DIRECT:
+        return {"status": "answer", "reply": entry["answer"]}
+    return {"status": "faq_proposee", "reply": entry["answer"], "args": message}
+
+
+def route_message(message: str, sans_faq: bool = False) -> dict:
     # Commande explicite (l'utilisateur a tapé /c, /q, …) : honorée telle quelle,
     # jamais soumise à Laya. Le routeur ne classe que le texte libre ; re-classer
     # une commande explicite ne peut que la corrompre (ex. /c pris pour /source).
@@ -58,18 +69,13 @@ def route_message(message: str) -> dict:
             if cmd in NEEDS_ARG and not args.strip():
                 return {"status": "answer", "reply": f"Usage : {cmd} <argument>"}
             return {"status": "ok", "command": cmd, "args": args}
-    # Laya d'abord : la FAQ ne répond que lorsqu'aucune commande ne correspond
-    # (2026-10-06 : la FAQ, consultée avant Laya, captait de vraies demandes).
+    if not sans_faq and (faq := _consulter_faq(message)) is not None:
+        return faq
     ranking = _classifier.classer(message) if _classifier is not None else [(None, 1.0)]
     command, p = ranking[0]
     if p >= SEUIL:
         if command is None:
-            return _faq_ou_no_match(message)
-        if command == "/q":
-            # La FAQ (réponses toutes faites) sert les questions choisies par Laya.
-            faq = _faq_ou_no_match(message)
-            if faq["status"] == "answer":
-                return faq
+            return {"status": "no_match"}
         # args : jamais généré, toujours le message brut (décision du 2026-09-28).
         return {"status": "ok", "command": command, "args": message}
     return {"status": "clarify", "options": options_proposees(ranking), "args": message}
@@ -83,7 +89,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         length = int(self.headers.get("Content-Length", 0))
         body = json.loads(self.rfile.read(length) or b"{}")
-        result = route_message(body.get("message", ""))
+        result = route_message(body.get("message", ""), sans_faq=bool(body.get("sans_faq")))
         payload = json.dumps(result).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")

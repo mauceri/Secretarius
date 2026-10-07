@@ -103,55 +103,13 @@ def _install_faq(tmp_path):
     router_server._faq = FaqIndex(_stub_embed, path=p, seuil=0.6)
 
 
-class _Fake:
-    def __init__(self, ranking):
-        self.ranking = ranking
-
-    def classer(self, message):
-        return self.ranking
-
-
-def test_route_faq_quand_laya_dit_aucune(tmp_path, monkeypatch):
-    _install_faq(tmp_path)
-    monkeypatch.setattr(router_server, "_classifier", _Fake([(None, 0.9), ("/q", 0.1)]))
-    r = router_server.route_message("parle-moi du perroquet")
-    assert r == {"status": "answer", "reply": "Coco."}
+def test_meilleure_renvoie_score_et_entree(tmp_path):
+    p = _ecrire(tmp_path, "## Le perroquet de Mme Michu ?\nCoco.")
+    idx = FaqIndex(_stub_embed, path=p, seuil=0.6)
+    score, entry = idx.meilleure("parle-moi du perroquet")
+    assert entry["answer"] == "Coco." and 0.0 <= score <= 1.0001
 
 
-def test_route_commande_laya_passe_avant_la_faq(tmp_path, monkeypatch):
-    # 2026-10-06 : « Ai-je reçu un mail de Paul sur le chantier ? » capté par la FAQ
-    # avant Laya. La FAQ ne sert plus que lorsque Laya ne reconnaît aucune commande.
-    _install_faq(tmp_path)
-    monkeypatch.setattr(router_server, "_classifier", _Fake([("/chercher", 0.9), (None, 0.1)]))
-    r = router_server.route_message("parle-moi du perroquet")
-    assert r == {"status": "ok", "command": "/chercher", "args": "parle-moi du perroquet"}
-
-
-def test_route_hesitation_laya_pas_de_faq(tmp_path, monkeypatch):
-    _install_faq(tmp_path)
-    monkeypatch.setattr(router_server, "_classifier", _Fake([(None, 0.5), ("/q", 0.4)]))
-    assert router_server.route_message("parle-moi du perroquet")["status"] == "clarify"
-
-
-def test_route_slash_court_circuite_faq(tmp_path):
-    _install_faq(tmp_path)
-    # commence par '/' -> FAQ ignorée ; l'adaptateur (8998) est injoignable en
-    # test -> call_adapter lève -> no_match. On vérifie surtout : jamais "answer".
-    r = router_server.route_message("/perroquet")
-    assert r["status"] != "answer"
-
-
-def test_route_sans_match_retombe_routage(tmp_path):
-    _install_faq(tmp_path)
-    r = router_server.route_message("cherche un truc inconnu xyz")
-    assert r["status"] != "answer"
-
-
-def test_route_faq_erreur_ne_crashe_pas(tmp_path, monkeypatch):
-    """Fix 1 TDD : lookup qui lève ne doit pas crasher route_message."""
-    _install_faq(tmp_path)
-    def boom(_msg):
-        raise RuntimeError("embed cassé")
-    monkeypatch.setattr(router_server._faq, "lookup", boom)
-    r = router_server.route_message("parle-moi du perroquet")
-    assert r["status"] != "answer"
+def test_meilleure_fichier_absent(tmp_path):
+    idx = FaqIndex(_stub_embed, path=tmp_path / "absent.md", seuil=0.6)
+    assert idx.meilleure("x") == (0.0, None)

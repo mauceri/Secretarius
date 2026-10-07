@@ -78,6 +78,16 @@ class FaqIndex:
         self._entry_of = entry_of
         self._qmat = self._embed_fn(questions) if questions else None
 
+    def meilleure(self, message: str) -> tuple[float, dict | None]:
+        """Meilleure entrée et sa similarité ; le routeur applique ses seuils."""
+        if self._current_mtime() != self._mtime:
+            self._reload()
+        if self._qmat is None:
+            return 0.0, None
+        sims = (self._embed_fn([message]) @ self._qmat.T).squeeze(0)
+        idx = int(sims.argmax())
+        return float(sims[idx]), self._entry_of[idx]
+
     def lookup(self, message: str):
         if self._current_mtime() != self._mtime:
             self._reload()

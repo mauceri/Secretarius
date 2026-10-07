@@ -1292,4 +1292,55 @@ describe("before_agent_reply — demande de précision", () => {
     expect(JSON.parse(fetchSpy.mock.calls[0][1].body).message).toBe("/cron add 2m consigne x");
     expect(runTironCron).toHaveBeenCalledWith(["preview", "--origin", "telegram", "--args", "add 2m consigne x"]);
   });
+
+  describe("réponse de FAQ proposée", () => {
+    function routeur() {
+      const spy = vi.fn(async (_u: any, init: any) => {
+        const b = JSON.parse(init.body);
+        if (b.message === "pourquoi une liste ?" && !b.sans_faq) {
+          return { ok: true, json: async () => ({ status: "faq_proposee", reply: "Parce que Tiron hésite.", args: b.message }) };
+        }
+        if (b.message === "pourquoi une liste ?" && b.sans_faq) {
+          return { ok: true, json: async () => ({ status: "no_match" }) };
+        }
+        return { ok: true, json: async () => ({ status: "no_match" }) };
+      });
+      vi.stubGlobal("fetch", spy);
+      return spy;
+    }
+
+    it("affiche la réponse et les deux suites possibles", async () => {
+      routeur();
+      const plugin = await freshPlugin(); const { api, hooks } = makeApi(); plugin.register(api);
+      const r = await hooks["before_agent_reply"].handler({ cleanedBody: "pourquoi une liste ?" }, {});
+      expect(r.reply.text).toBe("J'ai trouvé cette réponse dans la FAQ, sans être sûr qu'elle corresponde à votre demande :\n\nParce que Tiron hésite.\n\n1) Cette réponse me convient\n2) Continuer vers le traitement normal\nRépondez par le numéro.");
+    });
+
+    it("« 1 » : rien de plus", async () => {
+      const spy = routeur();
+      const plugin = await freshPlugin(); const { api, hooks } = makeApi(); plugin.register(api);
+      await hooks["before_agent_reply"].handler({ cleanedBody: "pourquoi une liste ?" }, {});
+      const r = await hooks["before_agent_reply"].handler({ cleanedBody: "1" }, {});
+      expect(r.reply.text).toBe("Très bien.");
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
+
+    it("« 2 » : repasse par le routeur sans la FAQ", async () => {
+      const spy = routeur();
+      const plugin = await freshPlugin(); const { api, hooks } = makeApi(); plugin.register(api);
+      await hooks["before_agent_reply"].handler({ cleanedBody: "pourquoi une liste ?" }, {});
+      const r = await hooks["before_agent_reply"].handler({ cleanedBody: "2" }, {});
+      const b = JSON.parse(spy.mock.calls[1][1].body);
+      expect(b).toEqual({ message: "pourquoi une liste ?", sans_faq: true });
+      expect(r.reply.text).toMatch(/^Je n'ai pas cette information/);
+    });
+
+    it("autre message : la proposition est abandonnée", async () => {
+      const spy = routeur();
+      const plugin = await freshPlugin(); const { api, hooks } = makeApi(); plugin.register(api);
+      await hooks["before_agent_reply"].handler({ cleanedBody: "pourquoi une liste ?" }, {});
+      await hooks["before_agent_reply"].handler({ cleanedBody: "bonjour" }, {});
+      expect(JSON.parse(spy.mock.calls[1][1].body)).toEqual({ message: "bonjour", sans_faq: false });
+    });
+  });
 });

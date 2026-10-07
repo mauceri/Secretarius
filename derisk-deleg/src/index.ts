@@ -13,23 +13,27 @@ import { parseEnv, diffEnv, applyEnvDiff, syncSecretFile, validateTelegramToken,
 
 const ROUTER_URL = "http://127.0.0.1:8999/route";
 
-async function callRouter(message: string): Promise<
+async function callRouter(message: string, sansFaq = false): Promise<
   | { status: "ok"; command: string; args: string }
   | { status: "answer"; reply: string }
   | { status: "no_match" }
   | { status: "unavailable" }
   | { status: "clarify"; options: { command: string | null; label: string }[]; args: string }
+  | { status: "faq_proposee"; reply: string; args: string }
 > {
   try {
     const resp = await fetch(ROUTER_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, sans_faq: sansFaq }),
       signal: AbortSignal.timeout(30000),
     });
     if (!resp.ok) return { status: "unavailable" };
     const data = await resp.json();
     if (data.status === "answer") return { status: "answer", reply: data.reply ?? "" };
+    if (data.status === "faq_proposee") {
+      return { status: "faq_proposee", reply: data.reply ?? "", args: data.args ?? "" };
+    }
     if (data.status === "clarify" && Array.isArray(data.options)) {
       return { status: "clarify", options: data.options, args: data.args ?? "" };
     }
@@ -113,7 +117,8 @@ type Pending =
   | { kind: "reply"; messageId: string; body: string; ts: number }
   | { kind: "router-write"; op: string; args: string; ts: number }
   | { kind: "cron"; args: string; origin: string; ts: number }
-  | { kind: "choix"; options: { command: string | null; label: string }[]; args: string; ts: number };
+  | { kind: "choix"; options: { command: string | null; label: string }[]; args: string; ts: number }
+  | { kind: "faq"; args: string; ts: number };
 let pending: Pending | null = null;
 
 // Ops wiki en LECTURE, jamais protégées par confirmation. Liste blanche :
@@ -664,7 +669,7 @@ export default definePluginEntry({
           pending = null;
           return { handled: true, reply: { text: "Brouillon expiré (plus de 10 min) — rien envoyé. Recomposez si besoin." } };
         }
-        if (pending.kind === "choix") {
+        if (pending.kind === "choix" || pending.kind === "faq") {
           return { handled: true, reply: { text: "Rien à confirmer : répondez par le numéro du choix proposé." } };
         }
         const p = pending;
@@ -698,7 +703,7 @@ export default definePluginEntry({
           pending = null;
           return { handled: true, reply: { text: "Planification abandonnée. Rien n'a été créé." } };
         }
-        if (pending.kind === "choix") {
+        if (pending.kind === "choix" || pending.kind === "faq") {
           pending = null;
           return { handled: true, reply: { text: "Choix abandonné." } };
         }
@@ -716,15 +721,31 @@ export default definePluginEntry({
       // autre message annule le choix et suit le chemin normal.
       let routed: Awaited<ReturnType<typeof callRouter>>;
       const choix = pending?.kind === "choix" && Date.now() - pending.ts <= PENDING_TTL_MS ? pending : null;
-      if (pending?.kind === "choix") pending = null;
+      const faqProposee = pending?.kind === "faq" && Date.now() - pending.ts <= PENDING_TTL_MS ? pending : null;
+      if (pending?.kind === "choix" || pending?.kind === "faq") pending = null;
       const num = text.trim().match(/^([1-9])$/);
-      if (choix && num) {
+      if (faqProposee && num?.[1] === "1") {
+        return { handled: true, reply: { text: "Très bien." } };
+      }
+      if (faqProposee && num?.[1] === "2") {
+        // « Continuer vers le traitement normal » : même message, sans la FAQ.
+        routed = await callRouter(faqProposee.args, true);
+      } else if (choix && num) {
         const opt = choix.options[Number(num[1]) - 1];
         routed = opt && opt.command
           ? { status: "ok", command: opt.command, args: choix.args }
           : { status: "no_match" };
       } else {
         routed = await callRouter(text);
+      }
+      if (routed.status === "faq_proposee") {
+        pending = { kind: "faq", args: routed.args, ts: Date.now() };
+        return {
+          handled: true,
+          reply: {
+            text: `J'ai trouvé cette réponse dans la FAQ, sans être sûr qu'elle corresponde à votre demande :\n\n${routed.reply}\n\n1) Cette réponse me convient\n2) Continuer vers le traitement normal\nRépondez par le numéro.`.slice(0, 4000),
+          },
+        };
       }
       if (routed.status === "clarify") {
         const options = routed.options.slice(0, 3);

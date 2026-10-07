@@ -68,7 +68,7 @@ def _route_vers_classement(r: dict) -> Classement:
     réutiliser `metriques` : ok/no_match = décision (p=1), clarify = question (p=0,05)."""
     if r["status"] == "ok":
         return [(r["command"], 1.0)]
-    if r["status"] in ("no_match", "answer"):
+    if r["status"] in ("no_match", "answer", "faq_proposee"):
         return [(None, 1.0)]
     # P_MIN_OPTION : sous le seuil de décision, mais assez pour que toutes les
     # options proposées soient conservées par options_proposees.

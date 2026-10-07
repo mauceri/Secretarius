@@ -55,24 +55,6 @@ def test_toujours_au_moins_deux_options(monkeypatch):
     assert len(router_server.route_message("x")["options"]) == 2
 
 
-def test_faq_dans_le_chemin_de_q(monkeypatch):
-    class _Faq:
-        def lookup(self, message):
-            return {"answer": "Je suis animé par qwen3:8b."}
-    monkeypatch.setattr(router_server, "_faq", _Faq())
-    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([("/q", 0.9)]))
-    assert router_server.route_message("quel modèle t'anime ?") == {"status": "answer", "reply": "Je suis animé par qwen3:8b."}
-
-
-def test_q_sans_reponse_faq_va_au_wiki(monkeypatch):
-    class _Faq:
-        def lookup(self, message):
-            return None
-    monkeypatch.setattr(router_server, "_faq", _Faq())
-    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([("/q", 0.9)]))
-    assert router_server.route_message("c koi SPLADE")["command"] == "/q"
-
-
 def test_nl_sous_le_seuil_demande_precision(monkeypatch):
     monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([("/lire", 0.45), ("/chercher", 0.40), (None, 0.1)]))
     r = router_server.route_message("le dernier mail de ma sœur")
@@ -231,3 +213,61 @@ def test_aucune_question_ne_depasse_le_budget_laya():
     for q in QUESTIONS.values():
         assert sum(len(f"{k}: {v}".split()) for k, v in q["criteria"].items()) < 120
 
+
+
+class _FaqScore:
+    """FAQ simulée : renvoie un score fixe et une entrée."""
+    def __init__(self, score):
+        self.score = score
+
+    def meilleure(self, message):
+        return self.score, {"answer": "Réponse de la FAQ."}
+
+
+def test_faq_au_dessus_de_0_85_reponse_directe(monkeypatch):
+    monkeypatch.setattr(router_server, "_faq", _FaqScore(0.90))
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([("/cron", 0.99)]))
+    assert router_server.route_message("qu'est-ce qu'une consigne ?") == {"status": "answer", "reply": "Réponse de la FAQ."}
+
+
+def test_faq_entre_0_75_et_0_85_proposee(monkeypatch):
+    monkeypatch.setattr(router_server, "_faq", _FaqScore(0.80))
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([("/q", 0.99)]))
+    assert router_server.route_message("pourquoi une liste ?") == {
+        "status": "faq_proposee", "reply": "Réponse de la FAQ.", "args": "pourquoi une liste ?"}
+
+
+def test_faq_sous_0_75_laya_decide(monkeypatch):
+    # « cherche les mails de la banque » : 0,738 mesuré le 2026-10-07.
+    monkeypatch.setattr(router_server, "_faq", _FaqScore(0.738))
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([("/chercher", 0.99)]))
+    assert router_server.route_message("cherche les mails de la banque")["command"] == "/chercher"
+
+
+def test_sans_faq_saute_la_faq(monkeypatch):
+    monkeypatch.setattr(router_server, "_faq", _FaqScore(0.95))
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([("/q", 0.99)]))
+    assert router_server.route_message("x", sans_faq=True)["command"] == "/q"
+
+
+def test_q_et_aucune_ne_consultent_plus_la_faq(monkeypatch):
+    monkeypatch.setattr(router_server, "_faq", _FaqScore(0.5))
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([("/q", 0.99)]))
+    assert router_server.route_message("c koi SPLADE")["command"] == "/q"
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([(None, 0.99)]))
+    assert router_server.route_message("il fait beau") == {"status": "no_match"}
+
+
+def test_commande_inconnue_en_slash_jamais_servie_par_la_faq(monkeypatch):
+    monkeypatch.setattr(router_server, "_faq", _FaqScore(0.99))
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([(None, 0.99)]))
+    assert router_server.route_message("/perroquet")["status"] != "answer"
+
+
+def test_faq_en_erreur_ne_bloque_pas_le_routage(monkeypatch):
+    class _Boom:
+        def meilleure(self, message):
+            raise RuntimeError("embed cassé")
+    monkeypatch.setattr(router_server, "_faq", _Boom())
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([("/q", 0.99)]))
+    assert router_server.route_message("c koi SPLADE")["command"] == "/q"
