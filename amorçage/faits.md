@@ -5,7 +5,9 @@
 ## Quel modèle de langage anime Tiron ?
 ## Quel LLM utilise Secretarius ?
 ## Sur quel modèle tourne Tiron ?
-Tiron est animé par Phi-4-mini-instruct (quantifié en Q6_K), augmenté d'adaptateurs LoRA spécialisés. L'extraction d'expressions du wiki utilise un second modèle, Phi-4-mini affiné sur Wikipédia en français.
+## Quel modèle vous anime ?
+## Quel modèle t'anime ?
+Tiron choisit la commande à exécuter avec Laya, un classifieur affiné sur ses propres commandes (Mauceric/laya-tiron-router). Les réponses de l'agent principal sont produites par Qwen3-8B, en local via Ollama. Le wiki utilise aussi Qwen3-8B en local. DeepSeek ne sert qu'à l'ingestion des pages web, et un modèle Qwen3-14B obfusqué sur Modal ou Infomaniak prennent le relais si le modèle local n'est pas utilisable.
 
 ## Sur quelle machine tourne Secretarius ?
 ## Quel est le matériel de sanroque ?
