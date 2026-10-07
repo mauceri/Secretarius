@@ -20,7 +20,7 @@ Secretarius tourne sur sanroque, un ordinateur portable : processeur AMD Ryzen 9
 
 ## Quels services tournent pour Secretarius ?
 ## Quels sont les services actifs et leurs ports ?
-Trois services systemd : tiron-router (port 8999, classifieur Laya calibré en process pour le routage des messages), openclaw-gateway (passerelle Telegram qui exécute Tiron), et l'extracteur llama.cpp Wikipédia FR (port 8989). Le service phi-4-mini/llama.cpp (port 8998) a été décommissionné le 2026-09-30 avec le passage à Laya.
+Services systemd utilisateur : tiron-router (port 8999, routage des messages par le classifieur Laya), openclaw-gateway (passerelle Telegram qui exécute Tiron), openclaw-scout et openclaw-injection-guard (lecture sécurisée des contenus externes), wiki-lm-server (serveur du wiki pour Obsidian, port 10443, joignable par Tailscale seulement), et trois relais vers les modèles obfusqués sur Modal : obfuscator-proxy (Qwen3-14B, port 8001), obfuscator-proxy-docker (le même, joignable depuis Docker) et obfuscator-proxy-8b (Qwen3-8B, port 8002). Ollama (port 11434) sert Qwen3-8B en local. L'extracteur llama.cpp (port 8989) et phi-4-mini (port 8998) ne tournent plus.
 
 ## Qu'est-ce que le wiki de Secretarius ?
 ## C'est quoi Wiki_LM ?
@@ -34,6 +34,13 @@ Utilisez /q <question> : la commande interroge la base de connaissances et renvo
 ## Comment capturer une page ou une note dans le wiki ?
 ## Quelle commande pour enregistrer un lien dans le wiki ?
 Utilisez /c <url|note> pour capturer une page web ou une note. Le traitement se lance ensuite avec /ingest (asynchrone).
+
+## Comment programmer un rappel ?
+## Quelle commande pour planifier une tâche ?
+Écrivez simplement « rappelle-moi demain à 9h d'appeler le garagiste » ou « chaque lundi à 8h… », ou utilisez /cron add <quand> [canal] rappel <texte>. Tiron montre la tâche comprise et la crée après /confirm. /cron list affiche les tâches, /cron rm <id> en supprime une.
+
+## Pourquoi Tiron me propose-t-il une liste numérotée ?
+Quand Tiron n'est pas sûr de la commande voulue, il propose les plus probables avec leur nom. Répondez par le numéro, ou reformulez.
 
 ## Comment lire une page web externe sans l'enregistrer ?
 ## Quelle commande pour consulter un lien tout de suite ?
