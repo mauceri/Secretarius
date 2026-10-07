@@ -571,12 +571,17 @@ export default definePluginEntry({
           label: string;
           restartUnit?: string;
           deferRestart?: boolean;
+          ajouter?: boolean;
         }> = [
           {
             path: join(HOME, ".openclaw", "gateway.systemd.env"),
             label: "gateway.systemd.env",
             restartUnit: "openclaw-gateway.service",
             deferRestart: true,
+            // Ajout des clés manquantes : DÉSACTIVÉ en attendant de choisir une
+            // règle — secrets.env contient des clés qui changeraient le
+            // comportement du gateway (OPENCLAW_GATEWAY_PASSWORD, OPENAI_API_KEY…).
+            ajouter: false,
           },
           {
             path: process.env.WIKI_LM_REPO_ENV || join(HOME, "Secretarius", "Wiki_LM", ".env"),
@@ -592,7 +597,7 @@ export default definePluginEntry({
         for (const t of targets) {
           if (!existsSync(t.path)) continue;
           const targetContent = readFileSync(t.path, "utf8");
-          const diffs = diffEnv(secrets, parseEnv(targetContent));
+          const diffs = diffEnv(secrets, parseEnv(targetContent), t.ajouter);
           if (diffs.length === 0) continue;
 
           const tgDiff = diffs.find((d) => d.key === "TELEGRAM_BOT_TOKEN");
@@ -611,7 +616,12 @@ export default definePluginEntry({
           }
 
           writeFileSync(t.path, applyEnvDiff(targetContent, diffs), "utf8");
-          report.push(`${t.label} : ${diffs.map((d) => d.key).join(", ")}`);
+          const ajoutees = diffs.filter((d) => d.ajout).map((d) => d.key);
+          const majs = diffs.filter((d) => !d.ajout).map((d) => d.key);
+          report.push(`${t.label} : ${[
+            ...(majs.length ? [`mises à jour ${majs.join(", ")}`] : []),
+            ...(ajoutees.length ? [`ajoutées ${ajoutees.join(", ")}`] : []),
+          ].join(" ; ")}`);
 
           if (t.restartUnit) {
             if (t.deferRestart) {

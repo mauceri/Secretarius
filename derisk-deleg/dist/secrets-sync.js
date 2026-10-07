@@ -27,21 +27,33 @@ export function parseEnv(content) {
 // Ne retient que les clés présentes dans les deux fichiers et dont la valeur
 // diffère — jamais d'ajout de clé absente du fichier cible (Wiki_LM/.env n'a
 // pas à recevoir TELEGRAM_BOT_TOKEN, par exemple).
-export function diffEnv(source, target) {
+// `ajouter` (gateway.systemd.env seulement, 2026-10-07) : les clés de la
+// source absentes de la cible y sont aussi ajoutées — sinon une nouvelle clé
+// (GMAIL_APP_PASSWORD) n'atteignait jamais le gateway.
+export function diffEnv(source, target, ajouter = false) {
     const diffs = [];
     for (const key of Object.keys(target)) {
         if (key in source && source[key] !== target[key]) {
             diffs.push({ key, oldValue: target[key], newValue: source[key] });
         }
     }
+    if (ajouter) {
+        for (const key of Object.keys(source)) {
+            if (!(key in target))
+                diffs.push({ key, oldValue: "", newValue: source[key], ajout: true });
+        }
+    }
     return diffs;
 }
 export function applyEnvDiff(content, diffs) {
     let out = content;
-    for (const { key, newValue } of diffs) {
+    for (const { key, newValue, ajout } of diffs) {
         const re = new RegExp(`^${key}=.*$`, "m");
         if (re.test(out)) {
             out = out.replace(re, `${key}=${newValue}`);
+        }
+        else if (ajout) {
+            out = `${out}${out === "" || out.endsWith("\n") ? "" : "\n"}${key}=${newValue}\n`;
         }
     }
     return out;

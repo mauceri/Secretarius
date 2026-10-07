@@ -39,11 +39,33 @@ describe("diffEnv", () => {
   });
 });
 
+describe("diffEnv avec ajout des clés manquantes", () => {
+  it("ajoute les clés absentes de la cible quand ajouter=true (gateway)", () => {
+    const d = diffEnv({ A: "1", NEW: "x" }, { A: "0" }, true);
+    expect(d).toEqual([
+      { key: "A", oldValue: "0", newValue: "1" },
+      { key: "NEW", oldValue: "", newValue: "x", ajout: true },
+    ]);
+  });
+  it("sans ajouter, comportement inchangé (Wiki_LM/.env)", () => {
+    expect(diffEnv({ A: "1", NEW: "x" }, { A: "0" })).toEqual([{ key: "A", oldValue: "0", newValue: "1" }]);
+  });
+});
+
 describe("applyEnvDiff", () => {
   it("remplace la ligne ciblée sans toucher au reste, sans ajouter de guillemets", () => {
     const content = "A=old\nB=untouched\n";
     const out = applyEnvDiff(content, [{ key: "A", oldValue: "old", newValue: "new" }]);
     expect(out).toBe("A=new\nB=untouched\n");
+  });
+
+  it("ajoute en fin de fichier une clé marquée ajout", () => {
+    const out = applyEnvDiff("A=old\n", [{ key: "NEW", oldValue: "", newValue: "x", ajout: true }]);
+    expect(out).toBe("A=old\nNEW=x\n");
+  });
+
+  it("ajoute aussi quand le fichier ne finit pas par un retour à la ligne", () => {
+    expect(applyEnvDiff("A=old", [{ key: "NEW", oldValue: "", newValue: "x", ajout: true }])).toBe("A=old\nNEW=x\n");
   });
 
   it("n'ajoute pas de ligne pour une clé absente du fichier cible", () => {
