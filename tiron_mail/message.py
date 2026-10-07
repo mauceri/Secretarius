@@ -6,7 +6,7 @@ from __future__ import annotations
 import email
 import email.policy
 import re
-from email.utils import parsedate_to_datetime
+from email.utils import parseaddr, parsedate_to_datetime
 from html.parser import HTMLParser
 
 
@@ -58,6 +58,7 @@ def analyser(brut: bytes) -> dict:
         "message_id": str(m.get("Message-ID", "")),
         "texte": texte,
         "pieces_jointes": [p.get_filename() or "(sans nom)" for p in m.iter_attachments()],
+        "repondre_a": parseaddr(str(m.get("Reply-To") or m.get("From", "")))[1],
     }
 
 

@@ -43,3 +43,12 @@ def test_pieces_jointes_listees_pas_ouvertes():
 
 def test_resume():
     assert resume(analyser(_brut()), "g:42") == "g:42  06/10 09:12  Paul <paul@ex.fr>  Chantier"
+
+
+def test_adresse_de_reponse():
+    m = analyser(_brut())
+    assert m["repondre_a"] == "paul@ex.fr"
+    from email.message import EmailMessage
+    e = EmailMessage(); e["From"] = "Lettre <noreply@ex.fr>"; e["Reply-To"] = "contact@ex.fr"
+    e["Subject"] = "x"; e.set_content("x")
+    assert analyser(e.as_bytes())["repondre_a"] == "contact@ex.fr"
