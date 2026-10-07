@@ -10,9 +10,11 @@ RAW="$CFG/auth_raw"; URL="$CFG/auth_url"; RESP="$CFG/auth_response"; DONE="$CFG/
 rm -f "$RAW" "$URL" "$RESP" "$DONE"
 FIFO="$CFG/.auth_fifo"; rm -f "$FIFO"; mkfifo "$FIFO"
 
-# gog lit l'URL de redirection sur stdin (FIFO), écrit ses prompts dans RAW.
+# gog lit l'URL de redirection sur stdin (FIFO ouvert en lecture-écriture : une
+# ouverture en lecture seule bloquerait jusqu'à l'arrivée de la réponse, et gog ne
+# démarrerait jamais — constaté le 2026-10-07), écrit ses prompts dans RAW.
 gog auth add "$EMAIL" --manual --force-consent \
-  --services gmail,drive,calendar < "$FIFO" > "$RAW" 2>&1 &
+  --services gmail,drive,calendar <> "$FIFO" > "$RAW" 2>&1 &
 GOGPID=$!
 
 # Attendre l'URL d'autorisation Google, puis l'exposer.
