@@ -1,0 +1,50 @@
+# Boîtes de courrier de Secretarius (spec docs/superpowers/specs/2026-10-07-agent-courrier-design.md).
+# À copier dans ~/.config/tiron_mail/comptes.toml. Aucun secret ici : chaque boîte
+# nomme la variable d'environnement (secret_env) qui porte son mot de passe,
+# définie dans ~/.config/secrets.env.
+
+[envoi]
+# Boîte d'envoi par défaut (/ecrire, notes Obsidian) : le Proton personnel.
+# Tant que Proton Bridge n'est pas installé, mettre "gmail".
+defaut = "proton"
+# Adresses de l'utilisateur : envoi direct permis vers elles.
+adresses_proprietaire = ["vous@gmail.com", "vous@proton.me"]
+
+# Gmail personnel : mot de passe d'application Google.
+[comptes.gmail]
+prefixe = "g"
+adresse = "vous@gmail.com"
+utilisateur = "vous@gmail.com"
+hote_imap = "imap.gmail.com"
+port_imap = 993
+securite_imap = "ssl"
+hote_smtp = "smtp.gmail.com"
+port_smtp = 465
+securite_smtp = "ssl"
+secret_env = "GMAIL_APP_PASSWORD"
+
+# Proton personnel, via Proton Bridge en local (mot de passe donné par le Bridge).
+[comptes.proton]
+prefixe = "p"
+adresse = "vous@proton.me"
+utilisateur = "vous@proton.me"
+hote_imap = "127.0.0.1"
+port_imap = 1143
+securite_imap = "starttls"
+hote_smtp = "127.0.0.1"
+port_smtp = 1025
+securite_smtp = "starttls"
+secret_env = "PROTON_BRIDGE_PASS_PERSO"
+
+# Boîte de Tiron (Proton Business), via le même Bridge.
+[comptes.tiron]
+prefixe = "t"
+adresse = "tiron@secretarius.co"
+utilisateur = "tiron@secretarius.co"
+hote_imap = "127.0.0.1"
+port_imap = 1143
+securite_imap = "starttls"
+hote_smtp = "127.0.0.1"
+port_smtp = 1025
+securite_smtp = "starttls"
+secret_env = "PROTON_BRIDGE_PASS_TIRON"
