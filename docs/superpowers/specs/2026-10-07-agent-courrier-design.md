@@ -34,7 +34,7 @@ Deux constats faits le 2026-10-07 orientent la conception :
 | Envoi par défaut | Proton perso (notes Obsidian, `/ecrire`) ; une réponse part de la boîte qui a reçu le message |
 | Construction | Module maison `tiron_mail` (Python standard, ligne de commande en JSON), sur le modèle de `tiron_cron`. Pas d'extension communautaire : vos identifiants restent dans votre code |
 | tiron@secretarius.co | Sert à transmettre des instructions à Tiron. Elles sont acceptées seulement si elles viennent de vos adresses ET sont authentifiées par Proton (`Authentication-Results`). Le compte rendu arrive sur Telegram. La conversation par courriel est remise à plus tard |
-| Instruction composée | Confiée à un nouvel agent « consignes », pas à `main` |
+| Instructions par courriel | Commandes explicites en `/`, une par ligne, comme les blocs ```wiki``` ; `/consigne <texte>` pour une instruction composée, confiée à un nouvel agent « consignes » (pas à `main`). Pas de langage naturel, pas de réentraînement de Laya (décision du 2026-10-07) |
 | Envoi par un agent | Automatique vers vos adresses ; vers toute autre adresse, brouillon à confirmer sur Telegram. Règle appliquée dans `tiron_mail`, pas par le modèle |
 | Obsidian | Blocs `mail?` (aperçu) et `mail!` (envoi), même convention que `cron?` et `cron!` |
 | Agenda et Drive | Restent sur gog en attendant une API calendrier chez Proton |
@@ -57,8 +57,8 @@ Boîtes : Gmail perso · Proton perso · tiron@secretarius.co
                                                           │ (--agent consignes), compte rendu Telegram
              relève de tiron@secretarius.co ──────────────┤
              expéditeur = vous + authentifié par Proton    │
-               ├─ une seule commande → routage habituel (FAQ, Laya)
-               └─ instruction composée → agent « consignes »
+               ├─ lignes « /commande … » → exécutées dans l'ordre, comme tapées
+               └─ « /consigne … » → agent « consignes »
              /cron … consigne … ────────────────────────────┘ (cet agent, au lieu de main)
 ```
 
@@ -92,19 +92,21 @@ Règles d'envoi, appliquées par le module lui-même :
 | `/repondre <id> <texte>` | brouillon depuis la boîte qui a reçu le message, puis `/confirm` | déduit de l'id |
 | `/ecrire <adresse> <texte>` *(nouvelle)* | nouveau message, puis `/confirm` | Proton perso |
 
-`/ecrire` est à ajouter au corpus de Laya lors du prochain travail sur le corpus.
+Ces commandes s'utilisent tapées : aucun ajout au corpus de Laya.
 
 ### Relève de tiron@secretarius.co
 
 - Service systemd `tiron-mail-releve` : interrogation IMAP toutes les minutes, via Proton Bridge.
 - Un message est accepté si son expéditeur est dans la liste de vos adresses **et** si
   `Authentication-Results` indique `dmarc=pass`, ou à défaut `spf=pass` et `dkim=pass`.
-- Message accepté : l'objet et le début du corps forment l'instruction.
-  - Une seule commande : routage habituel, comme un message Telegram, avec le compte rendu
-    et `/confirm` sur Telegram.
-  - Instruction composée : agent « consignes ».
-  - Le choix entre les deux est fait par Laya, avec une question de plus (« une commande
-    ou plusieurs étapes ? »), à ajouter au corpus.
+- Message accepté : chaque ligne de l'objet ou du corps qui commence par `/` est une commande.
+  - Les commandes sont exécutées dans l'ordre, comme si elles étaient tapées sur Telegram
+    (compte rendu et `/confirm` sur Telegram).
+  - `/consigne <texte>` (nouvelle commande) confie une instruction composée à l'agent
+    « consignes ».
+  - Un message sans aucune ligne en `/` n'est pas exécuté : avis sur Telegram avec la liste
+    des commandes.
+  - Pas de langage naturel, donc pas de Laya : aucun réentraînement.
 - Message refusé : rien n'est exécuté ; avis sur Telegram (expéditeur, motif) ; le corps
   ne part jamais vers un modèle.
 - Après traitement, le message est marqué lu et rangé dans « Traité » ou « Refusé ». Il ne
