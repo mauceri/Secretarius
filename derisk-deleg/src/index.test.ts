@@ -83,6 +83,7 @@ afterEach(() => {
   vi.doUnmock("./wiki-ops.js");
   vi.doUnmock("./cron-ops.js");
   vi.doUnmock("./gog-ops.js");
+  vi.doUnmock("./mail-ops.js");
 });
 
 describe("outils gog_* — délégation au sous-agent gog", () => {
@@ -680,71 +681,8 @@ describe("before_agent_reply — routage via tiron-router", () => {
     expect(message).toBe("url: https://exemple.com"); // args.trim()
   });
 
-  it("commande routée vers gog (/chercher) délègue op:search", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => ({ status: "ok", command: "/chercher", args: "facture edf" }),
-      })),
-    );
-    const plugin = await freshPlugin();
-    const { api, hooks, run } = makeApi();
-    plugin.register(api);
 
-    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "cherche la facture edf" });
 
-    expect(res).toEqual({ handled: true, reply: { text: "réponse simulée" } });
-    const [{ message }] = run.mock.calls[0];
-    expect(message).toBe("op: search | facture edf");
-  });
-
-  it("commande routée vers /repondre (gog-reply) prépare un brouillon SANS déléguer", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => ({ status: "ok", command: "/repondre", args: "18ab corps de la réponse" }),
-      })),
-    );
-    const plugin = await freshPlugin();
-    const { api, hooks, run } = makeApi();
-    plugin.register(api);
-
-    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "réponds à 18ab : corps de la réponse" });
-
-    expect(run).not.toHaveBeenCalled();
-    const text = (res as any).reply.text as string;
-    expect(text).toContain("En réponse à : 18ab");
-    expect(text).toContain("Corps : corps de la réponse");
-
-    // le brouillon posé par le routage est bien le même pending que /confirm consulte
-    const confirmRes = await hooks["before_agent_reply"].handler({ cleanedBody: "/confirm" });
-    expect(confirmRes.reply.text).toBe("réponse simulée");
-    const [{ sessionKey, message }] = run.mock.calls[0];
-    expect(sessionKey).toMatch(/^agent:gog:subagent:cmd-reply-/);
-    expect(message).toBe("op: reply | id=18ab; body=corps de la réponse");
-  });
-
-  it("commande routée vers /repondre avec args invalides (pas de corps) renvoie l'usage", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({
-        ok: true,
-        json: async () => ({ status: "ok", command: "/repondre", args: "18ab" }),
-      })),
-    );
-    const plugin = await freshPlugin();
-    const { api, hooks } = makeApi();
-    plugin.register(api);
-
-    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "réponds à 18ab" });
-
-    expect(res).toEqual({
-      handled: true,
-      reply: { text: "Usage: /repondre <id> <texte>" },
-    });
-  });
 });
 
 describe("before_agent_reply — confirmation des écritures wiki routées", () => {
@@ -1210,12 +1148,13 @@ describe("before_agent_reply — demande de précision", () => {
   });
 
   it("« 1 » exécute la commande avec le message d'origine", async () => {
+    const runTironMail = vi.fn(async () => ({ ok: false, text: "identifiant invalide" }));
+    vi.doMock("./mail-ops.js", () => ({ runTironMail }));
     routerClarify();
-    const plugin = await freshPlugin(); const { api, hooks, run } = makeApi(); plugin.register(api);
+    const plugin = await freshPlugin(); const { api, hooks } = makeApi(); plugin.register(api);
     await hooks["before_agent_reply"].handler({ cleanedBody: "le dernier mail de ma sœur" }, {});
     await hooks["before_agent_reply"].handler({ cleanedBody: "1" }, {});
-    expect(run).toHaveBeenCalledTimes(1);
-    expect(run.mock.calls[0][0].message).toContain("le dernier mail de ma sœur");
+    expect(runTironMail).toHaveBeenCalledWith(["lire", "--args", "le dernier mail de ma sœur"]);
   });
 
   it("« 2 » = rien de tout ça : réponse de non-correspondance", async () => {
@@ -1275,12 +1214,13 @@ describe("before_agent_reply — demande de précision", () => {
       }
       return { ok: true, json: async () => ({ status: "no_match" }) };
     }));
-    const plugin = await freshPlugin(); const { api, hooks, run } = makeApi(); plugin.register(api);
+    const runTironMail = vi.fn(async () => ({ ok: true, text: "g:3 …" }));
+    vi.doMock("./mail-ops.js", () => ({ runTironMail }));
+    const plugin = await freshPlugin(); const { api, hooks } = makeApi(); plugin.register(api);
     const r = await hooks["before_agent_reply"].handler({ cleanedBody: "un mail de Paul ?" }, {});
     expect(r.reply.text).toContain("3) /inbox — lister les emails récents");
     await hooks["before_agent_reply"].handler({ cleanedBody: "3" }, {});
-    expect(run).toHaveBeenCalledTimes(1);
-    expect(run.mock.calls[0][0].message).toContain("op: inbox");
+    expect(runTironMail).toHaveBeenCalledWith(["inbox", "--args", "un mail de Paul ?"]);
   });
 
   it("avis système en tête : la commande tapée reste une commande tapée", async () => {
@@ -1370,5 +1310,71 @@ describe("before_agent_reply — demande de précision", () => {
     expect(gogAuthStart).toHaveBeenCalledWith(api, "test@gmail.com");
     expect(r.reply.text).toContain("https://accounts.google.com/o/oauth2/auth");
     expect(run).not.toHaveBeenCalled();
+  });
+
+  describe("courrier par tiron_mail (sans gog)", () => {
+    function routeur(command: string, args: string) {
+      vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ status: "ok", command, args }) })));
+    }
+
+    it("/inbox : appel direct de tiron_mail, sans sous-agent", async () => {
+      const runTironMail = vi.fn(async () => ({ ok: true, text: "g:3  07/10 09:00  Paul  Chantier" }));
+      vi.doMock("./mail-ops.js", () => ({ runTironMail }));
+      routeur("/inbox", "");
+      const plugin = await freshPlugin(); const { api, hooks, run } = makeApi(); plugin.register(api);
+      const r = await hooks["before_agent_reply"].handler({ cleanedBody: "/inbox" }, {});
+      expect(runTironMail).toHaveBeenCalledWith(["inbox", "--args", ""]);
+      expect(r.reply.text).toBe("g:3  07/10 09:00  Paul  Chantier");
+      expect(run).not.toHaveBeenCalled();
+    });
+
+    it("/repondre : aperçu, puis /confirm envoie", async () => {
+      const runTironMail = vi.fn()
+        .mockResolvedValueOnce({ ok: true, text: "Réponse à « Chantier »…", args: "g:2 ok" })
+        .mockResolvedValueOnce({ ok: true, text: "Réponse envoyée à paul@ex.fr." });
+      vi.doMock("./mail-ops.js", () => ({ runTironMail }));
+      routeur("/repondre", "g:2 ok");
+      const plugin = await freshPlugin(); const { api, hooks } = makeApi(); plugin.register(api);
+      const r1 = await hooks["before_agent_reply"].handler({ cleanedBody: "/repondre g:2 ok" }, {});
+      expect(runTironMail).toHaveBeenNthCalledWith(1, ["repondre", "--args", "g:2 ok"]);
+      expect(r1.reply.text).toBe("Réponse à « Chantier »…\n\nTapez /confirm pour envoyer (valable 10 min), ou /annuler pour abandonner.");
+      const r2 = await hooks["before_agent_reply"].handler({ cleanedBody: "/confirm" }, {});
+      expect(runTironMail).toHaveBeenNthCalledWith(2, ["repondre", "--args", "g:2 ok", "--confirme"]);
+      expect(r2.reply.text).toBe("Réponse envoyée à paul@ex.fr.");
+    });
+
+    it("/ecrire puis /annuler : rien n'est envoyé", async () => {
+      const runTironMail = vi.fn().mockResolvedValueOnce({ ok: true, text: "Nouveau message…", args: "m@ex.fr x" });
+      vi.doMock("./mail-ops.js", () => ({ runTironMail }));
+      routeur("/ecrire", "m@ex.fr x");
+      const plugin = await freshPlugin(); const { api, hooks } = makeApi(); plugin.register(api);
+      await hooks["before_agent_reply"].handler({ cleanedBody: "/ecrire m@ex.fr x" }, {});
+      const r = await hooks["before_agent_reply"].handler({ cleanedBody: "/annuler" }, {});
+      expect(r.reply.text).toBe("Envoi abandonné. Rien n'a été envoyé.");
+      expect(runTironMail).toHaveBeenCalledTimes(1);
+    });
+
+    it("/confirm après 11 minutes : rien n'est envoyé", async () => {
+      vi.useFakeTimers();
+      const runTironMail = vi.fn().mockResolvedValueOnce({ ok: true, text: "Réponse…", args: "g:2 ok" });
+      vi.doMock("./mail-ops.js", () => ({ runTironMail }));
+      routeur("/repondre", "g:2 ok");
+      const plugin = await freshPlugin(); const { api, hooks } = makeApi(); plugin.register(api);
+      await hooks["before_agent_reply"].handler({ cleanedBody: "/repondre g:2 ok" }, {});
+      vi.advanceTimersByTime(11 * 60 * 1000);
+      await hooks["before_agent_reply"].handler({ cleanedBody: "/confirm" }, {});
+      expect(runTironMail).toHaveBeenCalledTimes(1);
+    });
+
+    it("aperçu en erreur : message relayé, rien en attente", async () => {
+      const runTironMail = vi.fn().mockResolvedValueOnce({ ok: false, text: "identifiant invalide : x" });
+      vi.doMock("./mail-ops.js", () => ({ runTironMail }));
+      routeur("/repondre", "x y");
+      const plugin = await freshPlugin(); const { api, hooks } = makeApi(); plugin.register(api);
+      const r = await hooks["before_agent_reply"].handler({ cleanedBody: "/repondre x y" }, {});
+      expect(r.reply.text).toBe("identifiant invalide : x");
+      const c = await hooks["before_agent_reply"].handler({ cleanedBody: "/confirm" }, {});
+      expect(c.reply.text).toMatch(/^Rien à confirmer/);
+    });
   });
 });

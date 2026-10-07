@@ -39,6 +39,18 @@ def _date_imap(d: date) -> str:
     return f"{d.day:02d}-{_MOIS[d.month - 1]}-{d.year}"
 
 
+# Mots sans valeur de recherche, retirés quand la demande arrive en phrase
+# (« Ai-je reçu un mail de Paul sur le chantier ? » → Paul, chantier).
+_MOTS_VIDES = {
+    "ai", "je", "j", "reçu", "recu", "un", "une", "de", "du", "des", "le", "la", "les", "l",
+    "sur", "à", "a", "au", "aux", "pour", "par", "avec", "et", "ou", "en", "dans",
+    "mail", "mails", "email", "emails", "courriel", "courriels", "message", "messages",
+    "cherche", "cherchez", "chercher", "retrouve", "retrouvez", "trouve", "trouvez",
+    "moi", "me", "mes", "mon", "ma", "vous", "tu", "t", "il", "y", "est", "ce", "que", "qui",
+    "quoi", "stp", "svp", "merci", "est-ce", "ai-je", "as-tu", "avez-vous",
+}
+
+
 def criteres_imap(texte: str, aujourd_hui: date) -> list[str]:
     """« de:paul objet:devis depuis:7j chantier » → critères IMAP SEARCH."""
     crit: list[str] = []
@@ -53,9 +65,11 @@ def criteres_imap(texte: str, aujourd_hui: date) -> list[str]:
         elif cle == "depuis" and val[:-1].isdigit() and val.endswith("j"):
             crit += ["SINCE", _date_imap(aujourd_hui - timedelta(days=int(val[:-1])))]
         else:
-            libres.append(mot.replace('"', ""))
-    if libres:
-        crit += ["TEXT", '"' + " ".join(libres) + '"']
+            propre = mot.strip("?!.,;:«»()'\"")
+            if propre and propre.lower() not in _MOTS_VIDES:
+                libres.append(propre)
+    for mot in libres:  # chaque mot doit figurer (ET), pas la phrase entière
+        crit += ["TEXT", f'"{mot}"']
     return crit or ["ALL"]
 
 

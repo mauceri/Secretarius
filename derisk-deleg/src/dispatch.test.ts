@@ -6,12 +6,14 @@ describe("commandToAction", () => {
     expect(commandToAction("/source")).toEqual({ kind: "scout" });
   });
 
-  it("mappe /repondre vers gog-reply (jamais gog direct)", () => {
-    expect(commandToAction("/repondre")).toEqual({ kind: "gog-reply" });
+  it("mappe /repondre et /ecrire vers l'envoi de courrier (tiron_mail)", () => {
+    expect(commandToAction("/repondre")).toEqual({ kind: "mail-envoi", op: "repondre" });
+    expect(commandToAction("/ecrire")).toEqual({ kind: "mail-envoi", op: "ecrire" });
   });
 
-  it("mappe /chercher vers gog search", () => {
-    expect(commandToAction("/chercher")).toEqual({ kind: "gog", op: "search" });
+  it("mappe /chercher et /inbox vers le courrier (tiron_mail), plus gog", () => {
+    expect(commandToAction("/chercher")).toEqual({ kind: "mail", op: "chercher" });
+    expect(commandToAction("/inbox")).toEqual({ kind: "mail", op: "inbox" });
   });
 
   it("retourne null pour une commande inconnue", () => {
@@ -30,8 +32,10 @@ describe("commandToAction", () => {
     expect(commandToAction("/kbupdate")).toEqual({ kind: "wiki", op: "kb_update" });
   });
 
-  it("mappe /lire vers gog get", () => {
-    expect(commandToAction("/lire")).toEqual({ kind: "gog", op: "get" });
+  it("mappe /lire vers le courrier ; /drive et /connecter restent gog", () => {
+    expect(commandToAction("/lire")).toEqual({ kind: "mail", op: "lire" });
+    expect(commandToAction("/drive")).toEqual({ kind: "gog", op: "drive_search" });
+    expect(commandToAction("/connecter")).toEqual({ kind: "gog", op: "auth_start" });
   });
 
   it("mappe /supprimer vers wiki delete", () => {

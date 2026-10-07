@@ -3,6 +3,7 @@ import { definePluginEntry } from "openclaw/plugin-sdk/core";
 import { parseReply } from "./parse.js";
 import { commandToAction } from "./dispatch.js";
 import { runTironCron } from "./cron-ops.js";
+import { runTironMail } from "./mail-ops.js";
 import { gogAuthStart, gogDriveSearch } from "./gog-ops.js";
 import { CRON_COMMANDS, sansAvisSysteme, unwrapCronEnvelope } from "./cron-envelope.js";
 import { fetchWikiOpJson, runWikiOp } from "./wiki-ops.js";
@@ -622,6 +623,9 @@ export default definePluginEntry({
                 else if (p.kind === "reply") {
                     out = await delegateGog(api, "reply", `id=${p.messageId}; body=${p.body}`);
                 }
+                else if (p.kind === "mail") {
+                    out = (await runTironMail([p.op, "--args", p.args, "--confirme"])).text;
+                }
                 else if (p.kind === "cron") {
                     out = (await runTironCron(["add", "--origin", p.origin, "--args", p.args])).text;
                 }
@@ -649,6 +653,10 @@ export default definePluginEntry({
                 if (pending.kind === "choix" || pending.kind === "faq") {
                     pending = null;
                     return { handled: true, reply: { text: "Choix abandonné." } };
+                }
+                if (pending.kind === "mail") {
+                    pending = null;
+                    return { handled: true, reply: { text: "Envoi abandonné. Rien n'a été envoyé." } };
                 }
                 const dest = pending.kind === "send" ? pending.to : `réponse à ${pending.messageId}`;
                 pending = null;
@@ -791,30 +799,29 @@ export default definePluginEntry({
                 const out = await delegateScout(api, routed.args.trim());
                 return { handled: true, reply: { text: out.slice(0, 4000) } };
             }
-            if (action.kind === "gog" && action.op === "drive_search") {
-                const out = await gogDriveSearch(api, routed.args);
-                return { handled: true, reply: { text: out.slice(0, 4000) } };
-            }
-            if (action.kind === "gog" && action.op === "auth_start") {
+            if (action.kind === "gog") {
+                if (action.op === "drive_search") {
+                    const out = await gogDriveSearch(api, routed.args);
+                    return { handled: true, reply: { text: out.slice(0, 4000) } };
+                }
                 const r = await connecterGoogle();
                 return { handled: true, reply: { text: r.content[0].text.slice(0, 4000) } };
             }
-            if (action.kind === "gog") {
-                const out = await delegateGog(api, action.op, routed.args);
-                return { handled: true, reply: { text: out.slice(0, 4000) } };
+            // Courrier : tiron_mail (IMAP/SMTP) appelé directement, plus gog
+            // (spec 2026-10-07). Lectures directes ; envois en aperçu puis /confirm.
+            if (action.kind === "mail") {
+                const r = await runTironMail([action.op, "--args", routed.args]);
+                return { handled: true, reply: { text: r.text.slice(0, 4000) } };
             }
-            // action.kind === "gog-reply" : réutilise EXACTEMENT la logique de mise
-            // en attente existante (parseReply + pending), jamais de délégation
-            // directe — /repondre est la seule commande sensible atteignable ici.
-            const parsed = parseReply(routed.args);
-            if (!parsed) {
-                return { handled: true, reply: { text: "Usage: /repondre <id> <texte>" } };
+            const apercu = await runTironMail([action.op, "--args", routed.args]);
+            if (!apercu.ok || !apercu.args) {
+                return { handled: true, reply: { text: apercu.text.slice(0, 4000) } };
             }
-            pending = { kind: "reply", messageId: parsed.messageId, body: parsed.body, ts: Date.now() };
+            pending = { kind: "mail", op: action.op, args: apercu.args, ts: Date.now() };
             return {
                 handled: true,
                 reply: {
-                    text: `📧 Brouillon de réponse prêt (non envoyé) :\n• En réponse à : ${parsed.messageId}\n• Corps : ${parsed.body}\n\nTapez /confirm pour envoyer (valable 10 min), ou /annuler pour abandonner.`,
+                    text: `${apercu.text}\n\nTapez /confirm pour envoyer (valable 10 min), ou /annuler pour abandonner.`.slice(0, 4000),
                 },
             };
         });

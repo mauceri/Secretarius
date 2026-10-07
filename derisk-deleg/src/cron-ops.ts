@@ -10,10 +10,11 @@ const execFileP = promisify(execFile);
 
 export type CronResult = { ok: boolean; text: string; args?: string };
 
-export async function runTironCron(argv: string[]): Promise<CronResult> {
+// Lanceur commun des modules Python à CLI JSON (tiron_cron, tiron_mail).
+export async function runPythonModule(module: string, argv: string[], indisponible: string): Promise<CronResult> {
   const cwd = process.env.SECRETARIUS_DIR || `${homedir()}/Secretarius`;
   try {
-    const { stdout } = await execFileP("python3", ["-m", "tiron_cron", ...argv], {
+    const { stdout } = await execFileP("python3", ["-m", module, ...argv], {
       cwd,
       timeout: 150000,
       encoding: "utf8",
@@ -21,6 +22,10 @@ export async function runTironCron(argv: string[]): Promise<CronResult> {
     const data = JSON.parse(String(stdout));
     return { ok: !!data.ok, text: String(data.text ?? ""), ...(data.args ? { args: String(data.args) } : {}) };
   } catch (e: any) {
-    return { ok: false, text: `Planificateur indisponible : ${String(e?.message ?? e).slice(0, 300)}` };
+    return { ok: false, text: `${indisponible} : ${String(e?.message ?? e).slice(0, 300)}` };
   }
+}
+
+export function runTironCron(argv: string[]): Promise<CronResult> {
+  return runPythonModule("tiron_cron", argv, "Planificateur indisponible");
 }

@@ -271,3 +271,10 @@ def test_faq_en_erreur_ne_bloque_pas_le_routage(monkeypatch):
     monkeypatch.setattr(router_server, "_faq", _Boom())
     monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([("/q", 0.99)]))
     assert router_server.route_message("c koi SPLADE")["command"] == "/q"
+
+
+def test_ecrire_tapee_honoree_sans_laya(monkeypatch):
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([(None, 1.0)]))
+    assert router_server.route_message("/ecrire marie@ex.fr bonjour") == {
+        "status": "ok", "command": "/ecrire", "args": "marie@ex.fr bonjour"}
+    assert router_server.route_message("/ecrire") == {"status": "answer", "reply": "Usage : /ecrire <argument>"}

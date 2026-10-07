@@ -9,6 +9,7 @@ from tiron_mail.boite import Boite, ErreurBoite, criteres_imap
 def test_criteres_imap():
     j = date(2026, 10, 7)
     assert criteres_imap("de:paul chantier", j) == ["FROM", '"paul"', "TEXT", '"chantier"']
+    assert criteres_imap("devis toiture", j) == ["TEXT", '"devis"', "TEXT", '"toiture"']
     assert criteres_imap("objet:devis depuis:7j", j) == ["SUBJECT", '"devis"', "SINCE", "30-Sep-2026"]
     assert criteres_imap("", j) == ["ALL"]
 
@@ -39,3 +40,10 @@ def test_boite_injoignable(compte_gmail):
 def test_uid_introuvable(faux_imap, compte_gmail):
     with pytest.raises(ErreurBoite, match="introuvable"):
         Boite(compte_gmail, {"GMAIL_APP_PASSWORD": "x"}, connecter=faux_imap).lire("99")
+
+
+def test_phrase_naturelle_reduite_aux_mots_utiles():
+    j = date(2026, 10, 7)
+    assert criteres_imap("Ai-je reçu un mail de Paul sur le chantier ?", j) == \
+        ["TEXT", '"Paul"', "TEXT", '"chantier"']
+    assert criteres_imap("cherchez les mails de la banque", j) == ["TEXT", '"banque"']
