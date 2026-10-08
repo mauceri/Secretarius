@@ -68,25 +68,39 @@ Utilisez /wikistatus.
 
 ## À quoi sert l'agent gog ?
 ## Qu'est-ce que Secretarius peut faire avec Google ?
-L'agent gog donne accès au compte Google de l'utilisateur : messagerie Gmail et fichiers Google Drive.
+L'agent gog donne accès à l'agenda Google et aux fichiers Google Drive de l'utilisateur. Le courrier ne passe plus par gog : Tiron lit et envoie les emails lui-même (IMAP/SMTP).
 
+## Quelles boîtes mail Tiron consulte-t-il ?
+## Quelles adresses mail sont configurées ?
+## Depuis quelle adresse Tiron envoie-t-il les mails ?
+Tiron consulte cinq boîtes, chacune repérée par un préfixe dans les identifiants de message : g: Gmail (cmauceri@gmail.com), p: Proton personnel (christian@mauceri.me), t: tiron@secretarius.co, c: contact@secretarius.co, v: privacy@secretarius.co. Les boîtes Proton passent par Proton Bridge, sur sanroque. Un nouveau message (/ecrire) part de tiron@secretarius.co ; une réponse (/repondre) part de la boîte qui a reçu le message.
+
+## Comment voir mes derniers emails ?
+## Quelle commande pour lister les mails récents ?
+Utilisez /inbox [n] [boîte] : /inbox affiche les 10 derniers messages de chaque boîte, /inbox 3 proton les 3 derniers de la boîte Proton. Noms des boîtes : gmail, proton, tiron, contact, privacy.
+
+## Comment chercher un email ?
 ## Comment chercher un email dans Gmail ?
 ## Quelle commande pour retrouver un mail ?
-Utilisez /chercher <critères> : recherche par mot-clé, expéditeur ou période. /inbox liste les emails récents.
+Utilisez /chercher <critères> [boîte] : mots du message, de:<expéditeur>, objet:<mot>, depuis:<n>j — par exemple /chercher de:paul depuis:7j devis. Sans nom de boîte, la recherche porte sur toutes les boîtes.
 
 ## Comment lire le contenu d'un email ?
 ## Quelle commande pour ouvrir un mail précis ?
-Utilisez /lire <id> : lit le contenu d'un email par son identifiant, obtenu via /inbox ou /chercher.
+Utilisez /lire <id>, avec l'identifiant donné par /inbox ou /chercher (par exemple /lire p:42). Le contenu est affiché comme non fiable, à lire seulement ; les pièces jointes sont listées mais jamais ouvertes.
 
 ## Comment répondre à un email ?
 ## Quelle commande pour préparer une réponse à un mail ?
-Utilisez /repondre <contexte> : cela prépare un brouillon. Aucun email n'est envoyé automatiquement — il n'est expédié qu'après confirmation par /confirm.
+Utilisez /repondre <id> <texte> : Tiron montre l'aperçu (destinataire, boîte d'envoi, texte). Rien n'est envoyé avant /confirm ; /annuler abandonne.
+
+## Comment écrire un nouvel email ?
+## Comment envoyer un mail ?
+Utilisez /ecrire <adresse> <texte> : le message part de tiron@secretarius.co, et son objet reprend le début de la première ligne. Tiron montre l'aperçu ; rien n'est envoyé avant /confirm.
 
 ## Comment chercher un fichier sur Google Drive ?
 Utilisez /drive <critères>.
 
 ## Comment connecter mon compte Google ?
-Utilisez /connecter pour autoriser l'accès au compte Google.
+Utilisez /connecter pour autoriser l'accès au compte Google (agenda et Drive).
 
 ## Comment s'appelle le perroquet de Madame Michu ?
 ## Le perroquet de Mme Michu ?
