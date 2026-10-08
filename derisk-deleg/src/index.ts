@@ -11,7 +11,7 @@ import { readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync,
 import { homedir, hostname } from "node:os";
 import { join, basename } from "node:path";
 import { execSync } from "node:child_process";
-import { parseEnv, diffEnv, applyEnvDiff, syncSecretFile, validateTelegramToken, EXPECTED_TELEGRAM_BOT } from "./secrets-sync.js";
+import { parseEnv, diffEnv, applyEnvDiff, ajoutGateway, syncSecretFile, validateTelegramToken, EXPECTED_TELEGRAM_BOT } from "./secrets-sync.js";
 
 const ROUTER_URL = "http://127.0.0.1:8999/route";
 
@@ -571,17 +571,14 @@ export default definePluginEntry({
           label: string;
           restartUnit?: string;
           deferRestart?: boolean;
-          ajouter?: boolean;
+          ajouter?: (key: string) => boolean;
         }> = [
           {
             path: join(HOME, ".openclaw", "gateway.systemd.env"),
             label: "gateway.systemd.env",
             restartUnit: "openclaw-gateway.service",
             deferRestart: true,
-            // Ajout des clés manquantes : DÉSACTIVÉ en attendant de choisir une
-            // règle — secrets.env contient des clés qui changeraient le
-            // comportement du gateway (OPENCLAW_GATEWAY_PASSWORD, OPENAI_API_KEY…).
-            ajouter: false,
+            ajouter: ajoutGateway,
           },
           {
             path: process.env.WIKI_LM_REPO_ENV || join(HOME, "Secretarius", "Wiki_LM", ".env"),

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { parseEnv, diffEnv, applyEnvDiff, syncSecretFile, validateTelegramToken, EXPECTED_TELEGRAM_BOT } from "./secrets-sync.js";
+import { parseEnv, diffEnv, applyEnvDiff, ajoutGateway, syncSecretFile, validateTelegramToken, EXPECTED_TELEGRAM_BOT } from "./secrets-sync.js";
 
 describe("parseEnv", () => {
   it("lit des valeurs sans guillemets", () => {
@@ -40,8 +40,8 @@ describe("diffEnv", () => {
 });
 
 describe("diffEnv avec ajout des clés manquantes", () => {
-  it("ajoute les clés absentes de la cible quand ajouter=true (gateway)", () => {
-    const d = diffEnv({ A: "1", NEW: "x" }, { A: "0" }, true);
+  it("ajoute les clés absentes de la cible retenues par le filtre (gateway)", () => {
+    const d = diffEnv({ A: "1", NEW: "x" }, { A: "0" }, () => true);
     expect(d).toEqual([
       { key: "A", oldValue: "0", newValue: "1" },
       { key: "NEW", oldValue: "", newValue: "x", ajout: true },
@@ -49,6 +49,12 @@ describe("diffEnv avec ajout des clés manquantes", () => {
   });
   it("sans ajouter, comportement inchangé (Wiki_LM/.env)", () => {
     expect(diffEnv({ A: "1", NEW: "x" }, { A: "0" })).toEqual([{ key: "A", oldValue: "0", newValue: "1" }]);
+  });
+  it("liste blanche du gateway : GMAIL_APP_PASSWORD, PROTON_*, TIRON_* seulement", () => {
+    const src = { GMAIL_APP_PASSWORD: "g", PROTON_BRIDGE_PASS_PERSO: "p", TIRON_X: "t",
+      OPENAI_API_KEY: "o", OPENCLAW_GATEWAY_PASSWORD: "w", HF: "h" };
+    expect(diffEnv(src, {}, ajoutGateway).map((d) => d.key))
+      .toEqual(["GMAIL_APP_PASSWORD", "PROTON_BRIDGE_PASS_PERSO", "TIRON_X"]);
   });
 });
 

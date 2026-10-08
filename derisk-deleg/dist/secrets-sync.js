@@ -28,9 +28,10 @@ export function parseEnv(content) {
 // diffère — jamais d'ajout de clé absente du fichier cible (Wiki_LM/.env n'a
 // pas à recevoir TELEGRAM_BOT_TOKEN, par exemple).
 // `ajouter` (gateway.systemd.env seulement, 2026-10-07) : les clés de la
-// source absentes de la cible y sont aussi ajoutées — sinon une nouvelle clé
-// (GMAIL_APP_PASSWORD) n'atteignait jamais le gateway.
-export function diffEnv(source, target, ajouter = false) {
+// source absentes de la cible et retenues par ce filtre y sont aussi
+// ajoutées — sinon une nouvelle clé (GMAIL_APP_PASSWORD) n'atteignait jamais
+// le gateway.
+export function diffEnv(source, target, ajouter) {
     const diffs = [];
     for (const key of Object.keys(target)) {
         if (key in source && source[key] !== target[key]) {
@@ -39,11 +40,17 @@ export function diffEnv(source, target, ajouter = false) {
     }
     if (ajouter) {
         for (const key of Object.keys(source)) {
-            if (!(key in target))
+            if (!(key in target) && ajouter(key))
                 diffs.push({ key, oldValue: "", newValue: source[key], ajout: true });
         }
     }
     return diffs;
+}
+// Liste blanche du gateway : seules les clés du courrier y sont ajoutées.
+// secrets.env contient d'autres clés qui changeraient son comportement
+// (OPENCLAW_GATEWAY_PASSWORD, OPENAI_API_KEY…).
+export function ajoutGateway(key) {
+    return key === "GMAIL_APP_PASSWORD" || key.startsWith("PROTON_") || key.startsWith("TIRON_");
 }
 export function applyEnvDiff(content, diffs) {
     let out = content;
