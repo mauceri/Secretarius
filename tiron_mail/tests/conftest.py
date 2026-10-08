@@ -1,5 +1,8 @@
 """Faux serveurs IMAP et SMTP pour les tests de tiron_mail (aucun réseau)."""
+import email
+import imaplib
 from email.message import EmailMessage
+from email.utils import parsedate_to_datetime
 
 import pytest
 
@@ -32,6 +35,12 @@ class FauxIMAP:
         if commande == "search":
             self.recherches.append(args[1:])
             return "OK", [" ".join(str(u) for u in sorted(self.messages)).encode()]
+        if commande == "fetch" and args[1] == "(INTERNALDATE)":
+            lignes = []
+            for u in (int(x) for x in args[0].split(",")):
+                quand = parsedate_to_datetime(email.message_from_bytes(self.messages[u])["Date"])
+                lignes.append(f"{u} (UID {u} INTERNALDATE {imaplib.Time2Internaldate(quand)})".encode())
+            return "OK", lignes
         if commande == "fetch":
             u = int(args[0])
             if u not in self.messages:

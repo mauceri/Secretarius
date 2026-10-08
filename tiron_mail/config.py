@@ -26,6 +26,10 @@ class Compte:
     port_smtp: int
     securite_smtp: str
     secret_env: str
+    # Trier par date de réception plutôt que par UID : nécessaire pour Proton
+    # Bridge (UIDs dans l'ordre de sa synchronisation), inutile et coûteux pour
+    # Gmail (UIDs chronologiques, 24 s pour dater 143 000 messages).
+    tri_par_date: bool = False
 
 
 @dataclass(frozen=True)

@@ -35,6 +35,7 @@ hote_smtp = "127.0.0.1"
 port_smtp = 1025
 securite_smtp = "starttls"
 secret_env = "PROTON_BRIDGE_PASS_PERSO"
+tri_par_date = true  # le Bridge numérote dans l'ordre de sa synchronisation
 
 # Boîte de Tiron (Proton Business), via le même Bridge.
 [comptes.tiron]
@@ -48,3 +49,4 @@ hote_smtp = "127.0.0.1"
 port_smtp = 1025
 securite_smtp = "starttls"
 secret_env = "PROTON_BRIDGE_PASS_TIRON"
+tri_par_date = true  # le Bridge numérote dans l'ordre de sa synchronisation

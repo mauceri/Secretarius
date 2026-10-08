@@ -1,9 +1,11 @@
 # tiron_mail/tests/test_boite.py
+from dataclasses import replace
 from datetime import date
 
 import pytest
 
 from tiron_mail.boite import Boite, ErreurBoite, criteres_imap
+from tiron_mail.tests.conftest import FauxIMAP, brut
 
 
 def test_criteres_imap():
@@ -18,6 +20,15 @@ def test_lister_les_plus_recents_d_abord(faux_imap, compte_gmail):
     b = Boite(compte_gmail, {"GMAIL_APP_PASSWORD": "x"}, connecter=faux_imap)
     ids = [m["id"] for m in b.lister(2)]
     assert ids == ["g:3", "g:2"]
+
+
+def test_lister_trie_par_date_et_non_par_uid(compte_gmail):
+    # Proton Bridge numérote dans l'ordre de sa synchronisation (du plus récent
+    # au plus ancien) : l'UID le plus haut n'est pas le message le plus récent.
+    serveur = FauxIMAP({1: brut(3), 2: brut(2), 3: brut(1)})
+    compte = replace(compte_gmail, tri_par_date=True)
+    b = Boite(compte, {"GMAIL_APP_PASSWORD": "x"}, connecter=lambda c: serveur)
+    assert [m["id"] for m in b.lister(2)] == ["g:1", "g:2"]
 
 
 def test_lire(faux_imap, compte_gmail):

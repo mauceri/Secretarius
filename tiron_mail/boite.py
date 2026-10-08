@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import imaplib
+import re
 import ssl
+import time
 from collections.abc import Mapping
 from datetime import date, timedelta
 
@@ -104,12 +106,28 @@ class Boite:
             out.append({"id": ident, "resume": resume(analyser(self._fetch(conn, u, "(RFC822.HEADER)")), ident)})
         return out
 
+    def _par_date(self, conn, uids: list[int]) -> list[int]:
+        """UIDs triés du plus ancien au plus récent selon la date de réception.
+        Pour les boîtes dont les UIDs ne suivent pas les dates (tri_par_date)."""
+        if not uids:
+            return []
+        typ, data = conn.uid("fetch", ",".join(map(str, uids)), "(INTERNALDATE)")
+        dates: dict[int, float] = {}
+        for ligne in data if typ == "OK" else []:
+            ligne = ligne[0] if isinstance(ligne, tuple) else ligne
+            u = re.search(rb"UID (\d+)", ligne or b"")
+            t = imaplib.Internaldate2tuple(ligne or b"")
+            if u and t:
+                dates[int(u.group(1))] = time.mktime(t)
+        return sorted(uids, key=lambda u: (dates.get(u, 0.0), u))
+
     def _chercher(self, crit: list[str], n: int) -> list[dict]:
         conn = self._ouvrir()
         try:
             typ, data = conn.uid("search", None, *crit)
             uids = [int(x) for x in (data[0] or b"").split()] if typ == "OK" else []
-            return self._resumes(conn, sorted(uids)[-n:][::-1])
+            ordre = self._par_date(conn, uids) if self.compte.tri_par_date else sorted(uids)
+            return self._resumes(conn, ordre[-n:][::-1])
         except (OSError, imaplib.IMAP4.error) as e:
             raise ErreurBoite(f"boîte {self.compte.nom} injoignable : {e}") from e
         finally:
