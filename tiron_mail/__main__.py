@@ -6,6 +6,7 @@ Toujours code 0 et une ligne JSON {"ok": bool, "text": str, ...}.
   lire     --args "<id>"
   repondre --args "<id> <texte>" [--confirme --message-id <Message-ID de l'aperçu>]
   ecrire   --args "<adresse> <texte>" [--confirme]
+  bloc     --args "<bloc de note : à :, objet :, corps>" [--confirme]
 
 Sans --confirme, repondre et ecrire montrent l'aperçu et n'envoient rien.
 L'aperçu de repondre renvoie le Message-ID du message visé : à la confirmation,
@@ -24,6 +25,22 @@ from tiron_mail.config import CHEMIN_DEFAUT, ErreurConfig, charger, compte_de_pr
 from tiron_mail.envoi import _smtp, construire, envoyer
 
 _ADRESSE = re.compile(r'^[^@\s,;<>"]+@[^@\s,;<>"]+\.[^@\s,;<>"]+$')
+
+
+_ENTETE = re.compile(r"^\s*(à|a|objet)\s*:\s*(.*)$", re.IGNORECASE)
+
+
+def _lire_bloc(texte: str) -> tuple[str, str, str]:
+    """En-têtes « à : » et « objet : » en tête de bloc seulement, puis le corps."""
+    dest = objet = ""
+    lignes = texte.strip().splitlines()
+    while lignes and (m := _ENTETE.match(lignes[0])):
+        if m.group(1).lower() == "objet":
+            objet = m.group(2).strip()
+        else:
+            dest = m.group(2).strip()
+        lignes.pop(0)
+    return dest, objet, "\n".join(lignes).strip()
 
 
 def _tete_et_reste(args: str) -> tuple[str, str]:
@@ -67,7 +84,7 @@ def _message(cfg, env, connecter, ident: str):
 def main(argv=None, env=None, connecter=_connecter_imap, smtp=_smtp) -> int:
     env = os.environ if env is None else env
     p = argparse.ArgumentParser(prog="tiron_mail")
-    p.add_argument("commande", choices=["inbox", "chercher", "lire", "repondre", "ecrire"])
+    p.add_argument("commande", choices=["inbox", "chercher", "lire", "repondre", "ecrire", "bloc"])
     p.add_argument("--args", default="")
     p.add_argument("--confirme", action="store_true")
     p.add_argument("--message-id", default="")
@@ -107,6 +124,17 @@ def main(argv=None, env=None, connecter=_connecter_imap, smtp=_smtp) -> int:
                 out = {"ok": True, "args": a.args.strip(), "message_id": m["message_id"], "text": (
                     f"Réponse à « {sujet} » ({m['repondre_a']}), depuis {compte.adresse} :"
                     f"\n\n{texte.strip()}{alerte}")}
+        elif a.commande == "bloc":  # blocs /mail? et /mail! d'une note Obsidian
+            dest, objet, corps = _lire_bloc(a.args)
+            if not _ADRESSE.match(dest) or not corps:
+                raise ErreurBoite("bloc mail : une ligne « à : <adresse> » et un corps sont nécessaires")
+            compte = cfg.comptes[cfg.envoi_defaut]
+            objet = " ".join((objet or corps.splitlines()[0][:60]).split())
+            if a.confirme:
+                envoyer(construire(compte, dest, objet, corps), compte, env, smtp)
+                out = {"ok": True, "text": f"Courriel envoyé à {dest} depuis {compte.adresse}."}
+            else:
+                out = {"ok": True, "text": f"Courriel depuis {compte.adresse} à {dest}\nObjet : {objet}\n\n{corps}"}
         else:  # ecrire
             dest, texte = _tete_et_reste(a.args)
             if not _ADRESSE.match(dest) or not texte.strip():

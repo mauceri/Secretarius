@@ -209,3 +209,26 @@ def test_configuration_mal_formee_renvoie_du_json(capsys, tmp_path):
     p.write_text(GMAIL.replace("secret_env", "secret_envv"), encoding="utf-8")
     out = _call(capsys, ["inbox", "--args", ""], {"TIRON_MAIL_CONFIG": str(p)})
     assert out["ok"] is False and "Erreur" in out["text"]
+
+
+BLOC = "à : marie@ex.fr\nobjet : Compte rendu\nBonjour Marie,\nobjet : ceci reste dans le corps."
+
+
+def test_bloc_apercu_n_envoie_rien(capsys, env_test, faux_smtp):
+    out = _call(capsys, ["bloc", "--args=" + BLOC], env_test, faux_smtp)
+    assert out["ok"] and faux_smtp.envoyes == []
+    assert "à marie@ex.fr" in out["text"] and "Objet : Compte rendu" in out["text"]
+    assert "objet : ceci reste dans le corps." in out["text"]
+
+
+def test_bloc_confirme_envoie(capsys, env_test, faux_smtp):
+    out = _call(capsys, ["bloc", "--args=" + BLOC, "--confirme"], env_test, faux_smtp)
+    m = faux_smtp.envoyes[0]
+    assert m["To"] == "marie@ex.fr" and m["Subject"] == "Compte rendu" and m["From"] == "moi@gmail.com"
+    assert m.get_content().startswith("Bonjour Marie,") and out["text"].startswith("Courriel envoyé")
+
+
+def test_bloc_sans_destinataire_ou_sans_corps(capsys, env_test, faux_smtp):
+    assert _call(capsys, ["bloc", "--args=objet : x\ncorps"], env_test, faux_smtp)["ok"] is False
+    assert _call(capsys, ["bloc", "--args=à : m@ex.fr\nobjet : x"], env_test, faux_smtp)["ok"] is False
+    assert faux_smtp.envoyes == []
