@@ -150,6 +150,18 @@ def _tiron_cron(argv: list[str], entree: str | None = None) -> dict:
     return {"text": data.get("text", "")} if data.get("ok") else {"error": data.get("text", "")}
 
 
+def _tiron_mail(argv: list[str]) -> dict:
+    """Délègue à la CLI JSON tiron_mail (blocs mail? / mail!, spec courrier)."""
+    cwd = os.environ.get("SECRETARIUS_DIR") or str(Path.home() / "Secretarius")
+    p = subprocess.run(["python3", "-m", "tiron_mail", *argv], cwd=cwd,
+                       capture_output=True, text=True, timeout=150)
+    try:
+        data = json.loads(p.stdout)
+    except ValueError:
+        return {"error": (p.stderr or p.stdout or "tiron_mail indisponible").strip()[:500]}
+    return {"text": data.get("text", "")} if data.get("ok") else {"error": data.get("text", "")}
+
+
 @app.post("/livraison")
 def handle_livraison():
     """Webhook des tâches /cron (OpenClaw, cron.webhookToken) : note dans
@@ -202,6 +214,10 @@ _RUN_OPS = {
     "/cron?": lambda arg, vault: _tiron_cron(["preview", "--origin", "obsidian", "--args", arg]),
     "/cron!": lambda arg, vault: _tiron_cron(["add", "--origin", "obsidian", "--args", arg]),
     "/cron": lambda arg, vault: _tiron_cron(["manage", "--args", arg]),
+    # Courrier (spec 2026-10-07) : /mail? aperçu, /mail! envoi depuis l'adresse
+    # par défaut de tiron_mail (le ! tient lieu de /confirm).
+    "/mail?": lambda arg, vault: _tiron_mail(["bloc", f"--args={arg}"]),
+    "/mail!": lambda arg, vault: _tiron_mail(["bloc", f"--args={arg}", "--confirme"]),
     "/help": lambda arg, vault: op_help(),
 }
 

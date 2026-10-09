@@ -10,6 +10,7 @@ import {
 import { buildCaptureText } from "./capture-text";
 import {
   applyWikiResults,
+  blocArgMail,
   extractWikiBlocks,
   formatWikiResult,
   SUPPORTED_COMMANDS,
@@ -116,7 +117,7 @@ export default class WikilmCapturePlugin extends Plugin {
 
     const resultTexts: string[] = [];
     for (const block of blocks) {
-      resultTexts.push(await this.runOneCommand(block));
+      resultTexts.push(await this.runOneCommand(block, raw));
     }
 
     const newContent = applyWikiResults(raw, blocks, resultTexts);
@@ -124,7 +125,7 @@ export default class WikilmCapturePlugin extends Plugin {
     new Notice(`Lot exécuté : ${blocks.length} commande(s)`);
   }
 
-  async runOneCommand(block: WikiBlockMatch): Promise<string> {
+  async runOneCommand(block: WikiBlockMatch, noteText: string): Promise<string> {
     if (!(SUPPORTED_COMMANDS as readonly string[]).includes(block.command)) {
       return formatWikiResult(block.command, {}, true);
     }
@@ -133,7 +134,11 @@ export default class WikilmCapturePlugin extends Plugin {
         url: `${this.settings.serverUrl}/run`,
         method: "POST",
         contentType: "application/json",
-        body: JSON.stringify({ command: block.command, arg: block.arg, vault_name: this.app.vault.getName() }),
+        body: JSON.stringify({
+          command: block.command,
+          arg: block.command.startsWith("/mail") ? blocArgMail(block.arg, noteText) : block.arg,
+          vault_name: this.app.vault.getName(),
+        }),
         throw: false,
       });
       const data = (response.json as Record<string, unknown>) ?? {};

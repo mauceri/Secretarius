@@ -17,6 +17,8 @@ export const SUPPORTED_COMMANDS = [
   "/cron?",
   "/cron!",
   "/cron",
+  "/mail?",
+  "/mail!",
   "/help",
 ] as const;
 
@@ -49,6 +51,17 @@ export function extractWikiBlocks(noteText: string): WikiBlockMatch[] {
     });
   }
   return blocks;
+}
+
+const ENTETE_MAIL = /^\s*(à|a|objet)\s*:/i;
+
+// Bloc /mail? ou /mail! sans corps (seulement « à : » et « objet : ») : la
+// note, sans ses blocs ```wiki ni leurs résultats, devient le corps (spec courrier).
+export function blocArgMail(arg: string, noteText: string): string {
+  const corps = arg.split("\n").filter((l) => l.trim() && !ENTETE_MAIL.test(l));
+  if (corps.length > 0) return arg;
+  const note = noteText.replace(new RegExp(BLOCK_RE.source, "g"), "").replace(/\n{3,}/g, "\n\n").trim();
+  return `${arg}\n${note}`;
 }
 
 export function applyWikiResults(
@@ -149,6 +162,10 @@ export function formatWikiResult(
       return `${String(data.text ?? "")}\n\nRien n'a été créé. Remplacez par /cron! pour créer la tâche.`;
     case "/cron!":
     case "/cron":
+      return String(data.text ?? "");
+    case "/mail?":
+      return `${String(data.text ?? "")}\n\nRien n'a été envoyé. Remplacez par /mail! pour envoyer.`;
+    case "/mail!":
       return String(data.text ?? "");
     case "/help":
       return String(data.help ?? "");

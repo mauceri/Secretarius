@@ -365,3 +365,13 @@ class TestLivraison:
         r = client.post("/livraison", json=self.EVT, headers={"Authorization": "Bearer bon"})
         assert r.status_code == 200 and r.get_json() == {"text": "/x.md"}
         assert appels[0][0] == ["livrer"] and '"summary": "x"' in appels[0][1]
+
+
+class TestMail:
+    def test_mail_apercu_et_envoi_delegues(self, client, monkeypatch):
+        import server
+        appels = []
+        monkeypatch.setattr(server, "_tiron_mail", lambda argv: appels.append(argv) or {"text": "ok"})
+        client.post("/run", json={"command": "/mail?", "arg": "à : m@ex.fr\nx"})
+        client.post("/run", json={"command": "/mail!", "arg": "à : m@ex.fr\nx"})
+        assert appels == [["bloc", "--args=à : m@ex.fr\nx"], ["bloc", "--args=à : m@ex.fr\nx", "--confirme"]]

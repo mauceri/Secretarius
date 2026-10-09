@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyWikiResults,
+  blocArgMail,
   extractWikiBlocks,
   formatWikiResult,
   SUPPORTED_COMMANDS,
@@ -290,7 +291,7 @@ describe("SUPPORTED_COMMANDS", () => {
     expect(SUPPORTED_COMMANDS).not.toContain("/supprimer");
   });
 
-  it("contains exactly the nineteen commands from the specs (wiki + cron)", () => {
+  it("contains exactly the twenty-one commands from the specs (wiki + cron + mail)", () => {
     expect([...SUPPORTED_COMMANDS].sort()).toEqual(
       [
         "/c",
@@ -301,6 +302,8 @@ describe("SUPPORTED_COMMANDS", () => {
         "/ingest",
         "/kbupdate",
         "/lint",
+        "/mail!",
+        "/mail?",
         "/q",
         "/r",
         "/relire",
@@ -355,5 +358,26 @@ describe("formatWikiResult — /cron", () => {
   });
   it("erreur", () => {
     expect(formatWikiResult("/cron!", { error: "contenu vide" }, true)).toBe("**Erreur :** contenu vide");
+  });
+});
+
+describe("blocs /mail? et /mail!", () => {
+  it("mail? et mail! sont des commandes reconnues", () => {
+    expect(SUPPORTED_COMMANDS).toContain("/mail?");
+    expect(SUPPORTED_COMMANDS).toContain("/mail!");
+  });
+
+  it("bloc sans corps : la note, sans ses blocs, devient le corps", () => {
+    const note = "Bonjour Marie,\n\n```wiki\n/mail?\nà : m@ex.fr\n```\n\n<!-- wikilm-run:start -->\nancien\n<!-- wikilm-run:end -->\nÀ jeudi.";
+    expect(blocArgMail("à : m@ex.fr", note)).toBe("à : m@ex.fr\nBonjour Marie,\n\nÀ jeudi.");
+  });
+
+  it("bloc avec corps : inchangé", () => {
+    expect(blocArgMail("à : m@ex.fr\nobjet : x\nCorps", "note")).toBe("à : m@ex.fr\nobjet : x\nCorps");
+  });
+
+  it("mise en forme de l'aperçu", () => {
+    expect(formatWikiResult("/mail?", { text: "Courriel…" }, true))
+      .toBe("Courriel…\n\nRien n'a été envoyé. Remplacez par /mail! pour envoyer.");
   });
 });
