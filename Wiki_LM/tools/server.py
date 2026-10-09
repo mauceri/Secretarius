@@ -88,6 +88,21 @@ _embed_status: dict = {"running": False, "last": None, "error": None}
 _cluster_status: dict = {"running": False, "last": None, "error": None}
 
 
+# Origines d'Obsidian (bureau, iOS, Android). Une page web ouverte dans un
+# navigateur sur sanroque ou sur le tailnet ne doit pas pouvoir écrire ni lancer
+# /run — dont /mail!, qui envoie un courriel (revue du 2026-10-09). Les requêtes
+# sans Origin (plugin via requestUrl, processus locaux) restent acceptées.
+_ORIGINES_OBSIDIAN = {"app://obsidian.md", "capacitor://localhost", "http://localhost"}
+
+
+@app.before_request
+def _refuser_pages_web():
+    origine = request.headers.get("Origin")
+    if request.method == "POST" and request.path != "/livraison" and origine and origine not in _ORIGINES_OBSIDIAN:
+        return jsonify({"error": f"origine refusée : {origine}"}), 403
+    return None
+
+
 @app.after_request
 def _cors(response):
     response.headers["Access-Control-Allow-Origin"] = "*"

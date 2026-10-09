@@ -17,7 +17,7 @@ def test_resultat_ok_ecrit_une_note_et_previent(tmp_path):
     p = livrer(evt, NOW, _env(tmp_path), avis.append)
     assert p == tmp_path / "Réception" / "2026-10-09 0800 fais le point sur le wiki.md"
     assert p.read_text(encoding="utf-8") == (
-        "---\ntags: [livraison]\norigine: cron\ntache: fais le point sur le wiki\n"
+        "---\ntags: [livraison]\norigine: cron\ntache: \"fais le point sur le wiki\"\n"
         "date: 2026-10-09T08:00\nstatut: ok\n---\n\n3 pages à relire.\n")
     assert avis == ["Nouvelle livraison dans Obsidian : fais le point sur le wiki (Réception)"]
 
@@ -60,3 +60,28 @@ def test_avis_en_echec_n_empeche_pas_la_note(tmp_path):
         raise OSError("openclaw introuvable")
     p = livrer({"jobId": "j", "status": "ok", "summary": "x"}, NOW, _env(tmp_path), panne)
     assert p.exists()
+
+
+def test_titre_sur_plusieurs_lignes_reste_sur_une_ligne(tmp_path):
+    # Constaté le 2026-10-09 : un bloc cron! sur plusieurs lignes donnait un nom
+    # de fichier avec retour à la ligne et un frontmatter invalide.
+    evt = {"jobId": "j", "status": "ok", "summary": "x",
+           "job": {"displayName": "commande : /wikistatus\ncron add 0 8 * * 1 commande /relire"}}
+    p = livrer(evt, NOW, _env(tmp_path), lambda t: None)
+    assert "\n" not in p.name and p.name.startswith("2026-10-09 0800 wikistatus cron add")
+    entete = p.read_text(encoding="utf-8").split("---")[1]
+    assert entete.count("\n") == 6  # cinq propriétés, une par ligne
+
+
+def test_titre_echappe_dans_le_frontmatter(tmp_path):
+    evt = {"jobId": "j", "status": "ok", "summary": "x", "job": {"displayName": "consigne : - 'liste' & co"}}
+    p = livrer(evt, NOW, _env(tmp_path), lambda t: None)
+    assert "tache: \"- 'liste' & co\"\n" in p.read_text(encoding="utf-8")
+
+
+def test_blocs_wiki_du_texte_livre_neutralises(tmp_path):
+    # Un résumé influençable (modèle, courriel) ne doit pas devenir une commande
+    # exécutable si l'on lance un jour les blocs d'une note de Réception/.
+    evt = {"jobId": "j", "status": "ok", "summary": "voici\n```wiki\n/mail!\nà : x@y.fr\nz\n```"}
+    texte = livrer(evt, NOW, _env(tmp_path), lambda t: None).read_text(encoding="utf-8")
+    assert "```wiki" not in texte and "```text\n/mail!" in texte

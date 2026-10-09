@@ -289,38 +289,7 @@ Le résultat d'une tâche `/cron` de type consigne ou commande arrive par
 défaut dans une note de `~/Documents/Arbath/Réception/`
 (`TIRON_RECEPTION_DIR`), une note par livraison, suivie d'un avis Telegram ;
 le mot `telegram` dans `/cron add` garde l'ancienne livraison. Les rappels ne
-changent pas. Chaîne : OpenClaw (`--webhook`) → wiki-lm-server
-`POST /livraison` (jeton `Authorization: Bearer`, `TIRON_LIVRAISON_TOKEN`) →
-`python3 -m tiron_cron livrer` (note, puis `openclaw message send`).
-
-Réglages : `TIRON_LIVRAISON_TOKEN` dans `~/.config/secrets.env` (copié par
-`/maj` dans `gateway.systemd.env` et `Wiki_LM/.env`) ; `TIRON_TELEGRAM_CHAT_ID`
-dans `Wiki_LM/.env` ; dans `~/.openclaw/openclaw.json`,
-`cron.webhookToken: "${TIRON_LIVRAISON_TOKEN}"` et
-`cron.webhookSsrfPolicy.allowedHostnames: ["127.0.0.1"]` (OpenClaw refuse
-sinon toute adresse locale). Une tâche sautée ou sans résultat ne produit
-rien ; un échec produit une note « Échec » et un avis.
-
-### Courriel depuis une note (`/mail?`, `/mail!`)
-
-Un bloc ` ```wiki ` dont la première ligne est `/mail?` ou `/mail!` décrit un
-courriel : lignes d'en-tête `à : <adresse>` et `objet : <objet>` en tête de
-bloc, puis le corps. Sans corps dans le bloc, la note elle-même (sans ses
-blocs ` ```wiki ` ni leurs résultats) sert de corps. `/mail?` insère l'aperçu
-sous le bloc, sans rien envoyer ; `/mail!` envoie (le `!` tient lieu de
-`/confirm`). Expéditeur : l'adresse par défaut de `tiron_mail`
-(`envoi.defaut` dans `~/.config/tiron_mail/comptes.toml`, aujourd'hui
-tiron@secretarius.co). Chemin : plugin → `POST /run` → `python3 -m tiron_mail
-bloc`. wiki-lm-server a besoin de `PROTON_BRIDGE_PASS_PERSO` dans
-`Wiki_LM/.env` (rempli par `/maj`).
-
-## Livraisons des tâches `/cron` (`Réception/`)
-
-Le résultat d'une tâche `/cron` de type consigne ou commande arrive par
-défaut dans une note de `~/Documents/Arbath/Réception/`
-(`TIRON_RECEPTION_DIR`), une note par livraison, suivie d'un avis Telegram ;
-le mot `telegram` dans `/cron add` garde l'ancienne livraison. Les rappels ne
-changent pas. Chaîne : OpenClaw (`--webhook`) → wiki-lm-server
+changent pas (canal d'origine). Chaîne : OpenClaw (`--webhook`) → wiki-lm-server
 `POST /livraison` (jeton `Authorization: Bearer`, `TIRON_LIVRAISON_TOKEN`) →
 `python3 -m tiron_cron livrer` (note, puis `openclaw message send`).
 

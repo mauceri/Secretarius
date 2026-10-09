@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyWikiResults,
   blocArgMail,
+  dejaEnvoye,
   extractWikiBlocks,
   formatWikiResult,
   SUPPORTED_COMMANDS,
@@ -379,5 +380,25 @@ describe("blocs /mail? et /mail!", () => {
   it("mise en forme de l'aperçu", () => {
     expect(formatWikiResult("/mail?", { text: "Courriel…" }, true))
       .toBe("Courriel…\n\nRien n'a été envoyé. Remplacez par /mail! pour envoyer.");
+  });
+});
+
+describe("pas de double envoi ni de métadonnées (revue du 2026-10-09)", () => {
+  const envoye = "```wiki\n/mail!\nà : m@ex.fr\nx\n```\n\n<!-- wikilm-run:start -->\nCourriel envoyé à m@ex.fr depuis t@ex.fr.\n<!-- wikilm-run:end -->";
+
+  it("un /mail! déjà envoyé n'est pas relancé, son résultat est gardé", () => {
+    const [b] = extractWikiBlocks(envoye);
+    expect(b.previousResult).toBe("Courriel envoyé à m@ex.fr depuis t@ex.fr.");
+    expect(dejaEnvoye(b)).toBe(true);
+  });
+
+  it("un /mail? devenu /mail! (résultat d'aperçu) part bien", () => {
+    const note = "```wiki\n/mail!\nà : m@ex.fr\nx\n```\n\n<!-- wikilm-run:start -->\nCourriel depuis t@ex.fr à m@ex.fr\n<!-- wikilm-run:end -->";
+    expect(dejaEnvoye(extractWikiBlocks(note)[0])).toBe(false);
+  });
+
+  it("les propriétés de la note ne partent pas dans le corps", () => {
+    const note = "---\ntags: [x]\nwiki_capture: 2026-10-09\n---\nBonjour.\n\n```wiki\n/mail?\nà : m@ex.fr\n```";
+    expect(blocArgMail("à : m@ex.fr", note)).toBe("à : m@ex.fr\nBonjour.");
   });
 });

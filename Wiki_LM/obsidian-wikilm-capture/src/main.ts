@@ -11,6 +11,7 @@ import { buildCaptureText } from "./capture-text";
 import {
   applyWikiResults,
   blocArgMail,
+  dejaEnvoye,
   extractWikiBlocks,
   formatWikiResult,
   SUPPORTED_COMMANDS,
@@ -117,7 +118,7 @@ export default class WikilmCapturePlugin extends Plugin {
 
     const resultTexts: string[] = [];
     for (const block of blocks) {
-      resultTexts.push(await this.runOneCommand(block, raw));
+      resultTexts.push(dejaEnvoye(block) ? block.previousResult ?? "" : await this.runOneCommand(block, raw));
     }
 
     const newContent = applyWikiResults(raw, blocks, resultTexts);

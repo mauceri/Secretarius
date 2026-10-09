@@ -383,3 +383,23 @@ def test_livraison_journalisee(client, monkeypatch, capsys):
     monkeypatch.setattr(server, "_tiron_cron", lambda argv, entree=None: {"text": "/x.md ; avis Telegram non envoyé : y"})
     client.post("/livraison", json={"status": "ok"}, headers={"Authorization": "Bearer bon"})
     assert "[livraison] /x.md ; avis Telegram non envoyé : y" in capsys.readouterr().out
+
+
+class TestOrigine:
+    """CSRF : une page web ne doit pas pouvoir lancer /run (dont /mail!), revue du 2026-10-09."""
+
+    def test_page_web_refusee(self, client, monkeypatch):
+        import server
+        appels = []
+        monkeypatch.setattr(server, "_tiron_mail", lambda argv: appels.append(argv) or {"text": "ok"})
+        r = client.post("/run", json={"command": "/mail!", "arg": "à : x@y.fr\nz"},
+                        headers={"Origin": "https://evil.example"})
+        assert r.status_code == 403 and appels == []
+
+    def test_obsidian_et_sans_origine_acceptes(self, client, monkeypatch):
+        import server
+        monkeypatch.setattr(server, "_tiron_mail", lambda argv: {"text": "ok"})
+        for entetes in ({}, {"Origin": "app://obsidian.md"}, {"Origin": "capacitor://localhost"},
+                        {"Origin": "http://localhost"}):
+            r = client.post("/run", json={"command": "/mail?", "arg": "à : x@y.fr\nz"}, headers=entetes)
+            assert r.status_code == 200, entetes

@@ -26,12 +26,13 @@ export interface WikiBlockMatch {
   command: string;
   arg: string;
   content: string;
+  previousResult?: string;
   start: number;
   end: number;
 }
 
 const BLOCK_RE =
-  /```wiki\r?\n([\s\S]*?)\r?\n```(?:\r?\n+<!-- wikilm-run:start -->[\s\S]*?<!-- wikilm-run:end -->)?/g;
+  /```wiki\r?\n([\s\S]*?)\r?\n```(?:\r?\n+<!-- wikilm-run:start -->\r?\n?([\s\S]*?)\r?\n?<!-- wikilm-run:end -->)?/g;
 
 export function extractWikiBlocks(noteText: string): WikiBlockMatch[] {
   const blocks: WikiBlockMatch[] = [];
@@ -46,6 +47,7 @@ export function extractWikiBlocks(noteText: string): WikiBlockMatch[] {
       command,
       arg,
       content,
+      ...(match[2] !== undefined ? { previousResult: match[2] } : {}),
       start: match.index,
       end: match.index + match[0].length,
     });
@@ -60,8 +62,18 @@ const ENTETE_MAIL = /^\s*(à|a|objet)\s*:/i;
 export function blocArgMail(arg: string, noteText: string): string {
   const corps = arg.split("\n").filter((l) => l.trim() && !ENTETE_MAIL.test(l));
   if (corps.length > 0) return arg;
-  const note = noteText.replace(new RegExp(BLOCK_RE.source, "g"), "").replace(/\n{3,}/g, "\n\n").trim();
+  const note = noteText
+    .replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, "") // propriétés de la note : jamais au destinataire
+    .replace(new RegExp(BLOCK_RE.source, "g"), "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
   return `${arg}\n${note}`;
+}
+
+// Relancer les commandes d'une note ne renvoie jamais un courriel déjà parti :
+// seul un résultat « Courriel envoyé » bloque (un aperçu /mail? devenu /mail! part).
+export function dejaEnvoye(block: WikiBlockMatch): boolean {
+  return block.command === "/mail!" && (block.previousResult ?? "").startsWith("Courriel envoyé");
 }
 
 export function applyWikiResults(
