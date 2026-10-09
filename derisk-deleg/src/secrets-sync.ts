@@ -72,7 +72,7 @@ export function applyEnvDiff(content: string, diffs: EnvDiffEntry[]): string {
   for (const { key, newValue, ajout } of diffs) {
     const re = new RegExp(`^${key}=.*$`, "m");
     if (re.test(out)) {
-      out = out.replace(re, `${key}=${newValue}`);
+      out = out.replace(re, () => `${key}=${newValue}`); // fonction : les $ de la valeur restent tels quels
     } else if (ajout) {
       out = `${out}${out === "" || out.endsWith("\n") ? "" : "\n"}${key}=${newValue}\n`;
     }

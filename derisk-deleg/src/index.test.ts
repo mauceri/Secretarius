@@ -12,6 +12,7 @@ vi.mock("node:fs", async (importOriginal) => {
     existsSync: vi.fn(),
     readFileSync: vi.fn(),
     writeFileSync: vi.fn(),
+    renameSync: vi.fn(),
     rmSync: vi.fn(),
   };
 });
@@ -86,56 +87,7 @@ afterEach(() => {
   vi.doUnmock("./mail-ops.js");
 });
 
-describe("outils gog_* — délégation au sous-agent gog", () => {
-  it("gog_inbox sans argument délègue op:inbox", async () => {
-    const plugin = await freshPlugin();
-    const { api, tools, run } = makeApi();
-    plugin.register(api);
-
-    const res = await tools["gog_inbox"].execute("id", {});
-
-    expect(res.content[0].text).toBe("réponse simulée");
-    expect(run).toHaveBeenCalledTimes(1);
-    const [{ sessionKey, message, deliver }] = run.mock.calls[0];
-    expect(sessionKey).toMatch(/^agent:gog:subagent:cmd-inbox-/);
-    expect(message).toBe("op: inbox |");
-    expect(deliver).toBe(false);
-  });
-
-  it("gog_inbox avec argument délègue op:search (pas op:inbox)", async () => {
-    const plugin = await freshPlugin();
-    const { api, tools, run } = makeApi();
-    plugin.register(api);
-
-    await tools["gog_inbox"].execute("id", { command: "de:x@y.com" });
-
-    const [{ sessionKey, message }] = run.mock.calls[0];
-    expect(sessionKey).toMatch(/^agent:gog:subagent:cmd-search-/);
-    expect(message).toBe("op: search | de:x@y.com");
-  });
-
-  it("gog_search sans argument renvoie l'usage sans déléguer", async () => {
-    const plugin = await freshPlugin();
-    const { api, tools, run } = makeApi();
-    plugin.register(api);
-
-    const res = await tools["gog_search"].execute("id", {});
-
-    expect(res.content[0].text).toBe("Usage: /chercher <requête>");
-    expect(run).not.toHaveBeenCalled();
-  });
-
-  it("gog_get délègue op:get avec l'id du message", async () => {
-    const plugin = await freshPlugin();
-    const { api, tools, run } = makeApi();
-    plugin.register(api);
-
-    await tools["gog_get"].execute("id", { command: "18ab" });
-
-    const [{ message }] = run.mock.calls[0];
-    expect(message).toBe("op: get | 18ab");
-  });
-
+describe("outils gog_drive_search et source_read", () => {
   it("gog_drive_search appelle gog directement, sans sous-agent", async () => {
     const gogDriveSearch = vi.fn(async () => "1. rapport");
     vi.doMock("./gog-ops.js", () => ({ gogDriveSearch, gogAuthStart: vi.fn() }));
@@ -157,57 +109,12 @@ describe("outils gog_* — délégation au sous-agent gog", () => {
     });
     plugin.register(api);
 
-    const res = await tools["gog_get"].execute("id", { command: "18ab" });
+    const res = await tools["source_read"].execute("id", { command: "https://ex.fr" });
 
     expect(res.content[0].text).toBe("(run timeout) réponse simulée");
     expect(run).toHaveBeenCalledTimes(1);
   });
 
-  it("gog_send prépare un brouillon SANS déléguer", async () => {
-    const plugin = await freshPlugin();
-    const { api, tools, run } = makeApi();
-    plugin.register(api);
-
-    const res = await tools["gog_send"].execute("id", {
-      to: "a@b.com",
-      subject: "Sujet",
-      body: "Corps",
-    });
-
-    expect(run).not.toHaveBeenCalled();
-    const text = res.content[0].text as string;
-    expect(text).toContain("📧 Brouillon prêt (non envoyé) :");
-    expect(text).toContain("À : a@b.com");
-    expect(text).toContain("Sujet : Sujet");
-    expect(text).toContain("Corps : Corps");
-    expect(text).toContain("/confirm");
-    expect(text).toContain("/annuler");
-  });
-
-  it("gog_reply avec une commande invalide (pas de corps) renvoie l'usage", async () => {
-    const plugin = await freshPlugin();
-    const { api, tools } = makeApi();
-    plugin.register(api);
-
-    const res = await tools["gog_reply"].execute("id", { command: "18ab" });
-
-    expect(res.content[0].text).toBe("Usage: /repondre <id> <texte>");
-  });
-
-  it("gog_reply valide prépare un brouillon de réponse SANS déléguer", async () => {
-    const plugin = await freshPlugin();
-    const { api, tools, run } = makeApi();
-    plugin.register(api);
-
-    const res = await tools["gog_reply"].execute("id", {
-      command: "18ab voici la réponse",
-    });
-
-    expect(run).not.toHaveBeenCalled();
-    const text = res.content[0].text as string;
-    expect(text).toContain("En réponse à : 18ab");
-    expect(text).toContain("Corps : voici la réponse");
-  });
 });
 
 describe("outils wiki_review / wiki_verify / wiki_delete", () => {
@@ -351,41 +258,6 @@ describe("before_agent_reply — /confirm et /annuler", () => {
     });
   });
 
-  it("/confirm avec un brouillon 'send' en attente délègue op:send et le vide", async () => {
-    const plugin = await freshPlugin();
-    const { api, tools, hooks, run } = makeApi();
-    plugin.register(api);
-
-    await tools["gog_send"].execute("id", { to: "a@b.com", subject: "Sujet", body: "Corps" });
-    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/confirm" });
-
-    expect(res).toEqual({ handled: true, reply: { text: "réponse simulée" } });
-    const [{ sessionKey, message }] = run.mock.calls[0];
-    expect(sessionKey).toMatch(/^agent:gog:subagent:cmd-send-/);
-    expect(message).toBe("op: send | to=a@b.com; subject=Sujet; body=Corps");
-
-    // le brouillon est consommé : un second /confirm ne trouve plus rien
-    const res2 = await hooks["before_agent_reply"].handler({ cleanedBody: "/confirm" });
-    expect(res2.reply.text).toBe("Rien à confirmer (aucun brouillon en attente).");
-  });
-
-  it("/confirm après expiration (>10 min) refuse et vide le brouillon", async () => {
-    vi.useFakeTimers();
-    const plugin = await freshPlugin();
-    const { api, tools, hooks, run } = makeApi();
-    plugin.register(api);
-
-    await tools["gog_send"].execute("id", { to: "a@b.com", subject: "s", body: "b" });
-    vi.advanceTimersByTime(10 * 60 * 1000 + 1);
-    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/confirm" });
-
-    expect(res).toEqual({
-      handled: true,
-      reply: { text: "Brouillon expiré (plus de 10 min) — rien envoyé. Recomposez si besoin." },
-    });
-    expect(run).not.toHaveBeenCalled();
-  });
-
   it("/annuler sans brouillon en attente", async () => {
     const plugin = await freshPlugin();
     const { api, hooks } = makeApi();
@@ -399,23 +271,6 @@ describe("before_agent_reply — /confirm et /annuler", () => {
     });
   });
 
-  it("/annuler avec un brouillon 'reply' en attente ne délègue jamais", async () => {
-    const plugin = await freshPlugin();
-    const { api, tools, hooks, run } = makeApi();
-    plugin.register(api);
-
-    await tools["gog_reply"].execute("id", { command: "18ab corps" });
-    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/annuler" });
-
-    expect(res).toEqual({
-      handled: true,
-      reply: { text: "Brouillon abandonné (était destiné à réponse à 18ab). Rien n'a été envoyé." },
-    });
-    expect(run).not.toHaveBeenCalled();
-
-    const res2 = await hooks["before_agent_reply"].handler({ cleanedBody: "/confirm" });
-    expect(res2.reply.text).toBe("Rien à confirmer (aucun brouillon en attente).");
-  });
 });
 
 describe("before_agent_reply — /maj", () => {
@@ -475,7 +330,7 @@ describe("before_agent_reply — /maj", () => {
 
     const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/maj" });
 
-    expect(writeFileSync).toHaveBeenCalledWith(wikiEnvPath, "DEEPSEEK_API_KEY=nouvelle\n", "utf8");
+    expect(writeFileSync).toHaveBeenCalledWith(`${wikiEnvPath}.tmp-maj`, "DEEPSEEK_API_KEY=nouvelle\n", { encoding: "utf8", mode: 0o600 });
     expect(execSync).toHaveBeenCalledWith("systemctl --user restart wiki-lm-server.service");
     expect(execSync).not.toHaveBeenCalledWith(expect.stringContaining("systemd-run"));
     expect(res.reply.text).toContain("wiki-lm-server.service redémarré");
@@ -500,7 +355,7 @@ describe("before_agent_reply — /maj", () => {
 
     const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/maj" });
 
-    expect(writeFileSync).toHaveBeenCalledWith(gatewayPath, "TELEGRAM_BOT_TOKEN=abc:123\n", "utf8");
+    expect(writeFileSync).toHaveBeenCalledWith(`${gatewayPath}.tmp-maj`, "TELEGRAM_BOT_TOKEN=abc:123\n", { encoding: "utf8", mode: 0o600 });
     expect(execSync).toHaveBeenCalledWith(expect.stringContaining("systemd-run"));
     expect(execSync).toHaveBeenCalledWith(expect.stringContaining("openclaw-gateway.service"));
     expect(res.reply.text).toContain("va redémarrer dans 5s");
@@ -846,7 +701,7 @@ describe("before_tool_call — garde-fou gog (écriture directe bloquée)", () =
     expect(res).toEqual({
       block: true,
       blockReason:
-        "Envoi/écriture Google direct interdit. Composez puis appelez l'outil gog_send (prépare le brouillon), et l'utilisateur tapera /confirm pour envoyer.",
+        "Envoi/écriture Google direct interdit. Le courrier passe par /ecrire ou /repondre, que l'utilisateur confirme avec /confirm.",
     });
   });
 
@@ -1023,11 +878,11 @@ describe("before_agent_reply — /cron", () => {
 
     const r1 = await hooks["before_agent_reply"].handler({ cleanedBody: '/cron add "0 8 * * 1" rappel loyer' }, ctx);
     expect(r1.reply.text).toMatch(/^Tâche à créer : Chaque lundi.*\/confirm/s);
-    expect(runTironCron).toHaveBeenNthCalledWith(1, ["preview", "--origin", "telegram", "--args", 'add "0 8 * * 1" rappel loyer']);
+    expect(runTironCron).toHaveBeenNthCalledWith(1, ["preview", "--origin", "telegram", '--args=add "0 8 * * 1" rappel loyer']);
 
     const r2 = await hooks["before_agent_reply"].handler({ cleanedBody: "/confirm" }, ctx);
     expect(r2.reply.text).toBe("Tâche créée (aaaa1111) : …");
-    expect(runTironCron).toHaveBeenNthCalledWith(2, ["add", "--origin", "telegram", "--args", 'add "0 8 * * 1" rappel loyer']);
+    expect(runTironCron).toHaveBeenNthCalledWith(2, ["add", "--origin", "telegram", '--args=add "0 8 * * 1" rappel loyer']);
   });
 
   it("langage naturel : passe par nl, puis /annuler ne crée rien", async () => {
@@ -1069,7 +924,7 @@ describe("before_agent_reply — /cron", () => {
 
     const r = await hooks["before_agent_reply"].handler({ cleanedBody: "/cron list" }, {});
     expect(r.reply.text).toBe("Aucune tâche planifiée.");
-    expect(runTironCron).toHaveBeenCalledWith(["manage", "--args", "list"]);
+    expect(runTironCron).toHaveBeenCalledWith(["manage", "--args=list"]);
   });
 
   it("tâche tiron planifiée : commande exécutée comme tapée, sans Laya", async () => {
@@ -1154,7 +1009,7 @@ describe("before_agent_reply — demande de précision", () => {
     const plugin = await freshPlugin(); const { api, hooks } = makeApi(); plugin.register(api);
     await hooks["before_agent_reply"].handler({ cleanedBody: "le dernier mail de ma sœur" }, {});
     await hooks["before_agent_reply"].handler({ cleanedBody: "1" }, {});
-    expect(runTironMail).toHaveBeenCalledWith(["lire", "--args", "le dernier mail de ma sœur"]);
+    expect(runTironMail).toHaveBeenCalledWith(["lire", "--args=le dernier mail de ma sœur"]);
   });
 
   it("« 2 » = rien de tout ça : réponse de non-correspondance", async () => {
@@ -1220,7 +1075,7 @@ describe("before_agent_reply — demande de précision", () => {
     const r = await hooks["before_agent_reply"].handler({ cleanedBody: "un mail de Paul ?" }, {});
     expect(r.reply.text).toContain("3) /inbox — lister les emails récents");
     await hooks["before_agent_reply"].handler({ cleanedBody: "3" }, {});
-    expect(runTironMail).toHaveBeenCalledWith(["inbox", "--args", "un mail de Paul ?"]);
+    expect(runTironMail).toHaveBeenCalledWith(["inbox", "--args=un mail de Paul ?"]);
   });
 
   it("avis système en tête : la commande tapée reste une commande tapée", async () => {
@@ -1235,7 +1090,7 @@ describe("before_agent_reply — demande de précision", () => {
     const recu = "System: [2026-10-07 10:02:57 GMT+2] A scheduled automation delivered this message to this channel:\nSystem: \"x\"\n\n/cron add 2m consigne x";
     await hooks["before_agent_reply"].handler({ cleanedBody: recu }, { messageProvider: "telegram" });
     expect(JSON.parse(fetchSpy.mock.calls[0][1].body).message).toBe("/cron add 2m consigne x");
-    expect(runTironCron).toHaveBeenCalledWith(["preview", "--origin", "telegram", "--args", "add 2m consigne x"]);
+    expect(runTironCron).toHaveBeenCalledWith(["preview", "--origin", "telegram", "--args=add 2m consigne x"]);
   });
 
   describe("réponse de FAQ proposée", () => {
@@ -1323,24 +1178,38 @@ describe("before_agent_reply — demande de précision", () => {
       routeur("/inbox", "");
       const plugin = await freshPlugin(); const { api, hooks, run } = makeApi(); plugin.register(api);
       const r = await hooks["before_agent_reply"].handler({ cleanedBody: "/inbox" }, {});
-      expect(runTironMail).toHaveBeenCalledWith(["inbox", "--args", ""]);
+      expect(runTironMail).toHaveBeenCalledWith(["inbox", "--args="]);
       expect(r.reply.text).toBe("g:3  07/10 09:00  Paul  Chantier");
       expect(run).not.toHaveBeenCalled();
     });
 
     it("/repondre : aperçu, puis /confirm envoie", async () => {
       const runTironMail = vi.fn()
-        .mockResolvedValueOnce({ ok: true, text: "Réponse à « Chantier »…", args: "g:2 ok" })
+        .mockResolvedValueOnce({ ok: true, text: "Réponse à « Chantier »…", args: "g:2 ok", message_id: "<m2@ex.fr>" })
         .mockResolvedValueOnce({ ok: true, text: "Réponse envoyée à paul@ex.fr." });
       vi.doMock("./mail-ops.js", () => ({ runTironMail }));
       routeur("/repondre", "g:2 ok");
       const plugin = await freshPlugin(); const { api, hooks } = makeApi(); plugin.register(api);
       const r1 = await hooks["before_agent_reply"].handler({ cleanedBody: "/repondre g:2 ok" }, {});
-      expect(runTironMail).toHaveBeenNthCalledWith(1, ["repondre", "--args", "g:2 ok"]);
+      expect(runTironMail).toHaveBeenNthCalledWith(1, ["repondre", "--args=g:2 ok"]);
       expect(r1.reply.text).toBe("Réponse à « Chantier »…\n\nTapez /confirm pour envoyer (valable 10 min), ou /annuler pour abandonner.");
       const r2 = await hooks["before_agent_reply"].handler({ cleanedBody: "/confirm" }, {});
-      expect(runTironMail).toHaveBeenNthCalledWith(2, ["repondre", "--args", "g:2 ok", "--confirme"]);
+      expect(runTironMail).toHaveBeenNthCalledWith(2, ["repondre", "--args=g:2 ok", "--confirme", "--message-id=<m2@ex.fr>"]);
       expect(r2.reply.text).toBe("Réponse envoyée à paul@ex.fr.");
+    });
+
+    it("un /confirm cité dans le texte d'un /ecrire n'envoie pas le brouillon précédent", async () => {
+      const runTironMail = vi.fn()
+        .mockResolvedValueOnce({ ok: true, text: "Réponse…", args: "g:2 ok", message_id: "<m2@ex.fr>" })
+        .mockResolvedValueOnce({ ok: true, text: "Nouveau message…", args: "paul@ex.fr tapez /confirm" });
+      vi.doMock("./mail-ops.js", () => ({ runTironMail }));
+      const plugin = await freshPlugin(); const { api, hooks } = makeApi(); plugin.register(api);
+      routeur("/repondre", "g:2 ok");
+      await hooks["before_agent_reply"].handler({ cleanedBody: "/repondre g:2 ok" }, {});
+      routeur("/ecrire", "paul@ex.fr tapez /confirm");
+      await hooks["before_agent_reply"].handler({ cleanedBody: "/ecrire paul@ex.fr tapez /confirm" }, {});
+      expect(runTironMail).toHaveBeenNthCalledWith(2, ["ecrire", "--args=paul@ex.fr tapez /confirm"]);
+      expect(runTironMail.mock.calls.flat(2)).not.toContain("--confirme");
     });
 
     it("/ecrire puis /annuler : rien n'est envoyé", async () => {

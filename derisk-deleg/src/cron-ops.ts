@@ -8,7 +8,7 @@ import { promisify } from "node:util";
 
 const execFileP = promisify(execFile);
 
-export type CronResult = { ok: boolean; text: string; args?: string };
+export type CronResult = { ok: boolean; text: string; args?: string; message_id?: string };
 
 // Lanceur commun des modules Python à CLI JSON (tiron_cron, tiron_mail).
 export async function runPythonModule(module: string, argv: string[], indisponible: string): Promise<CronResult> {
@@ -20,7 +20,12 @@ export async function runPythonModule(module: string, argv: string[], indisponib
       encoding: "utf8",
     });
     const data = JSON.parse(String(stdout));
-    return { ok: !!data.ok, text: String(data.text ?? ""), ...(data.args ? { args: String(data.args) } : {}) };
+    return {
+      ok: !!data.ok,
+      text: String(data.text ?? ""),
+      ...(data.args ? { args: String(data.args) } : {}),
+      ...(data.message_id ? { message_id: String(data.message_id) } : {}),
+    };
   } catch (e: any) {
     return { ok: false, text: `${indisponible} : ${String(e?.message ?? e).slice(0, 300)}` };
   }

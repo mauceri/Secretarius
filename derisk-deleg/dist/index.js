@@ -1,13 +1,12 @@
 import { Type } from "typebox";
 import { definePluginEntry } from "openclaw/plugin-sdk/core";
-import { parseReply } from "./parse.js";
 import { commandToAction } from "./dispatch.js";
 import { runTironCron } from "./cron-ops.js";
 import { runTironMail } from "./mail-ops.js";
 import { gogAuthStart, gogDriveSearch } from "./gog-ops.js";
 import { CRON_COMMANDS, sansAvisSysteme, unwrapCronEnvelope } from "./cron-envelope.js";
 import { fetchWikiOpJson, runWikiOp } from "./wiki-ops.js";
-import { readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync, copyFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync, copyFileSync, mkdirSync, renameSync } from "node:fs";
 import { homedir, hostname } from "node:os";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
@@ -91,13 +90,9 @@ function uniq() {
 function delegateScout(api, url) {
     return runAndRead(api, `agent:scout:subagent:cmd-source-${uniq()}`, `url: ${url}`);
 }
-// gog : message "op: <op> | <arg>" vers l'agent gog (Google via gog en sandbox).
-function delegateGog(api, op, arg) {
-    return runAndRead(api, `agent:gog:subagent:cmd-${op}-${uniq()}`, `op: ${op} | ${arg}`.trimEnd());
-}
-// Brouillon d'email en attente de confirmation (assistant mono-utilisateur).
-// Le flux : gog_send prépare le brouillon (n'envoie pas) -> /confirm l'envoie via
-// l'agent gog. Confirmation déterministe et Telegram-native, sans approbation native.
+// Action en attente de confirmation (assistant mono-utilisateur) : envoi de
+// courrier, écriture wiki, tâche planifiée. Confirmation déterministe et
+// Telegram-native (/confirm), sans approbation native.
 // Expire après PENDING_TTL_MS pour éviter qu'un /confirm tardif envoie un périmé.
 const PENDING_TTL_MS = 10 * 60 * 1000;
 let pending = null;
@@ -228,7 +223,7 @@ export default definePluginEntry({
             },
         });
         // Écriture : ne marque JAMAIS directement, même appelé en tant qu'outil —
-        // prépare la confirmation comme gog_send/gog_reply. "verify" est absent
+        // prépare la confirmation comme les envois de courrier. "verify" est absent
         // de WIKI_READ_OPS, donc le flux /confirm générique (router-write) le
         // traiterait déjà ainsi si inféré du langage naturel ; ce garde-fou dans
         // l'outil lui-même le rend vrai aussi pour un appel de modèle direct.
@@ -297,48 +292,6 @@ export default definePluginEntry({
             },
         });
         api.registerTool({
-            name: "gog_inbox",
-            description: "List recent inbox emails (delegates 'op: inbox' to the gog agent, which runs gog in its sandbox).",
-            parameters: Type.Object({
-                command: Type.Optional(Type.String({ description: "Optional Gmail query (default: in:inbox)." })),
-            }),
-            async execute(_id, params) {
-                const q = (params?.command ?? "").trim();
-                const out = q
-                    ? await delegateGog(api, "search", q)
-                    : await delegateGog(api, "inbox", "");
-                return { content: [{ type: "text", text: out.slice(0, 4000) }] };
-            },
-        });
-        api.registerTool({
-            name: "gog_search",
-            description: "Rechercher des emails Gmail (délègue 'op: search' à l'agent gog).",
-            parameters: Type.Object({
-                command: Type.Optional(Type.String({ description: "Requête Gmail." })),
-            }),
-            async execute(_id, params) {
-                const q = (params?.command ?? "").trim();
-                if (!q)
-                    return { content: [{ type: "text", text: "Usage: /chercher <requête>" }] };
-                const out = await delegateGog(api, "search", q);
-                return { content: [{ type: "text", text: out.slice(0, 4000) }] };
-            },
-        });
-        api.registerTool({
-            name: "gog_get",
-            description: "Lire le contenu d'un email Gmail par son id (délègue 'op: get' à l'agent gog).",
-            parameters: Type.Object({
-                command: Type.Optional(Type.String({ description: "L'id du message." })),
-            }),
-            async execute(_id, params) {
-                const id = (params?.command ?? "").trim();
-                if (!id)
-                    return { content: [{ type: "text", text: "Usage: /lire <id>" }] };
-                const out = await delegateGog(api, "get", id);
-                return { content: [{ type: "text", text: out.slice(0, 4000) }] };
-            },
-        });
-        api.registerTool({
             name: "gog_drive_search",
             description: "Rechercher des fichiers Google Drive (gog exécuté directement dans son conteneur).",
             parameters: Type.Object({
@@ -350,56 +303,6 @@ export default definePluginEntry({
                     return { content: [{ type: "text", text: "Usage: /drive <requête>" }] };
                 const out = await gogDriveSearch(api, q);
                 return { content: [{ type: "text", text: out.slice(0, 4000) }] };
-            },
-        });
-        // gog_send : PRÉPARE un brouillon d'email (n'envoie PAS). main compose puis
-        // appelle cet outil ; l'envoi réel se fait ensuite via /confirm.
-        api.registerTool({
-            name: "gog_send",
-            description: "Prépare un brouillon d'email pour confirmation (n'envoie PAS). Après l'appel, indiquer à l'utilisateur de taper /confirm pour envoyer.",
-            parameters: Type.Object({
-                to: Type.String({ description: "Destinataire (email)." }),
-                subject: Type.String({ description: "Sujet." }),
-                body: Type.String({ description: "Corps en texte brut." }),
-            }),
-            async execute(_id, params) {
-                pending = {
-                    kind: "send",
-                    to: params.to,
-                    subject: params.subject,
-                    body: params.body,
-                    ts: Date.now(),
-                };
-                return {
-                    content: [
-                        {
-                            type: "text",
-                            text: `📧 Brouillon prêt (non envoyé) :\n• À : ${params.to}\n• Sujet : ${params.subject}\n• Corps : ${params.body}\n\nTapez /confirm pour envoyer (valable 10 min), ou /annuler pour abandonner.`,
-                        },
-                    ],
-                };
-            },
-        });
-        api.registerTool({
-            name: "gog_reply",
-            description: "Prépare un brouillon de RÉPONSE à un email (n'envoie PAS). Indiquer ensuite à l'utilisateur de taper /confirm.",
-            parameters: Type.Object({
-                command: Type.Optional(Type.String({ description: "Args bruts : <id> <texte de la réponse>." })),
-            }),
-            async execute(_id, params) {
-                const parsed = parseReply(params?.command ?? "");
-                if (!parsed) {
-                    return { content: [{ type: "text", text: "Usage: /repondre <id> <texte>" }] };
-                }
-                pending = { kind: "reply", messageId: parsed.messageId, body: parsed.body, ts: Date.now() };
-                return {
-                    content: [
-                        {
-                            type: "text",
-                            text: `📧 Brouillon de réponse prêt (non envoyé) :\n• En réponse à : ${parsed.messageId}\n• Corps : ${parsed.body}\n\nTapez /confirm pour envoyer (valable 10 min), ou /annuler pour abandonner.`,
-                        },
-                    ],
-                };
             },
         });
         // Démarrage de l'autorisation Google, partagé par l'outil et par /connecter.
@@ -493,8 +396,10 @@ export default definePluginEntry({
                 const ok = done === "ok";
                 return { handled: true, reply: { text: ok ? "Compte Google connecté." : `Échec de la connexion (${done || "timeout"}). Réessayez /connecter.` } };
             }
-            const m = text.match(/(^|\s)\/(confirm|annuler|maj)\b/i);
-            const cmd = m ? "/" + m[2].toLowerCase() : "";
+            // En tête de message seulement : un « /confirm » cité dans le texte d'un
+            // /ecrire ne doit pas envoyer le brouillon précédent.
+            const m = text.match(/^\s*\/(confirm|annuler|maj)\b/i);
+            const cmd = m ? "/" + m[1].toLowerCase() : "";
             // /maj : resynchronise les clés d'API changées dans secrets.env vers
             // gateway.systemd.env et Wiki_LM/.env, puis relance les services
             // concernés. Commande directe (comme /confirm, /annuler) : ne passe
@@ -546,7 +451,10 @@ export default definePluginEntry({
                             return { handled: true, reply: { text: `Refusé : ${check.reason}. ${t.label} inchangé, rien d'autre écrit.` } };
                         }
                     }
-                    writeFileSync(t.path, applyEnvDiff(targetContent, diffs), "utf8");
+                    // Fichier temporaire (droits 600 : il contient des secrets) puis
+                    // renommage : jamais de fichier à moitié écrit.
+                    writeFileSync(`${t.path}.tmp-maj`, applyEnvDiff(targetContent, diffs), { encoding: "utf8", mode: 0o600 });
+                    renameSync(`${t.path}.tmp-maj`, t.path);
                     const ajoutees = diffs.filter((d) => d.ajout).map((d) => d.key);
                     const majs = diffs.filter((d) => !d.ajout).map((d) => d.key);
                     report.push(`${t.label} : ${[
@@ -623,17 +531,14 @@ export default definePluginEntry({
                 const p = pending;
                 pending = null;
                 let out;
-                if (p.kind === "send") {
-                    out = await delegateGog(api, "send", `to=${p.to}; subject=${p.subject}; body=${p.body}`);
-                }
-                else if (p.kind === "reply") {
-                    out = await delegateGog(api, "reply", `id=${p.messageId}; body=${p.body}`);
-                }
-                else if (p.kind === "mail") {
-                    out = (await runTironMail([p.op, "--args", p.args, "--confirme"])).text;
+                if (p.kind === "mail") {
+                    // La réponse n'est envoyée que si l'identifiant désigne toujours le
+                    // message de l'aperçu (Message-ID vérifié par tiron_mail).
+                    out = (await runTironMail([p.op, `--args=${p.args}`, "--confirme",
+                        ...(p.messageId ? [`--message-id=${p.messageId}`] : [])])).text;
                 }
                 else if (p.kind === "cron") {
-                    out = (await runTironCron(["add", "--origin", p.origin, "--args", p.args])).text;
+                    out = (await runTironCron(["add", "--origin", p.origin, `--args=${p.args}`])).text;
                 }
                 else {
                     out = await runWikiOp(api, p.op, p.args);
@@ -660,16 +565,8 @@ export default definePluginEntry({
                     pending = null;
                     return { handled: true, reply: { text: "Choix abandonné." } };
                 }
-                if (pending.kind === "mail") {
-                    pending = null;
-                    return { handled: true, reply: { text: "Envoi abandonné. Rien n'a été envoyé." } };
-                }
-                const dest = pending.kind === "send" ? pending.to : `réponse à ${pending.messageId}`;
                 pending = null;
-                return {
-                    handled: true,
-                    reply: { text: `Brouillon abandonné (était destiné à ${dest}). Rien n'a été envoyé.` },
-                };
+                return { handled: true, reply: { text: "Envoi abandonné. Rien n'a été envoyé." } };
             }
             // Routage déterministe via le service Tiron : tout message qui n'est
             // pas déjà /confirm, /annuler, ou un retour OAuth.
@@ -748,12 +645,12 @@ export default definePluginEntry({
                 const sub = routed.args.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
                 const gestion = ["list", "rm", "pause", "reprendre"].includes(sub);
                 if (explicitCommand && gestion) {
-                    const r = await runTironCron(["manage", "--args", routed.args]);
+                    const r = await runTironCron(["manage", `--args=${routed.args}`]);
                     return { handled: true, reply: { text: r.text.slice(0, 4000) } };
                 }
                 // "/cron demain à 9h …" : ni add ni gestion -> langage naturel.
                 const r = explicitCommand && sub === "add"
-                    ? await runTironCron(["preview", "--origin", origin, "--args", routed.args])
+                    ? await runTironCron(["preview", "--origin", origin, `--args=${routed.args}`])
                     : await runTironCron(["nl", "--origin", origin, "--text", routed.args]);
                 if (!r.ok || !r.args) {
                     return { handled: true, reply: { text: r.text.slice(0, 4000) } };
@@ -784,7 +681,7 @@ export default definePluginEntry({
                     };
                 }
                 // Écriture inférée en langage naturel : jamais exécutée directement,
-                // même logique de mise en attente que gog_send/gog_reply.
+                // même logique de mise en attente que les envois de courrier.
                 if (!explicitCommand && !WIKI_READ_OPS.has(action.op)) {
                     pending = { kind: "router-write", op: action.op, args: routed.args, ts: Date.now() };
                     return {
@@ -816,14 +713,14 @@ export default definePluginEntry({
             // Courrier : tiron_mail (IMAP/SMTP) appelé directement, plus gog
             // (spec 2026-10-07). Lectures directes ; envois en aperçu puis /confirm.
             if (action.kind === "mail") {
-                const r = await runTironMail([action.op, "--args", routed.args]);
+                const r = await runTironMail([action.op, `--args=${routed.args}`]);
                 return { handled: true, reply: { text: r.text.slice(0, 4000) } };
             }
-            const apercu = await runTironMail([action.op, "--args", routed.args]);
+            const apercu = await runTironMail([action.op, `--args=${routed.args}`]);
             if (!apercu.ok || !apercu.args) {
                 return { handled: true, reply: { text: apercu.text.slice(0, 4000) } };
             }
-            pending = { kind: "mail", op: action.op, args: apercu.args, ts: Date.now() };
+            pending = { kind: "mail", op: action.op, args: apercu.args, messageId: apercu.message_id, ts: Date.now() };
             return {
                 handled: true,
                 reply: {
@@ -848,7 +745,7 @@ export default definePluginEntry({
                 return; // flux confirmé (/confirm -> agent gog) : autorisé
             return {
                 block: true,
-                blockReason: "Envoi/écriture Google direct interdit. Composez puis appelez l'outil gog_send (prépare le brouillon), et l'utilisateur tapera /confirm pour envoyer.",
+                blockReason: "Envoi/écriture Google direct interdit. Le courrier passe par /ecrire ou /repondre, que l'utilisateur confirme avec /confirm.",
             };
         }, { priority: 50 });
     },

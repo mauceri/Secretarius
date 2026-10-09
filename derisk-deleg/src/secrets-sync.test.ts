@@ -65,6 +65,10 @@ describe("applyEnvDiff", () => {
     expect(out).toBe("A=new\nB=untouched\n");
   });
 
+  it("garde tels quels les $ d'une valeur mise à jour ($&, $', $$)", () => {
+    const v = "a$&b$'c$$d";
+    expect(applyEnvDiff("A=old\nB=1\n", [{ key: "A", oldValue: "old", newValue: v }])).toBe(`A=${v}\nB=1\n`);
+  });
   it("ajoute en fin de fichier une clé marquée ajout", () => {
     const out = applyEnvDiff("A=old\n", [{ key: "NEW", oldValue: "", newValue: "x", ajout: true }]);
     expect(out).toBe("A=old\nNEW=x\n");

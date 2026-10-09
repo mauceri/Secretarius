@@ -16,7 +16,12 @@ export async function runPythonModule(module, argv, indisponible) {
             encoding: "utf8",
         });
         const data = JSON.parse(String(stdout));
-        return { ok: !!data.ok, text: String(data.text ?? ""), ...(data.args ? { args: String(data.args) } : {}) };
+        return {
+            ok: !!data.ok,
+            text: String(data.text ?? ""),
+            ...(data.args ? { args: String(data.args) } : {}),
+            ...(data.message_id ? { message_id: String(data.message_id) } : {}),
+        };
     }
     catch (e) {
         return { ok: false, text: `${indisponible} : ${String(e?.message ?? e).slice(0, 300)}` };
