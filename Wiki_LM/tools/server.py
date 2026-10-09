@@ -46,6 +46,7 @@ Endpoint :
 from __future__ import annotations
 
 import argparse
+import hmac
 import json
 import os
 import subprocess
@@ -136,17 +137,32 @@ def handle_capture():
     return jsonify({"status": "ok", "filename": path.name})
 
 
-def _tiron_cron(argv: list[str]) -> dict:
+def _tiron_cron(argv: list[str], entree: str | None = None) -> dict:
     """Délègue à la CLI JSON tiron_cron (même cœur que Tiron, cf. spec cron).
     Python système (stdlib seulement), cwd = racine du dépôt Secretarius."""
     cwd = os.environ.get("SECRETARIUS_DIR") or str(Path.home() / "Secretarius")
-    p = subprocess.run(["python3", "-m", "tiron_cron", *argv], cwd=cwd,
+    p = subprocess.run(["python3", "-m", "tiron_cron", *argv], cwd=cwd, input=entree,
                        capture_output=True, text=True, timeout=150)
     try:
         data = json.loads(p.stdout)
     except ValueError:
         return {"error": (p.stderr or p.stdout or "tiron_cron indisponible").strip()[:500]}
     return {"text": data.get("text", "")} if data.get("ok") else {"error": data.get("text", "")}
+
+
+@app.post("/livraison")
+def handle_livraison():
+    """Webhook des tâches /cron (OpenClaw, cron.webhookToken) : note dans
+    Réception/ et avis Telegram, par tiron_cron. Joignable par Tailscale :
+    jamais sans jeton."""
+    attendu = os.environ.get("TIRON_LIVRAISON_TOKEN", "")
+    if not attendu:
+        return jsonify({"error": "livraison non configurée (TIRON_LIVRAISON_TOKEN)"}), 503
+    recu = request.headers.get("Authorization", "")
+    if not hmac.compare_digest(recu.encode(), f"Bearer {attendu}".encode()):
+        return jsonify({"error": "jeton refusé"}), 401
+    res = _tiron_cron(["livrer"], entree=json.dumps(request.get_json(silent=True) or {}, ensure_ascii=False))
+    return jsonify(res), (502 if "error" in res else 200)
 
 
 _RUN_OPS = {

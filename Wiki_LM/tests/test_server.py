@@ -341,3 +341,27 @@ class TestHandleRunCron:
         self._fake(monkeypatch, '{"ok": false, "text": "contenu vide"}')
         r = client.post("/run", json={"command": "/cron!", "arg": "add 20m rappel"})
         assert r.status_code == 200 and r.get_json() == {"error": "contenu vide"}
+
+
+class TestLivraison:
+    EVT = {"jobId": "j", "status": "ok", "summary": "x"}
+
+    def test_sans_jeton_serveur_refuse(self, client, monkeypatch):
+        monkeypatch.delenv("TIRON_LIVRAISON_TOKEN", raising=False)
+        assert client.post("/livraison", json=self.EVT).status_code == 503
+
+    def test_mauvais_jeton_refuse(self, client, monkeypatch):
+        monkeypatch.setenv("TIRON_LIVRAISON_TOKEN", "bon")
+        r = client.post("/livraison", json=self.EVT, headers={"Authorization": "Bearer mauvais"})
+        assert r.status_code == 401
+        assert client.post("/livraison", json=self.EVT).status_code == 401
+
+    def test_bon_jeton_delegue_a_tiron_cron(self, client, monkeypatch):
+        import server
+        monkeypatch.setenv("TIRON_LIVRAISON_TOKEN", "bon")
+        appels = []
+        monkeypatch.setattr(server, "_tiron_cron",
+                            lambda argv, entree=None: appels.append((argv, entree)) or {"text": "/x.md"})
+        r = client.post("/livraison", json=self.EVT, headers={"Authorization": "Bearer bon"})
+        assert r.status_code == 200 and r.get_json() == {"text": "/x.md"}
+        assert appels[0][0] == ["livrer"] and '"summary": "x"' in appels[0][1]
