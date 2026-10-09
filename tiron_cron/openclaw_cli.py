@@ -37,11 +37,15 @@ def build_add_argv(job: Job, canal: str | None, tz: str, env: Mapping[str, str],
     else:
         argv += ["--at", job.quand, "--tz", tz, "--delete-after-run"]
     if canal == "obsidian":
-        if job.type != "rappel":
-            raise SyntaxeInvalide("canal obsidian : rappels seulement en V1")
-        return argv + ["--command-argv", json.dumps(
-            ["python3", "-m", "tiron_cron", "deliver-obsidian", "--text", job.contenu]),
-            "--command-cwd", secretarius_dir(env), "--no-deliver"]
+        if job.type == "rappel":
+            return argv + ["--command-argv", json.dumps(
+                ["python3", "-m", "tiron_cron", "deliver-obsidian", "--text", job.contenu]),
+                "--command-cwd", secretarius_dir(env), "--no-deliver"]
+        # Consigne ou commande : le résultat part en webhook vers wiki-lm-server,
+        # qui écrit la note dans Réception/ et prévient sur Telegram (spec courrier).
+        url = env.get("TIRON_LIVRAISON_URL") or "http://127.0.0.1:5051/livraison"
+        return argv + ["--agent", "main", "--session", "isolated", "--light-context",
+                       "--thinking", "off", "--message", job.contenu, "--webhook", url]
     var = DESTINATAIRES_ENV[canal]
     dest = env.get(var)
     if not dest:

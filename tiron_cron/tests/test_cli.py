@@ -121,3 +121,18 @@ def test_livrer_lit_l_evenement_sur_stdin(capsys, monkeypatch, tmp_path):
     env = dict(ENV, TIRON_RECEPTION_DIR=str(tmp_path))
     out = _call(capsys, ["livrer"], env=env, notifier=lambda t: None)
     assert out["ok"] and out["text"].endswith("j.md")
+
+
+def test_consigne_va_dans_obsidian_par_defaut_meme_depuis_telegram(capsys):
+    out = _call(capsys, ["preview", "--origin", "telegram", "--args", "add 20m consigne fais le point"])
+    assert out["ok"] and ", obsidian, consigne" in out["text"]
+
+
+def test_consigne_telegram_explicite_garde_telegram(capsys):
+    out = _call(capsys, ["preview", "--origin", "obsidian", "--args", "add 20m telegram consigne x"])
+    assert ", telegram, consigne" in out["text"]
+
+
+def test_rappel_garde_le_canal_d_origine(capsys):
+    out = _call(capsys, ["preview", "--origin", "telegram", "--args", "add 20m rappel x"])
+    assert ", telegram, rappel" in out["text"]

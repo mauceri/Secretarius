@@ -66,10 +66,19 @@ def test_rappel_obsidian_lance_le_script_interne_sans_livraison():
     assert "--announce" not in argv
 
 
-def test_obsidian_refuse_consigne_et_commande():
+def test_consigne_et_commande_obsidian_par_webhook():
     for type_, contenu in (("consigne", "résume"), ("commande", "/tags")):
-        with pytest.raises(SyntaxeInvalide, match="rappels seulement"):
-            build_add_argv(Job("at", "1h", "obsidian", type_, contenu), "obsidian", "UTC", ENV, "tiron:1")
+        argv = build_add_argv(Job("at", "1h", "obsidian", type_, contenu), "obsidian", "UTC", ENV, "tiron:1")
+        assert _opt(argv, "--webhook") == "http://127.0.0.1:5051/livraison"
+        assert _opt(argv, "--agent") == "main" and _opt(argv, "--message") == contenu
+        for interdit in ("--announce", "--channel", "--to", "--no-deliver"):
+            assert interdit not in argv
+
+
+def test_url_de_livraison_configurable():
+    env = dict(ENV, TIRON_LIVRAISON_URL="http://127.0.0.1:9/x")
+    argv = build_add_argv(Job("at", "1h", "obsidian", "consigne", "r"), "obsidian", "UTC", env, "tiron:1")
+    assert _opt(argv, "--webhook") == "http://127.0.0.1:9/x"
 
 
 def test_destinataire_non_configure():

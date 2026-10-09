@@ -40,7 +40,9 @@ def _apercu(job: Job, origin: str, tz: str, env, job_key: str, now: datetime) ->
     if job.quand_kind == "at" and "T" in job.quand and \
             datetime.fromisoformat(job.quand).replace(tzinfo=ZoneInfo(tz)) <= now:
         raise SyntaxeInvalide(f"date déjà passée : {job.quand}")
-    canal = job.canal or _origine(origin)
+    # Résultats de consignes et de commandes : Obsidian par défaut, avis Telegram
+    # (décision du 2026-10-09) ; les rappels restent sur le canal d'origine.
+    canal = job.canal or ("obsidian" if job.type in ("consigne", "commande") else _origine(origin))
     argv = build_add_argv(job, canal, tz, env, job_key)  # valide canal + destinataire dès l'aperçu
     return describe(job, canal, tz), argv
 
