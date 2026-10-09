@@ -96,6 +96,22 @@ Utilisez /repondre <id> <texte> : Tiron montre l'aperçu (destinataire, boîte d
 ## Comment envoyer un mail ?
 Utilisez /ecrire <adresse> <texte> : le message part de tiron@secretarius.co, et son objet reprend le début de la première ligne. Tiron montre l'aperçu ; rien n'est envoyé avant /confirm.
 
+## Où arrivent les résultats de mes tâches planifiées ?
+## Où trouver le résultat d'une consigne /cron ?
+Le résultat d'une consigne ou d'une commande planifiée arrive dans une note du dossier Réception du coffre Arbath, et Tiron vous prévient sur Telegram. Ajoutez telegram dans /cron add (par exemple /cron add 8h telegram consigne …) pour le recevoir sur Telegram à la place. Les rappels arrivent toujours sur Telegram.
+
+## Comment envoyer un courriel depuis une note ?
+## Comment écrire un mail depuis Obsidian ?
+Dans la note, ajoutez un bloc wiki dont la première ligne est /mail?, puis « à : <adresse> », « objet : <objet> » et le texte ; sans texte, la note elle-même sert de corps. Exécutez les commandes wiki de la note : /mail? montre l'aperçu sous le bloc, sans rien envoyer. Remplacez par /mail! et relancez pour envoyer, depuis tiron@secretarius.co.
+
+## Où arrivent les résultats de mes tâches planifiées ?
+## Où trouver le résultat d'une consigne /cron ?
+Le résultat d'une consigne ou d'une commande planifiée arrive dans une note du dossier Réception du coffre Arbath, et Tiron vous prévient sur Telegram. Ajoutez telegram dans /cron add (par exemple /cron add "0 8 * * 1" telegram commande /relire) pour le recevoir sur Telegram à la place. Les rappels arrivent toujours sur Telegram. Pour l'état du wiki, planifiez une commande (/wikistatus, /relire) plutôt qu'une consigne : les consignes n'ont pas encore accès au wiki.
+
+## Comment envoyer un courriel depuis une note ?
+## Comment écrire un mail depuis Obsidian ?
+Dans la note, ajoutez un bloc wiki dont la première ligne est /mail?, puis « à : <adresse> », « objet : <objet> » et le texte ; sans texte, la note elle-même sert de corps. Exécutez les commandes wiki de la note : /mail? montre l'aperçu sous le bloc, sans rien envoyer. Remplacez par /mail! et relancez pour envoyer, depuis tiron@secretarius.co.
+
 ## Comment chercher un fichier sur Google Drive ?
 Utilisez /drive <critères>.
 
