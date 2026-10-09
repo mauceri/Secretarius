@@ -154,3 +154,16 @@ def test_manage_list_rm_pause_reprendre():
 
 def test_manage_list_vide():
     assert manage(Gestion("list", None), _runner([json.dumps({"jobs": []})])) == "Aucune tâche planifiée."
+
+
+def test_openclaw_hors_path_passe_par_l_enveloppe(monkeypatch):
+    # wiki-lm-server (systemd) n'a pas ~/.local/bin dans son PATH (2026-10-09).
+    from pathlib import Path
+    monkeypatch.setattr("shutil.which", lambda nom: None)
+    vus = []
+
+    def runner(argv, **kw):
+        vus.append(argv)
+        return subprocess.CompletedProcess(argv, 0, '{"jobs": []}', "")
+    list_jobs(runner)
+    assert vus[0][0] == str(Path.home() / ".local" / "bin" / "openclaw") and vus[0][1:3] == ["cron", "list"]

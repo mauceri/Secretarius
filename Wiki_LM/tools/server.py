@@ -174,6 +174,7 @@ def handle_livraison():
     if not hmac.compare_digest(recu.encode(), f"Bearer {attendu}".encode()):
         return jsonify({"error": "jeton refusé"}), 401
     res = _tiron_cron(["livrer"], entree=json.dumps(request.get_json(silent=True) or {}, ensure_ascii=False))
+    print(f"[livraison] {res.get('text') or res.get('error')}", flush=True)  # journal du service
     return jsonify(res), (502 if "error" in res else 200)
 
 

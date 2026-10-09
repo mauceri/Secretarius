@@ -375,3 +375,11 @@ class TestMail:
         client.post("/run", json={"command": "/mail?", "arg": "à : m@ex.fr\nx"})
         client.post("/run", json={"command": "/mail!", "arg": "à : m@ex.fr\nx"})
         assert appels == [["bloc", "--args=à : m@ex.fr\nx"], ["bloc", "--args=à : m@ex.fr\nx", "--confirme"]]
+
+
+def test_livraison_journalisee(client, monkeypatch, capsys):
+    import server
+    monkeypatch.setenv("TIRON_LIVRAISON_TOKEN", "bon")
+    monkeypatch.setattr(server, "_tiron_cron", lambda argv, entree=None: {"text": "/x.md ; avis Telegram non envoyé : y"})
+    client.post("/livraison", json={"status": "ok"}, headers={"Authorization": "Bearer bon"})
+    assert "[livraison] /x.md ; avis Telegram non envoyé : y" in capsys.readouterr().out

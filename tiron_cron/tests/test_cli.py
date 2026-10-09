@@ -136,3 +136,15 @@ def test_consigne_telegram_explicite_garde_telegram(capsys):
 def test_rappel_garde_le_canal_d_origine(capsys):
     out = _call(capsys, ["preview", "--origin", "telegram", "--args", "add 20m rappel x"])
     assert ", telegram, rappel" in out["text"]
+
+
+def test_livrer_signale_un_avis_non_envoye(capsys, monkeypatch, tmp_path):
+    import io
+    monkeypatch.setattr("sys.stdin", io.StringIO('{"jobId": "j", "status": "ok", "summary": "x"}'))
+    env = dict(ENV, TIRON_RECEPTION_DIR=str(tmp_path))
+
+    def panne(_):
+        raise OSError("openclaw : Node.js trop ancien")
+    out = _call(capsys, ["livrer"], env=env, notifier=panne)
+    assert out["ok"] and (tmp_path / "2026-10-02 1000 j.md").exists()
+    assert "avis Telegram non envoyé : openclaw : Node.js trop ancien" in out["text"]

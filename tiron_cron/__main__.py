@@ -104,8 +104,16 @@ def main(argv=None, runner=subprocess.run, env=None, now=None, http=None, job_ke
                 out = {"ok": False, "text": f"Échec : {e}"}
         elif a.cmd == "livrer":
             evt = json.loads(sys.stdin.read() or "{}")
-            p = livrer(evt, now, env, notifier or notifier_telegram(env))
-            out = {"ok": True, "text": str(p) if p else "rien à livrer"}
+            avis, erreurs = notifier or notifier_telegram(env), []
+
+            def prevenir(texte: str) -> None:  # la note est écrite ; l'échec de l'avis est rapporté
+                try:
+                    avis(texte)
+                except Exception as e:
+                    erreurs.append(str(e))
+            p = livrer(evt, now, env, prevenir)
+            texte = str(p) if p else "rien à livrer"
+            out = {"ok": True, "text": texte + (f" ; avis Telegram non envoyé : {erreurs[0]}" if erreurs else "")}
         else:
             out = {"ok": True, "text": str(deliver(a.text, now, env))}
     except SyntaxeInvalide as e:

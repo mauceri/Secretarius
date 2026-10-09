@@ -255,6 +255,9 @@ info "switch-model installé dans ${HOME}/.local/bin"
 #     l'environnement RÉGÉNÈRE le token gateway dans openclaw.json → désynchronise
 #     le service en cours et casse l'auth (CLI + Control UI). Le wrapper charge le
 #     token depuis gateway.systemd.env avant d'appeler le vrai binaire.
+#  3) Le dossier du vrai binaire passe en tête du PATH : son « #!/usr/bin/env
+#     node » doit trouver le Node de NVM, pas celui du système (trop ancien),
+#     même appelé par un service systemd au PATH minimal (wiki-lm-server, 2026-10-09).
 if [[ -x "$OPENCLAW_BIN" && "$OPENCLAW_BIN" != "${HOME}/.local/bin/openclaw" ]]; then
   cat > "${HOME}/.local/bin/openclaw" <<WRAP
 #!/usr/bin/env bash
@@ -264,6 +267,7 @@ if [[ -f "\$_envf" ]]; then
   _t=\$(grep '^OPENCLAW_GATEWAY_TOKEN=' "\$_envf" | cut -d= -f2-)
   [[ -n "\$_t" ]] && export OPENCLAW_GATEWAY_TOKEN="\$_t"
 fi
+export PATH="$(dirname "${OPENCLAW_BIN}"):\${PATH}"
 exec "${OPENCLAW_BIN}" "\$@"
 WRAP
   chmod +x "${HOME}/.local/bin/openclaw"

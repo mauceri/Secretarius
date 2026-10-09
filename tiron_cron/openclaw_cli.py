@@ -5,6 +5,7 @@ modifiables d'ici : toute résolution d'id se fait parmi les tâches tiron:*."""
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 from collections.abc import Mapping
 from pathlib import Path
@@ -62,6 +63,10 @@ def build_add_argv(job: Job, canal: str | None, tz: str, env: Mapping[str, str],
 
 
 def _run(argv: list[str], runner) -> str:
+    # Hors du PATH (service systemd : wiki-lm-server, blocs cron! d'Obsidian),
+    # passer par l'enveloppe ~/.local/bin/openclaw, qui charge le jeton du gateway.
+    if argv[0] == "openclaw" and shutil.which("openclaw") is None:
+        argv = [str(Path.home() / ".local" / "bin" / "openclaw"), *argv[1:]]
     try:
         p = runner(argv, capture_output=True, text=True, timeout=60)
     except FileNotFoundError as e:
