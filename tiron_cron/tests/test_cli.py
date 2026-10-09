@@ -113,3 +113,11 @@ def test_nl_consigne_du_modele_ramenee_a_un_rappel(capsys):
     http = lambda url, body, timeout: {"message": {"content": "add 1d consigne résume le wiki"}}
     out = _call(capsys, ["nl", "--origin", "telegram", "--text", "lundi prochain vers 8 heures x"], http=http)
     assert out["ok"] and out["args"] == "add 1d rappel résume le wiki"
+
+
+def test_livrer_lit_l_evenement_sur_stdin(capsys, monkeypatch, tmp_path):
+    import io
+    monkeypatch.setattr("sys.stdin", io.StringIO('{"jobId": "j", "status": "ok", "summary": "x"}'))
+    env = dict(ENV, TIRON_RECEPTION_DIR=str(tmp_path))
+    out = _call(capsys, ["livrer"], env=env, notifier=lambda t: None)
+    assert out["ok"] and out["text"].endswith("j.md")

@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import subprocess
+import sys
 import uuid
 from dataclasses import replace
 from datetime import datetime
@@ -15,6 +16,7 @@ from zoneinfo import ZoneInfo
 from tiron_cron import fallback
 from tiron_cron.deliver_obsidian import deliver
 from tiron_cron.describe import describe
+from tiron_cron.livraison import livrer, notifier_telegram
 from tiron_cron.nl import parse_nl
 from tiron_cron.openclaw_cli import OpenClawError, add_job, build_add_argv, manage
 from tiron_cron.syntax import CANAUX, USAGE_ADD, Gestion, Job, SyntaxeInvalide, parse_command, to_args
@@ -43,7 +45,8 @@ def _apercu(job: Job, origin: str, tz: str, env, job_key: str, now: datetime) ->
     return describe(job, canal, tz), argv
 
 
-def main(argv=None, runner=subprocess.run, env=None, now=None, http=None, job_key=None) -> int:
+def main(argv=None, runner=subprocess.run, env=None, now=None, http=None, job_key=None,
+         notifier=None) -> int:
     env = os.environ if env is None else env
     tz = env.get("TIRON_TZ", "Europe/Paris")
     now = now or datetime.now(ZoneInfo(tz))
@@ -59,6 +62,7 @@ def main(argv=None, runner=subprocess.run, env=None, now=None, http=None, job_ke
     s.add_argument("--text", required=True)
     sub.add_parser("manage").add_argument("--args", required=True)
     sub.add_parser("deliver-obsidian").add_argument("--text", required=True)
+    sub.add_parser("livrer")  # événement de fin de tâche OpenClaw (JSON) sur l'entrée standard
     a = p.parse_args(argv)
 
     try:
@@ -96,6 +100,10 @@ def main(argv=None, runner=subprocess.run, env=None, now=None, http=None, job_ke
                 out = {"ok": True, "text": manage(g, runner)}
             except OpenClawError as e:
                 out = {"ok": False, "text": f"Échec : {e}"}
+        elif a.cmd == "livrer":
+            evt = json.loads(sys.stdin.read() or "{}")
+            p = livrer(evt, now, env, notifier or notifier_telegram(env))
+            out = {"ok": True, "text": str(p) if p else "rien à livrer"}
         else:
             out = {"ok": True, "text": str(deliver(a.text, now, env))}
     except SyntaxeInvalide as e:
