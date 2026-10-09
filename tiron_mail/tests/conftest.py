@@ -9,21 +9,39 @@ import pytest
 from tiron_mail.config import Compte
 
 
-def brut(n: int) -> bytes:
+def brut(n: int, quand: str | None = None, **entetes) -> bytes:
     m = EmailMessage()
     m["From"] = f"Expéditeur {n} <exp{n}@ex.fr>"
     m["To"] = "moi@gmail.com"
     m["Subject"] = f"Message {n}"
-    m["Date"] = f"Tue, 0{n} Oct 2026 09:00:00 +0200"
+    m["Date"] = quand or f"Tue, 0{n} Oct 2026 09:00:00 +0200"
+    for cle, val in entetes.items():
+        del m[cle.replace("_", "-")]
+        m[cle.replace("_", "-")] = val
     m["Message-ID"] = f"<m{n}@ex.fr>"
     m.set_content(f"Corps du message {n}.")
     return m.as_bytes()
 
 
 class FauxIMAP:
-    def __init__(self, messages: dict):
+    """Comme imaplib, encode les arguments en ASCII, sauf après ENABLE UTF8=ACCEPT
+    (que seul un serveur qui l'annonce, utf8=True, accepte)."""
+
+    def __init__(self, messages: dict, utf8: bool = False):
         self.messages = messages
+        self.utf8 = utf8
+        self.utf8_actif = False
         self.recherches: list = []
+        self.datees: list = []
+        self.capabilities = ("IMAP4REV1",)
+
+    def capability(self):
+        return "OK", [b"IMAP4rev1 UTF8=ACCEPT" if self.utf8 else b"IMAP4rev1"]
+
+    def enable(self, capacite):
+        assert capacite in self.capabilities, "imaplib refuse ENABLE si la capacité n'est pas connue"
+        self.utf8_actif = True
+        return "OK", [b""]
 
     def login(self, utilisateur, mot_de_passe):
         return "OK", [b"connecte"]
@@ -32,12 +50,16 @@ class FauxIMAP:
         return "OK", [str(len(self.messages)).encode()]
 
     def uid(self, commande, *args):
+        for a in args:
+            if isinstance(a, str):
+                a.encode("utf-8" if self.utf8_actif else "ascii")
         if commande == "search":
             self.recherches.append(args[1:])
             return "OK", [" ".join(str(u) for u in sorted(self.messages)).encode()]
         if commande == "fetch" and args[1] == "(INTERNALDATE)":
             lignes = []
             for u in (int(x) for x in args[0].split(",")):
+                self.datees.append(u)
                 quand = parsedate_to_datetime(email.message_from_bytes(self.messages[u])["Date"])
                 lignes.append(f"{u} (UID {u} INTERNALDATE {imaplib.Time2Internaldate(quand)})".encode())
             return "OK", lignes

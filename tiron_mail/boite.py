@@ -53,6 +53,43 @@ _MOTS_VIDES = {
 }
 
 
+def _activer_utf8(conn) -> bool:
+    """Active UTF8=ACCEPT (RFC 6855) si le serveur l'annonce : Gmail oui, Proton
+    Bridge non. imaplib ne relit pas les capacités après login, d'où la relecture."""
+    typ, data = conn.capability()
+    caps = tuple((data[0] or b"").decode().upper().split()) if typ == "OK" and data else ()
+    if "UTF8=ACCEPT" not in caps:
+        return False
+    conn.capabilities = caps
+    conn.enable("UTF8=ACCEPT")
+    return True
+
+
+def _partie_ascii(valeur: str) -> str:
+    """« "réunion" » → « "union" » : plus longue partie ASCII d'au moins 3
+    caractères (la recherche IMAP est par sous-chaîne), "" s'il n'y en a pas."""
+    morceaux = re.findall(r"[\x20-\x7e]+", valeur.strip('"'))
+    meilleur = max(morceaux, key=len, default="").strip()
+    return f'"{meilleur}"' if len(meilleur) >= 3 else ""
+
+
+def sans_accents(crit: list[str]) -> list[str]:
+    """Critères pour un serveur sans UTF-8 : chaque valeur non ASCII est réduite à
+    sa partie ASCII, ou retirée avec sa clé. ErreurBoite s'il ne reste rien."""
+    out: list[str] = []
+    for i in range(0, len(crit) - 1, 2):
+        cle, val = crit[i], crit[i + 1]
+        if not val.isascii():
+            val = _partie_ascii(val)
+            if not val:
+                continue
+        out += [cle, val]
+    if crit != ["ALL"] and not out:
+        raise ErreurBoite("recherche impossible : ce serveur ne gère pas les accents, "
+                          "reformulez avec un mot sans accent")
+    return out or crit
+
+
 def criteres_imap(texte: str, aujourd_hui: date) -> list[str]:
     """« de:paul objet:devis depuis:7j chantier » → critères IMAP SEARCH."""
     crit: list[str] = []
@@ -65,7 +102,8 @@ def criteres_imap(texte: str, aujourd_hui: date) -> list[str]:
         elif cle == "objet" and val:
             crit += ["SUBJECT", f'"{val}"']
         elif cle == "depuis" and val[:-1].isdigit() and val.endswith("j"):
-            crit += ["SINCE", _date_imap(aujourd_hui - timedelta(days=int(val[:-1])))]
+            jours = min(int(val[:-1]), 36500)  # au-delà, timedelta déborde
+            crit += ["SINCE", _date_imap(aujourd_hui - timedelta(days=jours))]
         else:
             propre = mot.strip("?!.,;:«»()'\"")
             if propre and propre.lower() not in _MOTS_VIDES:
@@ -80,6 +118,7 @@ class Boite:
         self.compte = compte
         self.env = env
         self._connecter = connecter
+        self._utf8 = False
 
     def _ouvrir(self):
         mdp = self.env.get(self.compte.secret_env, "")
@@ -88,6 +127,7 @@ class Boite:
         try:
             conn = self._connecter(self.compte)
             conn.login(self.compte.utilisateur, mdp)
+            self._utf8 = _activer_utf8(conn)
             conn.select("INBOX", readonly=True)
             return conn
         except (OSError, imaplib.IMAP4.error) as e:
@@ -106,11 +146,18 @@ class Boite:
             out.append({"id": ident, "resume": resume(analyser(self._fetch(conn, u, "(RFC822.HEADER)")), ident)})
         return out
 
-    def _par_date(self, conn, uids: list[int]) -> list[int]:
+    def _par_date(self, conn, uids: list[int], n: int) -> list[int]:
         """UIDs triés du plus ancien au plus récent selon la date de réception.
-        Pour les boîtes dont les UIDs ne suivent pas les dates (tri_par_date)."""
+        Pour les boîtes dont les UIDs ne suivent pas les dates (tri_par_date).
+        Seuls les deux bouts sont datés : le Bridge numérote sa synchronisation
+        à rebours (récents en bas), puis les arrivées à la suite (récents en
+        haut) ; dater toute une grosse boîte prendrait des dizaines de secondes."""
         if not uids:
             return []
+        k = max(5 * n, 50)
+        uids = sorted(uids)
+        if len(uids) > 2 * k:
+            uids = uids[:k] + uids[-k:]
         typ, data = conn.uid("fetch", ",".join(map(str, uids)), "(INTERNALDATE)")
         dates: dict[int, float] = {}
         for ligne in data if typ == "OK" else []:
@@ -124,11 +171,13 @@ class Boite:
     def _chercher(self, crit: list[str], n: int) -> list[dict]:
         conn = self._ouvrir()
         try:
+            if not self._utf8:
+                crit = sans_accents(crit)
             typ, data = conn.uid("search", None, *crit)
             uids = [int(x) for x in (data[0] or b"").split()] if typ == "OK" else []
-            ordre = self._par_date(conn, uids) if self.compte.tri_par_date else sorted(uids)
+            ordre = self._par_date(conn, uids, n) if self.compte.tri_par_date else sorted(uids)
             return self._resumes(conn, ordre[-n:][::-1])
-        except (OSError, imaplib.IMAP4.error) as e:
+        except (OSError, UnicodeError, imaplib.IMAP4.error) as e:
             raise ErreurBoite(f"boîte {self.compte.nom} injoignable : {e}") from e
         finally:
             try:
@@ -148,6 +197,8 @@ class Boite:
             return analyser(self._fetch(conn, int(uid), "(RFC822)"))
         except ValueError as e:
             raise ErreurBoite(f"identifiant invalide : {uid}") from e
+        except (OSError, imaplib.IMAP4.error) as e:
+            raise ErreurBoite(f"boîte {self.compte.nom} injoignable : {e}") from e
         finally:
             try:
                 conn.logout()

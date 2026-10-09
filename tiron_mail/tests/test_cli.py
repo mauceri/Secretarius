@@ -130,7 +130,8 @@ def test_repondre_sans_confirme_n_envoie_rien(capsys, env_test, faux_smtp):
 
 
 def test_repondre_confirme_envoie_depuis_la_boite_d_origine(capsys, env_test, faux_smtp):
-    out = _call(capsys, ["repondre", "--args", "g:2 D'accord pour jeudi", "--confirme"], env_test, faux_smtp)
+    out = _call(capsys, ["repondre", "--args", "g:2 D'accord pour jeudi", "--confirme",
+                         "--message-id", "<m2@ex.fr>"], env_test, faux_smtp)
     m = faux_smtp.envoyes[0]
     assert m["From"] == "moi@gmail.com" and m["To"] == "exp2@ex.fr"
     assert m["Subject"] == "Re: Message 2" and m["In-Reply-To"] == "<m2@ex.fr>"
@@ -152,3 +153,59 @@ def test_ecrire_adresse_invalide(capsys, env_test, faux_smtp):
 def test_configuration_absente(capsys, tmp_path):
     out = _call(capsys, ["inbox", "--args", ""], {"TIRON_MAIL_CONFIG": str(tmp_path / "absent.toml")})
     assert out["ok"] is False and "introuvable" in out["text"]
+
+
+def _call_avec(capsys, argv, env, messages, smtp=None):
+    serveur = FauxIMAP(messages)
+    assert main(argv, env=env, connecter=lambda c: serveur, smtp=smtp or FauxSMTP()) == 0
+    return json.loads(capsys.readouterr().out)
+
+
+def test_repondre_apercu_renvoie_le_message_id(capsys, env_test):
+    out = _call(capsys, ["repondre", "--args", "g:2 D'accord"], env_test)
+    assert out["message_id"] == "<m2@ex.fr>"
+
+
+def test_repondre_confirme_refuse_si_le_message_a_change(capsys, env_test, faux_smtp):
+    # g:2 désigne un autre message qu'à l'aperçu (renumérotation du Bridge…).
+    out = _call(capsys, ["repondre", "--args", "g:2 D'accord", "--confirme",
+                         "--message-id", "<autre@ex.fr>"], env_test, faux_smtp)
+    assert out["ok"] is False and "changé" in out["text"] and faux_smtp.envoyes == []
+
+
+def test_repondre_confirme_exige_le_message_id(capsys, env_test, faux_smtp):
+    out = _call(capsys, ["repondre", "--args", "g:2 D'accord", "--confirme"], env_test, faux_smtp)
+    assert out["ok"] is False and faux_smtp.envoyes == []
+
+
+def test_repondre_signale_un_reply_to_different(capsys, env_test):
+    msg = brut(2, Reply_To="pirate@ailleurs.example")
+    out = _call_avec(capsys, ["repondre", "--args", "g:2 D'accord"], env_test, {2: msg})
+    assert "pirate@ailleurs.example" in out["text"] and "exp2@ex.fr" in out["text"]
+    assert "Attention" in out["text"]
+
+
+def test_repondre_objet_avec_retour_a_la_ligne(capsys, env_test, faux_smtp):
+    msg = brut(2, Subject="=?utf-8?q?Bonjour=0ABcc:_x@y.example?=")
+    # l'objet décodé contient un saut de ligne, que l'expéditeur maîtrise
+    out = _call_avec(capsys, ["repondre", "--args", "g:2 D'accord", "--confirme",
+                              "--message-id", "<m2@ex.fr>"], env_test, {2: msg}, faux_smtp)
+    assert out["ok"], out
+    assert "\n" not in faux_smtp.envoyes[0]["Subject"] and faux_smtp.envoyes[0]["Bcc"] is None
+
+
+def test_ecrire_texte_apres_un_retour_a_la_ligne(capsys, env_test):
+    out = _call(capsys, ["ecrire", "--args", "marie@ex.fr\nBonjour Marie,\nà jeudi."], env_test)
+    assert out["ok"] and "Objet : Bonjour Marie," in out["text"]
+
+
+def test_ecrire_adresse_avec_virgule_refusee(capsys, env_test, faux_smtp):
+    out = _call(capsys, ["ecrire", "--args", "paul,marie@ex.fr Bonjour", "--confirme"], env_test, faux_smtp)
+    assert out["ok"] is False and faux_smtp.envoyes == []
+
+
+def test_configuration_mal_formee_renvoie_du_json(capsys, tmp_path):
+    p = tmp_path / "comptes.toml"
+    p.write_text(GMAIL.replace("secret_env", "secret_envv"), encoding="utf-8")
+    out = _call(capsys, ["inbox", "--args", ""], {"TIRON_MAIL_CONFIG": str(p)})
+    assert out["ok"] is False and "Erreur" in out["text"]
