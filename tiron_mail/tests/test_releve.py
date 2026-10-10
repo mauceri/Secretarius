@@ -249,3 +249,38 @@ def test_commandes_natives_openclaw_refusees(cfg, tmp_path):
     faits, avis, _ = lancer(cfg, serveur, tmp_path)
     assert faits == ["/supprimer! page", "/r chiens"]
     assert len(avis) == 2 and "/model" in avis[0] and "/reset" in avis[1]
+
+
+from tiron_mail import releve
+from tiron_mail.releve import executer_openclaw
+
+
+def test_consigne_par_courriel_admise(cfg, tmp_path):
+    serveur = FauxIMAP({1: brut_releve(1, "/consigne fais le point sur le wiki", INTERNE)})
+    faits, avis, _ = lancer(cfg, serveur, tmp_path)
+    assert faits == ["/consigne fais le point sur le wiki"] and avis == []
+
+
+def test_consigne_confiee_a_l_agent_consignes(monkeypatch):
+    vus = []
+    monkeypatch.setattr(releve.subprocess, "run", lambda argv, **kw: vus.append(argv))
+    executer_openclaw({"TIRON_TELEGRAM_CHAT_ID": "1", "OPENCLAW_BIN": "oc"})("/consigne fais le point")
+    argv = vus[0]
+    assert argv[argv.index("--agent") + 1] == "consignes"
+    assert argv[argv.index("--message") + 1] == "fais le point"
+    assert argv[argv.index("--session-key") + 1].startswith("agent:consignes:courrier-")
+
+
+def test_commande_reste_sur_main(monkeypatch):
+    vus = []
+    monkeypatch.setattr(releve.subprocess, "run", lambda argv, **kw: vus.append(argv))
+    executer_openclaw({"TIRON_TELEGRAM_CHAT_ID": "1", "OPENCLAW_BIN": "oc"})("/wikistatus")
+    assert vus[0][vus[0].index("--agent") + 1] == "main"
+
+
+def test_consigne_vide_refusee_sans_appel(monkeypatch):
+    vus = []
+    monkeypatch.setattr(releve.subprocess, "run", lambda argv, **kw: vus.append(argv))
+    with pytest.raises(ValueError, match="usage"):
+        executer_openclaw({"TIRON_TELEGRAM_CHAT_ID": "1", "OPENCLAW_BIN": "oc"})("/consigne  ")
+    assert vus == []

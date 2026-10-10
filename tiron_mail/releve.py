@@ -9,6 +9,7 @@ import json
 import re
 import subprocess
 import sys
+import uuid
 from collections.abc import Mapping
 from email.message import Message
 from email.utils import getaddresses, parseaddr
@@ -54,7 +55,7 @@ def authentifier(m: Message, proprietaires: tuple) -> str:
 # natives d'OpenClaw (/model, /reset…) sont refusées.
 _PAR_COURRIEL = {"/wikistatus", "/tags", "/relire", "/q", "/r", "/c", "/ingest", "/kbupdate",
                  "/verifie", "/supprimer", "/source", "/drive", "/inbox", "/chercher", "/lire",
-                 "/repondre", "/ecrire", "/cron"}
+                 "/repondre", "/ecrire", "/cron", "/consigne"}
 
 
 def commandes(objet: str, texte: str) -> list[str]:
@@ -180,11 +181,20 @@ def relever(cfg, env, executer, notifier, etat_chemin: Path = ETAT_DEFAUT, conne
 
 
 def executer_openclaw(env: Mapping[str, str]):
-    """Injecte la commande comme un message Telegram ; la réponse part sur Telegram."""
+    """Commande : injectée comme un message Telegram (main). /consigne : agent consignes.
+    La réponse part sur Telegram."""
     def executer(commande: str) -> None:
         exe = env.get("OPENCLAW_BIN") or str(Path.home() / ".local" / "bin" / "openclaw")
-        subprocess.run([exe, "agent", "--agent", "main", "--session-key", "agent:main:courrier",
-                        "--message", commande, "--deliver", "--reply-channel", "telegram",
+        mot, _, reste = commande.partition(" ")
+        if mot.lower() == "/consigne":
+            if not reste.strip():
+                raise ValueError("usage : /consigne <texte>")
+            # Session neuve à chaque consigne : pas d'historique qui biaise le modèle.
+            cible = ["--agent", "consignes", "--session-key",
+                     f"agent:consignes:courrier-{uuid.uuid4().hex[:8]}", "--message", reste.strip()]
+        else:
+            cible = ["--agent", "main", "--session-key", "agent:main:courrier", "--message", commande]
+        subprocess.run([exe, "agent", *cible, "--deliver", "--reply-channel", "telegram",
                         "--reply-to", env["TIRON_TELEGRAM_CHAT_ID"], "--json"],
                        capture_output=True, text=True, timeout=600, check=True)
     return executer
