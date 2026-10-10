@@ -5,10 +5,11 @@ Toujours code 0 et une ligne JSON {"ok": bool, "text": str, ...}.
   chercher --args "<critères> [compte]"
   lire     --args "<id>"
   repondre --args "<id> <texte>" [--confirme --message-id <Message-ID de l'aperçu>]
-  ecrire   --args "<adresse> <texte>" [--confirme]
+  ecrire   --args "<adresse> <texte>" [--confirme] [--automatique]
   bloc     --args "<bloc de note : à :, objet :, corps>" [--confirme]
   releve   relève de tiron@ (service tiron-mail-releve)
 
+--automatique (agent consignes) : envoi vers vos adresses seulement.
 Sans --confirme, repondre et ecrire montrent l'aperçu et n'envoient rien.
 L'aperçu de repondre renvoie le Message-ID du message visé : à la confirmation,
 la réponse est refusée si l'identifiant désigne désormais un autre message."""
@@ -88,6 +89,7 @@ def main(argv=None, env=None, connecter=_connecter_imap, smtp=_smtp) -> int:
     p.add_argument("commande", choices=["inbox", "chercher", "lire", "repondre", "ecrire", "bloc", "releve"])
     p.add_argument("--args", default="")
     p.add_argument("--confirme", action="store_true")
+    p.add_argument("--automatique", action="store_true")
     p.add_argument("--message-id", default="")
     a = p.parse_args(argv)
     try:
@@ -145,6 +147,9 @@ def main(argv=None, env=None, connecter=_connecter_imap, smtp=_smtp) -> int:
             dest, texte = _tete_et_reste(a.args)
             if not _ADRESSE.match(dest) or not texte.strip():
                 raise ErreurBoite("usage : /ecrire <adresse> <texte>")
+            if a.automatique and dest.lower() not in cfg.adresses_proprietaire:
+                raise ErreurBoite(f"envoi automatique refusé : {dest} n'est pas une de vos adresses "
+                                  "(utilisez /ecrire)")
             compte = cfg.comptes[cfg.envoi_defaut]
             objet = texte.strip().splitlines()[0][:60]
             if a.confirme:

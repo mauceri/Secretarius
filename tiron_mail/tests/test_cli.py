@@ -232,3 +232,16 @@ def test_bloc_sans_destinataire_ou_sans_corps(capsys, env_test, faux_smtp):
     assert _call(capsys, ["bloc", "--args=objet : x\ncorps"], env_test, faux_smtp)["ok"] is False
     assert _call(capsys, ["bloc", "--args=à : m@ex.fr\nobjet : x"], env_test, faux_smtp)["ok"] is False
     assert faux_smtp.envoyes == []
+
+
+def test_ecrire_automatique_vers_le_proprietaire(capsys, env_test, faux_smtp):
+    out = _call(capsys, ["ecrire", "--args", "Moi@Gmail.com Point du jour", "--confirme", "--automatique"],
+                env_test, faux_smtp)
+    assert out["ok"] and faux_smtp.envoyes[0]["To"] == "Moi@Gmail.com"
+
+
+def test_ecrire_automatique_vers_un_tiers_refuse(capsys, env_test, faux_smtp):
+    out = _call(capsys, ["ecrire", "--args", "marie@ex.fr Bonjour", "--confirme", "--automatique"],
+                env_test, faux_smtp)
+    assert not out["ok"] and "refusé" in out["text"] and "/ecrire" in out["text"]
+    assert faux_smtp.envoyes == []
