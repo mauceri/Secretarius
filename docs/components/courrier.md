@@ -16,11 +16,14 @@ Chaque minute, `tiron-mail-releve.timer` lance `python3 -m tiron_mail releve`.
   - envoi depuis l'extérieur (Gmail) : `X-Pm-Origin: external` et `dmarc=pass` posé par
     `mail.protonmail.ch` (tout autre résultat dmarc entraîne un refus).
 
-  Proton remplace les `X-Pm-*` fournis par l'expéditeur (vérifié le 2026-10-10).
+  Proton remplace les `X-Pm-*` et retire les `Authentication-Results` fournis par
+  l'expéditeur (deux essais réels le 2026-10-10).
 - **Commandes** : l'objet s'il commence par `/`, puis les lignes `/` en tête du corps,
   jusqu'à la première autre ligne. Un message transféré ou cité n'est donc jamais
-  exécuté. `/confirm`, `/annuler` et `/maj` sont ignorés (avis) : ils se tapent sur
-  Telegram seulement. Chaque commande est injectée par `openclaw agent --session-key agent:main:courrier --deliver` : même
+  exécuté. Seules les commandes de derisk-deleg sont admises (liste
+  `_PAR_COURRIEL` de `releve.py`) ; `/confirm`, `/annuler`, `/maj`, `/connecter` et les
+  commandes natives d'OpenClaw (`/model`, `/reset`…) sont ignorées avec un avis : elles se
+  tapent sur Telegram. Chaque commande est injectée par `openclaw agent --session-key agent:main:courrier --deliver` : même
   chemin qu'un message Telegram ; la réponse arrive sur Telegram, et `/confirm` se tape
   sur Telegram.
 - **Refusé** : rien n'est exécuté, avis Telegram (expéditeur, motif), corps jamais transmis.

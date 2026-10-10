@@ -242,3 +242,10 @@ def test_rangement_refuse_par_le_serveur_un_seul_avis(cfg, tmp_path):
     _, avis1, _ = lancer(cfg, serveur, tmp_path)
     _, avis2, _ = lancer(cfg, serveur, tmp_path)
     assert len(avis1) == 1 and avis2 == []
+
+
+def test_commandes_natives_openclaw_refusees(cfg, tmp_path):
+    serveur = FauxIMAP({1: brut_releve(1, "/model ollama/x", INTERNE, corps="/reset\n/supprimer! page\n/r chiens")})
+    faits, avis, _ = lancer(cfg, serveur, tmp_path)
+    assert faits == ["/supprimer! page", "/r chiens"]
+    assert len(avis) == 2 and "/model" in avis[0] and "/reset" in avis[1]

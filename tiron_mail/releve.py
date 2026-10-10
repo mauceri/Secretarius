@@ -49,8 +49,12 @@ def authentifier(m: Message, proprietaires: tuple) -> str:
     return ""
 
 
-# Confirmations et resynchronisation : sur Telegram seulement, jamais par courriel.
-_SUR_TELEGRAM = ("/confirm", "/annuler", "/maj")
+# Commandes admises par courriel : celles de derisk-deleg, sauf confirmations,
+# resynchronisation et autorisation Google (Telegram seulement). Les commandes
+# natives d'OpenClaw (/model, /reset…) sont refusées.
+_PAR_COURRIEL = {"/wikistatus", "/tags", "/relire", "/q", "/r", "/c", "/ingest", "/kbupdate",
+                 "/verifie", "/supprimer", "/source", "/drive", "/inbox", "/chercher", "/lire",
+                 "/repondre", "/ecrire", "/cron"}
 
 
 def commandes(objet: str, texte: str) -> list[str]:
@@ -153,9 +157,9 @@ def relever(cfg, env, executer, notifier, etat_chemin: Path = ETAT_DEFAUT, conne
                 _prevenir(notifier, f"Courriel de {exp} reçu sur {compte.adresse} sans commande : "
                                     "écrivez une ligne qui commence par /, par exemple /wikistatus.")
             for c in cmds:
-                if c.split()[0].lower() in _SUR_TELEGRAM:
-                    _prevenir(notifier, f"{c.split()[0]} (courriel de {exp}) ignoré : "
-                                        "confirmez sur Telegram.")
+                if c.split()[0].lower().rstrip("?!") not in _PAR_COURRIEL:
+                    _prevenir(notifier, f"{c.split()[0]} (courriel de {exp}) non admis par courriel : "
+                                        "à taper sur Telegram.")
                     continue
                 try:
                     executer(c)
