@@ -208,6 +208,21 @@
      }
     }
    },
+   "consignes": {
+    "model": { "primary": "ollama/qwen3:8b" },
+    "workspace": "${HOME}/${OPENCLAW_DIR}/workspace-consignes",
+    "tools": {
+     "deny": ["exec"],
+     "sandbox": {
+      "tools": {
+       "allow": ["wiki_query", "wiki_search", "wiki_status", "wiki_review", "wiki_tags",
+                 "mail_inbox", "mail_chercher", "mail_lire", "mail_envoyer", "sessions_yield"],
+       "deny": ["wiki_capture", "wiki_ingest", "wiki_kb_update", "wiki_verify", "wiki_delete",
+                "source_read", "gog_connect_start", "gog_drive_search", "read", "write", "group:fs"]
+      }
+     }
+    }
+   },
    "gog": {
     "model": {
      "primary": "infomaniak/mistralai/Mistral-Small-4-119B-2603"

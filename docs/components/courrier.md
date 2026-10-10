@@ -23,7 +23,8 @@ Chaque minute, `tiron-mail-releve.timer` lance `python3 -m tiron_mail releve`.
   exécuté. Seules les commandes de derisk-deleg sont admises (liste
   `_PAR_COURRIEL` de `releve.py`) ; `/confirm`, `/annuler`, `/maj`, `/connecter` et les
   commandes natives d'OpenClaw (`/model`, `/reset`…) sont ignorées avec un avis : elles se
-  tapent sur Telegram. Chaque commande est injectée par `openclaw agent --session-key agent:main:courrier --deliver` : même
+  tapent sur Telegram. `/consigne <texte>` est confiée à l'agent consignes (ci-dessous),
+  dans une session neuve. Chaque commande est injectée par `openclaw agent --session-key agent:main:courrier --deliver` : même
   chemin qu'un message Telegram ; la réponse arrive sur Telegram, et `/confirm` se tape
   sur Telegram.
 - **Refusé** : rien n'est exécuté, avis Telegram (expéditeur, motif), corps jamais transmis.
@@ -39,6 +40,18 @@ Chaque minute, `tiron-mail-releve.timer` lance `python3 -m tiron_mail releve`.
   sur 1143 et 1026). Après une réinstallation du Bridge, relever la nouvelle empreinte :
   `openssl s_client -starttls imap -connect 127.0.0.1:1143 </dev/null | openssl x509 -noout -fingerprint -sha256`.
 
-Activation (une fois) :
+## Agent consignes
+
+- Reçoit les consignes `/cron` (`--agent consignes`) et les `/consigne` par courriel ; les
+  commandes en `/` restent sur `main`. Modèle : `ollama/qwen3:8b`.
+- Outils seulement : `wiki_query`, `wiki_search`, `wiki_status`, `wiki_review`, `wiki_tags`,
+  `mail_inbox`, `mail_chercher`, `mail_lire`, `mail_envoyer` ; pas d'`exec` ni d'écriture.
+  Les `wiki_*` tournent dans le conteneur `wiki`, les `mail_*` dans le gateway (`tiron_mail`).
+- `mail_envoyer` appelle `tiron_mail ecrire --automatique` : vos adresses
+  (`adresses_proprietaire`) seulement, tout autre destinataire est refusé (`/ecrire` pour un tiers).
+- Le hook `before_agent_reply` de derisk-deleg laisse passer ses tours (ni Laya ni commandes).
+- Vérifier les outils permis : `openclaw sandbox explain --agent consignes`.
+
+Activation de la relève (une fois) :
 `systemctl --user daemon-reload && systemctl --user enable --now tiron-mail-releve.timer`.
 Journal : `journalctl --user -u tiron-mail-releve -n 20`.

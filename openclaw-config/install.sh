@@ -468,8 +468,8 @@ while IFS= read -r -d '' src; do
   fi
 done < <(find "$WORKSPACE_SRC" -name "*.md" -print0)
 
-# Workspaces sous-agents (wiki, scout, gog)
-for _pair in "workspace-wiki:workspace-wiki" "workspace-scout:workspace-scout" "workspace-gog:workspace-gog"; do
+# Workspaces sous-agents (wiki, scout, gog, consignes)
+for _pair in "workspace-wiki:workspace-wiki" "workspace-scout:workspace-scout" "workspace-gog:workspace-gog" "workspace-consignes:workspace-consignes"; do
   _wa_src="${SCRIPT_DIR}/${_pair%%:*}"
   _wa_dst="${OPENCLAW_PATH}/${_pair##*:}"
   if [[ ! -d "$_wa_src" ]]; then
