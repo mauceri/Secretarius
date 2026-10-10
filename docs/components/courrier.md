@@ -17,16 +17,21 @@ Chaque minute, `tiron-mail-releve.timer` lance `python3 -m tiron_mail releve`.
     `mail.protonmail.ch` (tout autre résultat dmarc entraîne un refus).
 
   Proton remplace les `X-Pm-*` fournis par l'expéditeur (vérifié le 2026-10-10).
-- **Commandes** : l'objet et chaque ligne du corps qui commence par `/`. Chaque commande
-  est injectée par `openclaw agent --session-key agent:main:courrier --deliver` : même
+- **Commandes** : l'objet s'il commence par `/`, puis les lignes `/` en tête du corps,
+  jusqu'à la première autre ligne. Un message transféré ou cité n'est donc jamais
+  exécuté. `/confirm`, `/annuler` et `/maj` sont ignorés (avis) : ils se tapent sur
+  Telegram seulement. Chaque commande est injectée par `openclaw agent --session-key agent:main:courrier --deliver` : même
   chemin qu'un message Telegram ; la réponse arrive sur Telegram, et `/confirm` se tape
   sur Telegram.
 - **Refusé** : rien n'est exécuté, avis Telegram (expéditeur, motif), corps jamais transmis.
 - **Une seule fois** : le Message-ID est noté avant l'exécution dans
   `~/.local/state/tiron_mail/releve.json`. Le message est rangé dans `Folders/Traite` ou
   `Folders/Refuse`, et marqué lu.
+- **Mise en service** (journal absent ou illisible) : les messages déjà présents sont
+  rangés dans Traite sans être exécutés, avec un avis.
 - **Pannes** : une commande en échec donne un avis et n'arrête pas les suivantes. Dix
-  échecs de connexion de suite donnent un seul avis.
+  échecs de connexion de suite donnent un seul avis. Un avis qui échoue n'arrête pas la
+  relève (il est écrit dans le journal systemd).
 - **Certificat du Bridge épinglé** : `empreinte_tls` des boîtes Proton (même certificat
   sur 1143 et 1026). Après une réinstallation du Bridge, relever la nouvelle empreinte :
   `openssl s_client -starttls imap -connect 127.0.0.1:1143 </dev/null | openssl x509 -noout -fingerprint -sha256`.

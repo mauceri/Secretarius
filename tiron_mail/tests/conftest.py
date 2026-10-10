@@ -34,6 +34,7 @@ class FauxIMAP:
         self.recherches: list = []
         self.datees: list = []
         self.ranges: list = []
+        self.move_refuse = False
         self.capabilities = ("IMAP4REV1",)
 
     def capability(self):
@@ -72,6 +73,8 @@ class FauxIMAP:
             if u not in self.messages:
                 return "OK", [None]
             return "OK", [(f"{u} (UID {u} RFC822 {{1}}".encode(), self.messages[u]), b")"]
+        if commande == "move" and self.move_refuse:
+            return "NO", [b"move impossible"]
         if commande == "move":
             self.ranges.append((int(args[0]), args[1]))
             self.messages.pop(int(args[0]))

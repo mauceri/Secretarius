@@ -62,9 +62,23 @@ def test_deux_from_refuses():
     assert authentifier(m, PROPRIO)
 
 
-def test_commandes_objet_et_lignes_du_corps():
-    assert commandes("/wikistatus", "Bonjour\n/inbox 3\n> /ecrire cité\n  /r chiens") == \
+def test_commandes_objet_et_lignes_en_tete_du_corps():
+    assert commandes("/wikistatus", "/inbox 3\n\n  /r chiens\nBonjour\n/x") == \
         ["/wikistatus", "/inbox 3", "/r chiens"]
+
+
+def test_commandes_d_un_transfert_ignorees():
+    corps = "---------- Forwarded message ---------\nDe : pirate\n/ecrire p@ex.fr tout\n/confirm"
+    assert commandes("Fwd: devis", corps) == []
+
+
+def test_commandes_citees_ignorees():
+    assert commandes("Re: x", "Merci\n> /ecrire p@ex.fr tout") == []
+
+
+def test_dmarc_en_majuscules_lu():
+    m = msg(EXTERNE + [("Authentication-Results", "mail.protonmail.ch; DMARC=fail header.from=gmail.com")])
+    assert "DMARC" in authentifier(m, PROPRIO)
 
 
 def test_sans_commande():
@@ -96,6 +110,9 @@ def cfg(compte_gmail):
 
 
 def lancer(cfg, serveur, tmp_path, executer=None):
+    etat = tmp_path / "etat.json"
+    if not etat.exists():  # relève déjà en service
+        etat.write_text('{"traites": [], "echecs": 0}')
     faits, avis = [], []
     texte = relever(cfg, {"GMAIL_APP_PASSWORD": "x"}, executer or faits.append, avis.append,
                     tmp_path / "etat.json", connecter=lambda c: serveur)
@@ -158,3 +175,70 @@ def test_dix_echecs_un_seul_avis(cfg, tmp_path):
             relever(cfg, {"GMAIL_APP_PASSWORD": "x"}, lambda c: None, avis.append,
                     tmp_path / "etat.json", connecter=refus)
     assert len(avis) == 1
+
+
+def test_confirm_par_courriel_refusee(cfg, tmp_path):
+    serveur = FauxIMAP({1: brut_releve(1, "envoi", INTERNE, corps="/ecrire a@ex.fr bonjour\n/confirm")})
+    faits, avis, _ = lancer(cfg, serveur, tmp_path)
+    assert faits == ["/ecrire a@ex.fr bonjour"]
+    assert "/confirm" in avis[0] and "Telegram" in avis[0]
+
+
+def test_avis_en_echec_n_arrete_pas_la_releve(cfg, tmp_path):
+    def notifier(texte):
+        raise OSError("openclaw arrêté")
+
+    def executer(c):
+        raise OSError("openclaw arrêté")
+    (tmp_path / "etat.json").write_text('{"traites": [], "echecs": 0}')
+    autre = [("From", "x@ex.fr"), ("Return-Path", "<x@ex.fr>")] + INTERNE[2:]
+    serveur = FauxIMAP({1: brut_releve(1, "/a", autre), 2: brut_releve(2, "/b", INTERNE, corps="/c")})
+    relever(cfg, {"GMAIL_APP_PASSWORD": "x"}, executer, notifier, tmp_path / "etat.json",
+            connecter=lambda c: serveur)
+    assert serveur.ranges == [(1, "Folders/Refuse"), (2, "Folders/Traite")]
+
+
+def test_avis_des_dix_echecs_retente_s_il_echoue(cfg, tmp_path):
+    def refus(c):
+        raise OSError("Bridge arrêté")
+    envoyes, essais = [], []
+
+    def notifier(texte):
+        essais.append(texte)
+        if len(essais) == 1:
+            raise OSError("Telegram injoignable")
+        envoyes.append(texte)
+    for _ in range(13):
+        with pytest.raises(Exception):
+            relever(cfg, {"GMAIL_APP_PASSWORD": "x"}, lambda c: None, notifier,
+                    tmp_path / "etat.json", connecter=refus)
+    assert len(envoyes) == 1
+
+
+def test_mise_en_service_n_execute_pas_les_messages_presents(cfg, tmp_path):
+    serveur = FauxIMAP({1: brut_releve(1, "/wikistatus", INTERNE), 2: brut_releve(2, "/inbox", INTERNE)})
+    faits, avis = [], []
+    relever(cfg, {"GMAIL_APP_PASSWORD": "x"}, faits.append, avis.append, tmp_path / "etat.json",
+            connecter=lambda c: serveur)
+    assert faits == [] and serveur.ranges == [(1, "Folders/Traite"), (2, "Folders/Traite")]
+    assert "2" in avis[0]
+    faits2, _, _ = lancer(cfg, FauxIMAP({5: brut_releve(1, "/wikistatus", INTERNE)}), tmp_path)
+    assert faits2 == []  # noté au journal à la mise en service
+
+
+def test_journal_illisible_rien_execute(cfg, tmp_path):
+    (tmp_path / "etat.json").write_text("{")
+    serveur = FauxIMAP({1: brut_releve(1, "/wikistatus", INTERNE)})
+    faits = []
+    relever(cfg, {"GMAIL_APP_PASSWORD": "x"}, faits.append, lambda t: None, tmp_path / "etat.json",
+            connecter=lambda c: serveur)
+    assert faits == [] and serveur.ranges == [(1, "Folders/Traite")]
+
+
+def test_rangement_refuse_par_le_serveur_un_seul_avis(cfg, tmp_path):
+    autre = [("From", "x@ex.fr"), ("Return-Path", "<x@ex.fr>")] + INTERNE[2:]
+    serveur = FauxIMAP({1: brut_releve(1, "/a", autre)})
+    serveur.move_refuse = True
+    _, avis1, _ = lancer(cfg, serveur, tmp_path)
+    _, avis2, _ = lancer(cfg, serveur, tmp_path)
+    assert len(avis1) == 1 and avis2 == []
