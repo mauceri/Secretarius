@@ -33,6 +33,7 @@ class FauxIMAP:
         self.utf8_actif = False
         self.recherches: list = []
         self.datees: list = []
+        self.ranges: list = []
         self.capabilities = ("IMAP4REV1",)
 
     def capability(self):
@@ -41,6 +42,9 @@ class FauxIMAP:
     def enable(self, capacite):
         assert capacite in self.capabilities, "imaplib refuse ENABLE si la capacité n'est pas connue"
         self.utf8_actif = True
+        return "OK", [b""]
+
+    def create(self, dossier):
         return "OK", [b""]
 
     def login(self, utilisateur, mot_de_passe):
@@ -68,6 +72,10 @@ class FauxIMAP:
             if u not in self.messages:
                 return "OK", [None]
             return "OK", [(f"{u} (UID {u} RFC822 {{1}}".encode(), self.messages[u]), b")"]
+        if commande == "move":
+            self.ranges.append((int(args[0]), args[1]))
+            self.messages.pop(int(args[0]))
+            return "OK", [b""]
         raise AssertionError(commande)
 
     def logout(self):

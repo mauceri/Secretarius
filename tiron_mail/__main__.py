@@ -7,6 +7,7 @@ Toujours code 0 et une ligne JSON {"ok": bool, "text": str, ...}.
   repondre --args "<id> <texte>" [--confirme --message-id <Message-ID de l'aperçu>]
   ecrire   --args "<adresse> <texte>" [--confirme]
   bloc     --args "<bloc de note : à :, objet :, corps>" [--confirme]
+  releve   relève de tiron@ (service tiron-mail-releve)
 
 Sans --confirme, repondre et ecrire montrent l'aperçu et n'envoient rien.
 L'aperçu de repondre renvoie le Message-ID du message visé : à la confirmation,
@@ -84,7 +85,7 @@ def _message(cfg, env, connecter, ident: str):
 def main(argv=None, env=None, connecter=_connecter_imap, smtp=_smtp) -> int:
     env = os.environ if env is None else env
     p = argparse.ArgumentParser(prog="tiron_mail")
-    p.add_argument("commande", choices=["inbox", "chercher", "lire", "repondre", "ecrire", "bloc"])
+    p.add_argument("commande", choices=["inbox", "chercher", "lire", "repondre", "ecrire", "bloc", "releve"])
     p.add_argument("--args", default="")
     p.add_argument("--confirme", action="store_true")
     p.add_argument("--message-id", default="")
@@ -124,6 +125,11 @@ def main(argv=None, env=None, connecter=_connecter_imap, smtp=_smtp) -> int:
                 out = {"ok": True, "args": a.args.strip(), "message_id": m["message_id"], "text": (
                     f"Réponse à « {sujet} » ({m['repondre_a']}), depuis {compte.adresse} :"
                     f"\n\n{texte.strip()}{alerte}")}
+        elif a.commande == "releve":
+            from tiron_cron.livraison import notifier_telegram
+            from tiron_mail.releve import executer_openclaw, relever
+            out = {"ok": True, "text": relever(cfg, env, executer_openclaw(env), notifier_telegram(env),
+                                               connecter=connecter)}
         elif a.commande == "bloc":  # blocs /mail? et /mail! d'une note Obsidian
             dest, objet, corps = _lire_bloc(a.args)
             if not _ADRESSE.match(dest) or not corps:

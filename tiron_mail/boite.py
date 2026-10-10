@@ -135,7 +135,7 @@ class Boite:
         self._connecter = connecter
         self._utf8 = False
 
-    def _ouvrir(self):
+    def _ouvrir(self, lecture_seule: bool = True):
         mdp = self.env.get(self.compte.secret_env, "")
         if not mdp:
             raise ErreurBoite(f"boîte {self.compte.nom} : mot de passe absent ({self.compte.secret_env})")
@@ -143,7 +143,7 @@ class Boite:
             conn = self._connecter(self.compte)
             conn.login(self.compte.utilisateur, mdp)
             self._utf8 = _activer_utf8(conn)
-            conn.select("INBOX", readonly=True)
+            conn.select("INBOX", readonly=lecture_seule)
             return conn
         except (OSError, imaplib.IMAP4.error) as e:
             raise ErreurBoite(f"boîte {self.compte.nom} injoignable : {e}") from e

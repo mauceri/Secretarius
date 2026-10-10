@@ -40,6 +40,7 @@ class Config:
     comptes: dict
     envoi_defaut: str
     adresses_proprietaire: tuple
+    releve: str = ""
 
 
 def charger(chemin: Path = CHEMIN_DEFAUT) -> Config:
@@ -51,7 +52,10 @@ def charger(chemin: Path = CHEMIN_DEFAUT) -> Config:
     defaut = envoi.get("defaut", "")
     if defaut not in comptes:
         raise ErreurConfig(f"envoi.defaut « {defaut} » ne désigne aucune boîte configurée")
-    return Config(comptes, defaut, tuple(a.lower() for a in envoi.get("adresses_proprietaire", [])))
+    releve = d.get("releve", {}).get("boite", "")
+    if releve and releve not in comptes:
+        raise ErreurConfig(f"releve.boite « {releve} » ne désigne aucune boîte configurée")
+    return Config(comptes, defaut, tuple(a.lower() for a in envoi.get("adresses_proprietaire", [])), releve)
 
 
 def compte_de_prefixe(cfg: Config, prefixe: str) -> Compte:
