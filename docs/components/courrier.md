@@ -24,7 +24,8 @@ Chaque minute, `tiron-mail-releve.timer` lance `python3 -m tiron_mail releve`.
   `_PAR_COURRIEL` de `releve.py`) ; `/confirm`, `/annuler`, `/maj`, `/connecter` et les
   commandes natives d'OpenClaw (`/model`, `/reset`…) sont ignorées avec un avis : elles se
   tapent sur Telegram. `/consigne <texte>` est confiée à l'agent consignes (ci-dessous),
-  dans une session neuve. Chaque commande est injectée par `openclaw agent --session-key agent:main:courrier --deliver` : même
+  dans une session neuve ; son texte peut continuer sur les lignes suivantes, jusqu'à une
+  ligne vide. Chaque commande est injectée par `openclaw agent --session-key agent:main:courrier --deliver` : même
   chemin qu'un message Telegram ; la réponse arrive sur Telegram, et `/confirm` se tape
   sur Telegram.
 - **Refusé** : rien n'est exécuté, avis Telegram (expéditeur, motif), corps jamais transmis.

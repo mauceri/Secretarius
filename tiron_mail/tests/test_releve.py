@@ -284,3 +284,21 @@ def test_consigne_vide_refusee_sans_appel(monkeypatch):
     with pytest.raises(ValueError, match="usage"):
         executer_openclaw({"TIRON_TELEGRAM_CHAT_ID": "1", "OPENCLAW_BIN": "oc"})("/consigne  ")
     assert vus == []
+
+
+def test_consigne_sur_plusieurs_lignes_jusqu_a_la_ligne_vide():
+    corps = "/consigne fais le point du wiki\net envoie-moi les pages à relire\n\nCordialement\n/wikistatus"
+    assert commandes("", corps) == ["/consigne fais le point du wiki et envoie-moi les pages à relire"]
+
+
+def test_consigne_suivie_d_une_commande_ou_d_une_citation():
+    assert commandes("", "/consigne a\n/wikistatus") == ["/consigne a", "/wikistatus"]
+    assert commandes("", "/consigne a\n> /supprimer x") == ["/consigne a"]
+
+
+def test_consigne_separee_par_une_espace_insecable_va_a_consignes(monkeypatch):
+    vus = []
+    monkeypatch.setattr(releve.subprocess, "run", lambda argv, **kw: vus.append(argv))
+    executer_openclaw({"TIRON_TELEGRAM_CHAT_ID": "1", "OPENCLAW_BIN": "oc"})("/consigne fais le point")
+    assert vus[0][vus[0].index("--agent") + 1] == "consignes"
+    assert vus[0][vus[0].index("--message") + 1] == "fais le point"

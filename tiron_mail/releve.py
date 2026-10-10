@@ -60,15 +60,23 @@ _PAR_COURRIEL = {"/wikistatus", "/tags", "/relire", "/q", "/r", "/c", "/ingest",
 
 def commandes(objet: str, texte: str) -> list[str]:
     """L'objet s'il commence par « / », puis les lignes « / » en tête du corps, jusqu'à la
-    première autre ligne : un message transféré ou cité, qui vient après, n'est jamais lu."""
+    première autre ligne : un message transféré ou cité, qui vient après, n'est jamais lu.
+    Une /consigne se poursuit sur les lignes suivantes jusqu'à une ligne vide."""
     out = [objet.strip()] if objet.strip().startswith("/") else []
+    suite = False  # une /consigne continue sur les lignes suivantes, jusqu'à une ligne vide
     for ligne in texte.splitlines():
         ligne = ligne.strip()
         if not ligne:
+            if suite:
+                break
+            continue
+        if suite and not ligne.startswith(("/", ">")):
+            out[-1] += " " + ligne
             continue
         if not ligne.startswith("/"):
             break
         out.append(ligne)
+        suite = ligne.split()[0].lower() == "/consigne"
     return out
 
 
@@ -185,8 +193,8 @@ def executer_openclaw(env: Mapping[str, str]):
     La réponse part sur Telegram."""
     def executer(commande: str) -> None:
         exe = env.get("OPENCLAW_BIN") or str(Path.home() / ".local" / "bin" / "openclaw")
-        mot, _, reste = commande.partition(" ")
-        if mot.lower() == "/consigne":
+        mot, reste = (commande.split(None, 1) + [""])[:2]
+        if mot.lower().rstrip("?!") == "/consigne":
             if not reste.strip():
                 raise ValueError("usage : /consigne <texte>")
             # Session neuve à chaque consigne : pas d'historique qui biaise le modèle.
