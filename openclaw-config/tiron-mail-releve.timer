@@ -1,0 +1,8 @@
+[Unit]
+Description=Relève de tiron@secretarius.co (chaque minute)
+
+[Timer]
+OnCalendar=*:*:00
+
+[Install]
+WantedBy=timers.target

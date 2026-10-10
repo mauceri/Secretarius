@@ -10,6 +10,11 @@ defaut = "proton"
 # Adresses de l'utilisateur : envoi direct permis vers elles.
 adresses_proprietaire = ["vous@gmail.com", "vous@proton.me"]
 
+# Boîte relevée chaque minute (service tiron-mail-releve) : seules les commandes
+# de vos adresses, authentifiées par Proton, y sont exécutées.
+# [releve]
+# boite = "tiron"
+
 # Gmail personnel : mot de passe d'application Google.
 [comptes.gmail]
 prefixe = "g"
@@ -36,6 +41,7 @@ port_smtp = 1025
 securite_smtp = "starttls"
 secret_env = "PROTON_BRIDGE_PASS_PERSO"
 tri_par_date = true  # le Bridge numérote dans l'ordre de sa synchronisation
+# empreinte_tls = "AA:BB:…"  # certificat du Bridge épinglé, cf. docs/components/courrier.md
 
 # Boîte de Tiron (Proton Business), via le même Bridge.
 [comptes.tiron]
@@ -50,3 +56,4 @@ port_smtp = 1025
 securite_smtp = "starttls"
 secret_env = "PROTON_BRIDGE_PASS_TIRON"
 tri_par_date = true  # le Bridge numérote dans l'ordre de sa synchronisation
+# empreinte_tls = "AA:BB:…"  # certificat du Bridge épinglé, cf. docs/components/courrier.md

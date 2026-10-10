@@ -1,0 +1,11 @@
+[Unit]
+Description=Tiron — relève de tiron@secretarius.co (commandes de l'utilisateur)
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/Secretarius
+EnvironmentFile=%h/Secretarius/Wiki_LM/.env
+ExecStart=/usr/bin/python3 -m tiron_mail releve
+StandardOutput=journal
+StandardError=journal

@@ -437,6 +437,18 @@ if [[ -x "${HOME}/Secretarius/Wiki_LM/.venv/bin/python3" && -f "${HOME}/Secretar
     warn "Activation de wiki-lm-embed.timer échouée"
 fi
 
+# Relève de tiron@secretarius.co : unités copiées, activation laissée à l'utilisateur
+# (systemctl --user enable --now tiron-mail-releve.timer), cf. docs/components/courrier.md.
+for _tr in tiron-mail-releve.service tiron-mail-releve.timer; do
+  _tr_dst="${SYSTEMD_USER_DIR}/${_tr}"
+  if [[ -f "$_tr_dst" && "$FORCE" != "true" ]]; then
+    info "${_tr} existe déjà — ignoré"
+  else
+    cp "${SCRIPT_DIR}/${_tr}" "$_tr_dst"
+    info "${_tr} installé dans ${SYSTEMD_USER_DIR} (non activé)"
+  fi
+done
+
 # Workspace .md et skills
 WORKSPACE_SRC="${SCRIPT_DIR}/workspace"
 WORKSPACE_DST="${OPENCLAW_PATH}/workspace"
