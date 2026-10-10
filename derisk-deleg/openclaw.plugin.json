@@ -30,7 +30,11 @@
       "wiki_search",
       "wiki_review",
       "wiki_verify",
-      "wiki_delete"
+      "wiki_delete",
+      "mail_inbox",
+      "mail_chercher",
+      "mail_lire",
+      "mail_envoyer"
     ]
   }
 }

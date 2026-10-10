@@ -1247,3 +1247,38 @@ describe("before_agent_reply — demande de précision", () => {
     });
   });
 });
+
+describe("agent consignes : outils mail_* et hook", () => {
+  it("mail_inbox, mail_chercher, mail_lire appellent tiron_mail en lecture", async () => {
+    const runTironMail = vi.fn(async () => ({ ok: true, text: "g:3  Paul" }));
+    vi.doMock("./mail-ops.js", () => ({ runTironMail }));
+    const plugin = await freshPlugin(); const { api, tools } = makeApi(); plugin.register(api);
+    await tools["mail_inbox"].execute("1", { command: "5 tiron" });
+    await tools["mail_chercher"].execute("2", { command: "facture" });
+    const r = await tools["mail_lire"].execute("3", { command: "g:3" });
+    expect(runTironMail.mock.calls).toEqual([
+      [["inbox", "--args=5 tiron"]], [["chercher", "--args=facture"]], [["lire", "--args=g:3"]]]);
+    expect(r.content[0].text).toBe("g:3  Paul");
+  });
+
+  it("mail_envoyer passe toujours par --automatique (règle dans tiron_mail)", async () => {
+    const runTironMail = vi.fn(async () => ({ ok: false, text: "envoi automatique refusé" }));
+    vi.doMock("./mail-ops.js", () => ({ runTironMail }));
+    const plugin = await freshPlugin(); const { api, tools } = makeApi(); plugin.register(api);
+    const r = await tools["mail_envoyer"].execute("1", { adresse: "marie@ex.fr", texte: "Bonjour" });
+    expect(runTironMail).toHaveBeenCalledWith(
+      ["ecrire", "--args=marie@ex.fr Bonjour", "--confirme", "--automatique"]);
+    expect(r.content[0].text).toContain("refusé");
+  });
+
+  it("le hook laisse passer les tours de l'agent consignes, même en /", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const plugin = await freshPlugin(); const { api, hooks } = makeApi(); plugin.register(api);
+    for (const ctx of [{ agentId: "consignes" }, { sessionKey: "agent:consignes:courrier-ab12" }]) {
+      expect(await hooks["before_agent_reply"].handler({ cleanedBody: "/inbox fais le point" }, ctx))
+        .toBeUndefined();
+    }
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
