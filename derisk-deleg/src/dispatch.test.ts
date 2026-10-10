@@ -35,6 +35,7 @@ describe("commandToAction", () => {
   it("mappe /lire vers le courrier ; /drive et /connecter restent gog", () => {
     expect(commandToAction("/lire")).toEqual({ kind: "mail", op: "lire" });
     expect(commandToAction("/drive")).toEqual({ kind: "gog", op: "drive_search" });
+    expect(commandToAction("/agenda")).toEqual({ kind: "gog", op: "agenda" });
     expect(commandToAction("/connecter")).toEqual({ kind: "gog", op: "auth_start" });
   });
 

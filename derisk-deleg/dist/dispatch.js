@@ -11,6 +11,7 @@ const TABLE = {
     "/connecter": { kind: "gog", op: "auth_start" },
     "/inbox": { kind: "mail", op: "inbox" },
     "/drive": { kind: "gog", op: "drive_search" },
+    "/agenda": { kind: "gog", op: "agenda" },
     "/repondre": { kind: "mail-envoi", op: "repondre" },
     "/ecrire": { kind: "mail-envoi", op: "ecrire" },
     "/r": { kind: "wiki", op: "search" },

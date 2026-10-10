@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { formaterDrive, gogDriveSearch, gogAuthStart } from "./gog-ops.js";
+import { formaterAgenda, formaterDrive, gogAgenda, gogDriveSearch, gogAuthStart } from "./gog-ops.js";
 
 const JSON_DRIVE = JSON.stringify({ files: [
   { name: "Thèse — chapitre 1", mimeType: "application/vnd.google-apps.document",
@@ -51,5 +51,48 @@ describe("gogAuthStart", () => {
     const [, argv, script] = exec.mock.calls[0] as any[];
     expect(argv).toEqual(["gog-auth-bridge", "moi@gmail.com"]);
     expect(script).toBe('nohup "$1" "$2" >/dev/null 2>&1 &');
+  });
+});
+
+const JSON_AGENDA = JSON.stringify({ events: [
+  { summary: "Dentiste", start: { dateTime: "2026-10-12T09:30:00+02:00" }, location: "Paris" },
+  { summary: "Anniversaire", start: { date: "2026-10-14" } },
+] });
+
+describe("formaterAgenda", () => {
+  it("date et heure locales telles que données, journée entière, lieu", () => {
+    expect(formaterAgenda(JSON_AGENDA)).toBe(
+      "12/10 09:30  Dentiste (Paris)\n14/10 journée  Anniversaire");
+  });
+  it("tableau nu vide : aucun événement", () => {
+    expect(formaterAgenda("[]")).toBe("Aucun événement.");
+  });
+  it("sortie illisible", () => {
+    expect(formaterAgenda("pas du json")).toMatch(/^Réponse de gog illisible/);
+  });
+});
+
+describe("gogAgenda (lecture, appel direct)", () => {
+  it("7 jours par défaut, tous les agendas", async () => {
+    const exec = vi.fn(async () => ({ code: 0, stdout: JSON_AGENDA, stderr: "" }));
+    const out = await gogAgenda({}, "", exec);
+    expect(exec).toHaveBeenCalledWith({}, ["gog", "calendar", "events", "--all", "--days", "7", "--max", "30", "--json"]);
+    expect(out).toMatch(/^12\/10 09:30  Dentiste/);
+  });
+  it("nombre de jours donné", async () => {
+    const exec = vi.fn(async () => ({ code: 0, stdout: "[]", stderr: "" }));
+    await gogAgenda({}, "14", exec);
+    expect(exec.mock.calls[0][1]).toContain("14");
+  });
+  it("argument invalide : usage, rien d'exécuté", async () => {
+    const exec = vi.fn();
+    for (const a of ["demain", "0", "61"]) {
+      expect(await gogAgenda({}, a, exec)).toBe("Usage : /agenda [jours, de 1 à 60]");
+    }
+    expect(exec).not.toHaveBeenCalled();
+  });
+  it("autorisation expirée : invite à /connecter", async () => {
+    const exec = vi.fn(async () => ({ code: 1, stdout: "", stderr: 'oauth2: "invalid_grant"' }));
+    expect(await gogAgenda({}, "", exec)).toBe("Autorisation Google expirée ou absente : lancez /connecter.");
   });
 });

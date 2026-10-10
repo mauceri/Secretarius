@@ -4,6 +4,9 @@ Spec : `docs/superpowers/specs/2026-10-07-agent-courrier-design.md`. Boîtes dé
 `~/.config/tiron_mail/comptes.toml` (modèle : `tiron_mail/comptes.toml.modele`), mots de
 passe dans l'environnement. Commandes Telegram (`/inbox`, `/lire`, `/repondre`, `/ecrire`…)
 par derisk-deleg ; blocs `mail?`/`mail!` d'Obsidian : voir `obsidian.md`.
+Agenda : `/agenda [jours]` (7 par défaut, 60 au plus), lecture seule de tous les agendas
+Google par gog ; tapée sur Telegram ou par courriel, hors Laya. Exige une autorisation
+Google valide (`/connecter`).
 
 ## Relève de tiron@secretarius.co
 

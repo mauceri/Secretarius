@@ -3,7 +3,7 @@ import { definePluginEntry } from "openclaw/plugin-sdk/core";
 import { commandToAction } from "./dispatch.js";
 import { runTironCron } from "./cron-ops.js";
 import { runTironMail } from "./mail-ops.js";
-import { gogAuthStart, gogDriveSearch } from "./gog-ops.js";
+import { gogAgenda, gogAuthStart, gogDriveSearch } from "./gog-ops.js";
 import { CRON_COMMANDS, sansAvisSysteme, unwrapCronEnvelope } from "./cron-envelope.js";
 import { fetchWikiOpJson, runWikiOp } from "./wiki-ops.js";
 import { readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync, copyFileSync, mkdirSync, renameSync } from "node:fs";
@@ -794,6 +794,10 @@ export default definePluginEntry({
       if (action.kind === "gog") {
         if (action.op === "drive_search") {
           const out = await gogDriveSearch(api, routed.args);
+          return { handled: true, reply: { text: out.slice(0, 4000) } };
+        }
+        if (action.op === "agenda") {
+          const out = await gogAgenda(api, routed.args);
           return { handled: true, reply: { text: out.slice(0, 4000) } };
         }
         const r = await connecterGoogle();

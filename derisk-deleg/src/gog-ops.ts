@@ -45,6 +45,38 @@ export async function gogDriveSearch(api: any, q: string, exec: Exec = execGogSa
   return r.code === 0 ? formaterDrive(r.stdout) : erreurGog(r.stderr);
 }
 
+// Date et heure prises telles que gog les donne (déjà dans le fuseau de l'agenda) :
+// « 2026-10-12T09:30:00+02:00 » -> « 12/10 09:30 » ; « 2026-10-14 » -> « 14/10 journée ».
+function quandEvenement(start: any): string {
+  const s = String(start?.dateTime ?? start?.date ?? "");
+  const m = s.match(/^\d{4}-(\d{2})-(\d{2})(?:T(\d{2}:\d{2}))?/);
+  if (!m) return s || "?";
+  return `${m[2]}/${m[1]} ${m[3] ?? "journée"}`;
+}
+
+export function formaterAgenda(stdout: string): string {
+  let data: any;
+  try {
+    data = JSON.parse(stdout);
+  } catch {
+    return `Réponse de gog illisible : ${stdout.slice(0, 200)}`;
+  }
+  const events: any[] = Array.isArray(data) ? data : (data?.events ?? data?.items ?? []);
+  if (events.length === 0) return "Aucun événement.";
+  return events
+    .map((e) => `${quandEvenement(e.start)}  ${e.summary ?? "(sans titre)"}${e.location ? ` (${e.location})` : ""}`)
+    .join("\n");
+}
+
+// Lecture seule : événements des n prochains jours (7 par défaut), tous agendas.
+export async function gogAgenda(api: any, args: string, exec: Exec = execGogSandbox): Promise<string> {
+  const a = args.trim();
+  const jours = a === "" ? 7 : (/^\d+$/.test(a) ? Number(a) : NaN);
+  if (!(jours >= 1 && jours <= 60)) return "Usage : /agenda [jours, de 1 à 60]";
+  const r = await exec(api, ["gog", "calendar", "events", "--all", "--days", String(jours), "--max", "30", "--json"]);
+  return r.code === 0 ? formaterAgenda(r.stdout) : erreurGog(r.stderr);
+}
+
 // Lance le pont OAuth (gog-auth-bridge) en arrière-plan dans le conteneur : il
 // expose l'URL dans /gog-config/auth_url puis attend auth_response (fichiers
 // partagés avec l'hôte, lus par le plugin).

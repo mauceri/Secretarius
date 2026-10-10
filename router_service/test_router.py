@@ -278,3 +278,9 @@ def test_ecrire_tapee_honoree_sans_laya(monkeypatch):
     assert router_server.route_message("/ecrire marie@ex.fr bonjour") == {
         "status": "ok", "command": "/ecrire", "args": "marie@ex.fr bonjour"}
     assert router_server.route_message("/ecrire") == {"status": "answer", "reply": "Usage : /ecrire <argument>"}
+
+
+def test_agenda_tapee_honoree_sans_laya_avec_ou_sans_argument(monkeypatch):
+    monkeypatch.setattr(router_server, "_classifier", _FakeClassifier([(None, 1.0)]))
+    assert router_server.route_message("/agenda") == {"status": "ok", "command": "/agenda", "args": ""}
+    assert router_server.route_message("/agenda 14")["args"] == "14"

@@ -1154,6 +1154,17 @@ describe("before_agent_reply — demande de précision", () => {
     expect(run).not.toHaveBeenCalled();
   });
 
+  it("/agenda tapé : lecture directe de l'agenda par gog", async () => {
+    const gogAgenda = vi.fn(async () => "12/10 09:30  Dentiste");
+    vi.doMock("./gog-ops.js", () => ({ gogDriveSearch: vi.fn(), gogAgenda, gogAuthStart: vi.fn() }));
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ status: "ok", command: "/agenda", args: "3" }) })));
+    const plugin = await freshPlugin(); const { api, hooks, run } = makeApi(); plugin.register(api);
+    const r = await hooks["before_agent_reply"].handler({ cleanedBody: "/agenda 3" }, {});
+    expect(gogAgenda).toHaveBeenCalledWith(api, "3");
+    expect(r.reply.text).toBe("12/10 09:30  Dentiste");
+    expect(run).not.toHaveBeenCalled();
+  });
+
   it("/connecter : pont OAuth lancé directement avec le compte configuré", async () => {
     const gogAuthStart = vi.fn(async () => ({ code: 0, stdout: "", stderr: "" }));
     vi.doMock("./gog-ops.js", () => ({ gogDriveSearch: vi.fn(), gogAuthStart }));

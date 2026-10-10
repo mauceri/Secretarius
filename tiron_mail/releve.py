@@ -55,7 +55,7 @@ def authentifier(m: Message, proprietaires: tuple) -> str:
 # natives d'OpenClaw (/model, /reset…) sont refusées.
 _PAR_COURRIEL = {"/wikistatus", "/tags", "/relire", "/q", "/r", "/c", "/ingest", "/kbupdate",
                  "/verifie", "/supprimer", "/source", "/drive", "/inbox", "/chercher", "/lire",
-                 "/repondre", "/ecrire", "/cron", "/consigne"}
+                 "/repondre", "/ecrire", "/cron", "/consigne", "/agenda"}
 
 
 def commandes(objet: str, texte: str) -> list[str]:

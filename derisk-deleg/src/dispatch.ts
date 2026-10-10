@@ -6,12 +6,12 @@ export type RouterCommand =
   | "/c" | "/q" | "/ingest" | "/wikistatus" | "/source"
   | "/chercher" | "/connecter" | "/inbox" | "/drive" | "/repondre"
   | "/r" | "/tags" | "/kbupdate" | "/lire" | "/supprimer" | "/relire" | "/verifie"
-  | "/cron" | "/ecrire";
+  | "/cron" | "/ecrire" | "/agenda";
 
 export type ActionKind =
   | { kind: "wiki"; op: "capture" | "query" | "ingest" | "status" | "search" | "tags" | "kb_update" | "delete" | "review" | "verify" }
   | { kind: "scout" }
-  | { kind: "gog"; op: "auth_start" | "drive_search" }
+  | { kind: "gog"; op: "auth_start" | "drive_search" | "agenda" }
   | { kind: "mail"; op: "inbox" | "chercher" | "lire" }
   | { kind: "mail-envoi"; op: "repondre" | "ecrire" }
   | { kind: "cron" };
@@ -26,6 +26,7 @@ const TABLE: Record<RouterCommand, ActionKind> = {
   "/connecter": { kind: "gog", op: "auth_start" },
   "/inbox": { kind: "mail", op: "inbox" },
   "/drive": { kind: "gog", op: "drive_search" },
+  "/agenda": { kind: "gog", op: "agenda" },
   "/repondre": { kind: "mail-envoi", op: "repondre" },
   "/ecrire": { kind: "mail-envoi", op: "ecrire" },
   "/r": { kind: "wiki", op: "search" },

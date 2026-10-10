@@ -18,7 +18,7 @@ WIKI_CMDS = {"/c", "/q", "/ingest", "/source", "/wikistatus", "/r", "/tags", "/k
 GOG_CMDS = {"/chercher", "/connecter", "/inbox", "/drive", "/repondre", "/lire"}
 CRON_CMDS = {"/cron"}
 # Commandes tapées seulement, hors classifieur (pas de réentraînement de Laya).
-TAPEES_SEULEMENT = {"/ecrire"}
+TAPEES_SEULEMENT = {"/ecrire", "/agenda"}
 
 DOMAINES: dict[str, str] = {
     "wiki": "le wiki personnel : capturer, interroger, chercher, ingérer, relire, vérifier, supprimer ; et toute question de connaissance",

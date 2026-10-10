@@ -302,3 +302,9 @@ def test_consigne_separee_par_une_espace_insecable_va_a_consignes(monkeypatch):
     executer_openclaw({"TIRON_TELEGRAM_CHAT_ID": "1", "OPENCLAW_BIN": "oc"})("/consigne fais le point")
     assert vus[0][vus[0].index("--agent") + 1] == "consignes"
     assert vus[0][vus[0].index("--message") + 1] == "fais le point"
+
+
+def test_agenda_admis_par_courriel(cfg, tmp_path):
+    serveur = FauxIMAP({1: brut_releve(1, "/agenda 3", INTERNE)})
+    faits, avis, _ = lancer(cfg, serveur, tmp_path)
+    assert faits == ["/agenda 3"] and avis == []
