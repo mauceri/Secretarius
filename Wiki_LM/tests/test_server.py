@@ -403,3 +403,10 @@ class TestOrigine:
                         {"Origin": "http://localhost"}):
             r = client.post("/run", json={"command": "/mail?", "arg": "à : x@y.fr\nz"}, headers=entetes)
             assert r.status_code == 200, entetes
+
+
+def test_aide_decrit_toutes_les_commandes_servies():
+    from server import _RUN_OPS
+    from wiki import _HELP_TEXT
+    absentes = [c for c in _RUN_OPS if f"**{c}" not in _HELP_TEXT]
+    assert absentes == []

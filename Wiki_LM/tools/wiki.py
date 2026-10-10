@@ -256,6 +256,14 @@ _HELP_TEXT = """\
 - **/repair! `<famille>`** — applique réellement la réparation (`broken-link`, `missing-frontmatter`, `unlinked-mention` ou `unresolved-suggestion`). Sans argument : liste les familles disponibles.
 - **/reingerer! `<slug>`** — réingère réellement une page source : n'ajoute que les concepts/entités manquants (nouvelle page + lien), ne touche jamais au contenu déjà présent.
 - **/switch-wiki-model `<alias>`** — bascule le LLM du wiki (`local`, `obfusque`, `infomaniak`, `deepseek` — préférence dans cet ordre). Sans argument : affiche le modèle actuel (lecture seule).
+
+## Planification et courrier
+
+- **/cron? `add <quand> [<canal>] <rappel|commande|consigne> <contenu>`** — aperçu d'une tâche planifiée (rien n'est créé).
+- **/cron! `add <quand> [<canal>] <rappel|commande|consigne> <contenu>`** — crée réellement la tâche (canal par défaut : Obsidian, dossier `Réception/`).
+- **/cron `list|rm|pause|reprendre [id]`** — gère les tâches planifiées.
+- **/mail?** — aperçu d'un courriel : lignes `à :` et `objet :`, puis le corps (rien n'est envoyé).
+- **/mail!** — envoie réellement le courriel, depuis tiron@secretarius.co.
 """
 
 
