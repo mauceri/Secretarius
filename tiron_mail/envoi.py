@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from email.message import EmailMessage
 from email.utils import formatdate, make_msgid
 
-from tiron_mail.boite import ErreurBoite, _contexte_tls
+from tiron_mail.boite import ErreurBoite, _contexte_tls, verifier_empreinte
 from tiron_mail.config import Compte
 
 
@@ -27,10 +27,12 @@ def construire(depuis: Compte, a: str, objet: str, corps: str, en_reponse_a: str
 
 def _smtp(compte: Compte):
     if compte.securite_smtp == "ssl":
-        return smtplib.SMTP_SSL(compte.hote_smtp, compte.port_smtp,
+        conn = smtplib.SMTP_SSL(compte.hote_smtp, compte.port_smtp,
                                 context=_contexte_tls(compte.hote_smtp), timeout=30)
-    conn = smtplib.SMTP(compte.hote_smtp, compte.port_smtp, timeout=30)
-    conn.starttls(context=_contexte_tls(compte.hote_smtp))
+    else:
+        conn = smtplib.SMTP(compte.hote_smtp, compte.port_smtp, timeout=30)
+        conn.starttls(context=_contexte_tls(compte.hote_smtp))
+    verifier_empreinte(conn.sock, compte)
     return conn
 
 

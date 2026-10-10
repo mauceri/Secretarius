@@ -30,6 +30,9 @@ class Compte:
     # Bridge (UIDs dans l'ordre de sa synchronisation), inutile et coûteux pour
     # Gmail (UIDs chronologiques, 24 s pour dater 143 000 messages).
     tri_par_date: bool = False
+    # Empreinte SHA-256 du certificat du serveur (Proton Bridge, auto-signé) :
+    # « openssl s_client -starttls imap -connect 127.0.0.1:1143 | openssl x509 -noout -fingerprint -sha256 ».
+    empreinte_tls: str = ""
 
 
 @dataclass(frozen=True)

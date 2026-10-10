@@ -107,3 +107,28 @@ def test_lire_erreur_serveur_devient_erreur_boite(compte_gmail):
 
 def test_depuis_demesure_ne_plante_pas():
     assert criteres_imap("depuis:99999999j", date(2026, 10, 7))[0] == "SINCE"
+
+
+import hashlib
+from tiron_mail.boite import verifier_empreinte
+
+
+class _Sock:
+    def __init__(self, der): self.der = der
+    def getpeercert(self, binary_form=False): return self.der
+
+
+def test_empreinte_conforme_acceptee(compte_gmail):
+    emp = hashlib.sha256(b"cert").hexdigest().upper()
+    compte = replace(compte_gmail, empreinte_tls=":".join(emp[i:i + 2] for i in range(0, 64, 2)))
+    verifier_empreinte(_Sock(b"cert"), compte)
+
+
+def test_empreinte_differente_refusee(compte_gmail):
+    compte = replace(compte_gmail, empreinte_tls=hashlib.sha256(b"cert").hexdigest())
+    with pytest.raises(ErreurBoite, match="certificat"):
+        verifier_empreinte(_Sock(b"autre"), compte)
+
+
+def test_sans_empreinte_pas_de_controle(compte_gmail):
+    verifier_empreinte(_Sock(b"importe"), compte_gmail)

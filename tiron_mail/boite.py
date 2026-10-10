@@ -1,6 +1,8 @@
 """Accès IMAP à une boîte : lister, chercher, lire (lecture seule, INBOX)."""
 from __future__ import annotations
 
+import hashlib
+import hmac
 import imaplib
 import re
 import ssl
@@ -28,12 +30,25 @@ def _contexte_tls(hote: str) -> ssl.SSLContext:
     return ctx
 
 
+def verifier_empreinte(sock, compte: Compte) -> None:
+    """Le Bridge a un certificat auto-signé : sans vérification par autorité, on
+    compare son empreinte à celle notée dans la configuration."""
+    if not compte.empreinte_tls:
+        return
+    vue = hashlib.sha256(sock.getpeercert(binary_form=True) or b"").hexdigest()
+    attendue = compte.empreinte_tls.replace(":", "").lower()
+    if not hmac.compare_digest(vue, attendue):
+        raise ErreurBoite(f"boîte {compte.nom} : certificat inattendu ({vue[:16]}…), connexion refusée")
+
+
 def _connecter_imap(compte: Compte):
     if compte.securite_imap == "ssl":
-        return imaplib.IMAP4_SSL(compte.hote_imap, compte.port_imap,
+        conn = imaplib.IMAP4_SSL(compte.hote_imap, compte.port_imap,
                                  ssl_context=_contexte_tls(compte.hote_imap), timeout=30)
-    conn = imaplib.IMAP4(compte.hote_imap, compte.port_imap, timeout=30)
-    conn.starttls(ssl_context=_contexte_tls(compte.hote_imap))
+    else:
+        conn = imaplib.IMAP4(compte.hote_imap, compte.port_imap, timeout=30)
+        conn.starttls(ssl_context=_contexte_tls(compte.hote_imap))
+    verifier_empreinte(conn.sock, compte)
     return conn
 
 
