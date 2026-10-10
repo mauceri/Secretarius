@@ -43,7 +43,10 @@ Chaque minute, `tiron-mail-releve.timer` lance `python3 -m tiron_mail releve`.
 ## Agent consignes
 
 - Reçoit les consignes `/cron` (`--agent consignes`) et les `/consigne` par courriel ; les
-  commandes en `/` restent sur `main`. Modèle : `ollama/qwen3:8b`.
+  commandes en `/` restent sur `main`. Modèle : Qwen3-14B obfusqué (`obfusque/…`, proxy
+  `~/obfuscator`, service `obfuscator-proxy` sur 127.0.0.1:8001, Modal). qwen3:8b essayé le
+  2026-10-10 : outils appelés dans le désordre (courriel envoyé vide, succès affirmé).
+  OpenClaw impose `stream=true` : le proxy renvoie la réponse en SSE d'un seul bloc.
 - Outils seulement : `wiki_query`, `wiki_search`, `wiki_status`, `wiki_review`, `wiki_tags`,
   `mail_inbox`, `mail_chercher`, `mail_lire`, `mail_envoyer` ; pas d'`exec` ni d'écriture.
   Les `wiki_*` tournent dans le conteneur `wiki`, les `mail_*` dans le gateway (`tiron_mail`).

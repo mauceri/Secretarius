@@ -79,6 +79,22 @@
       "maxTokens": 8192
      }
     ]
+   },
+   "obfusque": {
+    "baseUrl": "http://127.0.0.1:8001/v1",
+    "apiKey": "local",
+    "api": "openai-completions",
+    "models": [
+     {
+      "id": "qwen3-14b-h128-a1-h02",
+      "name": "Qwen3-14B obfusqué (Modal)",
+      "api": "openai-completions",
+      "reasoning": false,
+      "input": ["text"],
+      "contextWindow": 32768,
+      "maxTokens": 2048
+     }
+    ]
    }
   }
  },
@@ -98,7 +114,8 @@
     "infomaniak/Qwen/Qwen3.5-397B-A17B-FP8": { "alias": "Qwen397" },
     "infomaniak/google/gemma-4-31B-it": { "alias": "Gemma4" },
     "infomaniak/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8": { "alias": "Nemotron3" },
-    "infomaniak/Qwen/Qwen3.5-122B-A10B-FP8": { "alias": "Qwen122" }
+    "infomaniak/Qwen/Qwen3.5-122B-A10B-FP8": { "alias": "Qwen122" },
+    "obfusque/qwen3-14b-h128-a1-h02": { "alias": "Obfusque14B", "streaming": false }
    },
    "workspace": "${HOME}/${OPENCLAW_DIR}/workspace",
    "compaction": {
@@ -209,7 +226,7 @@
     }
    },
    "consignes": {
-    "model": { "primary": "ollama/qwen3:8b" },
+    "model": { "primary": "obfusque/qwen3-14b-h128-a1-h02" },
     "workspace": "${HOME}/${OPENCLAW_DIR}/workspace-consignes",
     "tools": {
      "deny": ["exec"],
