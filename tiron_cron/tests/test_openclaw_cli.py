@@ -33,10 +33,10 @@ def test_tache_unique_supprimee_apres_succes():
     assert _opt(argv, "--at") == "20m" and "--delete-after-run" in argv
 
 
-def test_consigne_va_a_main_en_session_isolee():
+def test_consigne_va_a_l_agent_consignes_en_session_isolee():
     argv = build_add_argv(Job("cron", "0 7 * * *", None, "consigne", "résume le wiki"),
                           "telegram", "UTC", ENV, "tiron:1")
-    assert _opt(argv, "--agent") == "main" and _opt(argv, "--session") == "isolated"
+    assert _opt(argv, "--agent") == "consignes" and _opt(argv, "--session") == "isolated"
     assert _opt(argv, "--message") == "résume le wiki" and "--command-argv" not in argv
 
 
@@ -58,6 +58,12 @@ def test_commande_va_a_main():
     assert _opt(argv, "--message") == "/wikistatus"
 
 
+def test_commande_planifiee_reste_sur_main():
+    argv = build_add_argv(Job("cron", "0 8 * * 1", None, "commande", "/wikistatus"),
+                          "telegram", "UTC", ENV, "tiron:1")
+    assert _opt(argv, "--agent") == "main"
+
+
 def test_rappel_obsidian_lance_le_script_interne_sans_livraison():
     argv = build_add_argv(Job("at", "1h", "obsidian", "rappel", "payer"), "obsidian", "UTC", ENV, "tiron:1")
     assert json.loads(_opt(argv, "--command-argv")) == [
@@ -70,7 +76,8 @@ def test_consigne_et_commande_obsidian_par_webhook():
     for type_, contenu in (("consigne", "résume"), ("commande", "/tags")):
         argv = build_add_argv(Job("at", "1h", "obsidian", type_, contenu), "obsidian", "UTC", ENV, "tiron:1")
         assert _opt(argv, "--webhook") == "http://127.0.0.1:5051/livraison"
-        assert _opt(argv, "--agent") == "main" and _opt(argv, "--message") == contenu
+        assert _opt(argv, "--agent") == {"consigne": "consignes", "commande": "main"}[type_]
+        assert _opt(argv, "--message") == contenu
         for interdit in ("--announce", "--channel", "--to", "--no-deliver"):
             assert interdit not in argv
 

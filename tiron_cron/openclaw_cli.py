@@ -37,6 +37,9 @@ def build_add_argv(job: Job, canal: str | None, tz: str, env: Mapping[str, str],
         argv += ["--cron", job.quand, "--tz", tz, "--exact"]
     else:
         argv += ["--at", job.quand, "--tz", tz, "--delete-after-run"]
+    # Consigne : agent consignes (lecture du wiki, courrier) ; commande : main,
+    # que le hook de derisk-deleg traite.
+    agent = "consignes" if job.type == "consigne" else "main"
     if canal == "obsidian":
         if job.type == "rappel":
             return argv + ["--command-argv", json.dumps(
@@ -45,7 +48,7 @@ def build_add_argv(job: Job, canal: str | None, tz: str, env: Mapping[str, str],
         # Consigne ou commande : le résultat part en webhook vers wiki-lm-server,
         # qui écrit la note dans Réception/ et prévient sur Telegram (spec courrier).
         url = env.get("TIRON_LIVRAISON_URL") or "http://127.0.0.1:5051/livraison"
-        return argv + ["--agent", "main", "--session", "isolated", "--light-context",
+        return argv + ["--agent", agent, "--session", "isolated", "--light-context",
                        "--thinking", "off", "--message", job.contenu, "--webhook", url]
     var = DESTINATAIRES_ENV[canal]
     dest = env.get(var)
@@ -58,7 +61,7 @@ def build_add_argv(job: Job, canal: str | None, tz: str, env: Mapping[str, str],
     # Contexte allégé et raisonnement coupé : ~20 s gagnées avec qwen3:8b sur le
     # processeur (essai du 2026-10-07). Sans effet pour une commande, que le hook
     # de derisk-deleg traite avant le modèle.
-    return argv + ["--agent", "main", "--session", "isolated", "--light-context",
+    return argv + ["--agent", agent, "--session", "isolated", "--light-context",
                    "--thinking", "off", "--message", job.contenu] + delivery
 
 
