@@ -20,12 +20,25 @@ warn() { echo "[WARN] $*"; }
 
 SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
 
+# Toutes les unités que les modules peuvent poser (openclaw-config/modules.sh) ;
+# celles d'un module absent du profil sont simplement ignorées plus bas.
 SERVICES=(
   "$GW_SVC"
   "wiki-lm-server.service"
   "wiki-lm-embed.timer"
   "wiki-lm-embed.service"
+  "obfuscator-proxy.service"
+  "openclaw-injection-guard.service"
+  "openclaw-scout.service"
+  "tiron-router.service"
+  "tiron-mail-releve.timer"
+  "tiron-mail-releve.service"
 )
+# Instances de synchronisation du coffre (obsidian-sync@<coffre>).
+while read -r _inst _; do
+  [[ -n "$_inst" ]] && SERVICES+=("$_inst")
+done < <(systemctl --user list-units 'obsidian-sync@*' --all --plain --no-legend 2>/dev/null)
+unset _inst
 
 echo ""
 echo "Cible    : $OPENCLAW_PATH"
@@ -52,7 +65,10 @@ for _svc in "${SERVICES[@]}"; do
     info "$_svc_file supprimé"
   fi
 done
+# Unité modèle des instances obsidian-sync@ (ne contient pas de coffre).
+rm -f "${SYSTEMD_USER_DIR}/obsidian-sync@.service"
 systemctl --user daemon-reload 2>/dev/null || true
+# Le coffre, ~/obfuscator et les fichiers ZIM ne sont jamais supprimés.
 
 # Répertoire de configuration du gateway
 if [[ -d "$OPENCLAW_PATH" ]]; then
