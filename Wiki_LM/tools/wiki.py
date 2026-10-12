@@ -150,7 +150,8 @@ MODEL_ALIASES: dict[str, dict[str, str]] = {
     "obfusque": {
         "backend": "openai",
         "model": "aloepri-qwen3-14b",
-        "base_url": "http://127.0.0.1:8001/v1",
+        # Profil léger : un seul proxy, sur docker0 (OBFUSQUE_BASE_URL posée par l'installateur).
+        "base_url": os.environ.get("OBFUSQUE_BASE_URL", "http://127.0.0.1:8001/v1"),
         "api_key_env": "",
     },
     # Préférence de l'utilisateur (2026-10-06) : local > obfusqué > Infomaniak.

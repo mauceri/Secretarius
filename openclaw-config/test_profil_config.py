@@ -4,8 +4,6 @@ import re
 import sys
 from pathlib import Path
 
-import pytest
-
 sys.path.insert(0, str(Path(__file__).parent))
 from profil_config import OUTILS_DE, appliquer_profil  # noqa: E402
 
@@ -77,7 +75,6 @@ def test_entree_non_modifiee():
     assert json.dumps(c, sort_keys=True) == avant
 
 
-@pytest.mark.xfail(strict=True, reason="Task 4 : identifiant Telegram en dur dans le gabarit")
 def test_aucune_valeur_propre_a_sanroque():
     texte = json.dumps(appliquer_profil(_config(), LEGER, "modal"))
     assert "/home/mauceric" not in texte and "Arbath" not in texte and "220537738" not in texte

@@ -1065,3 +1065,13 @@ def test_switch_model_local_ecrit_les_variables_ollama(monkeypatch, tmp_path):
     assert "OLLAMA_MODEL=qwen3:8b" in content
     assert "OLLAMA_BASE_URL=http://localhost:11434" in content
     assert wiki.op_switch_model("")["alias"] == "local"
+
+
+def test_alias_obfusque_suit_obfusque_base_url(monkeypatch):
+    import importlib
+    import wiki
+    monkeypatch.setenv("OBFUSQUE_BASE_URL", "http://172.17.0.1:8001/v1")
+    importlib.reload(wiki)
+    assert wiki.MODEL_ALIASES["obfusque"]["base_url"] == "http://172.17.0.1:8001/v1"
+    monkeypatch.delenv("OBFUSQUE_BASE_URL")
+    importlib.reload(wiki)

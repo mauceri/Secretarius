@@ -165,7 +165,7 @@
        "${HOME}/Secretarius/Wiki_LM/tools:/wiki-tools:ro",
        "${OBSIDIAN_PATH}/Wiki_LM:/Wiki_LM:rw",
        "${HOME}/${OPENCLAW_DIR}/secrets/infomaniak-key:/run/infomaniak-key:ro",
-       "${HOME}/Secretarius/Wiki_LM/zim:/zim:ro"
+       "${WIKI_ZIM_DIR}:/zim:ro"
       ],
       "env": {
        "WIKI_PATH": "/Wiki_LM",
@@ -312,7 +312,7 @@
   "nativeSkills": "auto",
   "restart": true,
   "ownerAllowFrom": [
-   "telegram:220537738"
+   "telegram:${TELEGRAM_OWNER_ID}"
   ]
  },
  "session": {
@@ -328,7 +328,7 @@
    },
    "execApprovals": {
     "enabled": true,
-    "approvers": [220537738]
+    "approvers": [${TELEGRAM_OWNER_ID}]
    }
   }
  },
