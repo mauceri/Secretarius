@@ -1,0 +1,22 @@
+# Synchronisation Obsidian d'un coffre (instance = nom du coffre sous ~/Documents),
+# installée par install.sh (spec 2026-10-12). Remplace `ob sync --continuous`
+# lancé à la main dans tmux. Après le dépôt d'un plugin Obsidian :
+#   systemctl --user restart obsidian-sync@<coffre>
+
+[Unit]
+Description=Synchronisation Obsidian du coffre %i (ob sync)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Une synchro continue déjà lancée ne voit pas toujours un plugin déposé dans
+# .obsidian : chaque (re)démarrage fait d'abord une synchro ponctuelle.
+# ~/.local/bin/ob : enveloppe qui met le Node de NVM en tête du PATH.
+ExecStartPre=%h/.local/bin/ob sync --path %h/Documents/%i
+ExecStart=%h/.local/bin/ob sync --continuous --path %h/Documents/%i
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=default.target

@@ -200,6 +200,37 @@ for _m in $MODULES; do
 done
 unset _m
 
+# Étape 6b — Synchronisation du coffre (obsidian-sync@<coffre>). L'enveloppe
+# ~/.local/bin/ob met le Node de NVM en tête du PATH, comme celle d'openclaw,
+# pour que le service systemd (PATH minimal) trouve le bon Node.
+COMPTES_A_LIER=()
+_ob_bin="$(command -v ob || true)"
+if [[ -z "$_ob_bin" || "$_ob_bin" == "${HOME}/.local/bin/ob" ]]; then
+  for _cand in "$HOME"/.nvm/versions/node/*/bin/ob; do [[ -x "$_cand" ]] && _ob_bin="$_cand"; done
+fi
+[[ -x "$_ob_bin" && "$_ob_bin" != "${HOME}/.local/bin/ob" ]] \
+  || { error "obsidian-headless (ob) absent — lancer : sudo ./amorcage-systeme.sh"; exit 1; }
+cat > "${HOME}/.local/bin/ob" <<WRAP
+#!/usr/bin/env bash
+# Généré par Secretarius install.sh — ne pas éditer.
+export PATH="$(dirname "$_ob_bin"):\${PATH}"
+exec "$_ob_bin" "\$@"
+WRAP
+chmod +x "${HOME}/.local/bin/ob"
+cp "${OPENCLAW_CONFIG_PATH}/obsidian-sync@.service" "${SYSTEMD_USER_DIR}/obsidian-sync@.service"
+systemctl --user daemon-reload
+if "${HOME}/.local/bin/ob" sync-status --path "$OBSIDIAN_PATH" >/dev/null 2>&1; then
+  systemctl --user enable --now "obsidian-sync@${COFFRE}.service"
+  SERVICES_A_VERIFIER+=("obsidian-sync@${COFFRE}")
+  info "obsidian-sync@${COFFRE} actif ✓"
+else
+  COMPTES_A_LIER+=("Lier le coffre à Obsidian Sync, puis relancer install.sh :
+       ob login
+       ob sync-create-remote --name ${COFFRE}   (si le coffre distant n'existe pas)
+       ob sync-setup --vault ${COFFRE} --path ${OBSIDIAN_PATH}")
+fi
+unset _ob_bin _cand
+
 # Étape 7 — Gateway
 systemctl --user daemon-reload
 systemctl --user enable openclaw-gateway.service
@@ -221,5 +252,6 @@ if [[ ${#WARNINGS[@]} -gt 0 ]]; then
 fi
 echo ""
 echo "Étapes de compte (une fois) :"
+for _c in "${COMPTES_A_LIER[@]}"; do echo "  - ${_c}"; done
 echo "  - Appairer Telegram : envoyer /start au robot, puis"
 echo "       openclaw pairing approve telegram <CODE>"

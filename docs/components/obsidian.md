@@ -77,10 +77,13 @@ coffre partiellement fonctionnel (les commandes répondent, mais les liens
    renvoyer le nouveau contenu), ou peut s'être déconnectée silencieusement
    depuis longtemps sans se relancer — voir « Pièges connus » ci-dessous
    pour le diagnostic exact (`grep <fichier> sync.log`,
-   `tmux capture-pane -t <session> -p | tail`). Par prudence : après le
-   dépôt du plugin, **toujours** couper (Ctrl-C) et relancer
-   `ob sync --continuous` dans la session tmux du coffre plutôt que de
-   supposer qu'une synchro déjà active le détectera.
+   `journalctl --user -u obsidian-sync@<coffre> -n 50`). Par prudence :
+   après le dépôt du plugin, **toujours** relancer
+   `systemctl --user restart obsidian-sync@<coffre>` (le service fait
+   d'abord un `ob sync` ponctuel, puis repasse en continu) plutôt que de
+   supposer qu'une synchro déjà active le détectera. Sur une machine encore
+   synchronisée à la main dans tmux, l'équivalent reste de couper (Ctrl-C)
+   puis de lancer `ob sync`, puis `ob sync --continuous`.
 
 ## Désinstallation
 
