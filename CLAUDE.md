@@ -12,9 +12,10 @@
   deuxième personne du pluriel (« vous », « votre »), jamais en tutoiement.
 - Confirmation requise avant : `systemctl start/stop/enable/restart`,
   `docker compose up/down`, `git push`.
-- Le wiki (`WIKI_PATH`) est partagé entre sanroque et santiago via un unique coffre
-  Obsidian synchronisé, et le verrou d'ingestion est **local à chaque machine** :
-  ne jamais lancer deux ingestions en même temps depuis deux machines.
+- Chaque instance a son propre wiki (`WIKI_PATH`) : santiago (profil léger) est
+  déconnectée de sanroque, avec un wiki de publication parti de zéro dans le coffre
+  `Publication` (spec 2026-10-12). Ne jamais faire pointer deux machines sur le
+  même coffre de wiki : le verrou d'ingestion est **local à chaque machine**.
 - `git *` est pré-approuvé sauf `push --force`.
 
 ## Sessions Claude Code — protection de l'historique (incident du 2026-09-03)
