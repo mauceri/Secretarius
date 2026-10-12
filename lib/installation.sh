@@ -27,32 +27,80 @@ resoudre_zim() {
 # Pose KEY=VALUE dans un fichier .env (remplace la ligne, ou l'ajoute).
 _poser_env() {  # $1 = fichier, $2 = clé, $3 = valeur
   if grep -q "^$2=" "$1"; then
-    sed -i "s|^$2=.*|$2=$3|" "$1"
+    # Valeur passée par l'environnement : ni « | » ni « & » ne cassent le remplacement.
+    VALEUR="$3" CLE="$2" python3 - "$1" <<'PYEOF'
+import os, re, sys
+p = sys.argv[1]
+t = open(p).read()
+t = re.sub(rf"^{re.escape(os.environ['CLE'])}=.*$", lambda m: f"{os.environ['CLE']}={os.environ['VALEUR']}", t, flags=re.M)
+open(p, "w").write(t)
+PYEOF
   else
     printf '%s=%s\n' "$2" "$3" >> "$1"
   fi
 }
 
+# N'ajoute KEY=VALUE que si la clé est absente (réinstallation sans --force).
+_poser_env_si_absente() {  # $1 = fichier, $2 = clé, $3 = valeur
+  grep -q "^$2=" "$1" || printf '%s=%s\n' "$2" "$3" >> "$1"
+}
+
 # Wiki_LM/.env selon le profil (spec 2026-10-12) : chemins, branche web sur
 # DeepSeek, puis modèle du wiki appliqué par le code existant (op_switch_model).
+# Sur un .env existant sans --force, on n'ajoute que les clés manquantes : une
+# réinstallation ne doit ni effacer un miroir de coffre ni défaire un
+# /switch-wiki-model.
 ecrire_env_wiki() {
-  local env="${SECRETARIUS_ROOT}/Wiki_LM/.env"
+  local env="${SECRETARIUS_ROOT}/Wiki_LM/.env" poser=_poser_env neuf=false
   if [[ ! -f "$env" || "${FORCE:-false}" == "true" ]]; then
     cp "${SECRETARIUS_ROOT}/Wiki_LM/.env.template" "$env"
+    neuf=true
+  else
+    poser=_poser_env_si_absente
   fi
-  _poser_env "$env" WIKI_PATH "$WIKI_PATH"
-  _poser_env "$env" WIKI_ZIM_DIR "$WIKI_ZIM_DIR"
-  _poser_env "$env" WIKI_LOOKUP_OFFLINE 1
-  _poser_env "$env" WIKI_VAULT_MIRRORS "${WIKI_VAULT_MIRRORS:-}"
-  _poser_env "$env" WIKI_INGEST_WEB_LLM_BACKEND openai
-  [[ -n "${DEEPSEEK_API_KEY:-}" ]] && _poser_env "$env" DEEPSEEK_API_KEY "$DEEPSEEK_API_KEY"
+  $poser "$env" WIKI_PATH "$WIKI_PATH"
+  $poser "$env" WIKI_ZIM_DIR "$WIKI_ZIM_DIR"
+  $poser "$env" WIKI_LOOKUP_OFFLINE 1
+  $poser "$env" WIKI_VAULT_MIRRORS "${WIKI_VAULT_MIRRORS:-}"
+  $poser "$env" WIKI_INGEST_WEB_LLM_BACKEND openai
+  if [[ -n "${DEEPSEEK_API_KEY:-}" ]]; then $poser "$env" DEEPSEEK_API_KEY "$DEEPSEEK_API_KEY"; fi
   if [[ " ${MODULES} " == *" obfuscateur "* ]]; then
     export OBFUSQUE_BASE_URL="http://172.17.0.1:8001/v1"
-    _poser_env "$env" OBFUSQUE_BASE_URL "$OBFUSQUE_BASE_URL"
+    $poser "$env" OBFUSQUE_BASE_URL "$OBFUSQUE_BASE_URL"
   fi
-  (cd "${SECRETARIUS_ROOT}/Wiki_LM/tools" && ../.venv/bin/python -c \
+  [[ "$neuf" == true ]] || return 0
+  local sortie
+  sortie=$(cd "${SECRETARIUS_ROOT}/Wiki_LM/tools" && ../.venv/bin/python -c \
     "import sys, json, wiki; r = wiki.op_switch_model(sys.argv[1]); print(json.dumps(r)); sys.exit('error' in r)" \
-    "$WIKI_LLM") >/dev/null
+    "$WIKI_LLM") || { echo "$sortie" >&2; return 1; }
+}
+
+# Une instance = un robot Telegram. Si la gateway est déjà installée avec un
+# autre jeton, le changer exige --force (sinon l'ancien resterait en place).
+verifier_jeton_telegram() {  # $1 = gateway.systemd.env
+  [[ -f "$1" && "${FORCE:-false}" != "true" ]] || return 0
+  local actuel
+  actuel=$(grep '^TELEGRAM_BOT_TOKEN=' "$1" | cut -d= -f2-)
+  if [[ -n "$actuel" && "$actuel" != "${TELEGRAM_BOT_TOKEN:-}" ]]; then
+    echo "Le jeton Telegram de --env-file diffère de celui déjà installé ($1)." >&2
+    echo "Deux instances sur un même robot se volent les messages : vérifiez le jeton," >&2
+    echo "puis relancez avec --force pour remplacer l'ancien." >&2
+    return 1
+  fi
+}
+
+# Ancienne installation (sanroque) : deux proxys, dont obfuscator-proxy-docker
+# sur 172.17.0.1:8001. Le module installerait un second processus sur la même
+# adresse : on s'arrête avec la marche à suivre.
+verifier_proxy_obfuscateur() {
+  local ancien="${SYSTEMD_USER_DIR:-$HOME/.config/systemd/user}/obfuscator-proxy-docker.service"
+  if [[ -f "$ancien" ]]; then
+    echo "Ancien proxy présent : ${ancien} (déjà sur 172.17.0.1:8001)." >&2
+    echo "Migration : désactiver obfuscator-proxy-docker et obfuscator-proxy, supprimer leurs" >&2
+    echo "unités, faire pointer le fournisseur obfusque d'openclaw.json sur 172.17.0.1:8001," >&2
+    echo "puis relancer install.sh (voir openclaw-config/INSTALL.md, « Migration »)." >&2
+    return 1
+  fi
 }
 
 # Vérification finale (spec 2026-10-12) : chaque entrée "unite|url" doit être

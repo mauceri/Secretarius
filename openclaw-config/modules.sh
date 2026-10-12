@@ -112,6 +112,7 @@ module_obfuscateur() {
   # joignable de l'hôte (agent main) comme des conteneurs (ingestion du wiki).
   # La clé de permutation et le tokenizer restent locaux ; Modal ne reçoit que
   # des identifiants permutés.
+  verifier_proxy_obfuscateur || exit 1
   [[ -n "${ALOEPRI_API_KEY:-}" ]] || {
     echo "[ERREUR] ALOEPRI_API_KEY manquante (--env-file) : requise par le module obfuscateur" >&2
     exit 1
@@ -137,10 +138,15 @@ json.dump({"vocab_permutation": {str(k): v for k, v in perm.items()},
            "seed": 0}, open(os.path.join(os.environ["OBF_DIR"], "artifacts/obfuscation_keys.json"), "w"))
 PYEOF
   fi
+  # Comme le reste de l'installateur : rien n'est écrasé sans --force.
   mkdir -p "${HOME}/.config/obfuscator"
-  printf 'ALOEPRI_API_KEY=%s\n' "$ALOEPRI_API_KEY" > "${HOME}/.config/obfuscator/proxy.env"
-  chmod 600 "${HOME}/.config/obfuscator/proxy.env"
-  cp "${SCRIPT_DIR}/obfuscator-proxy.service" "${SYSTEMD_USER_DIR}/obfuscator-proxy.service"
+  if [[ ! -f "${HOME}/.config/obfuscator/proxy.env" || "$FORCE" == "true" ]]; then
+    printf 'ALOEPRI_API_KEY=%s\n' "$ALOEPRI_API_KEY" > "${HOME}/.config/obfuscator/proxy.env"
+    chmod 600 "${HOME}/.config/obfuscator/proxy.env"
+  fi
+  if [[ ! -f "${SYSTEMD_USER_DIR}/obfuscator-proxy.service" || "$FORCE" == "true" ]]; then
+    cp "${SCRIPT_DIR}/obfuscator-proxy.service" "${SYSTEMD_USER_DIR}/obfuscator-proxy.service"
+  fi
   systemctl --user daemon-reload
   systemctl --user enable --now obfuscator-proxy.service
   local pret=false

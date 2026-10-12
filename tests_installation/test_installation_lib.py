@@ -98,3 +98,51 @@ def test_verification_service_muet():
 def test_verification_unite_inactive():
     r = _bash('SYSTEMCTL=false; CURL=true; PAUSE=0; SERVICES_A_VERIFIER=("openclaw-scout"); verifier_services')
     assert r.returncode == 1 and "openclaw-scout" in r.stdout + r.stderr
+
+
+def _racine_wiki(tmp_path):
+    import shutil
+    racine = tmp_path / "Secretarius"
+    shutil.copytree(RACINE / "Wiki_LM" / "tools", racine / "Wiki_LM" / "tools",
+                    ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copy(RACINE / "Wiki_LM" / ".env.template", racine / "Wiki_LM" / ".env.template")
+    (racine / "Wiki_LM" / ".venv").symlink_to(Path.home() / "Secretarius" / "Wiki_LM" / ".venv")
+    return racine
+
+
+def test_env_wiki_existant_preserve_sans_force(tmp_path):
+    racine = _racine_wiki(tmp_path)
+    (racine / "Wiki_LM" / ".env").write_text(
+        "WIKI_LLM_BACKEND=ollama\nOLLAMA_MODEL=qwen3:8b\nWIKI_PATH=/ancien\n"
+        "WIKI_VAULT_MIRRORS=Arbath=/home/x/Arbath\n")
+    env = {"PATH": os.environ["PATH"], "HOME": str(tmp_path), "WIKI_PATH": "/coffre/Wiki_LM",
+           "WIKI_ZIM_DIR": "/zims", "WIKI_LLM": "obfusque", "MODULES": "wiki obfuscateur", "FORCE": "false"}
+    r = subprocess.run(["bash", "-c", f'SECRETARIUS_ROOT="{racine}"; source "{RACINE}/lib/installation.sh"; ecrire_env_wiki'],
+                       env=env, capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    lignes = (racine / "Wiki_LM" / ".env").read_text().splitlines()
+    assert "WIKI_VAULT_MIRRORS=Arbath=/home/x/Arbath" in lignes
+    assert "WIKI_LLM_BACKEND=ollama" in lignes and "WIKI_PATH=/ancien" in lignes
+    assert "WIKI_ZIM_DIR=/zims" in lignes  # clé absente : ajoutée
+
+
+def test_jeton_telegram_different_refuse(tmp_path):
+    f = tmp_path / "gateway.systemd.env"
+    f.write_text("TELEGRAM_BOT_TOKEN=jeton-ancien\n")
+    r = _bash(f'verifier_jeton_telegram "{f}"', {"TELEGRAM_BOT_TOKEN": "jeton-nouveau", "FORCE": "false"})
+    assert r.returncode == 1 and "--force" in r.stderr
+
+
+def test_jeton_telegram_identique_ou_force(tmp_path):
+    f = tmp_path / "gateway.systemd.env"
+    f.write_text("TELEGRAM_BOT_TOKEN=jeton\n")
+    assert _bash(f'verifier_jeton_telegram "{f}"', {"TELEGRAM_BOT_TOKEN": "jeton"}).returncode == 0
+    assert _bash(f'verifier_jeton_telegram "{f}"', {"TELEGRAM_BOT_TOKEN": "autre", "FORCE": "true"}).returncode == 0
+    assert _bash(f'verifier_jeton_telegram "{tmp_path}/absent"', {"TELEGRAM_BOT_TOKEN": "x"}).returncode == 0
+
+
+def test_ancien_proxy_obfuscateur_refuse(tmp_path):
+    (tmp_path / "obfuscator-proxy-docker.service").write_text("[Service]\n")
+    r = _bash("verifier_proxy_obfuscateur", {"SYSTEMD_USER_DIR": str(tmp_path)})
+    assert r.returncode == 1 and "obfuscator-proxy-docker" in r.stderr
+    assert _bash("verifier_proxy_obfuscateur", {"SYSTEMD_USER_DIR": str(tmp_path / "vide")}).returncode == 0

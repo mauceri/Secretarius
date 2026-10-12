@@ -121,6 +121,7 @@ for _var in TELEGRAM_BOT_TOKEN TELEGRAM_OWNER_ID; do
   fi
 done
 unset _var
+verifier_jeton_telegram "${OPENCLAW_PATH/#\~/$HOME}/gateway.systemd.env" || exit 1
 
 # Étape 2 — Coffre Obsidian : défaut dérivé du profil.
 OBSIDIAN_PATH="${OBSIDIAN_PATH:-$HOME/Documents/${COFFRE}}"
@@ -136,6 +137,9 @@ OBSIDIAN_PATH="${OBSIDIAN_PATH/#\~/$HOME}"
 mkdir -p "$OBSIDIAN_PATH"
 info "Coffre Obsidian ✓ (${OBSIDIAN_PATH})"
 WIKI_PATH="${OBSIDIAN_PATH}/Wiki_LM"
+# Créé ici, par l'utilisateur : sinon Docker créerait la source du montage du
+# conteneur wiki en root, et le wiki ne pourrait pas y écrire.
+mkdir -p "$WIKI_PATH"
 
 # Étape 2b — Copie locale de Wikipédia (ZIM fournis par l'utilisateur).
 WIKI_ZIM_DIR="$(resoudre_zim)" || exit 1
@@ -174,10 +178,28 @@ info "Dépendances Python ✓ (venv: ${VENV_PATH})"
 PLUGIN_SRC="${SECRETARIUS_ROOT}/derisk-deleg"
 PLUGIN_DST="${OPENCLAW_PATH}/extensions/derisk-deleg"
 [[ -d "${PLUGIN_SRC}/dist" ]] || { error "derisk-deleg/dist absent — construire le plugin (npm run build)"; exit 1; }
+# node_modules n'est pas versionné : sur une machine neuve, on l'installe depuis
+# package-lock.json (typebox, et openclaw qui fournit openclaw/plugin-sdk).
+if [[ ! -d "${PLUGIN_SRC}/node_modules" ]]; then
+  info "Dépendances du plugin derisk-deleg (npm ci)..."
+  (cd "$PLUGIN_SRC" && npm ci --no-audit --no-fund --loglevel=error) \
+    || { error "npm ci a échoué dans ${PLUGIN_SRC}"; exit 1; }
+fi
 mkdir -p "$PLUGIN_DST"
 cp -r "${PLUGIN_SRC}/dist" "${PLUGIN_SRC}/node_modules" \
       "${PLUGIN_SRC}/openclaw.plugin.json" "${PLUGIN_SRC}/package.json" "$PLUGIN_DST/"
 info "plugin derisk-deleg copié ✓"
+# OpenClaw >= 2026.8 exige un consentement de capacités par plugin (mise à jour
+# du 2026-09-03) : sans lui, derisk-deleg (et le fournisseur DeepSeek de Scout)
+# ne sont pas chargés.
+_plugins=(derisk-deleg)
+[[ " ${MODULES} " == *" scout "* ]] && _plugins+=(deepseek)
+for _p in "${_plugins[@]}"; do
+  "${HOME}/.local/bin/openclaw" plugins enable "$_p" --accept-capabilities >/dev/null \
+    || { error "openclaw plugins enable ${_p} --accept-capabilities a échoué"; exit 1; }
+  info "plugin ${_p} activé (capacités acceptées) ✓"
+done
+unset _plugins _p
 
 # Étape 5b — Images du socle : image de base (openclaw >= 2026.7 ne la livre plus)
 # et image de l'agent main. Les images des modules sont construites par les modules.
@@ -192,7 +214,7 @@ fi
 _construire_image "${OPENCLAW_CONFIG_PATH}/Dockerfile.tiron" secretarius-tiron:latest
 
 # Étape 6 — Modules du profil
-SERVICES_A_VERIFIER=("openclaw-gateway")
+SERVICES_A_VERIFIER=("openclaw-gateway|http://127.0.0.1:18789/health")
 for _m in $MODULES; do
   declare -F "module_${_m}" >/dev/null || { error "Module inconnu : ${_m}"; exit 1; }
   info "--- module ${_m} ---"
@@ -219,7 +241,14 @@ WRAP
 chmod +x "${HOME}/.local/bin/ob"
 cp "${OPENCLAW_CONFIG_PATH}/obsidian-sync@.service" "${SYSTEMD_USER_DIR}/obsidian-sync@.service"
 systemctl --user daemon-reload
-if "${HOME}/.local/bin/ob" sync-status --path "$OBSIDIAN_PATH" >/dev/null 2>&1; then
+if [[ "$OBSIDIAN_PATH" != "$HOME/Documents/${COFFRE}" ]]; then
+  # L'unité suit ~/Documents/<coffre> (%h/Documents/%i).
+  COMPTES_A_LIER+=("Synchronisation non activée : le coffre ${OBSIDIAN_PATH} n'est pas ~/Documents/${COFFRE}.")
+elif pgrep -u "$USER" -f "ob sync --continuous" >/dev/null; then
+  # Deux synchros continues sur un même coffre se marchent dessus.
+  COMPTES_A_LIER+=("Une synchro « ob sync --continuous » tourne déjà à la main (tmux ?) : l'arrêter,
+       puis : systemctl --user enable --now obsidian-sync@${COFFRE}")
+elif "${HOME}/.local/bin/ob" sync-status --path "$OBSIDIAN_PATH" >/dev/null 2>&1; then
   systemctl --user enable --now "obsidian-sync@${COFFRE}.service"
   SERVICES_A_VERIFIER+=("obsidian-sync@${COFFRE}")
   info "obsidian-sync@${COFFRE} actif ✓"

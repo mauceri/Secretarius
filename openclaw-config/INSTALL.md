@@ -113,6 +113,22 @@ curl -s http://172.17.0.1:8001/health       # proxy obfusqué (premier appel len
 > Control UI (mode jeton, mot de passe vide) :
 > `grep '^OPENCLAW_GATEWAY_TOKEN=' ~/.openclaw/gateway.systemd.env`.
 
+## Migration d'une installation antérieure (sanroque)
+
+Les installations d'avant les profils ont deux proxys obfusqués
+(`obfuscator-proxy` sur 127.0.0.1:8001, `obfuscator-proxy-docker` sur 172.17.0.1:8001) et
+une synchro Obsidian lancée à la main. `install.sh` s'arrête tant que
+`obfuscator-proxy-docker.service` existe. Pour migrer :
+
+1. `systemctl --user disable --now obfuscator-proxy obfuscator-proxy-docker`, puis
+   supprimer leurs deux unités de `~/.config/systemd/user/` ;
+2. dans `~/.openclaw/openclaw.json`, faire pointer `models.providers.obfusque.baseUrl` sur
+   `http://172.17.0.1:8001/v1` ;
+3. arrêter la synchro `ob sync --continuous` lancée dans tmux ;
+4. ajouter `TELEGRAM_OWNER_ID` et `ALOEPRI_API_KEY` au fichier de secrets, puis relancer
+   `./install.sh --profil lourd --env-file …` (sans `--force` : `Wiki_LM/.env`, ses miroirs
+   de coffres et le modèle du wiki sont conservés ; seules les clés manquantes sont ajoutées).
+
 ## 7. Désinstallation
 
 ```bash

@@ -48,7 +48,8 @@ sudo -u "$UTILISATEUR" -H bash -c '
   fi
   source "$NVM_DIR/nvm.sh"
   nvm install --lts
-  npm install -g openclaw obsidian-headless
+  # Version OpenClaw éprouvée sur sanroque : à relever délibérément.
+  npm install -g openclaw@2026.8.2 obsidian-headless
 '
 
 etape "Services utilisateur sans session ouverte (linger)"
