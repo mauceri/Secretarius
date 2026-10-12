@@ -31,6 +31,7 @@ function makeApi(overrides: {
   run?: any;
   waitForRun?: any;
   getSessionMessages?: any;
+  pluginConfig?: Record<string, unknown>;
 } = {}) {
   const tools: Record<string, any> = {};
   const hooks: Record<string, { handler: Function; opts?: any }> = {};
@@ -51,6 +52,7 @@ function makeApi(overrides: {
       hooks[event] = { handler, opts };
     },
     runtime: { subagent: { run, waitForRun, getSessionMessages } },
+    pluginConfig: overrides.pluginConfig,
     config: { agents: { entries: { gog: { sandbox: { docker: { env: { GOG_ACCOUNT: "test@gmail.com" } } } } } } },
   };
   return { api, tools, hooks, run, waitForRun, getSessionMessages };
@@ -453,6 +455,51 @@ describe("before_agent_reply — retour OAuth Google", () => {
 });
 
 describe("before_agent_reply — routage via tiron-router", () => {
+  it("commande tapée : exécutée sans appeler le routeur", async () => {
+    const fetchSpy = vi.fn(async () => { throw new Error("ne doit pas être appelé"); });
+    vi.stubGlobal("fetch", fetchSpy);
+    const runWikiOpSpy = vi.fn(async () => "12 pages.");
+    vi.doMock("./wiki-ops.js", () => ({ runWikiOp: runWikiOpSpy }));
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/wikistatus" });
+
+    expect(res).toEqual({ handled: true, reply: { text: "12 pages." } });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("commande tapée sans argument requis : usage, ni routeur ni délégation", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const plugin = await freshPlugin();
+    const { api, hooks, run } = makeApi();
+    plugin.register(api);
+
+    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/q" });
+
+    expect(res).toEqual({ handled: true, reply: { text: "Usage : /q <argument>" } });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it("sans routeur (routeur: false) : texte libre refusé poliment, routeur jamais appelé", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi({ pluginConfig: { routeur: false } });
+    plugin.register(api);
+
+    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "bonjour" });
+
+    expect(res).toEqual({
+      handled: true,
+      reply: { text: "Tapez une commande, par exemple /q <question> ou /c <texte>." },
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("routeur indisponible (fetch en échec)", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("ECONNREFUSED"); }));
     const plugin = await freshPlugin();
@@ -928,18 +975,18 @@ describe("before_agent_reply — /cron", () => {
   });
 
   it("tâche tiron planifiée : commande exécutée comme tapée, sans Laya", async () => {
-    const fetchSpy = vi.fn(async (_u: any, init: any) => ({
-      ok: true,
-      json: async () => ({ status: "ok", command: "/tags", args: "" }),
-    }));
+    const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
+    const runWikiOpSpy = vi.fn(async () => "3 tags.");
+    vi.doMock("./wiki-ops.js", () => ({ runWikiOp: runWikiOpSpy }));
     const plugin = await freshPlugin();
     const { api, hooks } = makeApi();
     plugin.register(api);
 
     await hooks["before_agent_reply"].handler(
       { cleanedBody: "[cron:1 tiron-abcd1234] /tags\nCurrent time: x\nThis is an unattended scheduled run." }, {});
-    expect(JSON.parse(fetchSpy.mock.calls[0][1].body).message).toBe("/tags");
+    expect(runWikiOpSpy).toHaveBeenCalledWith(api, "tags", "", undefined, "brief");
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("tâche tiron planifiée : consigne laissée au modèle de main", async () => {
@@ -1081,15 +1128,12 @@ describe("before_agent_reply — demande de précision", () => {
   it("avis système en tête : la commande tapée reste une commande tapée", async () => {
     const runTironCron = vi.fn().mockResolvedValueOnce({ ok: true, text: "Dans 2 min …", args: "add 2m consigne x" });
     vi.doMock("./cron-ops.js", () => ({ runTironCron }));
-    const fetchSpy = vi.fn(async (_u: any, init: any) => {
-      const msg = JSON.parse(init.body).message;
-      return { ok: true, json: async () => ({ status: "ok", command: "/cron", args: msg.replace(/^\/cron\s*/, "") }) };
-    });
+    const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
     const plugin = await freshPlugin(); const { api, hooks } = makeApi(); plugin.register(api);
     const recu = "System: [2026-10-07 10:02:57 GMT+2] A scheduled automation delivered this message to this channel:\nSystem: \"x\"\n\n/cron add 2m consigne x";
     await hooks["before_agent_reply"].handler({ cleanedBody: recu }, { messageProvider: "telegram" });
-    expect(JSON.parse(fetchSpy.mock.calls[0][1].body).message).toBe("/cron add 2m consigne x");
+    expect(fetchSpy).not.toHaveBeenCalled();
     expect(runTironCron).toHaveBeenCalledWith(["preview", "--origin", "telegram", "--args=add 2m consigne x"]);
   });
 

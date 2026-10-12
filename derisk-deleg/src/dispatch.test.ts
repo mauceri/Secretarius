@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { commandToAction } from "./dispatch.js";
+import { commandToAction, commandeTapee } from "./dispatch.js";
 
 describe("commandToAction", () => {
   it("mappe /source vers scout, pas wiki", () => {
@@ -53,5 +53,25 @@ describe("commandToAction", () => {
 
   it("mappe /cron vers cron", () => {
     expect(commandToAction("/cron")).toEqual({ kind: "cron" });
+  });
+});
+
+describe("commandeTapee", () => {
+  it("commande connue avec argument", () => {
+    expect(commandeTapee("/q quelle heure ?")).toEqual({ status: "ok", command: "/q", args: "quelle heure ?" });
+  });
+  it("espace insécable ou tabulation après la commande", () => {
+    expect(commandeTapee("/q x")).toEqual({ status: "ok", command: "/q", args: "x" });
+    expect(commandeTapee("/r\tchiens")).toEqual({ status: "ok", command: "/r", args: "chiens" });
+  });
+  it("argument requis manquant", () => {
+    expect(commandeTapee("/q   ")).toEqual({ status: "usage", reply: "Usage : /q <argument>" });
+  });
+  it("commande sans argument requis", () => {
+    expect(commandeTapee("/wikistatus")).toEqual({ status: "ok", command: "/wikistatus", args: "" });
+  });
+  it("commande inconnue ou texte libre : null", () => {
+    expect(commandeTapee("/inconnue x")).toBeNull();
+    expect(commandeTapee("bonjour")).toBeNull();
   });
 });

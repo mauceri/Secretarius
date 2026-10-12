@@ -6,7 +6,7 @@
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
-    "properties": {}
+    "properties": { "routeur": { "type": "boolean" } }
   },
   "activation": {
     "onStartup": true

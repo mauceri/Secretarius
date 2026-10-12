@@ -1,6 +1,6 @@
 import { Type } from "typebox";
 import { definePluginEntry } from "openclaw/plugin-sdk/core";
-import { commandToAction } from "./dispatch.js";
+import { commandToAction, commandeTapee } from "./dispatch.js";
 import { runTironCron } from "./cron-ops.js";
 import { runTironMail } from "./mail-ops.js";
 import { gogAgenda, gogAuthStart, gogDriveSearch } from "./gog-ops.js";
@@ -432,6 +432,9 @@ export default definePluginEntry({
     // le modèle. Le modèle n'a donc aucun outil confirm/cancel à appeler (fini les
     // appels erratiques). L'utilisateur seul déclenche ces commandes ; le hook
     // exécute l'action, répond, et réclame le message (handled:true => pas de modèle).
+    // Profil léger : pas de routeur Laya installé (spec 2026-10-12) ; option
+    // écrite par l'installateur, absente = routeur présent (sanroque).
+    const routeurActif = api.pluginConfig?.routeur !== false;
     api.on("before_agent_reply", async (event: any, ctx: any) => {
       // L'agent « consignes » traite lui-même ses consignes : ni routeur ni commandes.
       if (ctx?.agentId === "consignes" || String(ctx?.sessionKey ?? "").startsWith("agent:consignes:")) return;
@@ -676,7 +679,15 @@ export default definePluginEntry({
           ? { status: "ok", command: opt.command, args: choix.args }
           : { status: "no_match" };
       } else {
-        routed = await callRouter(text);
+        const tapee = commandeTapee(text);
+        if (tapee?.status === "usage") return { handled: true, reply: { text: tapee.reply } };
+        if (tapee) {
+          routed = { status: "ok", command: tapee.command, args: tapee.args };
+        } else if (!routeurActif) {
+          return { handled: true, reply: { text: "Tapez une commande, par exemple /q <question> ou /c <texte>." } };
+        } else {
+          routed = await callRouter(text);
+        }
       }
       if (routed.status === "faq_proposee") {
         pending = { kind: "faq", args: routed.args, ts: Date.now() };
