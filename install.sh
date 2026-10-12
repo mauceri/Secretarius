@@ -159,21 +159,7 @@ export GATEWAY_PASSWORD="${GATEWAY_PASSWORD:-}"
 export DEEPSEEK_API_KEY="${DEEPSEEK_API_KEY:-}"
 bash "${SECRETARIUS_ROOT}/openclaw-config/install.sh"
 
-# Étape 4 — Wiki_LM/.env
-info "Configuration de Wiki_LM/.env..."
-WIKI_ENV="${SECRETARIUS_ROOT}/Wiki_LM/.env"
-WIKI_ENV_TEMPLATE="${SECRETARIUS_ROOT}/Wiki_LM/.env.template"
-if [[ ! -f "$WIKI_ENV" || "$FORCE" == "true" ]]; then
-  cp "$WIKI_ENV_TEMPLATE" "$WIKI_ENV"
-  sed -i "s|^WIKI_PATH=.*|WIKI_PATH=${WIKI_PATH}|" "$WIKI_ENV"
-  if [[ -n "${DEEPSEEK_API_KEY:-}" ]]; then
-    sed -i "s|^DEEPSEEK_API_KEY=.*|DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}|" "$WIKI_ENV"
-  fi
-  info "Wiki_LM/.env créé"
-else
-  sed -i "s|^WIKI_PATH=.*|WIKI_PATH=${WIKI_PATH}|" "$WIKI_ENV"
-  info "Wiki_LM/.env : WIKI_PATH mis à jour (${WIKI_PATH})"
-fi
+# Étape 4 — Wiki_LM/.env : écrit par le module wiki (ecrire_env_wiki), venv présent.
 
 # Étape 5 — Dépendances Python (venv). Bloquant : les services en dépendent.
 info "Installation des dépendances Python..."

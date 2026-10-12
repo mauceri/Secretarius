@@ -19,6 +19,8 @@ _construire_image() {  # $1 = fichier Dockerfile, $2 = étiquette
 }
 
 module_wiki() {
+  ecrire_env_wiki || { echo "[ERREUR] Wiki_LM/.env : modèle du wiki « ${WIKI_LLM} » non appliqué" >&2; exit 1; }
+  info "Wiki_LM/.env écrit (modèle ${WIKI_LLM}, pages web résumées par DeepSeek)"
   # Service Wiki_LM Query Server (Flask :5051, pour le template de requête Obsidian).
   # Installé quel que soit le profil ; activé seulement si le venv et server.py existent.
   WIKI_SERVER_DST="${SYSTEMD_USER_DIR}/wiki-lm-server.service"

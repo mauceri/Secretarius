@@ -62,3 +62,24 @@ def test_install_sans_profil_refuse(tmp_path):
 def test_install_profil_inconnu_refuse(tmp_path):
     r = _install(["--profil", "moyen"], tmp_path)
     assert r.returncode != 0 and "Profil inconnu" in r.stderr
+
+
+def test_env_wiki_profil_leger(tmp_path):
+    import shutil
+    racine = tmp_path / "Secretarius"
+    shutil.copytree(RACINE / "Wiki_LM" / "tools", racine / "Wiki_LM" / "tools",
+                    ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copy(RACINE / "Wiki_LM" / ".env.template", racine / "Wiki_LM" / ".env.template")
+    (racine / "Wiki_LM" / ".venv").symlink_to(Path.home() / "Secretarius" / "Wiki_LM" / ".venv")
+    env = {"PATH": os.environ["PATH"], "HOME": str(tmp_path), "WIKI_PATH": "/coffre/Wiki_LM",
+           "WIKI_ZIM_DIR": "/zims", "WIKI_LLM": "obfusque", "MODULES": "wiki scout obfuscateur",
+           "DEEPSEEK_API_KEY": "cle-test", "FORCE": "false"}
+    r = subprocess.run(["bash", "-c", f'SECRETARIUS_ROOT="{racine}"; source "{RACINE}/lib/installation.sh"; ecrire_env_wiki'],
+                       env=env, capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    contenu = (racine / "Wiki_LM" / ".env").read_text()
+    for ligne in ["WIKI_LLM_BACKEND=openai", "OPENAI_BASE_URL=http://172.17.0.1:8001/v1",
+                  "WIKI_PATH=/coffre/Wiki_LM", "WIKI_ZIM_DIR=/zims", "WIKI_LOOKUP_OFFLINE=1",
+                  "WIKI_INGEST_WEB_LLM_BACKEND=openai", "DEEPSEEK_API_KEY=cle-test",
+                  "OBFUSQUE_BASE_URL=http://172.17.0.1:8001/v1"]:
+        assert ligne in contenu.splitlines(), ligne
