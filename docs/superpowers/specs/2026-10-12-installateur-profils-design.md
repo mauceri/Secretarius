@@ -106,7 +106,14 @@ autorisé, ni unité installée.
   en panne. La présence du routeur est une option de configuration du plugin, écrite par
   le module `laya`.
 - **Synchronisation du coffre** : unité `obsidian-sync@.service` (instance = nom du coffre)
-  à la place de `ob sync --continuous` lancé à la main dans tmux.
+  à la place de `ob sync --continuous` lancé à la main dans tmux. Une synchronisation
+  continue déjà lancée ne détecte pas toujours un plugin déposé dans `.obsidian`
+  (`docs/components/obsidian.md`, « Pièges connus ») ; d'où :
+  - l'unité commence par une synchronisation ponctuelle
+    (`ExecStartPre=ob sync --path <coffre>`), puis passe en continu
+    (`ExecStart=ob sync --continuous --path <coffre>`) ;
+  - « couper et relancer » devient `systemctl --user restart obsidian-sync@<coffre>`, que
+    tout script de déploiement d'un plugin Obsidian lance lui-même à la fin.
 - **Plus d'étape manuelle d'après installation** : l'entrée `derisk-deleg` (activée,
   `hooks.allowConversationAccess`) figure déjà dans le gabarit ; le message d'après
   installation qui demande de l'activer dans l'interface est à vérifier puis retirer, ainsi
