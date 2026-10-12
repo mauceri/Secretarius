@@ -1,7 +1,7 @@
 ---
 title: Installateur à profils (léger, lourd) et première installation de santiago
 date: 2026-10-12
-statut: à relire par l'utilisateur
+statut: approuvée le 2026-10-12
 ---
 
 # Installateur à profils et première installation de santiago
@@ -126,9 +126,22 @@ autorisé, ni unité installée.
 Recensés dans le guide de reprise (`Secretarius_dev/reprise-secretarius.md`), chacun
 corrigé dans le module concerné :
 
-- copie locale de Wikipédia : chemin des ZIM posé par l'installation (variable du module
-  `wiki`) ; sur santiago, le volume Hetzner qui porte déjà les ZIM en et fr. Sans ZIM,
-  le mode hors ligne reste forcé : jamais de repli silencieux vers l'API publique ;
+- copie locale de Wikipédia : les fichiers ZIM sont **fournis par l'utilisateur**
+  (taille, langues, variante et date sont ses choix ; plusieurs heures de téléchargement
+  n'ont pas leur place dans l'installation). Le module `wiki` cherche leur dossier dans
+  cet ordre, et le résumé dit lequel a servi :
+  1. `WIKI_ZIM_DIR`, fixée dans l'environnement ou le fichier `--env-file` (sur santiago :
+     `/mnt/HC_Volume_106134083`) ; dossier absent ou sans `.zim` → **échec** de
+     l'installation ;
+  2. sinon `~/Secretarius/Wiki_LM/zim/`, déjà monté par le conteneur d'ingestion ;
+  3. sinon, en mode `--interactive`, le chemin est demandé (réponse vide = pas de ZIM) ;
+  4. sinon pas de ZIM : l'installation continue, le résumé l'annonce (« enrichissement
+     par Wikipédia désactivé »).
+
+  Le dossier retenu est monté dans le conteneur d'ingestion. Sans ZIM, le mode hors ligne
+  reste forcé : jamais de repli silencieux vers l'API publique. Pas de fouille du disque.
+  La documentation d'installation indique où trouver les fichiers (catalogue Kiwix) et
+  quelle variante convient à quelle machine ;
 - `WIKI_VAULT_MIRRORS` posée par l'installation (vide par défaut) ;
 - `_DEFAULT_KB_DIR` (`Wiki_LM/tools/kb_update.py`) dérivé de `WIKI_PATH` au lieu d'Arbath ;
 - image gog : échec de construction bloquant, obtention du binaire documentée ;
