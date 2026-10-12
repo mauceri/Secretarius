@@ -339,27 +339,8 @@ for _pair in "${_espaces[@]}"; do
 done
 unset _pair _wa_src _wa_dst _espaces _m
 
-# Finalisation
-_gw_svc_final="openclaw-gateway.service"
-systemctl --user daemon-reload 2>/dev/null || true
-systemctl --user enable "${_gw_svc_final}" 2>/dev/null && \
-  info "${_gw_svc_final} activé" || \
-  warn "Activation échouée — lancer manuellement"
-info "Installation terminée."
-info "Modèles Infomaniak disponibles (agent main) :"
-info "  - mistralai/Mistral-Small-4-119B-2603  [défaut si Qwen397 indispo]"
-info "  - Qwen/Qwen3.5-397B-A17B-FP8           [recommandé — meilleur routage wiki]"
-info "  - Qwen/Qwen3.5-122B-A10B-FP8"
-info "  - google/gemma-4-31B-it"
-info "  - nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8"
-info "Agent scout : deepseek/deepseek-chat (DEEPSEEK_API_KEY requis)"
-info ""
-info "Post-install — plugin derisk-deleg :"
-info "  Copié automatiquement par install.sh (racine), après ce sous-script."
-info "  Puis dans l'UI gateway : activer le plugin + hooks:allowConversationAccess=true"
-info "  ⚠️  Après --force : plugins.entries est réinitialisé — rajouter l'entrée manuellement"
-info ""
-info "Démarrer : systemctl --user start ${_gw_svc_final}"
+# Finalisation : la gateway est activée et démarrée par install.sh (racine),
+# après les modules.
+info "Socle OpenClaw installé."
 info "Control UI : ouvrir depuis un poste réseau, mode jeton ="
 info "  grep OPENCLAW_GATEWAY_TOKEN ${OPENCLAW_PATH}/gateway.systemd.env"
-unset _gw_svc_final

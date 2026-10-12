@@ -255,3 +255,8 @@ echo "Étapes de compte (une fois) :"
 for _c in "${COMPTES_A_LIER[@]}"; do echo "  - ${_c}"; done
 echo "  - Appairer Telegram : envoyer /start au robot, puis"
 echo "       openclaw pairing approve telegram <CODE>"
+
+# Étape 8 — Vérification finale (bloquante)
+echo ""
+info "Vérification des services..."
+verifier_services || { error "Installation incomplète : services muets ci-dessus."; exit 1; }

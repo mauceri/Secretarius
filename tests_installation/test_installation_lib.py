@@ -83,3 +83,18 @@ def test_env_wiki_profil_leger(tmp_path):
                   "WIKI_INGEST_WEB_LLM_BACKEND=openai", "DEEPSEEK_API_KEY=cle-test",
                   "OBFUSQUE_BASE_URL=http://172.17.0.1:8001/v1"]:
         assert ligne in contenu.splitlines(), ligne
+
+
+def test_verification_tout_repond():
+    r = _bash('SYSTEMCTL=true; CURL=true; PAUSE=0; SERVICES_A_VERIFIER=("a|http://x" "b"); verifier_services')
+    assert r.returncode == 0
+
+
+def test_verification_service_muet():
+    r = _bash('SYSTEMCTL=true; CURL=false; PAUSE=0; SERVICES_A_VERIFIER=("wiki-lm-server|http://x"); verifier_services')
+    assert r.returncode == 1 and "wiki-lm-server" in r.stdout + r.stderr
+
+
+def test_verification_unite_inactive():
+    r = _bash('SYSTEMCTL=false; CURL=true; PAUSE=0; SERVICES_A_VERIFIER=("openclaw-scout"); verifier_services')
+    assert r.returncode == 1 and "openclaw-scout" in r.stdout + r.stderr

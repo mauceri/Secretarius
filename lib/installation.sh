@@ -54,3 +54,30 @@ ecrire_env_wiki() {
     "import sys, json, wiki; r = wiki.op_switch_model(sys.argv[1]); print(json.dumps(r)); sys.exit('error' in r)" \
     "$WIKI_LLM") >/dev/null
 }
+
+# Vérification finale (spec 2026-10-12) : chaque entrée "unite|url" doit être
+# active et, si une URL est donnée, répondre (trois essais : le proxy peut
+# attendre le réveil de Modal). SYSTEMCTL, CURL et PAUSE sont remplaçables
+# par les tests.
+verifier_services() {
+  local systemctl_cmd="${SYSTEMCTL:-systemctl --user}" curl_cmd="${CURL:-curl -sf --max-time 10 -o /dev/null}"
+  local muets=() entree unite url ok
+  for entree in "${SERVICES_A_VERIFIER[@]}"; do
+    unite="${entree%%|*}"; url=""
+    [[ "$entree" == *"|"* ]] && url="${entree#*|}"
+    if ! $systemctl_cmd is-active --quiet "$unite"; then muets+=("$unite (inactif)"); continue; fi
+    [[ -n "$url" ]] || continue
+    ok=false
+    for _ in 1 2 3; do
+      $curl_cmd "$url" && { ok=true; break; }
+      sleep "${PAUSE:-10}"
+    done
+    [[ "$ok" == true ]] || muets+=("$unite (ne répond pas sur $url)")
+  done
+  if [[ ${#muets[@]} -gt 0 ]]; then
+    echo "Services muets :" >&2
+    printf '  - %s\n' "${muets[@]}" >&2
+    return 1
+  fi
+  echo "Tous les services répondent (${#SERVICES_A_VERIFIER[@]})."
+}
