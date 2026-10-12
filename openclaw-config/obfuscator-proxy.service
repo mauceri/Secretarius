@@ -1,0 +1,32 @@
+# Proxy OpenAI local vers le Qwen3-14B obfusqué servi sur Modal (module
+# obfuscateur, spec 2026-10-12). Un seul processus pour l'hôte ET les
+# conteneurs : il écoute sur docker0 (172.17.0.1), pas sur 0.0.0.0 — le proxy
+# n'authentifie aucun appelant local, une exposition plus large (LAN,
+# Tailscale) donnerait un accès gratuit au modèle payant.
+# Installé par openclaw-config/modules.sh (module_obfuscateur).
+
+[Unit]
+Description=Proxy OpenAI local (docker0) vers le Qwen3-14B obfusqué servi sur Modal
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/obfuscator/proxy.env
+# Au démarrage de la machine, docker0 peut ne pas exister encore : on attend
+# son adresse (60 s au plus), Restart couvre le reste.
+ExecStartPre=/bin/sh -c 'for i in $(seq 1 30); do ip -4 addr show docker0 2>/dev/null | grep -q 172.17.0.1 && exit 0; sleep 2; done; exit 1'
+# La clé Π (artifacts/obfuscation_keys.json) et le tokenizer restent LOCAUX ;
+# Modal ne reçoit que des ids permutés (POST /generate).
+ExecStart=%h/Secretarius/Wiki_LM/.venv/bin/python %h/obfuscator/tools/openai_proxy.py \
+    --keys %h/obfuscator/artifacts/obfuscation_keys.json \
+    --url https://mauceri--obfuscator-aloepri-serve.modal.run \
+    --host 172.17.0.1 \
+    --port 8001
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
