@@ -49,196 +49,38 @@ Plugin derisk-deleg : fournit gog_* et wiki_* aux agents ; intercepte /confirm e
 
 ---
 
-## Prérequis
-
-- **Node.js ≥ 22.22.3** (ou 24.x, ou 25.x) — via NVM. OpenClaw **refuse de démarrer**
-  en dessous : le gateway boucle sur `Node.js >=22.22.3 … is required (current: vX)`.
-- openclaw, installé dans votre Node (NVM) avec `npm install -g openclaw`.
-  **Ne pas utiliser l'installeur `curl … install-cli.sh`** : il place openclaw dans
-  `~/.openclaw`, qui est le répertoire de config de Secretarius → l'uninstall
-  supprimerait openclaw avec.
-  > **Piège Node + systemd — nvm ne suffit pas.** Le service gateway lance openclaw
-  > via `#!/usr/bin/env node`, qui résout `node` par le **PATH système**
-  > (`/usr/bin/node`) — **jamais** par nvm (nvm ne modifie que les shells interactifs,
-  > pas les services systemd). Si le **Node système** est trop vieux, le gateway boucle
-  > sur l'erreur `Node.js … required` **quoi que fasse nvm** (`nvm install/use/alias`
-  > n'y changent rien). Vérifier le vrai coupable : `/usr/bin/node --version`.
-  > Deux corrections fiables :
-  > 1. **Mettre le Node système à niveau** (le plus propre) : installer Node ≥ 22.22.3
-  >    en système (NodeSource : `curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash - && sudo apt install -y nodejs`), puis `/usr/bin/node --version` doit être valide.
-  > 2. **Forcer un Node explicite dans le service** (sans toucher au système) via un
-  >    drop-in — utile si le Node valide n'est qu'en nvm :
-  >    ```bash
-  >    NODE=~/.nvm/versions/node/v24.18.0/bin/node        # une version >= 22.22.3 installée
-  >    OC=~/.nvm/versions/node/v24.18.0/bin/openclaw
-  >    mkdir -p ~/.config/systemd/user/openclaw-gateway.service.d
-  >    printf '[Service]\nExecStart=\nExecStart=%s %s gateway run\n' "$NODE" "$OC" \
-  >      > ~/.config/systemd/user/openclaw-gateway.service.d/node.conf
-  >    systemctl --user daemon-reload && systemctl --user restart openclaw-gateway
-  >    ```
-  >    (openclaw doit être installé sous ce Node : `nvm use 24 && npm install -g openclaw`.)
-- Docker 24+ — avec **~40 Go d'espace libre** pour ses images (l'image `wiki`
-  embarque BGE-M3 et pèse ~16 Go). `install.sh` construit l'image de base
-  `openclaw-sandbox:bookworm-slim` si elle manque, puis les 3 images secretarius.
-  > **VPS au disque juste.** Si `/` est trop petit, déplacez le data-root de
-  > Docker sur un volume dédié **avant** l'install, sinon le build de `wiki`
-  > remplit le disque :
-  > ```bash
-  > sudo systemctl stop docker docker.socket
-  > sudo rsync -aP /var/lib/docker/ /mnt/<volume>/docker/
-  > echo '{ "data-root": "/mnt/<volume>/docker" }' | sudo tee /etc/docker/daemon.json
-  > sudo mv /var/lib/docker /var/lib/docker.old && sudo systemctl start docker
-  > docker info | grep "Docker Root Dir"   # vérifier, puis: sudo rm -rf /var/lib/docker.old
-  > ```
-  > Vérifiez que le volume est dans `/etc/fstab` (option `nofail`) pour survivre au reboot.
-- Python 3.11+ (pour Wiki_LM)
-- `envsubst` : `apt install gettext`
-- `gog-bin` : binaire [gogcli](https://gogcli.sh/) (CLI Google Workspace) — télécharger le binaire Linux depuis [github.com/openclaw/gogcli](https://github.com/openclaw/gogcli/releases), renommer en `gog-bin` et placer à la racine du dépôt ; ou copier depuis une machine déjà configurée via `scp`
-- Bot Telegram (token via [@BotFather](https://t.me/botfather))
-- Clé API **Infomaniak** (backend principal)
-- Clé API **DeepSeek** (agent scout)
-
----
-
 ## Installation
 
-Procédure complète pour une première installation. Chaque étape indique le résultat attendu. (Pour mettre à jour une installation existante, voir « Mise à jour ».)
+Deux profils, un seul installateur (détails : `openclaw-config/INSTALL.md`) :
 
-**1. Cloner le dépôt**
-
-```bash
-git clone https://github.com/mauceri/Secretarius
-cd Secretarius
-```
-
-**2. Installer `gog-bin`**
-
-Télécharger le binaire Linux de [gogcli](https://github.com/openclaw/gogcli/releases), le renommer `gog-bin`, le placer à la racine du dépôt (ou le copier via `scp` depuis une machine déjà configurée) :
+- **`leger`** (petit VPS, ex. santiago) : wiki, Scout, proxy obfusqué ; tous les modèles
+  déportés (Qwen3-14B obfusqué sur Modal, DeepSeek pour le web), sans Laya ni modèle local ;
+- **`lourd`** (machine type sanroque) : en plus Laya, courrier, cron, gog, Ollama local.
 
 ```bash
-ls -l gog-bin        # le fichier doit exister
+git clone https://github.com/mauceri/Secretarius.git ~/Secretarius   # emplacement imposé
+cd ~/Secretarius
+sudo ./amorcage-systeme.sh            # une fois : Docker, Node (NVM), openclaw, Tailscale, swap
+# se reconnecter (groupe docker), puis :
+./install.sh --profil leger --env-file ~/.config/secrets.env
 ```
 
-**3. Créer le fichier de secrets** `~/.config/secrets.env`
+L'installation se termine par une vérification bloquante des services, puis liste les
+étapes de compte restantes (appairage Telegram, liaison Obsidian Sync). Le module `gog`
+(profil lourd) exige le binaire `gog-bin` à la racine du dépôt (voir
+[gogcli](https://github.com/openclaw/gogcli/releases)).
 
-```
-TELEGRAM_BOT_TOKEN=<token BotFather>
-INFOMANIAK_API_KEY=<clé Infomaniak, 80 caractères>
-INFOMANIAK_PRODUCT_ID=<identifiant produit Infomaniak>
-DEEPSEEK_API_KEY=<clé DeepSeek — agent scout>
-GOG_ACCOUNT=<adresse gmail>
-```
-
-**4. Construire les images Docker**
-
-> `install.sh` (étape 5) **construit désormais les trois images automatiquement**.
-> Les commandes ci-dessous ne sont un repli que si l'install signale un échec de build
-> (WARNING) — par exemple si Docker n'était pas encore accessible.
-
-```bash
-docker build -f openclaw-config/Dockerfile.tiron -t secretarius-tiron:latest .
-docker build -f openclaw-config/Dockerfile.wiki  -t secretarius-wiki:latest  .
-docker build -f openclaw-config/Dockerfile.gog   -t secretarius-gog:latest   .
-```
-
-→ attendu : `naming to ... secretarius-*:latest` pour chacune.
-
-**5. Lancer l'installation**
-
-```bash
-./install.sh --env-file ~/.config/secrets.env
-```
-
-Répondre aux 4 questions (coffre Obsidian, nom de l'assistant, LLM, chemin OpenClaw). `install.sh` génère `~/.openclaw`, écrit un jeton de gateway cohérent, installe la commande `openclaw`, construit les 3 images, copie le plugin, installe le routeur `tiron-router`, puis démarre le gateway.
-
-→ attendu : `Installation terminée` et `token gateway réconcilié`.
-
-> **Cerveau de l'agent principal (VPS sans GPU, ex. santiago).** Le modèle qui
-> alimente la conversation Telegram de Tiron — indépendant du routeur de
-> commandes `tiron-router`, qui utilise Laya en process, cf.
-> `docs/superpowers/specs/2026-09-28-routeur-laya-design.md` — est choisi
-> **automatiquement selon la RAM disponible** : Ollama local (Qwen3-8B)
-> au-dessus du seuil (`MAIN_BRAIN_RAM_THRESHOLD_MB`, 12 Go par défaut),
-> sinon un proxy Qwen3-8B obfusqué servi sur Modal (confidentialité
-> préservée, cf. `~/obfuscator/docs/acces-openai.md`) — Infomaniak n'est
-> jamais un choix automatique, uniquement manuel (`switch-model`), cf.
-> `docs/Secretarius.md` § Utilisation des LLMs. Pour forcer un choix :
+> **VPS au disque juste.** Si `/` est trop petit, déplacez le data-root de
+> Docker sur un volume dédié **avant** l'install, sinon le build de `wiki`
+> remplit le disque :
 > ```bash
-> MAIN_BRAIN=modal ALOEPRI_API_KEY=<clé du secret Modal aloepri-api-key> \
-> ./install.sh --env-file ~/.config/secrets.env
+> sudo systemctl stop docker docker.socket
+> sudo rsync -aP /var/lib/docker/ /mnt/<volume>/docker/
+> echo '{ "data-root": "/mnt/<volume>/docker" }' | sudo tee /etc/docker/daemon.json
+> sudo mv /var/lib/docker /var/lib/docker.old && sudo systemctl start docker
+> docker info | grep "Docker Root Dir"   # vérifier, puis: sudo rm -rf /var/lib/docker.old
 > ```
-
-**6. Copier le plugin derisk-deleg**
-
-> `install.sh` (étape 5) **copie désormais le plugin automatiquement**. Les commandes
-> ci-dessous ne sont un repli que si l'install signale un échec (WARNING).
-
-`openclaw plugins install .` échoue avec NVM ; on copie les fichiers (déjà construits dans le dépôt) :
-
-```bash
-SRC=~/Secretarius/derisk-deleg
-DST=~/.openclaw/extensions/derisk-deleg
-mkdir -p "$DST"
-cp -r "$SRC/dist" "$SRC/node_modules" "$SRC/openclaw.plugin.json" "$SRC/package.json" "$DST/"
-```
-
-**7. Redémarrer pour charger le plugin**
-
-```bash
-./start.sh
-```
-
-→ attendu : `openclaw-gateway démarré`.
-
-**8. Activer le plugin dans l'interface web**
-
-Afficher le jeton de connexion :
-
-```bash
-grep '^OPENCLAW_GATEWAY_TOKEN=' ~/.openclaw/gateway.systemd.env
-```
-
-Ouvrir l'interface depuis un poste ayant accès réseau à la machine — directement (poste de bureau), via Tailscale (`https://<hôte>.<tailnet>.ts.net`) ou par tunnel SSH si la machine est sans écran. Mode **jeton** : coller la valeur affichée, **laisser le champ mot de passe vide**, Connecter.
-
-> **Trouver l'URL Tailscale** (sur l'hôte) : `tailscale serve status` affiche directement l'URL si le gateway y est exposé (ex. `https://santiago.tailc69141.ts.net → http://127.0.0.1:18789`). Sinon, le nom complet de l'hôte (`<hôte>.<tailnet>.ts.net`) s'obtient par :
-> ```bash
-> tailscale status --json | python3 -c "import json,sys; print(json.load(sys.stdin)['Self']['DNSName'].rstrip('.'))"
-> ```
-> Si l'interface n'est pas encore exposée sur le tailnet d'une machine headless, l'y publier une fois : `tailscale serve --bg 18789`.
-
-À la **première connexion d'un navigateur**, l'interface affiche « Appairage de l'appareil requis » avec un identifiant. C'est normal (approbation unique). Approuvez-le sur l'hôte, puis reconnectez-vous :
-
-```bash
-openclaw devices approve <ID-affiché>
-```
-
-Puis dans l'interface : **Plugins** → activer `derisk-deleg` → cocher `allowConversationAccess` → **Restart**.
-
-**9. Appairer Telegram**
-
-Envoyer `/start` au bot, puis :
-
-```bash
-openclaw pairing approve telegram <CODE>
-./start.sh
-```
-
-**10. Identifiants Google (gog)**
-
-Pour que `/inbox` et l'envoi de mail fonctionnent, l'agent gog doit être authentifié. **Si gog est déjà installé et autorisé sur une autre machine Secretarius, ses identifiants sont directement réutilisables** (même chemin, refresh token inclus) — copiez-les vers cette machine :
-
-```bash
-scp -r <utilisateur>@<machine-source>:~/.openclaw/workspace/.gog-config/. \
-       ~/.openclaw/workspace/.gog-config/
-```
-
-Sinon (première authentification depuis zéro), voir la section [Identifiants Google (gog)](#identifiants-google-gog) plus bas.
-
-**11. Tester**
-
-Sur Telegram : `/inbox`, puis un envoi de mail suivi de `/confirm`.
-
----
+> Vérifiez que le volume est dans `/etc/fstab` (option `nofail`) pour survivre au reboot.
 
 ## Le jeton du gateway (à lire absolument)
 
@@ -341,26 +183,15 @@ L'agent `scout` utilise toujours DeepSeek (`deepseek-chat`) — non modifiable v
 
 ---
 
-## Cerveau de l'agent principal (Ollama local / Modal obfusqué / Infomaniak)
+## Cerveau de l'agent principal
 
-Distinct de `switch-model` (qui change le modèle de conversation *parmi les
-modèles Infomaniak*, resté utile pour basculer manuellement dessus si décidé
-pour une raison ou une autre) et du routeur de commandes `tiron-router`
-(Laya, en process, indépendant). Politique de confidentialité (cf.
-`docs/Secretarius.md` § Utilisation des LLMs) : toujours préférer un modèle
-obfusqué sur Modal à Infomaniak, jamais choisi automatiquement. `install.sh`
-choisit ce cerveau selon la RAM disponible
-(`MAIN_BRAIN_RAM_THRESHOLD_MB`, 12 Go par défaut) : Ollama local (Qwen3-8B)
-au-dessus du seuil, sinon un proxy Qwen3-8B obfusqué servi sur Modal
-(confidentialité préservée — clé de permutation et tokenizer restent
-locaux, cf. `~/obfuscator/docs/acces-openai.md`).
-
-Pour forcer un choix (et redéployer si besoin le proxy Modal) :
+Fixé par le profil (`MAIN_BRAIN`) : `modal` (Qwen3-14B obfusqué sur Modal, profil léger ;
+clé de permutation et tokenizer restent locaux, cf. `~/obfuscator/docs/acces-openai.md`)
+ou `ollama` (Qwen3-8B local, profil lourd). Infomaniak n'est jamais choisi
+automatiquement ; `switch-model` permet d'y basculer à la main. Pour forcer un choix :
 
 ```bash
-MAIN_BRAIN=ollama    ./install.sh --force   # Qwen3:8b local (OLLAMA_MAIN_MODEL)
-MAIN_BRAIN=modal ALOEPRI_API_KEY=<clé> ./install.sh --force   # Qwen3-8B obfusqué
-MAIN_BRAIN=infomaniak ./install.sh --force  # manuel seulement, provider par défaut
+MAIN_BRAIN=ollama ./install.sh --profil lourd --env-file ~/.config/secrets.env --force
 ```
 
 ---
@@ -369,13 +200,11 @@ MAIN_BRAIN=infomaniak ./install.sh --force  # manuel seulement, provider par dé
 
 ```bash
 git pull
-cd openclaw-config
-bash uninstall.sh --yes
-bash install.sh
-# Ré-activer le plugin derisk-deleg dans l'UI gateway
+./install.sh --profil <leger|lourd> --env-file ~/.config/secrets.env
 ```
 
-> `uninstall` + `install` est plus sûr que `--force` (évite l'effacement de l'entrée plugin).
+Sans `--force`, les fichiers existants (dont `openclaw.json`) sont conservés ;
+`uninstall.sh --yes` puis `install.sh` repart de zéro.
 
 ---
 

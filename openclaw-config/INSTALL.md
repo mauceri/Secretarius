@@ -1,292 +1,123 @@
-# Installation de Secretarius (OpenClaw)
+# Installation de Secretarius
 
-## Prérequis
+Une installation se fait depuis zéro, à partir du dépôt et d'un seul fichier de secrets,
+selon un **profil** (spec `docs/superpowers/specs/2026-10-12-installateur-profils-design.md`).
 
-| Composant | Version minimale | Notes |
-|-----------|-----------------|-------|
-| Node.js | 20+ | Via NVM recommandé |
-| npm | 10+ | Inclus avec Node |
-| Docker | 24+ | Pour les images sandbox |
-| Python 3 | 3.10+ | Pour Wiki_LM |
-| `gog-bin` | — | Binaire CLI Google, non versionnés — voir §4 |
+| Profil | Machine type | Modules | Modèles |
+|---|---|---|---|
+| `leger` | petit VPS (santiago : 4 cœurs, 7,6 Go) | `wiki scout obfuscateur` | agent `main` et notes du wiki : Qwen3-14B obfusqué (Modal) ; pages web et Scout : DeepSeek. Ni Laya, ni modèle local |
+| `lourd` | machine type sanroque (≥ 16 Go) | `wiki scout obfuscateur laya courrier cron gog` | agent `main` et wiki : Qwen3-8B local (Ollama) ; routeur Laya |
 
-```bash
-node --version   # v20+
-docker info      # doit répondre
-python3 --version
-```
+Un module absent du profil ne laisse aucune trace : ni agent, ni outil autorisé, ni service.
+Sans Laya (profil léger), seules les commandes tapées (`/q …`, `/c …`) sont comprises.
 
-### openclaw
-
-openclaw **doit être installé avant** de lancer `install.sh`, dans votre Node (NVM) :
+## 1. Amorçage du système (une fois, avec sudo)
 
 ```bash
-npm install -g openclaw
-openclaw --version
+git clone https://github.com/mauceri/Secretarius.git ~/Secretarius   # emplacement imposé
+cd ~/Secretarius
+sudo ./amorcage-systeme.sh
 ```
 
-> **Ne pas utiliser l'installeur `curl … install-cli.sh`** : il installe openclaw
-> dans `~/.openclaw` (son Node user-space), or `~/.openclaw` est le répertoire de
-> config de Secretarius → l'uninstall supprimerait openclaw, et la détection échoue.
+Le script installe Git, Python, gettext, curl et Docker (et ajoute l'utilisateur au
+groupe `docker`), 4 Go de swap s'il n'y en a pas, Tailscale, NVM avec Node LTS,
+`openclaw` et `obsidian-headless`, et active `loginctl enable-linger` pour que les
+services tournent sans session ouverte. Ensuite :
 
-`install.sh` détecte le binaire automatiquement (PATH, versions NVM, ou prefix npm global).
+1. se déconnecter puis se reconnecter (groupe `docker`) ;
+2. `sudo tailscale up --hostname=<nom> --ssh`, puis désactiver l'expiration de la clé de
+   la machine dans la console Tailscale.
 
----
+> **Ne pas installer openclaw avec `curl … install-cli.sh`** : il se place dans
+> `~/.openclaw`, qui est le répertoire de configuration de Secretarius.
 
-## Architecture
+> **Disque.** L'image Docker `wiki` embarque BGE-M3 (~16 Go). Sur un VPS au disque juste,
+> déplacer le `data-root` de Docker sur un volume **avant** l'installation (voir README).
 
-```
-Telegram
-    │
-    ▼
-openclaw-gateway  (port 18789, service systemd user)
-    │
-    ├── agent main   (Infomaniak — Mistral-Small-4 ou Qwen3.5-397B)
-    │       │  workspace : ~/.openclaw/workspace/
-    │       │  sandbox   : image Docker secretarius-tiron:latest
-    │       │              monte ~/.openclaw/workspace/.gog-config → /workspace/.gog-config
-    │       │
-    │       ├── agent wiki   (Infomaniak — Mistral-Small-4)
-    │       │       workspace : ~/.openclaw/workspace-wiki/
-    │       │       sandbox   : image Docker secretarius-wiki:latest
-    │       │                   monte ~/Documents/Arbath/Wiki_LM → /Wiki_LM  (rw)
-    │       │                   monte ~/Secretarius/Wiki_LM/tools → /wiki-tools  (ro)
-    │       │                   monte ~/.openclaw/secrets/infomaniak-key → /run/infomaniak-key  (ro)
-    │       │                   monte ~/Secretarius/Wiki_LM/zim → /zim  (ro) ← ZIM Wikipedia FR
-    │       │
-    │       ├── agent scout  (DeepSeek — deepseek-chat)
-    │       │       workspace : ~/.openclaw/workspace-scout/
-    │       │       sans sandbox Docker (outils read/write/process uniquement)
-    │       │
-    │       └── agent gog    (Infomaniak — Mistral-Small-4)
-    │               workspace : ~/.openclaw/workspace-gog/
-    │               sandbox   : image Docker secretarius-gog:latest
-    │                           monte ~/.openclaw/workspace/.gog-config → /gog-config  (rw)
-    │
-    └── plugin derisk-deleg
-            fournit : gog_send, gog_inbox, gog_get, gog_search, gog_reply,
-                      gog_drive_search, gog_connect_start,
-                      wiki_capture, wiki_ingest, wiki_status, wiki_query,
-                      wiki_search, wiki_kb_update, wiki_tags, source_read
-            intercepte : /confirm, /annuler  (flux d'envoi email)
-```
+## 2. Fichier de secrets et réglages de la machine
 
-### Images Docker
-
-| Image | Dockerfile | Rôle |
-|-------|-----------|------|
-| `secretarius-tiron:latest` | `openclaw-config/Dockerfile.tiron` | Sandbox agent main (gog CLI) |
-| `secretarius-wiki:latest` | `openclaw-config/Dockerfile.wiki` | Sandbox agent wiki (outils Python Wiki_LM) |
-| `secretarius-gog:latest` | `openclaw-config/Dockerfile.gog` | Sandbox agent gog (gog CLI) |
-
-Build depuis `~/Secretarius/` :
+Un seul fichier, par exemple `~/.config/secrets.env` (droits `600`), passé par `--env-file` :
 
 ```bash
-docker build -f openclaw-config/Dockerfile.tiron -t secretarius-tiron:latest .
-docker build -f openclaw-config/Dockerfile.wiki  -t secretarius-wiki:latest  .
-docker build -f openclaw-config/Dockerfile.gog   -t secretarius-gog:latest   .
+TELEGRAM_BOT_TOKEN=<jeton>        # propre à CETTE instance : deux instances sur le même
+                                  # robot se volent les messages (Conflict: getUpdates)
+TELEGRAM_OWNER_ID=<identifiant>   # votre identifiant Telegram numérique (propriétaire)
+ALOEPRI_API_KEY=<clé>             # proxy obfusqué sur Modal (module obfuscateur)
+DEEPSEEK_API_KEY=<clé>            # Scout et résumé des pages web
+WIKI_ZIM_DIR=/chemin/des/zim      # facultatif, voir § 3
+WIKI_VAULT_MIRRORS=               # facultatif : Nom=chemin,… (sous-wikis par coffre)
+# Facultatifs : INFOMANIAK_API_KEY, INFOMANIAK_PRODUCT_ID, GOG_ACCOUNT (profil lourd)
 ```
 
-### Skills (commandes déterministes)
+Toute variable du fichier l'emporte sur le profil (`MODULES`, `MAIN_BRAIN`, `WIKI_LLM`,
+`COFFRE`).
 
-16 skills dans `~/.openclaw/workspace/skills/` — chacun a `command-dispatch: tool` (aucune décision LLM) :
+## 3. Copie locale de Wikipédia (fichiers ZIM)
 
-| Commande | Outil plugin |
-|----------|-------------|
-| `/inbox` | `gog_inbox` |
-| `/chercher` | `gog_search` |
-| `/lire` | `gog_get` |
-| `/repondre` | `gog_reply` |
-| `/drive` | `gog_drive_search` |
-| `/connecter` | `gog_connect_start` |
-| `/c` | `wiki_capture` |
-| `/ingest` | `wiki_ingest` |
-| `/q` | `wiki_query` |
-| `/r` | `wiki_search` |
-| `/wikistatus` | `wiki_status` |
-| `/kbupdate` | `wiki_kb_update` |
-| `/tags` | `wiki_tags` |
-| `/source` | `source_read` |
-| `/scout` | délégation agent scout |
-| `/wiki-deleg` | délégation agent wiki |
+Les fichiers ZIM sont **fournis par l'utilisateur** : leur taille, leurs langues et leur
+variante sont des choix de machine. Catalogue Kiwix :
+<https://download.kiwix.org/zim/wikipedia/>. Variante `mini` pour une petite machine
+(fr : ~3,4 Go, en : ~12 Go), `nopic` sinon (fr : ~13 Go).
 
----
+L'installateur cherche le dossier dans cet ordre et dit lequel a servi :
 
-## Variables d'environnement
+1. `WIKI_ZIM_DIR` (dossier absent ou sans `.zim` → **échec**) ;
+2. `~/Secretarius/Wiki_LM/zim/` ;
+3. en `--interactive`, il demande le chemin (réponse vide = aucun) ;
+4. sinon aucun : l'installation continue, l'enrichissement par Wikipédia est désactivé.
 
-Créer `~/.config/secrets.env` (sourcé automatiquement par `.bashrc` via `set -a`) :
+La consultation reste toujours hors ligne : jamais de repli vers l'API publique.
+
+## 4. Installation
 
 ```bash
-# Bot Telegram de cette instance
-TELEGRAM_BOT_TOKEN=<token>      # sanroque = bot dev, santiago = bot prod
-
-# Infomaniak AI — backend principal
-INFOMANIAK_API_KEY=<clé 80 chars>    # vérifier longueur : echo -n "$INFOMANIAK_API_KEY" | wc -c
-INFOMANIAK_PRODUCT_ID=109005
-
-# DeepSeek — agent scout uniquement
-DEEPSEEK_API_KEY=<clé>
-
-# Google (gog CLI)
-GOG_ACCOUNT=<email@gmail.com>
+cd ~/Secretarius
+./install.sh --profil leger --env-file ~/.config/secrets.env
 ```
 
-> **Piège** : sur sanroque, `secrets.env` est sourcé par `.bashrc` et ses valeurs ont
-> priorité sur ce que `install.sh` tenterait d'écrire dans `gateway.systemd.env`.
-> Mettre le bon token dans `secrets.env` directement.
+Relancer la même commande ne casse rien : les fichiers existants sont conservés
+(`--force` pour les régénérer). Le coffre par défaut est `~/Documents/<coffre du profil>`
+(`Publication` pour le léger, `Secretarius` pour le lourd), créé s'il manque.
 
----
+L'installation se termine par une **vérification bloquante** de chaque service installé
+(gateway, serveur wiki, proxy obfusqué, garde d'injection, Scout, synchronisation du
+coffre…). Un service muet fait échouer l'installation, avec son nom.
 
-## Procédure d'installation
+## 5. Étapes de compte (une fois)
 
-### 1. Première installation
+Le résumé final liste celles qui restent :
 
-```bash
-cd ~/Secretarius/openclaw-config
-bash install.sh
-```
+- **Telegram** : envoyer `/start` au robot, puis `openclaw pairing approve telegram <CODE>`.
+- **Obsidian Sync** du coffre (double authentification possible) :
+  `ob login`, `ob sync-create-remote --name <coffre>` si le coffre distant n'existe pas,
+  `ob sync-setup --vault <coffre> --path ~/Documents/<coffre>`, puis relancer `install.sh`,
+  qui active alors `obsidian-sync@<coffre>`.
+- **Google** (profil lourd, module gog) : copier `~/.openclaw/workspace/.gog-config/gogcli/`
+  depuis une machine authentifiée, ou lancer `/connecter`.
 
-`install.sh` :
-- Génère `~/.openclaw/openclaw.json` depuis le template
-- Génère `~/.openclaw/gateway.systemd.env` (token vide à compléter si secrets.env absent)
-- Écrit `auth-profiles.json` pour chaque agent (main/wiki/gog/scout)
-- Déploie `AGENTS.md` et `*/SKILL.md` dans les workspaces
-- Active les services systemd (gateway + wiki-lm-server + wiki-lm-embed.timer)
+Après le dépôt d'un plugin Obsidian dans le coffre :
+`systemctl --user restart obsidian-sync@<coffre>`.
 
-### 2. Plugin derisk-deleg (manuel si NVM)
-
-`openclaw plugins install .` échoue avec NVM (symlink cassé). Copie manuelle :
-
-```bash
-SRC=~/Secretarius/derisk-deleg
-DST=~/.openclaw/extensions/derisk-deleg
-mkdir -p "$DST"
-cp -r "$SRC/dist" "$SRC/node_modules" "$SRC/openclaw.plugin.json" "$SRC/package.json" "$DST/"
-```
-
-Puis dans la Control UI, ouverte depuis un poste ayant accès réseau (direct, Tailscale ou tunnel SSH si headless). Le jeton de connexion (mode **jeton**, mot de passe vide) est dans `gateway.systemd.env` :
+## 6. Vérification et dépannage
 
 ```bash
-grep '^OPENCLAW_GATEWAY_TOKEN=' ~/.openclaw/gateway.systemd.env
-```
-
-- Aller dans **Plugins** → activer `derisk-deleg`
-- Cocher **Hooks → allowConversationAccess**
-- Redémarrer le gateway : `systemctl --user restart openclaw-gateway`
-
-> **Piège --force** : `install.sh --force` régénère `openclaw.json` avec `plugins.entries:{}`,
-> ce qui efface l'entrée du plugin. Après chaque `--force`, ré-activer le plugin dans l'UI.
-
-> **Piège token gateway** : le gateway (systemd) s'authentifie via `OPENCLAW_GATEWAY_TOKEN`
-> (env), mais le CLI et la Control UI lisent `gateway.auth.token` / `gateway.remote.token`
-> dans `openclaw.json`. **Toute commande `openclaw` lancée sans `OPENCLAW_GATEWAY_TOKEN`
-> dans l'environnement régénère un token aléatoire dans `openclaw.json`** et casse l'auth
-> (« unauthorized: gateway token mismatch »). `install.sh` installe un *wrapper*
-> `~/.local/bin/openclaw` qui charge ce token automatiquement — utilisez toujours cette
-> commande (et non le binaire NVM direct). Le jeton à coller dans l'UI :
-> `grep '^OPENCLAW_GATEWAY_TOKEN=' ~/.openclaw/gateway.systemd.env` (mode jeton, mot de passe vide).
-
-### 3. Credentials Google (gog)
-
-Les credentials vivent dans `~/.openclaw/workspace/.gog-config/gogcli/` :
-- `credentials.json` — tokens OAuth
-- `keyring/` — clé chiffrée
-- `keyring-password` — mot de passe du keyring
-
-Sur une **nouvelle machine**, les copier depuis une machine déjà authentifiée :
-
-```bash
-# Depuis la machine source
-scp -r ~/.openclaw/workspace/.gog-config/gogcli/ user@cible:~/.openclaw/workspace/.gog-config/
-```
-
-Ou lancer l'authentification OAuth depuis zéro :
-
-```bash
-# Dans le conteneur gog (via une session agent gog)
-/inbox  # déclenche gog_inbox → gog_connect_start si non authentifié
-/connecter
-```
-
-### 4. Fichier ZIM Wikipedia FR
-
-Le conteneur wiki monte `~/Secretarius/Wiki_LM/zim/` en lecture seule pour la lookup Wikipedia offline (`WIKI_ZIM_DIR=/zim`, `WIKI_LOOKUP_OFFLINE=1`). Le fichier ZIM doit être présent :
-
-```bash
-ls ~/Secretarius/Wiki_LM/zim/
-# Doit contenir un fichier .zim (Wikipedia FR)
-```
-
-Si absent, le lookup Wikipedia est désactivé mais le reste du wiki fonctionne.
-
----
-
-## Réinstallation propre
-
-Préférer `uninstall` + `install` plutôt que `--force` (évite les deux pièges cités) :
-
-```bash
-cd ~/Secretarius/openclaw-config
-bash uninstall.sh --yes
-bash install.sh
-# Puis refaire §2 (plugin) et vérifier §3 (credentials)
-```
-
----
-
-## Modèles disponibles
-
-| Alias | ID complet | Agent | Notes |
-|-------|-----------|-------|-------|
-| `Infomaniak` | `infomaniak/mistralai/Mistral-Small-4-119B-2603` | main, wiki, gog | Défaut si Qwen397 indispo |
-| `Qwen397` | `infomaniak/Qwen/Qwen3.5-397B-A17B-FP8` | main | Recommandé : meilleur routage wiki |
-| `Qwen122` | `infomaniak/Qwen/Qwen3.5-122B-A10B-FP8` | main | Variante légère |
-| `Gemma4` | `infomaniak/google/gemma-4-31B-it` | main | — |
-| `Nemotron3` | `infomaniak/nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8` | main | — |
-| — | `deepseek/deepseek-chat` | scout | DEEPSEEK_API_KEY requis |
-
-Changer le modèle de l'agent main :
-
-```bash
-switch-model Qwen397   # ou Infomaniak, Qwen122, etc.
-systemctl --user restart openclaw-gateway
-```
-
-> **Santiago** : `Qwen3.5-397B` est indisponible sur ce compte Infomaniak (product_id 109005).
-> L'agent main tourne sur Mistral-Small-4. Surveiller la qualité du routage `/c`→wiki.
-
----
-
-## Vérification rapide
-
-```bash
-# Service actif ?
-systemctl --user status openclaw-gateway
-
-# Logs gateway (30 dernières lignes)
+systemctl --user status openclaw-gateway wiki-lm-server obfuscator-proxy
 journalctl --user -u openclaw-gateway -n 30
-
-# Plugin chargé ?
-grep -i "derisk-deleg" ~/.openclaw/openclaw.json
-
-# Auth-profiles des agents
-for a in main wiki gog scout; do
-  echo "=== $a ==="; cat ~/.openclaw/agents/$a/agent/auth-profiles.json 2>/dev/null || echo "(absent)"
-done
-
-# Clé Infomaniak : doit faire 80 chars
-echo -n "$INFOMANIAK_API_KEY" | wc -c
+curl -s http://127.0.0.1:5051/health        # serveur wiki
+curl -s http://172.17.0.1:8001/health       # proxy obfusqué (premier appel lent : réveil de Modal)
 ```
 
----
+> **Jeton de la gateway.** Toute commande `openclaw` lancée sans `OPENCLAW_GATEWAY_TOKEN`
+> régénère un jeton dans `openclaw.json` et casse l'authentification. Utiliser l'enveloppe
+> `~/.local/bin/openclaw` installée par `install.sh`, qui charge le jeton. Jeton de la
+> Control UI (mode jeton, mot de passe vide) :
+> `grep '^OPENCLAW_GATEWAY_TOKEN=' ~/.openclaw/gateway.systemd.env`.
 
-## Deux instances (sanroque vs santiago)
+## 7. Désinstallation
 
-| | sanroque | santiago |
-|---|----------|----------|
-| Bot Telegram | `@secretarius_tiron_bot` (dev) | `@secretarius1789_bot` (prod) |
-| Path | `~/.openclaw` | `~/.openclaw` |
-| Port | 18789 | 18789 |
-| Qwen397 | disponible | **indisponible** (fallback Mistral) |
+```bash
+bash ~/Secretarius/openclaw-config/uninstall.sh --yes
+```
 
-Ne jamais faire tourner deux gateways pointant sur le même bot token → `Conflict: getUpdates`.
+Arrête et retire tous les services que les modules peuvent poser, et `~/.openclaw`.
+Le coffre, `~/obfuscator` et les fichiers ZIM sont conservés.
