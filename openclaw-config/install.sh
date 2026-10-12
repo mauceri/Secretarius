@@ -220,7 +220,7 @@ SERVICE_TARGET="${SYSTEMD_USER_DIR}/${_gw_svc}"
 if [[ -f "$SERVICE_TARGET" && "$FORCE" != "true" ]]; then
   info "${_gw_svc} existe déjà — ignoré"
 else
-  envsubst '${OPENCLAW_BIN}' \
+  OPENCLAW_BIN_DIR="$(dirname "$OPENCLAW_BIN")" envsubst '${OPENCLAW_BIN} ${OPENCLAW_BIN_DIR}' \
     < "${SCRIPT_DIR}/${_gw_svc}" \
     > "$SERVICE_TARGET"
   info "Service systemd installé dans ${SYSTEMD_USER_DIR} (${OPENCLAW_BIN})"

@@ -6,6 +6,9 @@ Wants=network-online.target
 [Service]
 Type=simple
 EnvironmentFile=%h/.openclaw/gateway.systemd.env
+# openclaw démarre par « #!/usr/bin/env node » : sans ce PATH, systemd ne
+# trouverait que le Node du système (absent ou trop vieux), jamais celui de NVM.
+Environment=PATH=${OPENCLAW_BIN_DIR}:/usr/local/bin:/usr/bin:/bin
 ExecStart=${OPENCLAW_BIN} gateway run
 Restart=on-failure
 RestartSec=10
