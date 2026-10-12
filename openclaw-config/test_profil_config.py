@@ -78,3 +78,8 @@ def test_entree_non_modifiee():
 def test_aucune_valeur_propre_a_sanroque():
     texte = json.dumps(appliquer_profil(_config(), LEGER, "modal"))
     assert "/home/mauceric" not in texte and "Arbath" not in texte and "220537738" not in texte
+
+
+def test_leger_agent_wiki_sur_obfusque():
+    c = appliquer_profil(_config(), LEGER, "modal")
+    assert c["agents"]["entries"]["wiki"]["model"]["primary"] == "obfusque/qwen3-14b-h128-a1-h02"

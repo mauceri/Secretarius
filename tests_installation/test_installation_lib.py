@@ -44,3 +44,21 @@ def test_zim_absent_non_interactif(tmp_path):
         ["bash", "-c", f'SECRETARIUS_ROOT="{tmp_path}"; source "{RACINE}/lib/installation.sh"; resoudre_zim'],
         capture_output=True, text=True)
     assert r.returncode == 0 and r.stdout.strip() == ""
+
+
+def _install(args, tmp_path):
+    # HOME temporaire : même si install.sh allait plus loin que prévu, il
+    # n'écrirait jamais dans la configuration de la machine (incident du 2026-10-12).
+    env = {"PATH": "/usr/bin:/bin", "HOME": str(tmp_path)}
+    return subprocess.run(["bash", str(RACINE / "install.sh"), *args], capture_output=True, text=True,
+                          timeout=30, stdin=subprocess.DEVNULL, env=env)
+
+
+def test_install_sans_profil_refuse(tmp_path):
+    r = _install([], tmp_path)
+    assert r.returncode == 2 and "--profil" in r.stdout + r.stderr
+
+
+def test_install_profil_inconnu_refuse(tmp_path):
+    r = _install(["--profil", "moyen"], tmp_path)
+    assert r.returncode != 0 and "Profil inconnu" in r.stderr

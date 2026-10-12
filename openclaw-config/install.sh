@@ -4,13 +4,15 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../install.conf"
+# Appelé par install.sh (racine), qui charge le profil : jamais seul.
+: "${MODULES:?lancer ./install.sh --profil leger|lourd depuis la racine du dépôt}"
+: "${MAIN_BRAIN:?lancer ./install.sh --profil leger|lourd depuis la racine du dépôt}"
 
 OBSIDIAN_PATH="${OBSIDIAN_PATH:-$HOME/Documents/Obsidian}"
 # WIKI_PATH n'est calculé dans install.sh (racine) qu'APRÈS l'appel à ce script —
 # on reprend ici la même formule pour que tiron-router.env soit correct.
 WIKI_PATH="${WIKI_PATH:-${OBSIDIAN_PATH}/Wiki_LM}"
 ASSISTANT_NAME="${ASSISTANT_NAME:-Tiron}"
-LLM_BACKEND="${LLM_BACKEND:-deepseek}"
 FORCE="${FORCE:-false}"
 INTERACTIVE="${INTERACTIVE:-false}"
 _i=0; _args=("$@")
@@ -106,7 +108,7 @@ if [[ -n "${INFOMANIAK_API_KEY:-}" ]]; then
   chmod 600 "${OPENCLAW_PATH}/secrets/infomaniak-key"
   info "Fichier secrets/infomaniak-key créé (600)"
 else
-  warn "INFOMANIAK_API_KEY absent — secrets/infomaniak-key non créé (l'agent wiki échouera)"
+  info "INFOMANIAK_API_KEY absente — secrets/infomaniak-key non créé (Infomaniak facultatif)"
 fi
 
 # Note : l'auth par agent (clés API) est configurée plus bas, APRÈS la génération
@@ -132,6 +134,10 @@ else
   # et restaure silencieusement l'ancienne config au démarrage suivant.
   cp "$TARGET" "${OPENCLAW_PATH}/openclaw.json.bak" 2>/dev/null || true
   info "openclaw.json généré dans ${OPENCLAW_PATH}"
+  # Élagage selon le profil : un module absent ne laisse ni agent ni outil
+  # (spec 2026-10-12). Seulement à la génération : jamais sur une config existante.
+  python3 "${SCRIPT_DIR}/profil_config.py" "$TARGET" --modules "$MODULES" --cerveau "$MAIN_BRAIN"
+  info "openclaw.json élagué pour les modules : ${MODULES}"
 fi
 
 # Réconcilier le token gateway (même quand openclaw.json est "ignoré").
@@ -167,6 +173,9 @@ if [[ -f "$TARGET" && ( -n "${INFOMANIAK_API_KEY:-}" || -n "${DEEPSEEK_API_KEY:-
   export OPENCLAW_GATEWAY_TOKEN   # éviter que la commande régénère le token gateway
   _set_auth() {  # $1=agent  $2=provider  $3=clé
     [[ -n "$3" ]] || return 0
+    # Agent absent du profil : rien à authentifier.
+    python3 -c 'import json,sys; sys.exit(0 if sys.argv[2] in json.load(open(sys.argv[1]))["agents"]["entries"] else 1)' \
+      "$TARGET" "$1" || return 0
     if printf '%s\n' "$3" | "$OPENCLAW_BIN" models auth --agent "$1" \
          paste-api-key --provider "$2" --profile-id "$2:default" >/dev/null 2>&1; then
       info "auth ${2} → agent ${1}"
@@ -185,27 +194,6 @@ if [[ -f "$TARGET" && ( -n "${INFOMANIAK_API_KEY:-}" || -n "${DEEPSEEK_API_KEY:-
   cp "$TARGET" "${OPENCLAW_PATH}/openclaw.json.bak" 2>/dev/null || true
 fi
 
-# Appliquer le choix LLM_BACKEND comme modèle de l'agent main.
-# Le template fixe un modèle par défaut ; ici on le remplace par le choix de l'utilisateur.
-_LLM_MODEL=""
-case "${LLM_BACKEND:-}" in
-  deepseek) _LLM_MODEL="deepseek/deepseek-chat" ;;
-  infomaniak)    _LLM_MODEL="infomaniak/mistralai/Mistral-Small-4-119B-2603" ;;
-esac
-if [[ -n "$_LLM_MODEL" && -f "$TARGET" ]]; then
-  _LLM_MODEL="$_LLM_MODEL" python3 - "$TARGET" <<'PYEOF'
-import json, os, sys
-path, model = sys.argv[1], os.environ['_LLM_MODEL']
-d = json.load(open(path))
-d['agents']['defaults']['model']['primary'] = model
-d['agents']['entries']['main']['model'] = {'primary': model}
-json.dump(d, open(path, 'w'), indent=1)
-PYEOF
-  cp "$TARGET" "${OPENCLAW_PATH}/openclaw.json.bak" 2>/dev/null || true
-  info "Modèle agent main : ${_LLM_MODEL}"
-fi
-unset _LLM_MODEL
-
 # gateway.systemd.env
 _env_tpl="${SCRIPT_DIR}/gateway.systemd.env.template"
 ENV_TARGET="${OPENCLAW_PATH}/gateway.systemd.env"
@@ -215,8 +203,6 @@ else
   # Génère gateway.systemd.env avec les secrets fournis (env/--env-file).
   # Variables manquantes = chaîne vide ; on avertit pour les indispensables.
   [[ -z "${TELEGRAM_BOT_TOKEN:-}" ]] && warn "TELEGRAM_BOT_TOKEN non défini — à renseigner dans ${ENV_TARGET} avant de démarrer"
-  [[ -z "${INFOMANIAK_API_KEY:-}" ]] && warn "INFOMANIAK_API_KEY non défini — à renseigner dans ${ENV_TARGET} avant de démarrer"
-  [[ -z "${INFOMANIAK_PRODUCT_ID:-}" ]] && warn "INFOMANIAK_PRODUCT_ID non défini — l'URL Infomaniak sera invalide (erreur '404 method_not_found' sur tous les appels). À renseigner dans ${ENV_TARGET} (et ~/.config/secrets.env)."
   export TELEGRAM_BOT_TOKEN OPENCLAW_GATEWAY_TOKEN GATEWAY_PASSWORD OPENCLAW_BIN GOG_ACCOUNT INFOMANIAK_API_KEY INFOMANIAK_PRODUCT_ID DEEPSEEK_API_KEY
   envsubst '${TELEGRAM_BOT_TOKEN} ${OPENCLAW_GATEWAY_TOKEN} ${GATEWAY_PASSWORD} ${OPENCLAW_BIN} ${HOME} ${GOG_ACCOUNT} ${INFOMANIAK_API_KEY} ${INFOMANIAK_PRODUCT_ID} ${DEEPSEEK_API_KEY}' \
     < "$_env_tpl" \
@@ -274,180 +260,32 @@ WRAP
   info "wrapper openclaw installé dans ${HOME}/.local/bin (→ ${OPENCLAW_BIN}, token chargé)"
 fi
 
-# Service Wiki_LM Query Server (Flask :5051, pour le template de requête Obsidian).
-# Installé quel que soit le profil ; activé seulement si le venv et server.py existent.
-WIKI_SERVER_DST="${SYSTEMD_USER_DIR}/wiki-lm-server.service"
-if [[ -f "$WIKI_SERVER_DST" && "$FORCE" != "true" ]]; then
-  info "wiki-lm-server.service existe déjà — ignoré"
-else
-  cp "${SCRIPT_DIR}/wiki-lm-server.service" "$WIKI_SERVER_DST"
-  info "wiki-lm-server.service installé dans ${SYSTEMD_USER_DIR}"
-fi
-if [[ -x "${HOME}/Secretarius/Wiki_LM/.venv/bin/python3" && -f "${HOME}/Secretarius/Wiki_LM/tools/server.py" ]]; then
-  systemctl --user daemon-reload 2>/dev/null || true
-  systemctl --user enable wiki-lm-server.service 2>/dev/null && \
-    info "wiki-lm-server.service activé au boot" || \
-    warn "Activation de wiki-lm-server.service échouée"
-fi
-
-# Routeur Tiron (tiron-router) — versionné, câblé au cerveau via tiron-router.env.
-ROUTER_DST="${SYSTEMD_USER_DIR}/tiron-router.service"
-cp "${SCRIPT_DIR}/tiron-router.service" "$ROUTER_DST"
-# Env du routeur : checkpoint Laya (classifieur en process, indépendant du
-# cerveau tiron-llm ci-dessus) + FAQ_PATH.
-# Non écrasé s'il existe déjà.
-if [[ ! -f "${HOME}/.openclaw/tiron-router.env" || "$FORCE" == "true" ]]; then
-  cat > "${HOME}/.openclaw/tiron-router.env" <<EOF
-LAYA_CHECKPOINT=${LAYA_CHECKPOINT}
-FAQ_PATH=${WIKI_PATH}/faits/faits.md
-EOF
-else
-  info "tiron-router.env déjà présent — conservé"
-fi
-python3 -m pip install --user --break-system-packages -q "laya[onnx]" 2>/dev/null && \
-  info "laya[onnx] installé" || \
-  warn "Installation de laya échouée — installez manuellement : python3 -m pip install --user --break-system-packages 'laya[onnx]'"
-# Cerveau de l'agent main (conversation Telegram, indépendant du routeur de
-# commandes ci-dessus) : choix automatique selon la RAM disponible, sauf si
-# MAIN_BRAIN est déjà fixé (install.conf ou variable d'environnement).
-# Politique de confidentialité (cf. docs/Secretarius.md § Utilisation des LLMs) :
-# toujours préférer un modèle obfusqué sur Modal à Infomaniak. Infomaniak reste
-# joignable en manuel (switch-model) mais n'est jamais un choix automatique ici.
-if [[ -z "${MAIN_BRAIN}" ]]; then
-  AVAIL_MB="$(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo)"
-  if [[ "$AVAIL_MB" -ge "$MAIN_BRAIN_RAM_THRESHOLD_MB" ]]; then
-    MAIN_BRAIN="ollama"
-  elif [[ "$INTERACTIVE" == "true" ]]; then
-    echo "RAM disponible : ${AVAIL_MB} Mo (< ${MAIN_BRAIN_RAM_THRESHOLD_MB} Mo) — un modèle local n'est pas recommandé pour l'agent principal."
-    read -rp "Cerveau agent principal (modal|infomaniak) [modal]: " _mb || true
-    MAIN_BRAIN="${_mb:-modal}"
-  else
-    MAIN_BRAIN="modal"
-    warn "RAM < ${MAIN_BRAIN_RAM_THRESHOLD_MB} Mo : cerveau agent principal = modal (Qwen3-8B obfusqué) par défaut (--interactive pour choisir infomaniak)"
+# Cerveau de l'agent main : Ollama local (profil lourd). Le cerveau obfusqué
+# (modal) est écrit dans openclaw.json par profil_config.py : rien à faire ici.
+if [[ "${MAIN_BRAIN}" == "ollama" ]]; then
+  _ollama_provider="{\"baseUrl\": \"http://127.0.0.1:11434\", \"apiKey\": \"ollama-local\", \"api\": \"ollama\",
+ \"models\": [{\"id\": \"${OLLAMA_MAIN_MODEL}\", \"name\": \"${OLLAMA_MAIN_MODEL} (Ollama local)\",
+             \"reasoning\": true, \"input\": [\"text\"], \"contextTokens\": 32768,
+             \"params\": {\"thinking\": false, \"num_ctx\": 32768}}]}"
+  OPENCLAW_JSON="$TARGET" MODEL_ID="$OLLAMA_MAIN_MODEL" PROVIDER_JSON="$_ollama_provider" \
+    python3 - <<'PYEOF'
+import json, os
+p = os.environ["OPENCLAW_JSON"]
+c = json.load(open(p))
+c["models"]["providers"]["ollama"] = json.loads(os.environ["PROVIDER_JSON"])
+c["agents"]["entries"]["main"]["model"] = {"primary": f"ollama/{os.environ['MODEL_ID']}"}
+json.dump(c, open(p, "w"), indent=1, ensure_ascii=False)
+open(p, "a").write("\n")
+PYEOF
+  cp "$TARGET" "${OPENCLAW_PATH}/openclaw.json.bak" 2>/dev/null || true
+  unset _ollama_provider
+  if ! curl -s -o /dev/null "http://127.0.0.1:11434/api/tags"; then
+    warn "Ollama injoignable sur 127.0.0.1:11434 — installez/démarrez Ollama, puis : ollama pull ${OLLAMA_MAIN_MODEL}"
   fi
 fi
 info "Cerveau agent principal : ${MAIN_BRAIN}"
 
-_set_main_model_provider() {  # provider_json_key model_id
-  OPENCLAW_JSON="${HOME}/.openclaw/openclaw.json" PROVIDER_KEY="$1" MODEL_ID="$2" PROVIDER_JSON="$3" \
-    python3 - <<'PYEOF'
-import json, os
-p = os.environ["OPENCLAW_JSON"]
-key, model = os.environ["PROVIDER_KEY"], os.environ["MODEL_ID"]
-provider = json.loads(os.environ["PROVIDER_JSON"])
-c = json.load(open(p))
-c["models"]["providers"][key] = provider
-c["agents"]["entries"]["main"]["model"] = {"primary": f"{key}/{model}"}
-json.dump(c, open(p, "w"), indent=1, ensure_ascii=False)
-open(p, "a").write("\n")
-PYEOF
-}
-
-case "$MAIN_BRAIN" in
-  ollama)
-    _set_main_model_provider ollama "$OLLAMA_MAIN_MODEL" "$(cat <<EOF
-{"baseUrl": "http://127.0.0.1:11434", "apiKey": "ollama-local", "api": "ollama",
- "models": [{"id": "${OLLAMA_MAIN_MODEL}", "name": "${OLLAMA_MAIN_MODEL} (Ollama local)",
-             "reasoning": true, "input": ["text"], "contextTokens": 32768,
-             "params": {"thinking": false, "num_ctx": 32768}}]}
-EOF
-)"
-    if ! curl -s -o /dev/null "http://127.0.0.1:11434/api/tags"; then
-      warn "Ollama injoignable sur 127.0.0.1:11434 — installez/démarrez Ollama, puis : ollama pull ${OLLAMA_MAIN_MODEL}"
-    fi
-    ;;
-  modal)
-    OBF_DIR="${HOME}/obfuscator"
-    if [[ ! -d "$OBF_DIR" ]]; then
-      info "Clonage de ${OBF_DIR} (proxy obfusqué, dépôt séparé de Secretarius)"
-      git clone https://github.com/mauceri/obfuscator.git "$OBF_DIR" || \
-        { warn "Clonage échoué — cerveau agent principal laissé à Infomaniak par défaut"; MAIN_BRAIN="infomaniak"; }
-    fi
-    if [[ "$MAIN_BRAIN" == "modal" ]]; then
-      PROXY_VENV="${WIKI_LM_PATH}/.venv"
-      "${PROXY_VENV}/bin/pip" install -q fastapi uvicorn requests 2>/dev/null || \
-        warn "Installation des dépendances du proxy échouée (fastapi/uvicorn/requests dans ${PROXY_VENV})"
-      if [[ ! -f "${OBF_DIR}/artifacts/obfuscation_keys.json" ]]; then
-        info "Régénération de la clé de permutation (déterministe, seed documentée)"
-        mkdir -p "${OBF_DIR}/artifacts"
-        "${PROXY_VENV}/bin/python" - <<PYEOF
-import json
-V = 151936
-import random
-rng = random.Random(0)
-permuted = list(range(V)); rng.shuffle(permuted)
-perm = dict(zip(range(V), permuted))
-unperm = {v: k for k, v in perm.items()}
-json.dump({"vocab_permutation": {str(k): v for k, v in perm.items()},
-           "vocab_unpermute": {str(k): v for k, v in unperm.items()},
-           "seed": 0}, open("${OBF_DIR}/artifacts/obfuscation_keys.json", "w"))
-PYEOF
-      fi
-      if [[ -z "$ALOEPRI_API_KEY" ]]; then
-        warn "ALOEPRI_API_KEY absente — cerveau agent principal laissé à Infomaniak (fixez ALOEPRI_API_KEY et relancez avec --force pour activer Modal)"
-        MAIN_BRAIN="infomaniak"
-      else
-        mkdir -p "${HOME}/.config/obfuscator"
-        printf 'ALOEPRI_API_KEY=%s\n' "$ALOEPRI_API_KEY" > "${HOME}/.config/obfuscator/proxy.env"
-        chmod 600 "${HOME}/.config/obfuscator/proxy.env"
-        # 8B, pas 14B : même taille que le choix Ollama local (OLLAMA_MAIN_MODEL),
-        # Modal n'est qu'un relais quand la RAM manque pour le faire tourner ici.
-        cp "${OBF_DIR}/systemd/obfuscator-proxy-8b.service" "${SYSTEMD_USER_DIR}/obfuscator-proxy-8b.service"
-        systemctl --user daemon-reload
-        systemctl --user enable --now obfuscator-proxy-8b.service
-        _ready=false
-        for _ in $(seq 1 6); do
-          curl -s -o /dev/null "http://127.0.0.1:8002/health" && { _ready=true; break; }
-          sleep 5
-        done
-        if [[ "$_ready" != "true" ]]; then
-          warn "Proxy obfusqué pas encore prêt après 30s (cold start Modal possible, jusqu'à quelques minutes) — configuré quand même, réessayez plus tard : curl http://127.0.0.1:8002/health"
-        fi
-        _set_main_model_provider modal-obfusque qwen3-8b-ft-h128-a1-h02 \
-          '{"baseUrl": "http://127.0.0.1:8002/v1", "apiKey": "local", "api": "openai-completions",
-            "models": [{"id": "qwen3-8b-ft-h128-a1-h02", "name": "Qwen3-8B obfusqué (Modal)",
-                        "api": "openai-completions", "reasoning": false, "input": ["text"],
-                        "contextWindow": 32768, "maxTokens": 4096}]}'
-      fi
-    fi
-    ;;
-  infomaniak|*)
-    info "Cerveau agent principal : Infomaniak (provider par défaut, aucune config supplémentaire)"
-    ;;
-esac
-# Le service tiron-router est copié ci-dessus ; son activation + démarrage
-# (enable --now) est faite par le top-level install.sh APRÈS la création du venv
-# (ici le venv n'existe pas encore, l'activation serait sautée à tort).
 systemctl --user daemon-reload 2>/dev/null || true
-
-# Timer Wiki_LM embeddings : recalcul incrémental périodique (+ reload du serveur).
-for _wl in wiki-lm-embed.service wiki-lm-embed.timer; do
-  _wl_dst="${SYSTEMD_USER_DIR}/${_wl}"
-  if [[ -f "$_wl_dst" && "$FORCE" != "true" ]]; then
-    info "${_wl} existe déjà — ignoré"
-  else
-    cp "${SCRIPT_DIR}/${_wl}" "$_wl_dst"
-    info "${_wl} installé dans ${SYSTEMD_USER_DIR}"
-  fi
-done
-if [[ -x "${HOME}/Secretarius/Wiki_LM/.venv/bin/python3" && -f "${HOME}/Secretarius/Wiki_LM/tools/embed.py" ]]; then
-  systemctl --user daemon-reload 2>/dev/null || true
-  systemctl --user enable --now wiki-lm-embed.timer 2>/dev/null && \
-    info "wiki-lm-embed.timer activé (toutes les 6 h)" || \
-    warn "Activation de wiki-lm-embed.timer échouée"
-fi
-
-# Relève de tiron@secretarius.co : unités copiées, activation laissée à l'utilisateur
-# (systemctl --user enable --now tiron-mail-releve.timer), cf. docs/components/courrier.md.
-for _tr in tiron-mail-releve.service tiron-mail-releve.timer; do
-  _tr_dst="${SYSTEMD_USER_DIR}/${_tr}"
-  if [[ -f "$_tr_dst" && "$FORCE" != "true" ]]; then
-    info "${_tr} existe déjà — ignoré"
-  else
-    cp "${SCRIPT_DIR}/${_tr}" "$_tr_dst"
-    info "${_tr} installé dans ${SYSTEMD_USER_DIR} (non activé)"
-  fi
-done
 
 # Workspace .md et skills
 WORKSPACE_SRC="${SCRIPT_DIR}/workspace"
@@ -469,7 +307,17 @@ while IFS= read -r -d '' src; do
 done < <(find "$WORKSPACE_SRC" -name "*.md" -print0)
 
 # Workspaces sous-agents (wiki, scout, gog, consignes)
-for _pair in "workspace-wiki:workspace-wiki" "workspace-scout:workspace-scout" "workspace-gog:workspace-gog" "workspace-consignes:workspace-consignes"; do
+# Seulement les espaces des modules présents (un module absent ne laisse aucune trace).
+_espaces=()
+for _m in $MODULES; do
+  case "$_m" in
+    wiki) _espaces+=("workspace-wiki:workspace-wiki") ;;
+    scout) _espaces+=("workspace-scout:workspace-scout") ;;
+    gog) _espaces+=("workspace-gog:workspace-gog") ;;
+    courrier) _espaces+=("workspace-consignes:workspace-consignes") ;;
+  esac
+done
+for _pair in "${_espaces[@]}"; do
   _wa_src="${SCRIPT_DIR}/${_pair%%:*}"
   _wa_dst="${OPENCLAW_PATH}/${_pair##*:}"
   if [[ ! -d "$_wa_src" ]]; then
@@ -489,54 +337,7 @@ for _pair in "workspace-wiki:workspace-wiki" "workspace-scout:workspace-scout" "
     fi
   done < <(find "$_wa_src" -name "*.md" -print0)
 done
-unset _pair _wa_src _wa_dst
-
-# Répertoire tasks/done/results pour l'agent scout + .gog-config pour l'agent gog
-mkdir -p "${OPENCLAW_PATH}/workspace-scout/tasks/pending" \
-         "${OPENCLAW_PATH}/workspace-scout/tasks/done" \
-         "${OPENCLAW_PATH}/workspace-scout/results"
-mkdir -p "${OPENCLAW_PATH}/workspace/.gog-config"
-info "Répertoires scout (tasks/results) et .gog-config créés"
-
-# injection-guard : filtre le contenu externe (motifs regex + DeBERTa) avant
-# toute lecture par un LLM. Installé et démarré AVANT scout-watcher : le
-# watcher l'appelle (via scout_process.py) dès la première tâche traitée.
-cp "${SCRIPT_DIR}/injection_guard.py" "${HOME}/.local/bin/injection_guard.py"
-chmod +x "${HOME}/.local/bin/injection_guard.py"
-info "injection_guard.py installé dans ${HOME}/.local/bin"
-GUARD_SVC_DST="${SYSTEMD_USER_DIR}/openclaw-injection-guard.service"
-if [[ -f "$GUARD_SVC_DST" && "$FORCE" != "true" ]]; then
-  info "openclaw-injection-guard.service existe déjà — ignoré"
-else
-  cp "${SCRIPT_DIR}/openclaw-injection-guard.service" "$GUARD_SVC_DST"
-  info "openclaw-injection-guard.service installé dans ${SYSTEMD_USER_DIR}"
-fi
-systemctl --user daemon-reload 2>/dev/null || true
-systemctl --user enable --now openclaw-injection-guard.service 2>/dev/null && \
-  info "openclaw-injection-guard.service activé et démarré" || \
-  warn "Activation de openclaw-injection-guard.service échouée"
-
-# scout-watcher : surveille workspace-scout/tasks/pending, pré-fetch les URLs
-# (curl côté watcher, pas d'exec dans scout) et signale scout via tasks/done.
-mkdir -p "${HOME}/.local/bin"
-cp "${SCRIPT_DIR}/scout-watcher" "${HOME}/.local/bin/scout-watcher"
-cp "${SCRIPT_DIR}/scout_process.py" "${HOME}/.local/bin/scout_process.py"
-chmod +x "${HOME}/.local/bin/scout-watcher" "${HOME}/.local/bin/scout_process.py"
-info "scout-watcher et scout_process.py installés dans ${HOME}/.local/bin"
-SCOUT_SVC_DST="${SYSTEMD_USER_DIR}/openclaw-scout.service"
-if [[ -f "$SCOUT_SVC_DST" && "$FORCE" != "true" ]]; then
-  info "openclaw-scout.service existe déjà — ignoré"
-else
-  cp "${SCRIPT_DIR}/openclaw-scout.service" "$SCOUT_SVC_DST"
-  info "openclaw-scout.service installé dans ${SYSTEMD_USER_DIR}"
-fi
-systemctl --user daemon-reload 2>/dev/null || true
-# --now : sans lui, le watcher restait éteint jusqu'au prochain boot sur une
-# installation neuve (relevé par la revue DSH du 16/09/2026, start.sh ne le
-# relance pas non plus).
-systemctl --user enable --now openclaw-scout.service 2>/dev/null && \
-  info "openclaw-scout.service activé et démarré" || \
-  warn "Activation de openclaw-scout.service échouée"
+unset _pair _wa_src _wa_dst _espaces _m
 
 # Finalisation
 _gw_svc_final="openclaw-gateway.service"

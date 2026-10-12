@@ -61,7 +61,10 @@ def appliquer_profil(config: dict, modules: set[str], cerveau: str) -> dict:
         c["agents"]["defaults"].get("models", {}).pop(MODELE_OBFUSQUE, None)
 
     if cerveau == "modal":
-        entries["main"]["model"] = {"primary": MODELE_OBFUSQUE}
+        # Aucun agent ne reste sur Infomaniak, dont la clé est facultative.
+        for agent in ("main", "wiki", "gog"):
+            if agent in entries:
+                entries[agent]["model"] = {"primary": MODELE_OBFUSQUE}
         c["agents"]["defaults"]["model"]["primary"] = MODELE_OBFUSQUE
 
     if "laya" not in modules:
