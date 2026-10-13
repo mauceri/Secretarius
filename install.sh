@@ -189,7 +189,11 @@ info "plugin derisk-deleg copié ✓"
 # du 2026-09-03) : sans lui, derisk-deleg (et le fournisseur DeepSeek de Scout)
 # ne sont pas chargés.
 _plugins=(derisk-deleg)
-[[ " ${MODULES} " == *" scout "* ]] && _plugins+=(deepseek)
+if [[ " ${MODULES} " == *" scout "* ]]; then
+  installer_plugin_deepseek "${HOME}/.local/bin/openclaw" \
+    || { error "installation du plugin deepseek (@openclaw/deepseek-provider) échouée"; exit 1; }
+  _plugins+=(deepseek)
+fi
 for _p in "${_plugins[@]}"; do
   "${HOME}/.local/bin/openclaw" plugins enable "$_p" --accept-capabilities >/dev/null \
     || { error "openclaw plugins enable ${_p} --accept-capabilities a échoué"; exit 1; }

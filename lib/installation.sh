@@ -148,3 +148,13 @@ charger_nvm() {
   export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
   [[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh" 2>/dev/null || true
 }
+
+# Le fournisseur DeepSeek (Scout) n'est pas livré avec OpenClaw : c'est le paquet
+# npm @openclaw/deepseek-provider, à installer à la version d'OpenClaw en place.
+installer_plugin_deepseek() {  # $1 = openclaw
+  "$1" plugins info deepseek >/dev/null 2>&1 && return 0
+  local v
+  v="$("$1" --version 2>/dev/null | grep -oE '[0-9]{4}\.[0-9]+\.[0-9]+' | head -1)"
+  [[ -n "$v" ]] || return 1
+  "$1" plugins install "@openclaw/deepseek-provider@${v}" --accept-capabilities >/dev/null
+}

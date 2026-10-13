@@ -182,3 +182,32 @@ def test_nvm_charge_meme_si_enveloppe_openclaw_presente(tmp_path):
     r = _bash("charger_nvm; command -v npm",
               env={"HOME": str(tmp_path), "PATH": str(env_bin)})
     assert r.returncode == 0 and r.stdout.strip() == str(nvm_bin / "npm"), r.stderr
+
+
+def _faux_openclaw(tmp_path, deepseek_present):
+    journal = tmp_path / "oc.log"
+    oc = tmp_path / "openclaw"
+    oc.write_text(f'''#!/bin/bash
+echo "$*" >> {journal}
+[[ "$1" == "--version" ]] && {{ echo "OpenClaw 2026.8.2 (0965053)"; exit 0; }}
+[[ "$1 $2" == "plugins info" ]] && exit {0 if deepseek_present else 1}
+exit 0
+''')
+    oc.chmod(0o755)
+    return oc, journal
+
+
+def test_plugin_deepseek_installe_a_la_version_openclaw(tmp_path):
+    """deepseek n'est pas livré avec OpenClaw : paquet npm à installer (santiago, 2026-10-13)."""
+    oc, journal = _faux_openclaw(tmp_path, deepseek_present=False)
+    r = _bash(f"installer_plugin_deepseek {oc}")
+    assert r.returncode == 0, r.stderr
+    assert "plugins install @openclaw/deepseek-provider@2026.8.2 --accept-capabilities" \
+        in journal.read_text().splitlines()
+
+
+def test_plugin_deepseek_deja_present_non_reinstalle(tmp_path):
+    oc, journal = _faux_openclaw(tmp_path, deepseek_present=True)
+    r = _bash(f"installer_plugin_deepseek {oc}")
+    assert r.returncode == 0
+    assert not any(l.startswith("plugins install") for l in journal.read_text().splitlines())
