@@ -6,10 +6,17 @@ jamais hors du coffre, jamais dans Wiki_LM/ ni dans un dossier caché
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 TAILLE_MAX = 1_000_000
 ZONES_INTERDITES = {"Wiki_LM"}
+
+
+# Même motif que le plugin wikilm-capture (run-commands.ts, BLOCK_RE) : un
+# bloc est repéré n'importe où, pas seulement en début de ligne.
+_BLOC_WIKI = re.compile(r"```wiki\r?\n([\s\S]*?)\r?\n```")
+_CASE_VIDE = re.compile(r"^\s*[-*]\s+\[ \]")
 
 
 class Refus(Exception):
@@ -58,6 +65,18 @@ def lire(racine: Path, chemin: str) -> str:
     return cible.read_text(encoding="utf-8")
 
 
+def _verifier_blocs_wiki(contenu: str) -> None:
+    """Une note d'agent ne porte que des /c derrière une case vide : sinon la
+    validation de l'utilisateur dans Obsidian exécuterait le reste (revue
+    finale du 2026-10-13 : /supprimer!, /mail!… venus d'une page web)."""
+    for m in _BLOC_WIKI.finditer(contenu):
+        lignes = [l for l in contenu[:m.start()].split("\n") if l.strip()]
+        if not lignes or not _CASE_VIDE.match(lignes[-1]):
+            raise Refus("chaque bloc wiki doit être précédé d'une case vide « - [ ] »")
+        if m.group(1).split("\n")[0].strip() != "/c":
+            raise Refus("seule la commande /c est permise dans un bloc wiki")
+
+
 def ecrire(racine: Path, prefixe: str, chemin: str, contenu: str) -> str:
     cible = resoudre(racine, chemin)
     _exiger_md(cible)
@@ -65,6 +84,7 @@ def ecrire(racine: Path, prefixe: str, chemin: str, contenu: str) -> str:
         raise Refus(f"le nom du fichier doit commencer par {prefixe}-")
     if len(contenu.encode("utf-8")) > TAILLE_MAX:
         raise Refus(f"contenu trop long (maximum {TAILLE_MAX} octets)")
+    _verifier_blocs_wiki(contenu)
     cible.parent.mkdir(parents=True, exist_ok=True)
     cible.write_text(contenu, encoding="utf-8")
     return cible.relative_to(racine.resolve()).as_posix()

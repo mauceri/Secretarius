@@ -96,3 +96,15 @@ def test_page(tmp_path):
     for slug in ["src-vieux", "src-absent", "../x", "SRC-a", "x-a", "src-a.md"]:
         with pytest.raises(Refus):
             lecture_wiki.page(wiki, slug)
+
+
+def test_question_deja_en_cours_refusee_sans_attente(faux_wiki, monkeypatch):
+    """Revue finale : pas de file d'attente illimitée (pool de 40 threads)."""
+    monkeypatch.setattr(lecture_wiki, "ATTENTE_VERROU", 0.1)
+    assert lecture_wiki._VERROU_QUESTION.acquire()
+    try:
+        with pytest.raises(WikiIndisponible, match="déjà en cours"):
+            lecture_wiki.question(faux_wiki, "x")
+    finally:
+        lecture_wiki._VERROU_QUESTION.release()
+    assert _Faux.recus == []

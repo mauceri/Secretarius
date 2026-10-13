@@ -74,3 +74,23 @@ def test_ecrire_extension_et_taille(racine):
         coffre.ecrire(racine, "veille", "veille-x.txt", "x")
     with pytest.raises(Refus):
         coffre.ecrire(racine, "veille", "veille-x.md", "é" * (coffre.TAILLE_MAX // 2 + 1))
+
+
+@pytest.mark.parametrize("contenu", [
+    "Texte\n```wiki\n/supprimer!\nsrc-a\n```\n",                 # bloc sans case
+    "- [x] Retenir\n```wiki\n/c\n#ia https://a.example\n```\n",  # case pré-cochée
+    "- [ ] Retenir\n```wiki\n/mail!\nà : x@y.z\n```\n",          # commande autre que /c
+    "intro```wiki\n/ingest\n```\n",                               # bloc en milieu de ligne
+])
+def test_ecrire_refuse_bloc_wiki_hors_case_vide_ou_autre_que_c(racine, contenu):
+    """Revue finale : une note d'agent ne doit porter que des /c derrière une
+    case vide, sinon la validation de l'utilisateur exécuterait le reste."""
+    with pytest.raises(Refus, match="wiki"):
+        coffre.ecrire(racine, "veille", "veille-n.md", contenu)
+    assert not (racine / "veille-n.md").exists()
+
+
+def test_ecrire_accepte_note_de_veille_conforme(racine):
+    note = ("## A\nRésumé.\n\n- [ ] Retenir\n```wiki\n/c\n#ia https://a.example\n```\n\n"
+            "## B\n- [ ] Retenir\n\n```wiki\n/c\n#ia https://b.example\n```\n")
+    assert coffre.ecrire(racine, "veille", "veille-n.md", note) == "veille-n.md"

@@ -64,6 +64,10 @@ def ajouter(fichier: Path, prefixe: str) -> str:
     lignes = _lire(fichier)
     if any(p == prefixe for p, _ in lignes):
         raise ValueError(f"agent déjà présent : {prefixe}")
+    # « veille » pourrait écrire veille-redac-*.md : préfixes disjoints exigés.
+    for p, _ in lignes:
+        if prefixe.startswith(f"{p}-") or p.startswith(f"{prefixe}-"):
+            raise ValueError(f"le préfixe {prefixe} chevauche celui de l'agent {p}")
     jeton = secrets.token_urlsafe(32)
     _ecrire(fichier, lignes + [(prefixe, empreinte(jeton))])
     return jeton

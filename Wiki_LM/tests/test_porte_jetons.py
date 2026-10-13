@@ -69,3 +69,17 @@ def test_cli_ajouter_affiche_le_jeton_une_fois(tmp_path, capsys):
     assert capsys.readouterr().out.strip().splitlines()[-1] == "veille"
     assert jetons.main(["--fichier", str(f), "retirer", "veille"]) == 0
     assert jetons.main(["--fichier", str(f), "retirer", "veille"]) == 1
+
+
+def test_prefixes_chevauchants_refuses(tmp_path):
+    """Revue finale : « veille » pourrait écrire veille-redac-*.md et écraser
+    les fichiers de l'agent « veille-redac »."""
+    f = tmp_path / "agents"
+    jetons.ajouter(f, "veille")
+    with pytest.raises(ValueError, match="chevauche"):
+        jetons.ajouter(f, "veille-redac")
+    g = tmp_path / "agents2"
+    jetons.ajouter(g, "veille-redac")
+    with pytest.raises(ValueError, match="chevauche"):
+        jetons.ajouter(g, "veille")
+    jetons.ajouter(g, "veilleur")  # simple préfixe commun de lettres : permis

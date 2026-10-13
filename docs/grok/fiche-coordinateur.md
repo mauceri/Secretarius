@@ -18,7 +18,7 @@ fichiers, l'utilisateur coche ce qu'il retient.
 | Outil | Paramètres | Usage |
 |---|---|---|
 | `wiki_recherche` | `mots` | À utiliser en premier : instantané, sans coût. Renvoie titres et extraits. |
-| `wiki_question` | `question` | Synthèse rédigée à partir du wiki + slugs cités. Jusqu'à ~1 min au réveil du modèle ; une question à la fois pour toute l'équipe. |
+| `wiki_question` | `question` | Synthèse rédigée à partir du wiki + slugs cités. Jusqu'à ~1 min au réveil du modèle ; une question à la fois pour toute l'équipe (sinon « une question est déjà en cours » : réessayer plus tard). |
 | `wiki_page` | `slug` | Texte complet d'une page (`src-…`, `c-…`, `e-…`), slugs tirés des références de `wiki_question`. |
 | `coffre_lister` | `dossier` (facultatif) | Fichiers `.md` du coffre. |
 | `coffre_lire` | `chemin` | Lire un fichier `.md`. |
@@ -58,6 +58,8 @@ Résumé : <3 à 6 phrases>.
 ````
 
 - Toujours une case vide : ne jamais cocher à la place de l'utilisateur.
+- Seule la commande `/c` est permise dans un bloc `wiki`, et chaque bloc doit suivre
+  immédiatement sa case vide : sinon `coffre_ecrire` refuse la note entière.
 - Tags courts, sans espace, en français si possible.
 - Une URL par bloc.
 

@@ -15,6 +15,9 @@ SLUG_RE = re.compile(r"^(src|c|e)-[a-z0-9-]+$")
 # Une question à la fois : chaque /query sollicite le modèle (Modal), et
 # l'ingestion comme les questions partagent ce même modèle.
 _VERROU_QUESTION = threading.Lock()
+# Pas de file d'attente : chaque attente immobilise un des 40 threads du pool
+# de fastmcp, et des relances en série finiraient par bloquer tous les outils.
+ATTENTE_VERROU = 5.0
 
 
 class WikiIndisponible(Exception):
@@ -43,8 +46,12 @@ def _post(url: str, chemin: str, corps: dict, delai: float) -> dict:
 
 
 def question(url: str, texte: str, delai: float = 360) -> dict:
-    with _VERROU_QUESTION:
+    if not _VERROU_QUESTION.acquire(timeout=ATTENTE_VERROU):
+        raise WikiIndisponible("une question est déjà en cours ; réessayez dans une minute")
+    try:
         data = _post(url, "/query", {"question": texte}, delai)
+    finally:
+        _VERROU_QUESTION.release()
     return {"synthese": data.get("text", ""), "references": data.get("references", [])}
 
 
