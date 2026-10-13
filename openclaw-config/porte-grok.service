@@ -9,6 +9,7 @@ EnvironmentFile=%h/.config/porte-grok/porte.env
 ExecStart=%h/Secretarius/Wiki_LM/.venv/bin/python3 -m porte.serveur
 Restart=always
 RestartSec=10
+NoNewPrivileges=true
 StandardOutput=journal
 StandardError=journal
 
