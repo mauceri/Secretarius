@@ -135,7 +135,7 @@ info "Coffre Obsidian ✓ (${OBSIDIAN_PATH})"
 WIKI_PATH="${OBSIDIAN_PATH}/Wiki_LM"
 # Créé ici, par l'utilisateur : sinon Docker créerait la source du montage du
 # conteneur wiki en root, et le wiki ne pourrait pas y écrire.
-mkdir -p "$WIKI_PATH"
+preparer_wiki "$WIKI_PATH"
 
 # Étape 2b — Copie locale de Wikipédia (ZIM fournis par l'utilisateur).
 WIKI_ZIM_DIR="$(resoudre_zim)" || exit 1

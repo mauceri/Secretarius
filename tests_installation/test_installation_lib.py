@@ -211,3 +211,11 @@ def test_plugin_deepseek_deja_present_non_reinstalle(tmp_path):
     r = _bash(f"installer_plugin_deepseek {oc}")
     assert r.returncode == 0
     assert not any(l.startswith("plugins install") for l in journal.read_text().splitlines())
+
+
+def test_preparer_wiki_cree_le_squelette(tmp_path):
+    """Coffre neuf (santiago, 2026-10-13) : sans wiki/, wiki-lm-server refuse de démarrer."""
+    w = tmp_path / "Publication" / "Wiki_LM"
+    r = _bash(f'preparer_wiki "{w}"')
+    assert r.returncode == 0, r.stderr
+    assert (w / "wiki").is_dir() and (w / "raw").is_dir()

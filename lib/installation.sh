@@ -158,3 +158,9 @@ installer_plugin_deepseek() {  # $1 = openclaw
   [[ -n "$v" ]] || return 1
   "$1" plugins install "@openclaw/deepseek-provider@${v}" --accept-capabilities >/dev/null
 }
+
+# Squelette d'un wiki neuf : sans wiki/, wiki-lm-server refuse de démarrer.
+# L'ingestion crée elle-même concepts/, entités/, sources/.
+preparer_wiki() {  # $1 = WIKI_PATH
+  mkdir -p "$1/wiki" "$1/raw"
+}
