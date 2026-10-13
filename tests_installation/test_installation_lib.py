@@ -164,3 +164,21 @@ def test_dependances_python_torch_cpu_et_tmpdir_sur_disque(tmp_path):
     assert "-r /r/requirements.txt" in appels[1]
     for a in appels:
         assert a.split("|")[0].startswith(str(tmp_path / ".cache"))
+
+
+def test_nvm_charge_meme_si_enveloppe_openclaw_presente(tmp_path):
+    """Relance par SSH : l'enveloppe ~/.local/bin/openclaw du premier passage
+    est dans le PATH, mais npm (NVM) non — NVM doit quand même être chargé."""
+    env_bin = tmp_path / "bin"
+    env_bin.mkdir()
+    (env_bin / "openclaw").write_text("#!/bin/sh\n")
+    (env_bin / "openclaw").chmod(0o755)
+    (env_bin / "bash").symlink_to("/bin/bash")  # PATH isolé : pas de /usr/bin/npm
+    nvm_bin = tmp_path / ".nvm" / "bin"
+    nvm_bin.mkdir(parents=True)
+    (nvm_bin / "npm").write_text("#!/bin/sh\n")
+    (nvm_bin / "npm").chmod(0o755)
+    (tmp_path / ".nvm" / "nvm.sh").write_text(f'PATH="{nvm_bin}:$PATH"\n')
+    r = _bash("charger_nvm; command -v npm",
+              env={"HOME": str(tmp_path), "PATH": str(env_bin)})
+    assert r.returncode == 0 and r.stdout.strip() == str(nvm_bin / "npm"), r.stderr

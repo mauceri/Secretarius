@@ -139,3 +139,12 @@ installer_dependances_python() {  # $1 = pip du venv, $2 = requirements.txt
   TMPDIR="$tmp" "$1" install --quiet torch --index-url https://download.pytorch.org/whl/cpu \
     && TMPDIR="$tmp" "$1" install --quiet -r "$2"
 }
+
+# Sessions SSH non interactives : .bashrc (donc NVM) n'est pas chargé. On teste
+# npm et non openclaw : l'enveloppe ~/.local/bin/openclaw d'un premier passage
+# est dans le PATH sans que NVM le soit.
+charger_nvm() {
+  command -v npm &>/dev/null && return 0
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  [[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh" 2>/dev/null || true
+}

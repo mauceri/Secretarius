@@ -83,11 +83,7 @@ done
 unset _cmd
 info "git, envsubst, curl ✓"
 
-# Sourcer NVM si nécessaire (sessions SSH non-interactives ne chargent pas .bashrc)
-if ! command -v openclaw &>/dev/null; then
-  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-  [[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh" 2>/dev/null || true
-fi
+charger_nvm
 
 # Tester openclaw avec un timeout : un binaire résiduel (paquet npm désinstallé)
 # reste dans le PATH mais part en boucle sur --version → l'install se figeait.
