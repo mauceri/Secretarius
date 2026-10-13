@@ -9,6 +9,8 @@ import pytest
 
 # Rendre tools/ importable
 sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
+# Rendre le paquet porte/ importable (porte.jetons, porte.coffre…)
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 # ---------------------------------------------------------------------------
