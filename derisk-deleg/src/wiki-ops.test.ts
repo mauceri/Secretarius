@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fetchWikiOpJson, formatWikiResult, runWikiOp } from "./wiki-ops.js";
+import { delaiSandbox, fetchWikiOpJson, formatWikiResult, runWikiOp } from "./wiki-ops.js";
 
 describe("formatWikiResult", () => {
   it("query (regime full) : renvoie la synthèse verbatim", () => {
@@ -167,5 +167,15 @@ describe("fetchWikiOpJson", () => {
       async () => ({ code: 0, stdout: "pas du json", stderr: "" }));
     expect(out.ok).toBe(false);
     expect(out.text).toContain("Erreur wiki");
+  });
+});
+
+describe("delaiSandbox", () => {
+  it("accorde 6 min à query (Qwen3-8B sur CPU : ~4 min mesurées)", () => {
+    expect(delaiSandbox(["python3", "/wiki-tools/wiki.py", "query", "substack"])).toBe(360000);
+  });
+  it("garde 120 s pour les autres opérations", () => {
+    expect(delaiSandbox(["python3", "/wiki-tools/wiki.py", "status"])).toBe(120000);
+    expect(delaiSandbox(["gog", "query"])).toBe(120000);
   });
 });

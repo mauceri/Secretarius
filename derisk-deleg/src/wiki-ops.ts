@@ -8,6 +8,15 @@ import { resolveSandboxContext } from "openclaw/plugin-sdk/agent-harness-runtime
 // Session stable -> le backend sandbox réutilise le même conteneur entre appels.
 const WIKI_SANDBOX_SESSION_KEY = "agent:wiki:subagent:ops";
 const WIKI_SANDBOX_TIMEOUT_MS = 120000;
+// query fait une synthèse puis un résumé par le LLM du wiki : ~4 min avec
+// Qwen3-8B sur CPU (mesuré le 2026-10-13), d'où « Aborted » à 120 s.
+const WIKI_QUERY_TIMEOUT_MS = 360000;
+
+export function delaiSandbox(argv: string[]): number {
+  return argv[1] === "/wiki-tools/wiki.py" && argv[2] === "query"
+    ? WIKI_QUERY_TIMEOUT_MS
+    : WIKI_SANDBOX_TIMEOUT_MS;
+}
 
 // Exécute argv (ex. ["python3","/wiki-tools/wiki.py","status"]) dans le sandbox
 // wiki via le SDK OpenClaw. Ne lève jamais : sandbox indisponible -> code 1.
@@ -47,7 +56,7 @@ export async function execSandbox(
     }
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), WIKI_SANDBOX_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), delaiSandbox(argv));
     try {
       const res = await ctx.backend.runShellCommand({
         script: script ?? argv.map((_, i) => `"$${i + 1}"`).join(" "),
