@@ -9,6 +9,33 @@ import {
 } from "./run-commands";
 
 describe("extractWikiBlocks", () => {
+  it("ignore un bloc précédé d'une case vide", () => {
+    const note = "Résumé\n\n- [ ] Retenir\n```wiki\n/c\n#ia https://a.example\n```\n";
+    expect(extractWikiBlocks(note)).toHaveLength(0);
+  });
+
+  it("exécute un bloc précédé d'une case cochée (x ou X)", () => {
+    for (const c of ["x", "X"]) {
+      const note = `- [${c}] Retenir\n\`\`\`wiki\n/c\n#ia https://a.example\n\`\`\`\n`;
+      const blocks = extractWikiBlocks(note);
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0].arg).toBe("#ia https://a.example");
+    }
+  });
+
+  it("note de veille mêlée : seuls les blocs cochés ou sans case, positions exactes", () => {
+    const note =
+      "## A\nRésumé A\n\n- [ ] Retenir\n```wiki\n/c\nA\n```\n\n" +
+      "## B\nRésumé B\n\n- [x] Retenir\n\n```wiki\n/c\nB\n```\n\n" +
+      "Texte libre\n```wiki\n/wikistatus\n```\n";
+    const blocks = extractWikiBlocks(note);
+    expect(blocks.map((b) => b.arg || b.command)).toEqual(["B", "/wikistatus"]);
+    for (const b of blocks) {
+      expect(note.slice(b.start, b.start + 8)).toBe("```wiki\n");
+      expect(note.slice(b.end - 3, b.end)).toBe("```");
+    }
+  });
+
   it("extracts command and argument from a single block", () => {
     const note = "```wiki\n/q\nQuestion ?\n```\n";
     const blocks = extractWikiBlocks(note);

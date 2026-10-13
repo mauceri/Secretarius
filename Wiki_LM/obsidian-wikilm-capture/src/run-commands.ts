@@ -34,11 +34,22 @@ export interface WikiBlockMatch {
 const BLOCK_RE =
   /```wiki\r?\n([\s\S]*?)\r?\n```(?:\r?\n+<!-- wikilm-run:start -->\r?\n?([\s\S]*?)\r?\n?<!-- wikilm-run:end -->)?/g;
 
+// Note de veille (porte Grok, 2026-10-13) : une case vide « - [ ] » sur la
+// dernière ligne non vide avant un bloc l'écarte ; cochée, ou absente, le
+// bloc s'exécute comme avant.
+const CASE_VIDE = /^\s*[-*]\s+\[ \]/;
+
+function precedeDUneCaseVide(noteText: string, debut: number): boolean {
+  const lignes = noteText.slice(0, debut).split("\n").filter((l) => l.trim() !== "");
+  return lignes.length > 0 && CASE_VIDE.test(lignes[lignes.length - 1]);
+}
+
 export function extractWikiBlocks(noteText: string): WikiBlockMatch[] {
   const blocks: WikiBlockMatch[] = [];
   const re = new RegExp(BLOCK_RE.source, "g");
   let match: RegExpExecArray | null;
   while ((match = re.exec(noteText)) !== null) {
+    if (precedeDUneCaseVide(noteText, match.index)) continue;
     const content = match[1];
     const lines = content.split("\n");
     const command = lines[0].trim();
