@@ -129,3 +129,13 @@ verifier_services() {
   fi
   echo "Tous les services répondent (${#SERVICES_A_VERIFIER[@]})."
 }
+
+# Ubuntu 26.04 monte /tmp en tmpfs à quota par utilisateur : le torch CUDA que
+# PyPI sert par défaut (plusieurs Go de nvidia-*) l'épuise. Aucune machine
+# Secretarius n'a de carte NVIDIA : torch CPU d'abord, et pip travaille sur disque.
+installer_dependances_python() {  # $1 = pip du venv, $2 = requirements.txt
+  local tmp="${HOME}/.cache/pip-tmp"
+  mkdir -p "$tmp"
+  TMPDIR="$tmp" "$1" install --quiet torch --index-url https://download.pytorch.org/whl/cpu \
+    && TMPDIR="$tmp" "$1" install --quiet -r "$2"
+}

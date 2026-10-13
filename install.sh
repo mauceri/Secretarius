@@ -170,7 +170,7 @@ info "Installation des dépendances Python..."
 WIKI_LM_PATH="${SECRETARIUS_ROOT}/Wiki_LM"
 VENV_PATH="${WIKI_LM_PATH}/.venv"
 python3 -m venv "$VENV_PATH" || { error "venv impossible — lancer : sudo ./amorcage-systeme.sh"; exit 1; }
-"${VENV_PATH}/bin/pip" install -r "${WIKI_LM_PATH}/requirements.txt" --quiet \
+installer_dependances_python "${VENV_PATH}/bin/pip" "${WIKI_LM_PATH}/requirements.txt" \
   || { error "dépendances Python non installées : ${VENV_PATH}/bin/pip install -r ${WIKI_LM_PATH}/requirements.txt"; exit 1; }
 info "Dépendances Python ✓ (venv: ${VENV_PATH})"
 

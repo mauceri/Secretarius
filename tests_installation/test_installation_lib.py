@@ -146,3 +146,21 @@ def test_ancien_proxy_obfuscateur_refuse(tmp_path):
     r = _bash("verifier_proxy_obfuscateur", {"SYSTEMD_USER_DIR": str(tmp_path)})
     assert r.returncode == 1 and "obfuscator-proxy-docker" in r.stderr
     assert _bash("verifier_proxy_obfuscateur", {"SYSTEMD_USER_DIR": str(tmp_path / "vide")}).returncode == 0
+
+
+def test_dependances_python_torch_cpu_et_tmpdir_sur_disque(tmp_path):
+    """Ubuntu 26.04 : /tmp en tmpfs à quota ; torch CUDA par défaut (plusieurs Go)
+    l'épuise (santiago, 2026-10-13). torch CPU d'abord, pip hors de /tmp."""
+    journal = tmp_path / "pip.log"
+    pip = tmp_path / "pip"
+    pip.write_text(f'#!/bin/bash\necho "$TMPDIR|$*" >> {journal}\n')
+    pip.chmod(0o755)
+    r = _bash(f'installer_dependances_python {pip} /r/requirements.txt',
+              env={"HOME": str(tmp_path)})
+    assert r.returncode == 0, r.stderr
+    appels = journal.read_text().splitlines()
+    assert len(appels) == 2
+    assert "torch" in appels[0] and "download.pytorch.org/whl/cpu" in appels[0]
+    assert "-r /r/requirements.txt" in appels[1]
+    for a in appels:
+        assert a.split("|")[0].startswith(str(tmp_path / ".cache"))
