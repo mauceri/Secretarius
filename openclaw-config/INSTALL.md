@@ -24,7 +24,9 @@ groupe `docker`), 4 Go de swap s'il n'y en a pas, Tailscale, NVM avec Node LTS,
 `openclaw` et `obsidian-headless`, et active `loginctl enable-linger` pour que les
 services tournent sans session ouverte. Ensuite :
 
-1. se déconnecter puis se reconnecter (groupe `docker`) ;
+1. se déconnecter puis se reconnecter (groupe `docker`), et relancer le gestionnaire des
+   services utilisateur, qui garde les groupes de son démarrage :
+   `sudo systemctl restart user@$(id -u).service` ;
 2. `sudo tailscale up --hostname=<nom> --ssh`, puis désactiver l'expiration de la clé de
    la machine dans la console Tailscale.
 

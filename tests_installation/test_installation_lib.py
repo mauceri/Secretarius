@@ -219,3 +219,25 @@ def test_preparer_wiki_cree_le_squelette(tmp_path):
     r = _bash(f'preparer_wiki "{w}"')
     assert r.returncode == 0, r.stderr
     assert (w / "wiki").is_dir() and (w / "raw").is_dir()
+
+
+def _faux_systemd_run(tmp_path, groupes):
+    sr = tmp_path / "systemd-run"
+    sr.write_text(f'#!/bin/sh\necho "{groupes}"\n')
+    sr.chmod(0o755)
+    return sr
+
+
+def test_gestionnaire_systemd_sans_groupe_docker_refuse(tmp_path):
+    """santiago, 2026-10-13 : systemd --user lancé avant l'ajout au groupe docker ;
+    la gateway ne pouvait pas joindre docker.sock (permission denied)."""
+    sr = _faux_systemd_run(tmp_path, "mauceric sudo users")
+    r = _bash(f"SYSTEMD_RUN={sr}; verifier_groupe_docker_systemd")
+    assert r.returncode == 1
+    assert "user@" in r.stdout + r.stderr
+
+
+def test_gestionnaire_systemd_avec_groupe_docker(tmp_path):
+    sr = _faux_systemd_run(tmp_path, "mauceric sudo users docker")
+    r = _bash(f"SYSTEMD_RUN={sr}; verifier_groupe_docker_systemd")
+    assert r.returncode == 0, r.stdout + r.stderr

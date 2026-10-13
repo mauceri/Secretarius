@@ -104,6 +104,7 @@ if ! command -v docker &>/dev/null || ! docker ps &>/dev/null; then
   exit 1
 fi
 info "docker $(docker --version | cut -d' ' -f3 | tr -d ',') ✓"
+verifier_groupe_docker_systemd || exit 1
 
 if ! systemctl --user status &>/dev/null; then
   error "systemd utilisateur indisponible — requis pour les services"

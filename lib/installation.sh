@@ -164,3 +164,16 @@ installer_plugin_deepseek() {  # $1 = openclaw
 preparer_wiki() {  # $1 = WIKI_PATH
   mkdir -p "$1/wiki" "$1/raw"
 }
+
+# Les services héritent des groupes du gestionnaire systemd --user, figés à son
+# démarrage : ajouté au groupe docker après coup (amorçage), il faut le relancer,
+# une reconnexion ne suffit pas. SYSTEMD_RUN est remplaçable par les tests.
+verifier_groupe_docker_systemd() {
+  local groupes
+  groupes="$(${SYSTEMD_RUN:-systemd-run} --user --wait --pipe --quiet id -nG 2>/dev/null)"
+  if [[ " ${groupes} " != *" docker "* ]]; then
+    echo "Le gestionnaire systemd --user n'a pas le groupe docker : les services ne" >&2
+    echo "pourront pas joindre Docker. Lancer : sudo systemctl restart user@$(id -u).service" >&2
+    return 1
+  fi
+}

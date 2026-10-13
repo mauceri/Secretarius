@@ -59,7 +59,9 @@ cat <<EOF
 
 Amorçage terminé. Reste à faire, en tant que ${UTILISATEUR} :
   1. Se déconnecter puis se reconnecter (le groupe docker n'est pris en compte
-     qu'à la prochaine connexion).
+     qu'à la prochaine connexion), et relancer le gestionnaire des services
+     utilisateur, qui garde les groupes de son démarrage :
+       sudo systemctl restart user@$(id -u "${UTILISATEUR}").service
   2. Relier la machine au tailnet :
        sudo tailscale up --hostname=<nom> --ssh
      puis, dans la console Tailscale, désactiver l'expiration de la clé de
