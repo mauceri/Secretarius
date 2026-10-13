@@ -36,12 +36,12 @@ def test_capture_url_with_tags(monkeypatch, tmp_path):
     # texte + URL → un seul .url combiné (note embarquée, pas de .md séparé)
     assert len(out["files"]) == 1
     fname = out["files"][0]
-    assert fname.endswith(".url")
+    assert fname.endswith(".url.md")
     content = (tmp_path / "raw" / fname).read_text()
     assert "https://example.com" in content
     assert "tags: a, b" in content
     assert "note libre" in content
-    assert not list((tmp_path / "raw").glob("*.md"))
+    assert [p.name for p in (tmp_path / "raw").glob("*.md")] == [fname]
 
 
 def test_capture_file_directive_reads_file_under_wiki_root(monkeypatch, tmp_path):

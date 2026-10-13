@@ -559,6 +559,24 @@ class TestIngestLocalNote:
         assert seen["llm_during_call"] is web_llm
         assert ingestor.llm is default_llm  # restauré après l'appel
 
+    def test_url_md_traite_comme_url_avec_web_llm(self, ingestor, raw_dir):
+        """Capture au format .url.md (visible dans Obsidian) : page web, pas note."""
+        web_llm = object()
+        ingestor.web_llm = web_llm
+        (raw_dir / "20261013-000000-example-com.url.md").write_text(
+            "https://example.com/article\ntags: écriture\n", encoding="utf-8")
+        seen = {}
+
+        def fake_ingest(source, **kwargs):
+            seen["source"] = source
+            seen["llm"] = ingestor.llm
+            seen["local_note"] = kwargs.get("local_note")
+            return "src-test"
+
+        ingestor.ingest = fake_ingest
+        ingestor.ingest_raw_dir()
+        assert seen == {"source": "https://example.com/article", "llm": web_llm, "local_note": False}
+
     def test_md_source_ignores_web_llm(self, ingestor, wiki_dir, raw_dir):
         default_llm = ingestor.llm
         ingestor.web_llm = object()  # ne doit jamais être utilisé ici

@@ -70,7 +70,7 @@ def _normalize_url(url: str) -> str:
 
 def _existing_urls(raw: Path) -> set[str]:
     seen = set()
-    for f in raw.glob("*.url"):
+    for f in [*raw.glob("*.url"), *raw.glob("*.url.md")]:
         for line in f.read_text(encoding="utf-8", errors="replace").splitlines():
             line = line.strip()
             if line.startswith("url:"):
@@ -84,7 +84,7 @@ def _existing_urls(raw: Path) -> set[str]:
 def _existing_hashes(raw: Path) -> set[str]:
     seen = set()
     for f in raw.iterdir():
-        if f.is_file() and f.suffix.lower() not in (".url",):
+        if f.is_file() and not f.name.lower().endswith((".url", ".url.md")):
             try:
                 seen.add(_file_hash(f))
             except OSError:
@@ -175,7 +175,8 @@ def capture_urls(urls: list[str], raw: Path, tags: list[str] | None = None,
         domain = re.sub(r"https?://", "", url).split("/")[0]
         domain_slug = slugify(domain.replace(".", "-"), max_words=3)
         suffix = f"-{i}" if len(urls) > 1 else ""
-        fname = f"{ts}{suffix}-{domain_slug}.url"
+        # .url.md et non .url : Obsidian Sync ne transmet pas les .url
+        fname = f"{ts}{suffix}-{domain_slug}.url.md"
         path = raw / fname
         content = url + "\n"
         if simple:

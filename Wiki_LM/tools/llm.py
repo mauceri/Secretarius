@@ -147,6 +147,13 @@ class _OpenAIBackend:
         base_url = base_url or _env("OPENAI_BASE_URL", "http://localhost:11434/v1")
         self._client = openai.OpenAI(api_key=api_key or _cle_pour(base_url), base_url=base_url)
         self.model = model or _env("OPENAI_MODEL", "deepseek-v4-flash")
+        # deepseek-v4-flash raisonne par défaut, et ces tokens sont décomptés de
+        # max_tokens : les pages web étaient tronquées avant la liste des
+        # concepts/entités (2026-10-13). Paramètre propre à l'API DeepSeek.
+        self._extra = (
+            {"extra_body": {"thinking": {"type": "disabled"}}}
+            if "api.deepseek.com" in base_url else {}
+        )
 
     def complete(self, messages: list[dict], system: str = "", max_tokens: int = 2048) -> str:
         if system:
@@ -155,6 +162,7 @@ class _OpenAIBackend:
             model=self.model,
             messages=messages,
             max_tokens=max_tokens,
+            **self._extra,
         )
         return resp.choices[0].message.content
 

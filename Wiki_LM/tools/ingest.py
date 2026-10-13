@@ -370,6 +370,11 @@ def _file_hash(path: Path) -> str:
     return h.hexdigest()
 
 
+def _is_url_capture(path: Path) -> bool:
+    """Capture d'URL : .url (historique) ou .url.md (visible dans Obsidian)."""
+    return path.name.lower().endswith((".url", ".url.md"))
+
+
 def _extract_url_from_file(path: Path) -> str:
     """Extrait l'URL d'un fichier .url (les deux formats)."""
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -416,7 +421,7 @@ def _dedup_files(files: list[Path]) -> list[Path]:
     seen: dict[str, Path] = {}
     result: list[Path] = []
     for f in files:
-        if f.suffix.lower() == ".url":
+        if _is_url_capture(f):
             key = _extract_url_from_file(f)
             # Normalisation minimale : supprimer fragment et trailing slash
             key = key.split("#")[0].rstrip("/")
@@ -1185,7 +1190,7 @@ class Ingestor:
             ts = datetime.datetime.now().strftime("%H:%M:%S")
             print(f"\n[ingest] ({i}/{len(pending)}) {ts} — {path.name}")
             try:
-                if path.suffix.lower() == ".url":
+                if _is_url_capture(path):
                     url = self._parse_url_file(path)
                     if not url:
                         print(f"[ingest] Fichier .url vide ou invalide : {path.name}")

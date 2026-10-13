@@ -79,7 +79,8 @@ class TestCaptureUrls:
     def test_single_url(self, tmp_path):
         files = capture_urls(["https://example.com/page"], tmp_path)
         assert len(files) == 1
-        assert files[0].suffix == ".url"
+        # .url.md : Obsidian Sync ne transmet pas les .url (santiago, 2026-10-13)
+        assert files[0].name.endswith(".url.md")
         assert files[0].read_text().strip() == "https://example.com/page"
 
     def test_multiple_urls(self, tmp_path):
@@ -92,7 +93,12 @@ class TestCaptureUrls:
         capture_urls([url], tmp_path)
         files2 = capture_urls([url], tmp_path)
         assert len(files2) == 0
-        assert len(list(tmp_path.glob("*.url"))) == 1
+        assert len(list(tmp_path.glob("*.url.md"))) == 1
+
+    def test_duplicate_detecte_ancien_format_url(self, tmp_path):
+        """Les captures antérieures restent en .url : le doublon doit être vu."""
+        (tmp_path / "20260901-000000-example-com.url").write_text("https://example.com/page\n")
+        assert capture_urls(["https://example.com/page"], tmp_path) == []
 
     def test_duplicate_url_tracking_params(self, tmp_path):
         """Même URL avec paramètres tracking différents → doublon."""
