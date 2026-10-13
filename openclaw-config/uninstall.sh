@@ -30,6 +30,7 @@ SERVICES=(
   "obfuscator-proxy.service"
   "openclaw-injection-guard.service"
   "openclaw-scout.service"
+  "porte-grok.service"
   "tiron-router.service"
   "tiron-mail-releve.timer"
   "tiron-mail-releve.service"

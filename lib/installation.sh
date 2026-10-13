@@ -177,3 +177,9 @@ verifier_groupe_docker_systemd() {
     return 1
   fi
 }
+
+# Porte Grok (spec 2026-10-13) : Funnel publie 127.0.0.1:5052 sur le port 8443.
+# TAILSCALE est remplaçable par les tests.
+etat_funnel_porte() {
+  "${TAILSCALE:-tailscale}" funnel status 2>/dev/null | grep -q ':8443'
+}

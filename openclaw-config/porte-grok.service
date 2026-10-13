@@ -1,0 +1,16 @@
+[Unit]
+Description=Porte Grok — MCP public du wiki et du coffre (127.0.0.1:5052, Funnel 8443)
+After=network.target wiki-lm-server.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Secretarius/Wiki_LM
+EnvironmentFile=%h/.config/porte-grok/porte.env
+ExecStart=%h/Secretarius/Wiki_LM/.venv/bin/python3 -m porte.serveur
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

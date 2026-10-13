@@ -15,7 +15,7 @@ def _bash(script, env=None):
 
 def test_profil_leger():
     r = _bash('charger_profil leger && echo "$MODULES|$MAIN_BRAIN|$WIKI_LLM"')
-    assert r.stdout.strip() == "wiki scout obfuscateur|modal|obfusque"
+    assert r.stdout.strip() == "wiki scout obfuscateur porte|modal|obfusque"
 
 
 def test_profil_inconnu():
@@ -241,3 +241,30 @@ def test_gestionnaire_systemd_avec_groupe_docker(tmp_path):
     sr = _faux_systemd_run(tmp_path, "mauceric sudo users docker")
     r = _bash(f"SYSTEMD_RUN={sr}; verifier_groupe_docker_systemd")
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_profil_lourd_sans_porte():
+    r = _bash('charger_profil lourd && echo "$MODULES"')
+    assert "porte" not in r.stdout.split()
+
+
+def _faux_tailscale(tmp_path, sortie):
+    t = tmp_path / "tailscale"
+    t.write_text(f'#!/bin/sh\necho "{sortie}"\n')
+    t.chmod(0o755)
+    return t
+
+
+def test_funnel_porte_actif(tmp_path):
+    t = _faux_tailscale(tmp_path, "https://santiago.x.ts.net:8443 (Funnel on)\\n|-- / proxy http://127.0.0.1:5052")
+    assert _bash(f"TAILSCALE={t}; etat_funnel_porte").returncode == 0
+
+
+def test_funnel_porte_absent(tmp_path):
+    t = _faux_tailscale(tmp_path, "No serve config")
+    assert _bash(f"TAILSCALE={t}; etat_funnel_porte").returncode == 1
+
+
+def test_comptes_a_lier_initialise_avant_les_modules():
+    texte = (RACINE / "install.sh").read_text()
+    assert texte.index("COMPTES_A_LIER=()") < texte.index("for _m in $MODULES")

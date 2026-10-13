@@ -5,7 +5,7 @@ selon un **profil** (spec `docs/superpowers/specs/2026-10-12-installateur-profil
 
 | Profil | Machine type | Modules | Modèles |
 |---|---|---|---|
-| `leger` | petit VPS (santiago : 4 cœurs, 7,6 Go) | `wiki scout obfuscateur` | agent `main` et notes du wiki : Qwen3-14B obfusqué (Modal) ; pages web et Scout : DeepSeek. Ni Laya, ni modèle local |
+| `leger` | petit VPS (santiago : 4 cœurs, 7,6 Go) | `wiki scout obfuscateur porte` | agent `main` et notes du wiki : Qwen3-14B obfusqué (Modal) ; pages web et Scout : DeepSeek. Ni Laya, ni modèle local |
 | `lourd` | machine type sanroque (≥ 16 Go) | `wiki scout obfuscateur laya courrier cron gog` | agent `main` et wiki : Qwen3-8B local (Ollama) ; routeur Laya |
 
 Un module absent du profil ne laisse aucune trace : ni agent, ni outil autorisé, ni service.

@@ -216,6 +216,7 @@ _construire_image "${OPENCLAW_CONFIG_PATH}/Dockerfile.tiron" secretarius-tiron:l
 
 # Étape 6 — Modules du profil
 SERVICES_A_VERIFIER=("openclaw-gateway|http://127.0.0.1:18789/health")
+COMPTES_A_LIER=()
 for _m in $MODULES; do
   declare -F "module_${_m}" >/dev/null || { error "Module inconnu : ${_m}"; exit 1; }
   info "--- module ${_m} ---"
@@ -226,7 +227,6 @@ unset _m
 # Étape 6b — Synchronisation du coffre (obsidian-sync@<coffre>). L'enveloppe
 # ~/.local/bin/ob met le Node de NVM en tête du PATH, comme celle d'openclaw,
 # pour que le service systemd (PATH minimal) trouve le bon Node.
-COMPTES_A_LIER=()
 _ob_bin="$(command -v ob || true)"
 if [[ -z "$_ob_bin" || "$_ob_bin" == "${HOME}/.local/bin/ob" ]]; then
   for _cand in "$HOME"/.nvm/versions/node/*/bin/ob; do [[ -x "$_cand" ]] && _ob_bin="$_cand"; done

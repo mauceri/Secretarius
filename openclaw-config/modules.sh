@@ -215,3 +215,46 @@ module_gog() {
   info "Répertoire .gog-config créé"
   _construire_image "${OPENCLAW_CONFIG_PATH}/Dockerfile.gog" secretarius-gog:latest
 }
+
+# Porte Grok (spec 2026-10-13) : MCP public du wiki et du coffre, pour les
+# agents Grok Bot. Funnel n'est pas activé ici (réglages de compte Tailscale) :
+# son absence devient une étape de compte, pas un échec.
+module_porte() {
+  local conf="${HOME}/.config/porte-grok"
+  mkdir -p "$conf" && chmod 700 "$conf"
+  [[ -f "${conf}/agents" ]] || { : > "${conf}/agents"; chmod 600 "${conf}/agents"; }
+  printf 'PORTE_COFFRE=%s\nPORTE_AGENTS=%s\nPORTE_WIKI_URL=http://127.0.0.1:5051\n' \
+    "$OBSIDIAN_PATH" "${conf}/agents" > "${conf}/porte.env"
+  chmod 600 "${conf}/porte.env"
+
+  cat > "${HOME}/.local/bin/porte-jeton" <<EOF
+#!/usr/bin/env bash
+# Généré par Secretarius install.sh — jetons des agents de la porte Grok.
+cd "${SECRETARIUS_ROOT}/Wiki_LM" && exec .venv/bin/python3 -m porte.jetons "\$@"
+EOF
+  chmod +x "${HOME}/.local/bin/porte-jeton"
+  info "porte-jeton installé dans ${HOME}/.local/bin"
+
+  local dst="${SYSTEMD_USER_DIR}/porte-grok.service"
+  if [[ -f "$dst" && "$FORCE" != "true" ]]; then
+    info "porte-grok.service existe déjà — ignoré"
+  else
+    cp "${SCRIPT_DIR}/porte-grok.service" "$dst"
+    info "porte-grok.service installé dans ${SYSTEMD_USER_DIR}"
+  fi
+  systemctl --user daemon-reload 2>/dev/null || true
+  systemctl --user enable porte-grok.service 2>/dev/null || true
+  systemctl --user restart porte-grok.service 2>/dev/null \
+    && info "porte-grok.service démarré" || warn "Démarrage de porte-grok.service échoué"
+  SERVICES_A_VERIFIER+=("porte-grok|http://127.0.0.1:5052/health")
+
+  if etat_funnel_porte; then
+    info "Funnel publie la porte sur 8443 ✓"
+  else
+    COMPTES_A_LIER+=("Publier la porte Grok (une fois) : autoriser Funnel pour cette machine dans la
+       console Tailscale, puis
+       sudo tailscale set --operator=\$USER
+       tailscale funnel --bg --https=8443 http://127.0.0.1:5052
+     Jeton d'un agent : porte-jeton ajouter <préfixe>")
+  fi
+}
