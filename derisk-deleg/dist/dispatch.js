@@ -23,6 +23,7 @@ const TABLE = {
     "/verifie": { kind: "wiki", op: "verify" },
     "/cron": { kind: "cron" },
 };
+export const COMMANDES_TAPEES = Object.keys(TABLE);
 export function commandToAction(command) {
     return TABLE[command] ?? null;
 }

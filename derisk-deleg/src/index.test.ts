@@ -275,6 +275,20 @@ describe("before_agent_reply — /confirm et /annuler", () => {
 
 });
 
+describe("before_agent_reply — /aide", () => {
+  it("renvoie l'aide Telegram, sans sous-agent", async () => {
+    const { AIDE } = await import("./aide.js");
+    const plugin = await freshPlugin();
+    const { api, hooks, run } = makeApi();
+    plugin.register(api);
+
+    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/aide" });
+
+    expect(res).toEqual({ handled: true, reply: { text: AIDE } });
+    expect(run).not.toHaveBeenCalled();
+  });
+});
+
 describe("before_agent_reply — /jeton", () => {
   it("traitée directement, sans sous-agent ; porte absente sur cette machine", async () => {
     vi.stubEnv("HOME", "/home/test");

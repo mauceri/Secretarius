@@ -39,6 +39,8 @@ const TABLE: Record<RouterCommand, ActionKind> = {
   "/cron": { kind: "cron" },
 };
 
+export const COMMANDES_TAPEES = Object.keys(TABLE);
+
 export function commandToAction(command: string): ActionKind | null {
   return (TABLE as Record<string, ActionKind>)[command] ?? null;
 }
