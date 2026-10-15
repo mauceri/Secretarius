@@ -275,6 +275,22 @@ describe("before_agent_reply — /confirm et /annuler", () => {
 
 });
 
+describe("before_agent_reply — /jeton", () => {
+  it("traitée directement, sans sous-agent ; porte absente sur cette machine", async () => {
+    vi.stubEnv("HOME", "/home/test");
+    vi.mocked(existsSync).mockReturnValue(false);
+    const plugin = await freshPlugin();
+    const { api, hooks, run } = makeApi();
+    plugin.register(api);
+
+    const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/jeton lister" });
+
+    expect(res).toEqual({ handled: true, reply: { text: "Porte absente sur cette machine." } });
+    expect(existsSync).toHaveBeenCalledWith("/home/test/.local/bin/porte-jeton");
+    expect(run).not.toHaveBeenCalled();
+  });
+});
+
 describe("before_agent_reply — /maj", () => {
   function setupFiles(files: Record<string, string>) {
     vi.mocked(existsSync).mockImplementation((p: any) => String(p) in files);

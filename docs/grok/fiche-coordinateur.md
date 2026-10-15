@@ -11,6 +11,8 @@ fichiers, l'utilisateur coche ce qu'il retient.
 - Adresse : `https://santiago.<tailnet>.ts.net:8443/mcp` (l'utilisateur vous donne l'adresse exacte).
 - Authentification : en-tête `Authorization: Bearer <jeton>`. **Un jeton par agent**, fourni
   par l'utilisateur ; chaque jeton porte un **préfixe** (ex. `veille`, `redaction`).
+  Pour un nouvel agent, demandez à l'utilisateur un jeton : il le crée avec `/jeton ajouter
+  <préfixe>` sur Telegram.
 - Ne jamais mettre un jeton dans une URL, un fichier du coffre ou un message.
 
 ## Outils

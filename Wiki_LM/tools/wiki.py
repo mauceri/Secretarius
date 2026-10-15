@@ -265,6 +265,10 @@ _HELP_TEXT = """\
 - **/cron `list|rm|pause|reprendre [id]`** — gère les tâches planifiées.
 - **/mail?** — aperçu d'un courriel : lignes `à :` et `objet :`, puis le corps (rien n'est envoyé).
 - **/mail!** — envoie réellement le courriel, depuis tiron@secretarius.co.
+
+## Porte Grok (Telegram seulement)
+
+- **/jeton `ajouter|retirer <préfixe>` ou `lister`** — jetons des agents Grok (santiago). Le jeton s'affiche une seule fois : effacez le message après l'avoir collé dans Grok.
 """
 
 

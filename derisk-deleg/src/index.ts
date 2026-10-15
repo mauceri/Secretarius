@@ -6,6 +6,7 @@ import { runTironMail } from "./mail-ops.js";
 import { gogAgenda, gogAuthStart, gogDriveSearch } from "./gog-ops.js";
 import { CRON_COMMANDS, sansAvisSysteme, unwrapCronEnvelope } from "./cron-envelope.js";
 import { fetchWikiOpJson, runWikiOp } from "./wiki-ops.js";
+import { commandeJeton } from "./jeton-ops.js";
 import { readFileSync, writeFileSync, existsSync, rmSync, readdirSync, statSync, copyFileSync, mkdirSync, renameSync } from "node:fs";
 import { homedir, hostname } from "node:os";
 import { join, basename } from "node:path";
@@ -473,8 +474,15 @@ export default definePluginEntry({
 
       // En tête de message seulement : un « /confirm » cité dans le texte d'un
       // /ecrire ne doit pas envoyer le brouillon précédent.
-      const m = text.match(/^\s*\/(confirm|annuler|maj)\b/i);
+      const m = text.match(/^\s*\/(confirm|annuler|maj|jeton)\b/i);
       const cmd = m ? "/" + m[1].toLowerCase() : "";
+
+      // /jeton : jetons de la porte Grok, commande directe comme /maj
+      // (fichier hôte, hors du périmètre des outils wiki_*).
+      if (cmd === "/jeton") {
+        const bin = join(process.env.HOME || homedir(), ".local", "bin", "porte-jeton");
+        return { handled: true, reply: { text: commandeJeton(text.replace(/^\s*\/jeton\b/i, ""), bin) } };
+      }
 
       // /maj : resynchronise les clés d'API changées dans secrets.env vers
       // gateway.systemd.env et Wiki_LM/.env, puis relance les services
