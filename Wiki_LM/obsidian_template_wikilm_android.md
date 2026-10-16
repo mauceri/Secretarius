@@ -30,6 +30,10 @@ const { requestUrl } = tp.obsidian ?? require("obsidian");
 // coffre Secretarius.
 const vaultName = app.vault.getName();
 
+// Avis permanent (durée 0) jusqu'à la réponse : au réveil du modèle, une
+// question peut prendre une à deux minutes.
+const attente = new Notice("Wiki_LM : recherche en cours… Jusqu'à 2 min si le modèle se réveille, patientez.", 0);
+
 let data;
 try {
     const resp = await requestUrl({
@@ -44,6 +48,8 @@ try {
 } catch (e) {
     new Notice(`Wiki_LM : erreur — ${e.message}`, 8000);
     return;
+} finally {
+    attente.hide();
 }
 
 const historyPath = `Wiki_LM/historique/${data.history_slug}.md`;
