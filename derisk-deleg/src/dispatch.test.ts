@@ -64,8 +64,19 @@ describe("commandeTapee", () => {
     expect(commandeTapee("/q x")).toEqual({ status: "ok", command: "/q", args: "x" });
     expect(commandeTapee("/r\tchiens")).toEqual({ status: "ok", command: "/r", args: "chiens" });
   });
-  it("argument requis manquant", () => {
-    expect(commandeTapee("/q   ")).toEqual({ status: "usage", reply: "Usage : /q <argument>" });
+  it("argument requis manquant : description de chaque argument", () => {
+    const r = commandeTapee("/q   ");
+    expect(r?.status).toBe("usage");
+    expect(r && r.status === "usage" && r.reply).toMatch(/^\/q <question>\n  question : /);
+    const lire = commandeTapee("/lire");
+    expect(lire && lire.status === "usage" && lire.reply).toContain("g gmail, p proton");
+  });
+  it("chaque commande à argument requis a son texte d'usage", () => {
+    for (const c of ["/c", "/q", "/source", "/chercher", "/repondre", "/r", "/lire", "/supprimer", "/verifie", "/cron", "/ecrire"]) {
+      const r = commandeTapee(c);
+      expect(r?.status, c).toBe("usage");
+      expect(r && r.status === "usage" && r.reply.startsWith(c + " "), c).toBe(true);
+    }
   });
   it("commande sans argument requis", () => {
     expect(commandeTapee("/wikistatus")).toEqual({ status: "ok", command: "/wikistatus", args: "" });

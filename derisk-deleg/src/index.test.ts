@@ -509,7 +509,7 @@ describe("before_agent_reply — routage via tiron-router", () => {
 
     const res = await hooks["before_agent_reply"].handler({ cleanedBody: "/q" });
 
-    expect(res).toEqual({ handled: true, reply: { text: "Usage : /q <argument>" } });
+    expect(res).toEqual({ handled: true, reply: { text: expect.stringMatching(/^\/q <question>\n  question : /) } });
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(run).not.toHaveBeenCalled();
   });
