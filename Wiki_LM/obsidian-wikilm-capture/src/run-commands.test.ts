@@ -3,9 +3,13 @@ import {
   applyWikiResults,
   blocArgMail,
   dejaEnvoye,
+  ATTENTE,
+  BLOC_MODIFIE,
   extractWikiBlocks,
+  finaliserLot,
   formatWikiResult,
   SUPPORTED_COMMANDS,
+  usageBloc,
 } from "./run-commands";
 
 describe("extractWikiBlocks", () => {
@@ -427,5 +431,59 @@ describe("pas de double envoi ni de métadonnées (revue du 2026-10-09)", () => 
   it("les propriétés de la note ne partent pas dans le corps", () => {
     const note = "---\ntags: [x]\nwiki_capture: 2026-10-09\n---\nBonjour.\n\n```wiki\n/mail?\nà : m@ex.fr\n```";
     expect(blocArgMail("à : m@ex.fr", note)).toBe("à : m@ex.fr\nBonjour.");
+  });
+});
+
+describe("usageBloc — argument manquant", () => {
+  const bloc = (contenu: string) => extractWikiBlocks("```wiki\n" + contenu + "\n```\n")[0];
+
+  it("décrit chaque argument d'une commande qui en exige un", () => {
+    expect(usageBloc(bloc("/q"))).toMatch(/^Argument manquant[\s\S]*\/q <question>\n  question : /);
+    expect(usageBloc(bloc("/c"))).toContain("@simple");
+    for (const c of ["/c", "/q", "/r", "/verifie", "/supprimer?", "/supprimer!", "/cron?", "/cron!", "/cron"]) {
+      expect(usageBloc(bloc(c)), c).not.toBeNull();
+    }
+  });
+
+  it("rien quand l'argument est là, ou quand la commande n'en exige pas", () => {
+    expect(usageBloc(bloc("/q\nquelle heure ?"))).toBeNull();
+    for (const c of ["/help", "/tags", "/wikistatus", "/repair?", "/switch-wiki-model", "/lint"]) {
+      expect(usageBloc(bloc(c)), c).toBeNull();
+    }
+  });
+
+  it("/mail? et /mail! : usage seulement sans ligne « à : »", () => {
+    expect(usageBloc(bloc("/mail?\nobjet : test"))).toContain("à :");
+    expect(usageBloc(bloc("/mail!"))).toContain("à :");
+    expect(usageBloc(bloc("/mail?\nà : paul@exemple.fr"))).toBeNull();
+  });
+});
+
+describe("finaliserLot — message d'attente", () => {
+  it("remplace les seuls messages d'attente et garde ce qui a été tapé entre-temps", () => {
+    const pendant =
+      "Intro\n```wiki\n/q\nA ?\n```\n\n<!-- wikilm-run:start -->\n" + ATTENTE + "\n<!-- wikilm-run:end -->\n" +
+      "Tapé pendant l'attente\n```wiki\n/r\nchiens\n```\n\n<!-- wikilm-run:start -->\n" + ATTENTE + "\n<!-- wikilm-run:end -->\n";
+    const fin = finaliserLot(pendant, [
+      { content: "/q\nA ?", result: "Réponse A" },
+      { content: "/r\nchiens", result: "1. Chien" },
+    ]);
+    expect(fin).toContain("Tapé pendant l'attente");
+    expect(fin).toContain("<!-- wikilm-run:start -->\nRéponse A\n<!-- wikilm-run:end -->");
+    expect(fin).toContain("<!-- wikilm-run:start -->\n1. Chien\n<!-- wikilm-run:end -->");
+    expect(fin).not.toContain(ATTENTE);
+  });
+
+  it("ne touche pas un bloc au résultat déjà écrit, ni un bloc modifié pendant l'attente", () => {
+    const pendant =
+      "```wiki\n/tags\n```\n\n<!-- wikilm-run:start -->\nancien\n<!-- wikilm-run:end -->\n" +
+      "```wiki\n/q\nB modifiée ?\n```\n\n<!-- wikilm-run:start -->\n" + ATTENTE + "\n<!-- wikilm-run:end -->\n";
+    const fin = finaliserLot(pendant, [
+      { content: "/tags", result: "nouveau" },
+      { content: "/q\nB ?", result: "Réponse B" },
+    ]);
+    expect(fin).toContain("<!-- wikilm-run:start -->\nancien\n<!-- wikilm-run:end -->");
+    expect(fin).toContain("<!-- wikilm-run:start -->\n" + BLOC_MODIFIE + "\n<!-- wikilm-run:end -->");
+    expect(fin).not.toContain("Réponse B");
   });
 });

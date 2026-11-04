@@ -10,11 +10,14 @@ import {
 import { buildCaptureText } from "./capture-text";
 import {
   applyWikiResults,
+  ATTENTE,
   blocArgMail,
   dejaEnvoye,
   extractWikiBlocks,
+  finaliserLot,
   formatWikiResult,
   SUPPORTED_COMMANDS,
+  usageBloc,
   WikiBlockMatch,
 } from "./run-commands";
 
@@ -116,13 +119,26 @@ export default class WikilmCapturePlugin extends Plugin {
       return;
     }
 
-    const resultTexts: string[] = [];
-    for (const block of blocks) {
-      resultTexts.push(dejaEnvoye(block) ? block.previousResult ?? "" : await this.runOneCommand(block, raw));
+    // Message d'attente écrit tout de suite dans chaque zone de résultat ;
+    // un /mail! déjà envoyé garde le sien.
+    await this.app.vault.modify(
+      file,
+      applyWikiResults(raw, blocks, blocks.map((b) => (dejaEnvoye(b) ? b.previousResult ?? "" : ATTENTE)))
+    );
+    const attente = new Notice(`Wiki_LM : ${blocks.length} commande(s) en cours…`, 0);
+
+    const resultats: { content: string; result: string }[] = [];
+    try {
+      for (const block of blocks) {
+        if (dejaEnvoye(block)) continue;
+        resultats.push({ content: block.content, result: await this.runOneCommand(block, raw) });
+      }
+    } finally {
+      attente.hide();
     }
 
-    const newContent = applyWikiResults(raw, blocks, resultTexts);
-    await this.app.vault.modify(file, newContent);
+    // Relecture : ce qui a été tapé pendant l'attente est conservé.
+    await this.app.vault.process(file, (actuel) => finaliserLot(actuel, resultats));
     new Notice(`Lot exécuté : ${blocks.length} commande(s)`);
   }
 
@@ -130,6 +146,8 @@ export default class WikilmCapturePlugin extends Plugin {
     if (!(SUPPORTED_COMMANDS as readonly string[]).includes(block.command)) {
       return formatWikiResult(block.command, {}, true);
     }
+    const usage = usageBloc(block);
+    if (usage) return usage;
     try {
       const response = await requestUrl({
         url: `${this.settings.serverUrl}/run`,

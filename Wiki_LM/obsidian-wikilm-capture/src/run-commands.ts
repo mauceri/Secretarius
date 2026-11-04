@@ -68,6 +68,60 @@ export function extractWikiBlocks(noteText: string): WikiBlockMatch[] {
 
 const ENTETE_MAIL = /^\s*(à|a|objet)\s*:/i;
 
+const ENTETE_A = /^\s*(à|a)\s*:/im;
+
+const PREFIXE_USAGE = "Argument manquant. Écrivez-le sur la ligne qui suit la commande, dans le bloc :\n\n";
+
+const CRON_ADD = `<quand> [<canal>] <type> <contenu>   (sur la ligne suivante, précédé de « add »)
+  quand   : "0 8 * * 1" (format cron, entre guillemets), 2026-11-05T09:00, ou 20m / 2h / 1d.
+  canal   : facultatif — telegram, whatsapp, sms, obsidian (par défaut : obsidian).
+  type    : rappel (texte envoyé), commande (/q, /r, /tags…), consigne (tâche pour l'agent).
+  contenu : le texte, la commande ou la consigne.`;
+
+// Blocs dont l'argument est obligatoire, avec le texte écrit dans la zone de
+// résultat quand il manque. /repair et /switch-wiki-model ont déjà une
+// réponse utile sans argument ; /mail est traité à part (ligne « à : »).
+const USAGES_BLOC: Record<string, string> = {
+  "/c": `/c <texte ou URL>
+  texte ou URL : la note à capturer, ou l'adresse d'une page web.
+  Options dans le texte :
+    #tag      étiquette la capture
+    ref:<url> cite une source
+    @simple   écrit la note telle quelle comme page source du wiki, sans ingestion
+    file:<chemin> ajoute le contenu d'un fichier déjà déposé dans le wiki (pièce jointe)`,
+  "/q": `/q <question>
+  question : en langage courant. Réponse rédigée à partir du wiki (environ 1 min).`,
+  "/r": `/r <mots-clés>
+  mots-clés : recherche rapide sans synthèse, 5 résultats.`,
+  "/verifie": `/verifie <page>
+  page : nom de fichier de la page sans .md (ex. c-domestication-des-chiens).`,
+  "/supprimer?": `/supprimer? <page>
+  page : nom de fichier de la page sans .md. Essai à blanc : rien n'est supprimé.`,
+  "/supprimer!": `/supprimer! <page>
+  page : nom de fichier de la page sans .md. Suppression réelle, en cascade (vers la poubelle).`,
+  "/cron?": `/cron? ${CRON_ADD}
+  /cron? montre l'aperçu, rien n'est créé.`,
+  "/cron!": `/cron! ${CRON_ADD}
+  /cron! crée la tâche.`,
+  "/cron": `/cron list | rm <id> | pause <id> | reprendre <id>
+  Pour créer une tâche : /cron? (aperçu) ou /cron! (création).`,
+};
+
+const USAGE_MAIL = `/mail? ou /mail!
+  à :     adresse du destinataire (ligne « à : … »).
+  objet : facultatif (ligne « objet : … ») ; sinon la première ligne du corps.
+  corps : les lignes suivantes ; si le bloc n'en a pas, la note elle-même.
+  /mail? montre l'aperçu, /mail! envoie depuis tiron@secretarius.co.`;
+
+// Texte d'usage si le bloc n'a pas l'argument qu'exige sa commande, sinon null.
+export function usageBloc(block: WikiBlockMatch): string | null {
+  if (block.command === "/mail?" || block.command === "/mail!") {
+    return ENTETE_A.test(block.arg) ? null : PREFIXE_USAGE + USAGE_MAIL;
+  }
+  const usage = USAGES_BLOC[block.command];
+  return usage && !block.arg ? PREFIXE_USAGE + usage : null;
+}
+
 // Bloc /mail? ou /mail! sans corps (seulement « à : » et « objet : ») : la
 // note, sans ses blocs ```wiki ni leurs résultats, devient le corps (spec courrier).
 export function blocArgMail(arg: string, noteText: string): string {
@@ -102,6 +156,28 @@ export function applyWikiResults(
   });
   output += noteText.slice(cursor);
   return output;
+}
+
+export const ATTENTE = "Évaluation en cours…";
+export const BLOC_MODIFIE = "Bloc modifié pendant l'évaluation : relancez les commandes.";
+
+// Fin de lot : la note a pu changer pendant l'attente. On ne remplace que les
+// messages d'attente, chacun par le résultat du bloc de même contenu ; un bloc
+// modifié entre-temps n'a plus de résultat qui lui corresponde.
+export function finaliserLot(
+  noteText: string,
+  resultats: { content: string; result: string }[]
+): string {
+  const restants = [...resultats];
+  const blocs: WikiBlockMatch[] = [];
+  const textes: string[] = [];
+  for (const block of extractWikiBlocks(noteText)) {
+    if (block.previousResult?.trim() !== ATTENTE) continue;
+    const i = restants.findIndex((r) => r.content === block.content);
+    blocs.push(block);
+    textes.push(i >= 0 ? restants.splice(i, 1)[0].result : BLOC_MODIFIE);
+  }
+  return applyWikiResults(noteText, blocs, textes);
 }
 
 export function formatWikiResult(
