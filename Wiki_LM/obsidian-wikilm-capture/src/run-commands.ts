@@ -72,7 +72,8 @@ const ENTETE_A = /^\s*(à|a)\s*:/im;
 
 const PREFIXE_USAGE = "Argument manquant. Écrivez-le sur la ligne qui suit la commande, dans le bloc :\n";
 
-const CRON_ADD = `<quand> [<canal>] <type> <contenu>   (sur la ligne suivante, précédé de « add »)
+const CRON_ADD = `add <quand> [<canal>] <type> <contenu>
+
   quand   : "0 8 * * 1" (format cron, entre guillemets), 2026-11-05T09:00, ou 20m / 2h / 1d.
   canal   : facultatif — telegram, whatsapp, sms, obsidian (par défaut : obsidian).
   type    : rappel (texte envoyé), commande (/q, /r, /tags…), consigne (tâche pour l'agent).
@@ -82,32 +83,52 @@ const CRON_ADD = `<quand> [<canal>] <type> <contenu>   (sur la ligne suivante, p
 // résultat quand il manque. /repair et /switch-wiki-model ont déjà une
 // réponse utile sans argument ; /mail est traité à part (ligne « à : »).
 const USAGES_BLOC: Record<string, string> = {
-  "/c": `/c <texte ou URL>
+  "/c": `/c
+<texte ou URL>
+
   texte ou URL : la note à capturer, ou l'adresse d'une page web.
   Options dans le texte :
     #tag      étiquette la capture
     ref:<url> cite une source
     @simple   écrit la note telle quelle comme page source du wiki, sans ingestion
     file:<chemin> ajoute le contenu d'un fichier déjà déposé dans le wiki (pièce jointe)`,
-  "/q": `/q <question>
+  "/q": `/q
+<question>
+
   question : en langage courant. Réponse rédigée à partir du wiki (environ 1 min).`,
-  "/r": `/r <mots-clés>
+  "/r": `/r
+<mots-clés>
+
   mots-clés : recherche rapide sans synthèse, 5 résultats.`,
-  "/verifie": `/verifie <page>
+  "/verifie": `/verifie
+<page>
+
   page : nom de fichier de la page sans .md (ex. c-domestication-des-chiens).`,
-  "/supprimer?": `/supprimer? <page>
+  "/supprimer?": `/supprimer?
+<page>
+
   page : nom de fichier de la page sans .md. Essai à blanc : rien n'est supprimé.`,
-  "/supprimer!": `/supprimer! <page>
+  "/supprimer!": `/supprimer!
+<page>
+
   page : nom de fichier de la page sans .md. Suppression réelle, en cascade (vers la poubelle).`,
-  "/cron?": `/cron? ${CRON_ADD}
+  "/cron?": `/cron?
+${CRON_ADD}
   /cron? montre l'aperçu, rien n'est créé.`,
-  "/cron!": `/cron! ${CRON_ADD}
+  "/cron!": `/cron!
+${CRON_ADD}
   /cron! crée la tâche.`,
-  "/cron": `/cron list | rm <id> | pause <id> | reprendre <id>
+  "/cron": `/cron
+list | rm <id> | pause <id> | reprendre <id>
+
   Pour créer une tâche : /cron? (aperçu) ou /cron! (création).`,
 };
 
 const USAGE_MAIL = `/mail? ou /mail!
+à : <adresse>
+objet : <objet>
+<corps>
+
   à :     adresse du destinataire (ligne « à : … »).
   objet : facultatif (ligne « objet : … ») ; sinon la première ligne du corps.
   corps : les lignes suivantes ; si le bloc n'en a pas, la note elle-même.

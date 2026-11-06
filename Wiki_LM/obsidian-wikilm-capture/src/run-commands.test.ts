@@ -438,11 +438,16 @@ describe("usageBloc — argument manquant", () => {
   const bloc = (contenu: string) => extractWikiBlocks("```wiki\n" + contenu + "\n```\n")[0];
 
   it("décrit chaque argument d'une commande qui en exige un", () => {
-    expect(usageBloc(bloc("/q"))).toMatch(/^Argument manquant[\s\S]*\/q <question>\n  question : /);
+    expect(usageBloc(bloc("/q"))).toMatch(/^Argument manquant[\s\S]*\/q\n<question>\n\n  question : /);
     expect(usageBloc(bloc("/c"))).toContain("@simple");
     // Bloc de code : Obsidian masquerait <question> comme une balise HTML.
-    expect(usageBloc(bloc("/q"))).toMatch(/\n```\n\/q <question>\n[\s\S]*\n```$/);
-    expect(usageBloc(bloc("/mail!"))).toMatch(/\n```\n\/mail\? ou \/mail![\s\S]*\n```$/);
+    expect(usageBloc(bloc("/q"))).toMatch(/\n```\n\/q\n<question>\n[\s\S]*\n```$/);
+    expect(usageBloc(bloc("/mail!"))).toMatch(/\n```\n\/mail\? ou \/mail!\nà : <adresse>\n[\s\S]*\n```$/);
+    // L'argument va sur la ligne suivante : aucune première ligne « commande argument ».
+    expect(usageBloc(bloc("/cron?"))).toContain("```\n/cron?\nadd <quand> [<canal>] <type> <contenu>\n");
+    for (const c of ["/c", "/r", "/verifie", "/supprimer?", "/supprimer!", "/cron!", "/cron"]) {
+      expect(usageBloc(bloc(c)), c).toContain("```\n" + c + "\n");
+    }
     for (const c of ["/c", "/q", "/r", "/verifie", "/supprimer?", "/supprimer!", "/cron?", "/cron!", "/cron"]) {
       expect(usageBloc(bloc(c)), c).not.toBeNull();
     }
