@@ -440,9 +440,22 @@ describe("usageBloc — argument manquant", () => {
   it("décrit chaque argument d'une commande qui en exige un", () => {
     expect(usageBloc(bloc("/q"))).toMatch(/^Argument manquant[\s\S]*\/q <question>\n  question : /);
     expect(usageBloc(bloc("/c"))).toContain("@simple");
+    // Bloc de code : Obsidian masquerait <question> comme une balise HTML.
+    expect(usageBloc(bloc("/q"))).toMatch(/\n```\n\/q <question>\n[\s\S]*\n```$/);
+    expect(usageBloc(bloc("/mail!"))).toMatch(/\n```\n\/mail\? ou \/mail![\s\S]*\n```$/);
     for (const c of ["/c", "/q", "/r", "/verifie", "/supprimer?", "/supprimer!", "/cron?", "/cron!", "/cron"]) {
       expect(usageBloc(bloc(c)), c).not.toBeNull();
     }
+  });
+
+  it("une aide écrite dans la note ne gêne pas la relecture des blocs", () => {
+    const note = "```wiki\n/q\n```\n\n```wiki\n/r\nchiens\n```\n";
+    const blocks = extractWikiBlocks(note);
+    const apres = applyWikiResults(note, blocks, [usageBloc(blocks[0]) ?? "", "1. Chien"]);
+    const relus = extractWikiBlocks(apres);
+    expect(relus.map((b) => b.command)).toEqual(["/q", "/r"]);
+    expect(relus[0].previousResult).toBe(usageBloc(blocks[0]));
+    expect(relus[1].previousResult).toBe("1. Chien");
   });
 
   it("rien quand l'argument est là, ou quand la commande n'en exige pas", () => {

@@ -70,7 +70,7 @@ const ENTETE_MAIL = /^\s*(à|a|objet)\s*:/i;
 
 const ENTETE_A = /^\s*(à|a)\s*:/im;
 
-const PREFIXE_USAGE = "Argument manquant. Écrivez-le sur la ligne qui suit la commande, dans le bloc :\n\n";
+const PREFIXE_USAGE = "Argument manquant. Écrivez-le sur la ligne qui suit la commande, dans le bloc :\n";
 
 const CRON_ADD = `<quand> [<canal>] <type> <contenu>   (sur la ligne suivante, précédé de « add »)
   quand   : "0 8 * * 1" (format cron, entre guillemets), 2026-11-05T09:00, ou 20m / 2h / 1d.
@@ -116,10 +116,15 @@ const USAGE_MAIL = `/mail? ou /mail!
 // Texte d'usage si le bloc n'a pas l'argument qu'exige sa commande, sinon null.
 export function usageBloc(block: WikiBlockMatch): string | null {
   if (block.command === "/mail?" || block.command === "/mail!") {
-    return ENTETE_A.test(block.arg) ? null : PREFIXE_USAGE + USAGE_MAIL;
+    return ENTETE_A.test(block.arg) ? null : enUsage(USAGE_MAIL);
   }
   const usage = USAGES_BLOC[block.command];
-  return usage && !block.arg ? PREFIXE_USAGE + usage : null;
+  return usage && !block.arg ? enUsage(usage) : null;
+}
+
+// Bloc de code : Obsidian masquerait <question>, <page>… comme des balises HTML.
+function enUsage(usage: string): string {
+  return PREFIXE_USAGE + "```\n" + usage + "\n```";
 }
 
 // Bloc /mail? ou /mail! sans corps (seulement « à : » et « objet : ») : la
