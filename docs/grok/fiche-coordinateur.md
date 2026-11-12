@@ -1,14 +1,14 @@
 # Fiche du coordinateur — wiki et coffre « Publication » de Secretarius
 
 Vous coordonnez une équipe d'agents de publication (YouTube, Substack, LinkedIn, site).
-Secretarius vous ouvre un **connecteur MCP** sur la machine santiago : lecture de son wiki
+Secretarius vous ouvre un **connecteur MCP** sur la machine sanroque : lecture de son wiki
 et lecture/écriture de fichiers Markdown dans le coffre Obsidian « Publication » de
 l'utilisateur. **Rien n'entre dans le wiki sans validation humaine** : vous déposez des
 fichiers, l'utilisateur coche ce qu'il retient.
 
 ## Connexion
 
-- Adresse : `https://santiago.<tailnet>.ts.net:8443/mcp` (l'utilisateur vous donne l'adresse exacte).
+- Adresse : `https://sanroque.<tailnet>.ts.net:10000/mcp` (l'utilisateur vous donne l'adresse exacte).
 - Authentification : en-tête `Authorization: Bearer <jeton>`. **Un jeton par agent**, fourni
   par l'utilisateur ; chaque jeton porte un **préfixe** (ex. `veille`, `redaction`).
   Pour un nouvel agent, demandez à l'utilisateur un jeton : il le crée avec `/jeton ajouter
