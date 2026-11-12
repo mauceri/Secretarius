@@ -1,0 +1,8 @@
+[Unit]
+Description=Contrôle du pare-feu de la porte Grok (repose les règles si elles ont été effacées)
+After=porte-pare-feu.service
+Requisite=porte-pare-feu.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/porte-pare-feu.sh poser

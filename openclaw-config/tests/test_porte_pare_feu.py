@@ -46,9 +46,13 @@ def faux(tmp_path):
     iptables = tmp_path / "iptables"
     iptables.write_text(f"#!/bin/sh\nexec {sys.executable} {faux_py} \"$@\"\n")
     iptables.chmod(0o755)
+    docker = tmp_path / "docker"
+    docker.write_text(f"#!/bin/sh\necho \"docker $*\" >> {tmp_path / 'journal'}\n"
+                      f"[ -e {tmp_path / 'temoin'} ] && echo temoin-present >> {tmp_path / 'journal'}\nexit 0\n")
+    docker.chmod(0o755)
     etat = tmp_path / "etat.json"
     etat.write_text(json.dumps({"INPUT": [], "DOCKER-USER": []}))
-    env = dict(os.environ, IPTABLES=str(iptables), TEMOIN=str(tmp_path / "temoin"),
+    env = dict(os.environ, IPTABLES=str(iptables), DOCKER=str(docker), TEMOIN=str(tmp_path / "temoin"),
                FAUX_ETAT=str(etat), FAUX_JOURNAL=str(tmp_path / "journal"))
 
     class Faux:
@@ -112,3 +116,14 @@ def test_verifier_reussit_avec_temoin(faux):
 
 def test_action_inconnue(faux):
     assert faux.lancer("ouvrir") == 2
+
+
+def test_retirer_arrete_le_conteneur_avant_d_ouvrir(faux):
+    """Sinon le conteneur déjà lancé tourne sans filtre (revue finale 2026-11-12)."""
+    faux.lancer("poser")
+    faux.journal.write_text("")
+    assert faux.lancer("retirer") == 0
+    lignes = faux.journal.read_text().splitlines()
+    arret = lignes.index("docker stop porte-grok")
+    assert "temoin-present" not in lignes  # témoin effacé avant l'arrêt : pas de relance
+    assert all(not l.startswith("-D") for l in lignes[:arret])

@@ -6,6 +6,7 @@
 set -euo pipefail
 
 IPTABLES="${IPTABLES:-iptables}"
+DOCKER="${DOCKER:-docker}"
 TEMOIN="${TEMOIN:-/run/porte-pare-feu.ok}"
 PONT="${PONT:-br-porte}"
 PORT_OLLAMA="${PORT_OLLAMA:-11434}"
@@ -33,11 +34,14 @@ poser() {
 
 retirer() {
   local chaine regle
+  # Fermer avant d'ouvrir : témoin d'abord (la relance par Restart=always échoue
+  # alors à `verifier`), puis arrêt du conteneur, et seulement ensuite les règles.
+  rm -f "$TEMOIN"
+  "$DOCKER" stop porte-grok >/dev/null 2>&1 || true
   while read -r chaine regle; do
     # shellcheck disable=SC2086
     if "$IPTABLES" -C "$chaine" $regle 2>/dev/null; then "$IPTABLES" -D "$chaine" $regle; fi
   done < <(regles)
-  rm -f "$TEMOIN"
 }
 
 case "${1:-}" in
