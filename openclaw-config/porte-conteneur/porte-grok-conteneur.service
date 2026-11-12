@@ -1,0 +1,47 @@
+# Porte Grok + wiki Publication dans un conteneur isolé (spec 2026-11-12-porte-sanroque).
+# Refuse de démarrer sans le pare-feu (témoin de porte-pare-feu.service).
+#
+# ~/.config/porte-grok/conteneur.env (chmod 600 ; jamais porte.env, que
+# l'installateur réécrit) :
+#   PORTE_HOTE=0.0.0.0
+#   PORTE_COFFRE=/coffre
+#   PORTE_AGENTS=/etc/porte/agents
+#   PORTE_WIKI_URL=http://127.0.0.1:5051
+#   WIKI_PATH=/coffre/Wiki_LM
+#   WIKI_LLM_BACKEND=ollama
+#   OLLAMA_MODEL=qwen3:8b
+#   OLLAMA_BASE_URL=http://host.docker.internal:11434
+#   WIKI_VAULT_MIRRORS=
+#   HF_HUB_OFFLINE=1
+#   PYTHONDONTWRITEBYTECODE=1
+[Unit]
+Description=Porte Grok en conteneur (coffre Publication, 127.0.0.1:5052, Funnel 10000)
+Conflicts=porte-grok.service
+
+[Service]
+Type=simple
+ExecStartPre=/usr/local/sbin/porte-pare-feu.sh verifier
+ExecStartPre=-/usr/bin/docker network create -o com.docker.network.bridge.name=br-porte porte-grok
+ExecStartPre=-/usr/bin/docker rm -f porte-grok
+ExecStart=/usr/bin/docker run --rm --name porte-grok \
+  --network porte-grok -p 127.0.0.1:5052:5052 \
+  --add-host host.docker.internal:host-gateway \
+  --user 1000:1000 --read-only --tmpfs /tmp \
+  --cap-drop ALL --security-opt no-new-privileges \
+  --env-file %h/.config/porte-grok/conteneur.env \
+  -e HOME=/tmp -e HF_HOME=/hf -e NLTK_DATA=/nltk \
+  -e VENV=%h/Secretarius/Wiki_LM/.venv -e TOOLS=%h/Secretarius/Wiki_LM/tools \
+  -v %h/Documents/Publication:/coffre \
+  -v %h/Secretarius/Wiki_LM/tools:%h/Secretarius/Wiki_LM/tools:ro \
+  -v %h/Secretarius/Wiki_LM/porte:%h/Secretarius/Wiki_LM/porte:ro \
+  -v %h/Secretarius/Wiki_LM/.venv:%h/Secretarius/Wiki_LM/.venv:ro \
+  -v %h/.cache/huggingface:/hf:ro \
+  -v %h/nltk_data:/nltk:ro \
+  -v %h/.config/porte-grok/agents:/etc/porte/agents:ro \
+  porte-grok:local
+ExecStop=/usr/bin/docker stop porte-grok
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
