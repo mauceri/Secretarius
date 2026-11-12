@@ -101,13 +101,18 @@ def creer_app(racine: Path, fichier_agents: Path, wiki_url: str):
     return mcp.http_app(path="/mcp", middleware=[Middleware(_Authentification)], stateless_http=True)
 
 
+def hote_ecoute() -> str:
+    """Adresse d'écoute : boucle locale par défaut, 0.0.0.0 dans le conteneur."""
+    return os.environ.get("PORTE_HOTE", "127.0.0.1")
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(name)s %(message)s")
     racine = Path(os.environ["PORTE_COFFRE"])
     agents = Path(os.environ.get("PORTE_AGENTS", str(jetons.FICHIER_DEFAUT)))
     wiki_url = os.environ.get("PORTE_WIKI_URL", "http://127.0.0.1:5051")
     app = creer_app(racine, agents, wiki_url)
-    uvicorn.run(app, host="127.0.0.1", port=5052, log_level="warning")
+    uvicorn.run(app, host=hote_ecoute(), port=5052, log_level="warning")
 
 
 if __name__ == "__main__":

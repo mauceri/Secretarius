@@ -119,3 +119,15 @@ def test_journal_sans_contenu(porte, caplog):
     lignes = [r.getMessage() for r in caplog.records if r.name == "porte-grok"]
     assert any("veille" in l and "coffre_ecrire" in l and "veille-j.md" in l and "ok" in l for l in lignes)
     assert not any("CONTENU-SECRET" in l for l in lignes)
+
+
+def test_hote_ecoute_defaut_boucle_locale(monkeypatch):
+    from porte.serveur import hote_ecoute
+    monkeypatch.delenv("PORTE_HOTE", raising=False)
+    assert hote_ecoute() == "127.0.0.1"
+
+
+def test_hote_ecoute_lit_porte_hote(monkeypatch):
+    from porte.serveur import hote_ecoute
+    monkeypatch.setenv("PORTE_HOTE", "0.0.0.0")
+    assert hote_ecoute() == "0.0.0.0"
