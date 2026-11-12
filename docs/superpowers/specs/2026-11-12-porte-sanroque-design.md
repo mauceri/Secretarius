@@ -81,15 +81,30 @@ n'a pas de souci de droits), `--read-only` hors montages + `--tmpfs /tmp`,
   cloud, la porte n'a besoin d'aucune sortie Internet. Le script doit aussi poser la
   règle `INPUT` correspondante : le trafic d'un conteneur vers une IP de l'hôte passe
   par `INPUT`, pas par `FORWARD`/`DOCKER-USER`.
-- La persistance de la règle après redémarrage (unité système ou
-  `iptables-persistent`) est tranchée dans le plan, avec l'accord de l'utilisateur.
+- Persistance : unité **système** `openclaw-config/porte-pare-feu.service`
+  (oneshot, `RemainAfterExit=yes`), installée et activée une fois par
+  l'utilisateur avec `sudo`, qui lance `porte-pare-feu.sh poser` à chaque démarrage
+  (les règles `iptables` ne survivent pas au redémarrage). Le script crée la chaîne
+  `DOCKER-USER` si Docker ne l'a pas encore créée, et n'ajoute pas une règle déjà
+  présente.
+- **Fermé par défaut** : l'unité du conteneur vérifie la règle (`ExecStartPre`,
+  `porte-pare-feu.sh verifier`, lisible sans `sudo` : `iptables -S` ou équivalent à
+  déterminer dans le plan) et refuse de démarrer si elle est absente. Mieux vaut une
+  porte fermée qu'une porte ouverte sans filtre.
 
 ### Lancement et publication
 
 - Unité systemd utilisateur `openclaw-config/porte-grok-conteneur.service` :
-  `docker run --rm --name porte-grok …`. L'unité `porte-grok.service` actuelle reste
-  celle du profil santiago ; l'installateur n'est pas modifié dans cette étape.
-- Variables dans `~/.config/porte-grok/porte.env` (chmod 600) : `PORTE_COFFRE=/coffre`,
+  `docker run --rm --name porte-grok …`, `Restart=always`. L'unité
+  `porte-grok.service` actuelle reste celle du profil léger ; l'installateur n'est
+  pas modifié dans cette étape.
+- `Conflicts=porte-grok.service` : la porte native (non isolée) et le conteneur ne
+  tournent jamais ensemble sur 5052.
+- Démarrage : une unité utilisateur ne peut pas s'ordonner après `docker.service`
+  (unité système) ; si Docker n'est pas prêt au boot, `Restart=always` relance.
+  `Linger=yes` (déjà actif) la démarre sans session ouverte.
+- Variables dans `~/.config/porte-grok/conteneur.env` (chmod 600), fichier distinct
+  de `porte.env` que `module_porte` réécrit à chaque installation : `PORTE_COFFRE=/coffre`,
   `PORTE_AGENTS=/etc/porte/agents`, `PORTE_WIKI_URL=http://127.0.0.1:5051`,
   `WIKI_PATH=/coffre/Wiki_LM`, `WIKI_LLM_BACKEND=ollama`, adresse d'Ollama par
   `host-gateway`, `WIKI_VAULT_MIRRORS=` vide.
@@ -129,6 +144,23 @@ récent déjà présent.
 
 Confirmation de l'utilisateur avant chaque `systemctl start/stop/enable/restart`,
 `docker run`, commande Funnel et `git push`.
+
+## Démarrage et réinstallation
+
+- Redémarrage de sanroque : unité de pare-feu → règles posées ; conteneur → vérifie
+  la règle puis démarre ; Funnel revient seul (`--bg`, sauf clé Tailscale expirée) ;
+  si Ollama n'est pas prêt, les `/q` échouent proprement, la porte répond.
+- Réinstallation en profil lourd (sanroque) : le module `porte` n'y est pas, rien
+  n'est touché.
+- Réinstallation avec le module `porte` : `porte.env` est réécrit mais n'est pas
+  celui du conteneur ; la porte native démarrée par `module_porte` arrête le
+  conteneur (`Conflicts=`) — à savoir : il faut alors relancer le conteneur et
+  désactiver `porte-grok.service`.
+- `openclaw-config/uninstall.sh` : ajouter `porte-grok-conteneur.service` à la liste
+  `SERVICES`, sinon une désinstallation laisse le conteneur tourner derrière Funnel.
+- Le `.venv` est partagé : une mise à jour des paquets prend effet au redémarrage du
+  conteneur ; un `.venv` reconstruit avec un autre Python que 3.12 exige de changer
+  l'image.
 
 ## Retour arrière
 
