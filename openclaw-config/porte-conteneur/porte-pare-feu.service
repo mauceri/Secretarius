@@ -1,0 +1,13 @@
+[Unit]
+Description=Pare-feu du conteneur de la porte Grok (br-porte : Ollama seulement)
+After=network-pre.target
+Before=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/porte-pare-feu.sh poser
+ExecStop=/usr/local/sbin/porte-pare-feu.sh retirer
+
+[Install]
+WantedBy=multi-user.target
