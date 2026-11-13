@@ -440,6 +440,10 @@ export default definePluginEntry({
     api.on("before_agent_reply", async (event: any, ctx: any) => {
       // L'agent « consignes » traite lui-même ses consignes : ni routeur ni commandes.
       if (ctx?.agentId === "consignes" || String(ctx?.sessionKey ?? "").startsWith("agent:consignes:")) return;
+      // Sous-agents (scout, wiki, gog) : leur message vient du code ou de main,
+      // jamais de l'utilisateur. Le routeur relancerait Scout en boucle sur « url: … ».
+      const agent = ctx?.agentId ?? String(ctx?.sessionKey ?? "").split(":")[1];
+      if (agent && agent !== "main") return;
       let text = sansAvisSysteme(String(event?.cleanedBody ?? ""));
 
       // Tour planifié d'une tâche /cron (nom tiron-…) : OpenClaw l'enveloppe

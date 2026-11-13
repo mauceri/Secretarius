@@ -1366,4 +1366,22 @@ describe("agent consignes : outils mail_* et hook", () => {
     }
     expect(fetchSpy).not.toHaveBeenCalled();
   });
+
+  it("le hook laisse passer les tours des sous-agents (scout, wiki, gog) : pas de boucle /source", async () => {
+    // Régression 2026-11-13 : le message « url: … » reçu par Scout repassait par
+    // le routeur, classé /source, qui relançait Scout en cascade.
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const plugin = await freshPlugin(); const { api, hooks } = makeApi(); plugin.register(api);
+    for (const ctx of [
+      { agentId: "scout" },
+      { sessionKey: "agent:scout:subagent:cmd-source-1-ab" },
+      { agentId: "wiki" },
+      { sessionKey: "agent:gog:subagent:x" },
+    ]) {
+      expect(await hooks["before_agent_reply"].handler({ cleanedBody: "url: https://example.org" }, ctx))
+        .toBeUndefined();
+    }
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });
