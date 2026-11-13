@@ -94,7 +94,9 @@ class TestCheckEndpointConsultationSystematiqueDeberta:
             assert data["blocked"] is False
             assert data["risk"] == "medium"
 
-    def test_deberta_blocked_sur_low_regex_bloque_quand_meme(self):
+    def test_deberta_score_eleve_avertit_sans_bloquer(self):
+        # Mesure du 2026-11-13 : un courriel français ordinaire obtient 1,000,
+        # comme une injection. DeBERTa avertit (medium), seules les regex bloquent.
         client = self._client()
         with patch.object(ig, "_deberta_available", True), \
              patch.object(ig, "_deberta_risk", return_value="blocked"):
@@ -103,7 +105,9 @@ class TestCheckEndpointConsultationSystematiqueDeberta:
                 "content": "Un texte anodin en apparence mais jugé injecté par le classifieur.",
             })
             data = resp.get_json()
-            assert data["blocked"] is True
+            assert data["blocked"] is False
+            assert data["risk"] == "medium"
+            assert data["clean_text"].startswith("Un texte anodin")
 
     def test_regex_blocked_ne_delegue_jamais_a_deberta(self):
         client = self._client()

@@ -182,9 +182,9 @@ def check():
     # coût supplémentaire par appel reste modeste.
     try:
         deberta_risk = _deberta_risk(clean_text)
-        if deberta_risk == "blocked":
-            return jsonify({"blocked": True, "reason": "DeBERTa: score d'injection élevé"})
-        risk = deberta_risk
+        # Avertit sans bloquer (2026-11-13) : ce modèle note 1,000 un courriel
+        # français ordinaire comme une injection ; seules les regex bloquent.
+        risk = "medium" if deberta_risk == "blocked" else deberta_risk
     except Exception as exc:
         logging.error("DeBERTa inference error: %s", exc)
 
