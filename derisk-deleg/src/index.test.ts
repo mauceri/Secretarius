@@ -104,17 +104,18 @@ describe("outils gog_drive_search et source_read", () => {
     expect(run).not.toHaveBeenCalled();
   });
 
-  it("un run non 'ok' préfixe la réponse par (run <status>)", async () => {
+  it("email_check passe le corps à verifierCourriel, sans sous-agent", async () => {
+    const verifierCourriel = vi.fn(async () => '{"blocked":false}');
+    vi.doMock("./scout-ops.js", () => ({ lireSource: vi.fn(), verifierCourriel }));
     const plugin = await freshPlugin();
-    const { api, tools, run } = makeApi({
-      waitForRun: vi.fn(async () => ({ status: "timeout" })),
-    });
+    const { api, tools, run } = makeApi();
     plugin.register(api);
 
-    const res = await tools["source_read"].execute("id", { command: "https://ex.fr" });
+    const res = await tools["email_check"].execute("id", { command: "Bonjour Marie" });
 
-    expect(res.content[0].text).toBe("(run timeout) réponse simulée");
-    expect(run).toHaveBeenCalledTimes(1);
+    expect(verifierCourriel).toHaveBeenCalledWith("Bonjour Marie");
+    expect(res.content[0].text).toBe('{"blocked":false}');
+    expect(run).not.toHaveBeenCalled();
   });
 
 });
@@ -218,8 +219,10 @@ describe("outils wiki_review / wiki_verify / wiki_delete", () => {
   });
 });
 
-describe("source_read — délégation à scout", () => {
-  it("délègue url:<url> à l'agent scout", async () => {
+describe("source_read — lecture par scout-watcher, sans agent", () => {
+  it("passe l'url à lireSource, sans sous-agent", async () => {
+    const lireSource = vi.fn(async () => "Résumé simulé");
+    vi.doMock("./scout-ops.js", () => ({ lireSource, verifierCourriel: vi.fn() }));
     const plugin = await freshPlugin();
     const { api, tools, run } = makeApi();
     plugin.register(api);
@@ -228,10 +231,9 @@ describe("source_read — délégation à scout", () => {
       command: "https://example.com/a",
     });
 
-    expect(res.content[0].text).toBe("réponse simulée");
-    const [{ sessionKey, message }] = run.mock.calls[0];
-    expect(sessionKey).toMatch(/^agent:scout:subagent:cmd-source-/);
-    expect(message).toBe("url: https://example.com/a");
+    expect(res.content[0].text).toBe("Résumé simulé");
+    expect(lireSource).toHaveBeenCalledWith("https://example.com/a");
+    expect(run).not.toHaveBeenCalled();
   });
 
   it("sans url renvoie l'usage sans déléguer", async () => {
@@ -593,7 +595,9 @@ describe("before_agent_reply — routage via tiron-router", () => {
     });
   });
 
-  it("commande routée vers scout (/source) délègue url:<args>", async () => {
+  it("commande routée vers scout (/source) passe l'url à lireSource", async () => {
+    const lireSource = vi.fn(async () => "Résumé simulé");
+    vi.doMock("./scout-ops.js", () => ({ lireSource, verifierCourriel: vi.fn() }));
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
@@ -607,10 +611,9 @@ describe("before_agent_reply — routage via tiron-router", () => {
 
     const res = await hooks["before_agent_reply"].handler({ cleanedBody: "regarde cette page https://exemple.com" });
 
-    expect(res).toEqual({ handled: true, reply: { text: "réponse simulée" } });
-    const [{ sessionKey, message }] = run.mock.calls[0];
-    expect(sessionKey).toMatch(/^agent:scout:subagent:cmd-source-/);
-    expect(message).toBe("url: https://exemple.com"); // args.trim()
+    expect(res).toEqual({ handled: true, reply: { text: "Résumé simulé" } });
+    expect(lireSource).toHaveBeenCalledWith("https://exemple.com"); // args.trim()
+    expect(run).not.toHaveBeenCalled();
   });
 
 

@@ -92,3 +92,15 @@ def test_scout_sur_obfusque_dans_les_deux_profils():
     for modules, cerveau in ((LEGER, "modal"), (tous, "ollama")):
         c = appliquer_profil(_config(), modules, cerveau)
         assert c["agents"]["entries"]["scout"]["model"]["primary"] == "obfusque/qwen3-14b-h128-a1-h02"
+
+
+def test_email_check_suit_source_read_partout():
+    # Outil email_check (derisk-deleg, 2026-11-13) : même périmètre que source_read.
+    c = _config()
+    listes = [c["tools"]["sandbox"]["tools"].get(k, []) for k in ("allow", "deny")]
+    for a in c["agents"]["entries"].values():
+        st = a.get("tools", {}).get("sandbox", {}).get("tools", {})
+        listes += [st.get("allow", []), st.get("deny", [])]
+    for liste in listes:
+        assert ("source_read" in liste) == ("email_check" in liste)
+    assert "email_check" in OUTILS_DE["scout"]

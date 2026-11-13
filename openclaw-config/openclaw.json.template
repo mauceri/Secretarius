@@ -198,7 +198,7 @@
         "gog", "read", "sessions_list", "sessions_spawn", "sessions_yield", "group:runtime"
        ],
        "deny": [
-        "wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read",
+        "wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read", "email_check",
         "gog_connect_start", "gog_drive_search", "wiki_tags", "wiki_kb_update", "wiki_search", "wiki_review", "wiki_verify", "wiki_delete",
         "mail_inbox", "mail_chercher", "mail_lire", "mail_envoyer"
        ]
@@ -217,7 +217,7 @@
       "tools": {
        "allow": ["read", "write", "process", "sessions_yield", "view_image"],
        "deny": [
-        "wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read",
+        "wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read", "email_check",
         "gog_connect_start", "gog_drive_search", "wiki_tags", "wiki_kb_update", "wiki_search", "wiki_review", "wiki_verify", "wiki_delete",
         "mail_inbox", "mail_chercher", "mail_lire", "mail_envoyer"
        ]
@@ -235,7 +235,7 @@
        "allow": ["wiki_query", "wiki_search", "wiki_status", "wiki_review", "wiki_tags",
                  "mail_inbox", "mail_chercher", "mail_lire", "mail_envoyer", "sessions_yield"],
        "deny": ["wiki_capture", "wiki_ingest", "wiki_kb_update", "wiki_verify", "wiki_delete",
-                "source_read", "gog_connect_start", "gog_drive_search", "read", "write", "group:fs"]
+                "source_read", "email_check", "gog_connect_start", "gog_drive_search", "read", "write", "group:fs"]
       }
      }
     }
@@ -268,7 +268,7 @@
         "gog", "read", "sessions_list", "sessions_spawn", "sessions_yield", "group:runtime"
        ],
        "deny": [
-        "wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read",
+        "wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read", "email_check",
         "gog_connect_start", "gog_drive_search", "wiki_tags", "wiki_kb_update", "wiki_search", "wiki_review", "wiki_verify", "wiki_delete",
         "mail_inbox", "mail_chercher", "mail_lire", "mail_envoyer"
        ]
@@ -293,7 +293,7 @@
    "tools": {
     "allow": [
      "gog", "read", "sessions_list", "sessions_spawn", "sessions_yield", "group:runtime",
-     "wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read",
+     "wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "source_read", "email_check",
      "gog_connect_start", "gog_drive_search", "wiki_tags", "wiki_kb_update", "wiki_search", "wiki_review", "wiki_verify", "wiki_delete"
     ],
     "deny": [

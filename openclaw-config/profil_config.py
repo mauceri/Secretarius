@@ -17,7 +17,7 @@ AGENTS_DE = {"wiki": ["wiki"], "scout": ["scout"], "courrier": ["consignes"], "g
 OUTILS_DE = {
     "wiki": ["wiki_capture", "wiki_status", "wiki_ingest", "wiki_query", "wiki_tags",
              "wiki_kb_update", "wiki_search", "wiki_review", "wiki_verify", "wiki_delete"],
-    "scout": ["source_read"],
+    "scout": ["source_read", "email_check"],
     "gog": ["gog", "gog_connect_start", "gog_drive_search"],
     "courrier": ["mail_inbox", "mail_chercher", "mail_lire", "mail_envoyer"],
 }
