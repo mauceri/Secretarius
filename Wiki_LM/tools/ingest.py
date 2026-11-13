@@ -40,8 +40,6 @@ from kb_query import kb_query
 from wiki_lookup import WikiLookup
 from wiki_paths import CONTENT_SUBDIRS, CLUSTERING_SUBDIR, iter_pages, mirror_page, slug_to_path
 
-_DEFAULT_KB_DIR = Path.home() / "Documents" / "Secretarius" / "Wiki_LM" / "knowledge_base"
-
 
 # ---------------------------------------------------------------------------
 # Utilitaires
@@ -916,7 +914,7 @@ class Ingestor:
         self.web_llm = web_llm
         self.today = _today()
         self._wiki_lookup = WikiLookup(wiki_path)
-        self._kb_dir = _DEFAULT_KB_DIR
+        self._kb_dir = self.wiki_root / "knowledge_base"
         self._embed_model = None  # BGE-M3 chargé paresseusement par _kb_context
 
     # ------------------------------------------------------------------

@@ -1046,3 +1046,10 @@ class TestReingestSource:
         result = ingestor.reingest_source("src-jade", dry_run=True)
 
         assert result == {"status": "nothing_to_add", "slug": "src-jade"}
+
+
+def test_ingestor_kb_dir_suit_wiki_path(wiki_root: Path, raw_dir: Path, mock_llm) -> None:
+    # Régression (2026-11-13) : _kb_dir pointait en dur vers
+    # ~/Documents/Secretarius/Wiki_LM/knowledge_base, ignorant WIKI_PATH.
+    ing = Ingestor(wiki_root, llm=mock_llm, raw_path=raw_dir)
+    assert ing._kb_dir == wiki_root / "knowledge_base"
