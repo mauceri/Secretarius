@@ -83,3 +83,12 @@ def test_aucune_valeur_propre_a_sanroque():
 def test_leger_agent_wiki_sur_obfusque():
     c = appliquer_profil(_config(), LEGER, "modal")
     assert c["agents"]["entries"]["wiki"]["model"]["primary"] == "obfusque/qwen3-14b-h128-a1-h02"
+
+
+def test_scout_sur_obfusque_dans_les_deux_profils():
+    # Décision 2026-11-13 : Scout lit aussi le corps des courriels (check_email),
+    # qui ne doit pas partir chez DeepSeek.
+    tous = {"wiki", "scout", "obfuscateur", "laya", "courrier", "cron", "gog"}
+    for modules, cerveau in ((LEGER, "modal"), (tous, "ollama")):
+        c = appliquer_profil(_config(), modules, cerveau)
+        assert c["agents"]["entries"]["scout"]["model"]["primary"] == "obfusque/qwen3-14b-h128-a1-h02"

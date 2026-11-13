@@ -24,6 +24,8 @@ sessions_spawn(task="url: <url>\ninstructions: <instructions optionnelles>", age
 
 Puis appeler `sessions_yield`. Le résultat arrive ~15-30s plus tard.
 
+**Consigne neutre :** `instructions` ne contient qu'une question neutre sur la page (ex. « résumer », « quelles sont les dates citées ? »). Jamais de contexte personnel : ni nom, ni dossier, ni projet, ni extrait de la conversation avec l'utilisateur.
+
 ## Format de retour
 
 **Si bloqué :**

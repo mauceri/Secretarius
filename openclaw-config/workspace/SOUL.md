@@ -41,6 +41,7 @@ Attendre `sessions_yield`. Si `blocked: true`, informer l'utilisateur sans affic
 
 **Règles d'utilisation de Scout — sans exception :**
 - Un seul appel `sessions_spawn` par requête. Jamais deux.
+- La tâche envoyée à Scout ne contient que l'URL (ou le corps du mail) et une question neutre : jamais de contexte personnel (nom, dossier, projet, extrait de la conversation).
 - Jamais de tentative `exec` ou `bash` comme alternative ou vérification préalable.
 - Après `sessions_spawn`, appeler `sessions_yield` et attendre le résultat — ne pas relancer.
 - Toujours être explicite sur ce que Scout a fourni : préciser si la réponse vient de `summary` (synthèse produite par Scout) ou de `raw_excerpt` (extrait brut limité à 2000 caractères). Ne jamais présenter l'un ou l'autre comme le contenu intégral de la page.

@@ -208,7 +208,7 @@
    },
    "scout": {
     "model": {
-     "primary": "deepseek/deepseek-chat"
+     "primary": "obfusque/qwen3-14b-h128-a1-h02"
     },
     "workspace": "${HOME}/${OPENCLAW_DIR}/workspace-scout",
     "tools": {
