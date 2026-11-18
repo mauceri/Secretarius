@@ -2,6 +2,8 @@ import { timingSafeEqual } from "node:crypto";
 import type { BrokerConfig } from "./config";
 import type { InboundEvent } from "./inbound";
 import type { Store } from "./store";
+import type { SessionLike } from "./inbound";
+import { NotAllowedError, sendText, setTyping } from "./outbound";
 
 export type BrokerStatus = { lastPollOkAt: string | null; lastSendOkAt: string | null; sessionId: string };
 
@@ -9,6 +11,9 @@ export type HttpDeps = {
   cfg: BrokerConfig;
   status: BrokerStatus;
   store?: Store;
+  session?: SessionLike;
+  sleep?: (ms: number) => Promise<void>;
+  log?: (line: string) => void;
 };
 
 function autorise(req: Request, token: string): boolean {
@@ -60,6 +65,24 @@ export function createServer(deps: HttpDeps) {
       if (typeof id !== "string") return new Response("id requis", { status: 400 });
       deps.store.ack(id);
       return new Response(null, { status: 204 });
+    }
+    if (req.method === "POST" && (pathname === "/send" || pathname === "/typing") && deps.session) {
+      const body: any = await req.json().catch(() => ({}));
+      const od = { session: deps.session, cfg: deps.cfg, sleep: deps.sleep, log: deps.log ?? (() => {}) };
+      if (typeof body.to !== "string") return new Response("to requis", { status: 400 });
+      try {
+        if (pathname === "/typing") {
+          await setTyping(body.to, Boolean(body.on), od);
+          return new Response(null, { status: 204 });
+        }
+        if (typeof body.text !== "string" || !body.text) return new Response("text requis", { status: 400 });
+        const r = await sendText(body.to, body.text, od);
+        deps.status.lastSendOkAt = new Date().toISOString();
+        return json(r);
+      } catch (e) {
+        if (e instanceof NotAllowedError) return new Response("destinataire non autorisé", { status: 403 });
+        return new Response("échec d'envoi", { status: 502 });
+      }
     }
     return new Response("not found", { status: 404 });
   }
