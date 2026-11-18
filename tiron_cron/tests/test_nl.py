@@ -67,3 +67,8 @@ def test_tous_les_soirs_et_heure_sans_a():
     assert parse_nl("tous les soirs à 21h rappel pilulier", NOW).quand == "0 21 * * *"
     assert parse_nl("demain 9h rappelle-moi le garagiste", NOW).quand == "2026-10-03T09:00"
 
+
+
+def test_nl_sur_session():
+    job = parse_nl("rappelle-moi demain à 9h sur session de payer le loyer", NOW)
+    assert job is not None and job.canal == "session"

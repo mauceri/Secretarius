@@ -22,9 +22,23 @@ def test_preview(capsys):
                    "text": "Chaque lundi à 08:00 (Europe/Paris), telegram, rappel : payer le loyer"}
 
 
-def test_preview_origine_inconnue_sans_canal(capsys):
-    out = _call(capsys, ["preview", "--origin", "webchat", "--args", "add 20m rappel x"])
-    assert out["ok"] is False and "canal" in out["text"]
+def test_origine_inconnue_va_sur_session(capsys):
+    env = {**ENV, "TIRON_SESSION_ID": "05ab"}
+    for origine in ("webchat", ""):
+        out = _call(capsys, ["preview", "--origin", origine, "--args", "add 20m rappel x"], env=env)
+        assert out["ok"] is True and "session" in out["text"]
+
+
+def test_origine_session_reste_sur_session(capsys):
+    out = _call(capsys, ["preview", "--origin", "session", "--args", "add 20m rappel x"],
+                env={**ENV, "TIRON_SESSION_ID": "05ab"})
+    assert out["ok"] is True and "session" in out["text"]
+
+
+def test_origine_telegram_reste_sur_telegram(capsys):
+    out = _call(capsys, ["preview", "--origin", "telegram", "--args", "add 20m rappel x"],
+                env={**ENV, "TIRON_SESSION_ID": "05ab"})
+    assert out["ok"] is True and "telegram" in out["text"]
 
 
 def test_preview_refuse_la_gestion(capsys):

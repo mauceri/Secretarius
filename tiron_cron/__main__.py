@@ -31,7 +31,8 @@ def _job_from_args(args: str) -> Job:
 
 def _origine(origin: str) -> str | None:
     o = (origin or "").lower()
-    return o if o in CANAUX else None
+    # Origine inconnue (courriel, ligne de commande) : Session (décision du 2026-11-18).
+    return o if o in CANAUX else "session"
 
 
 def _apercu(job: Job, origin: str, tz: str, env, job_key: str, now: datetime) -> tuple[str, list[str]]:

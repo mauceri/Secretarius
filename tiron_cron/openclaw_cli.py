@@ -14,8 +14,8 @@ from tiron_cron.syntax import Gestion, Job, SyntaxeInvalide
 
 DECL_PREFIX = "tiron:"
 # Canal Tiron -> identifiant de canal OpenClaw (vérifié par l'essai préalable).
-CANAUX_OPENCLAW = {"telegram": "telegram", "whatsapp": "whatsapp", "sms": "sms"}
-DESTINATAIRES_ENV = {"telegram": "TIRON_TELEGRAM_CHAT_ID", "whatsapp": "TIRON_WHATSAPP_TO",
+CANAUX_OPENCLAW = {"telegram": "telegram", "session": "session", "whatsapp": "whatsapp", "sms": "sms"}
+DESTINATAIRES_ENV = {"telegram": "TIRON_TELEGRAM_CHAT_ID", "session": "TIRON_SESSION_ID", "whatsapp": "TIRON_WHATSAPP_TO",
                      "sms": "TIRON_SMS_TO"}
 
 
@@ -30,7 +30,7 @@ def secretarius_dir(env: Mapping[str, str]) -> str:
 def build_add_argv(job: Job, canal: str | None, tz: str, env: Mapping[str, str],
                    job_key: str) -> list[str]:
     if canal is None:
-        raise SyntaxeInvalide("canal non précisé et canal d'origine inconnu (telegram, whatsapp, sms, obsidian)")
+        raise SyntaxeInvalide("canal non précisé et canal d'origine inconnu (telegram, session, whatsapp, sms, obsidian)")
     argv = ["openclaw", "cron", "add", "--json", "--name", job_key.replace(":", "-"),
             "--display-name", f"{job.type} : {job.contenu}"[:60], "--declaration-key", job_key]
     if job.quand_kind == "cron":

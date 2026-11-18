@@ -16,7 +16,7 @@ _JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche
 SYSTEM_PROMPT = """Tu convertis une demande de planification en UNE ligne de la forme :
 add <quand> [<canal>] <type> <contenu>
 - <quand> : expression cron 5 champs entre guillemets doubles ("0 8 * * 1"), OU date-heure locale ISO (2026-10-02T09:00), OU durée (20m, 2h, 1d).
-- <canal> (facultatif, seulement si la demande le précise) : telegram, whatsapp, sms ou obsidian.
+- <canal> (facultatif, seulement si la demande le précise) : telegram, session, whatsapp, sms ou obsidian.
 - <type> : rappel (un texte à rappeler), commande (une commande Tiron commençant par /), consigne (une tâche confiée à l'assistant).
 - <contenu> : le texte du rappel, la commande, ou la consigne.
 Le <contenu> ne reprend jamais l'indication de moment. « lundi prochain », « demain », « dans … » sont ponctuels (date ISO ou durée) ; seuls « chaque … », « tous les … » sont récurrents (cron).

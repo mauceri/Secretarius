@@ -7,7 +7,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 
-CANAUX = ("telegram", "whatsapp", "sms", "obsidian")
+CANAUX = ("telegram", "session", "whatsapp", "sms", "obsidian")
 TYPES = ("rappel", "commande", "consigne")
 # Lecture ou écriture sans risque de perte ; /inbox s'ajoutera avec l'agent courrier.
 COMMANDES_PLANIFIABLES = frozenset({"/wikistatus", "/tags", "/relire", "/q", "/r", "/ingest", "/kbupdate"})

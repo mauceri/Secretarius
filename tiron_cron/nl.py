@@ -15,7 +15,7 @@ _MOIS = {"janvier": 1, "février": 2, "fevrier": 2, "mars": 3, "avril": 4, "mai"
          "décembre": 12, "decembre": 12}
 _H = r"(\d{1,2})\s*h\s*(\d{2})?"
 _I = re.IGNORECASE
-_CANAL = re.compile(r"\b(?:par|en|sur|via)\s+(sms|texto|whatsapp|telegram|obsidian)\b", _I)
+_CANAL = re.compile(r"\b(?:par|en|sur|via)\s+(sms|texto|whatsapp|telegram|session|obsidian)\b", _I)
 _RELATIF = re.compile(r"\bdans\s+(\d+)\s*(minutes?|min|heures?|h|jours?)\b", _I)
 _A = r"\s+(?:à\s+)?"  # « demain 9h » autant que « demain à 9h »
 _HEBDO = re.compile(r"\b(?:chaque|tous\s+les)\s+(" + "|".join(_JOURS) + r")s?" + _A + _H, _I)

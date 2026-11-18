@@ -9,6 +9,10 @@ def test_add_cron_avec_canal():
         "cron", "0 8 * * 1", "sms", "rappel", "payer le loyer")
 
 
+def test_add_canal_session():
+    assert parse_command("add 20m session rappel x").canal == "session"
+
+
 def test_add_iso_sans_canal():
     assert parse_command("add 2026-10-02T09:00 rappel appeler le garagiste") == Job(
         "at", "2026-10-02T09:00", None, "rappel", "appeler le garagiste")
