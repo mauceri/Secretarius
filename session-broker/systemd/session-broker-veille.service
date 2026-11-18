@@ -1,0 +1,12 @@
+[Unit]
+Description=Secretarius — veille du broker Session (alerte par courriel)
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/Secretarius
+# Mot de passe du Bridge pour l'envoi ; le jeton du broker est lu à part dans
+# secrets.env (jamais la phrase secrète).
+EnvironmentFile=%h/Secretarius/Wiki_LM/.env
+ExecStart=/usr/bin/python3 -m tiron_mail.veille_session
+NoNewPrivileges=yes
+UMask=0077

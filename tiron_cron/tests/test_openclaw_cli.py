@@ -28,6 +28,17 @@ def test_rappel_cron_sms():
     assert "--delete-after-run" not in argv
 
 
+def test_rappel_session():
+    argv = build_add_argv(Job("at", "20m", None, "rappel", "x"), "session", "UTC",
+                          {**ENV, "TIRON_SESSION_ID": "05ab"}, "tiron:1")
+    assert argv[-5:] == ["--announce", "--channel", "session", "--to", "05ab"]
+
+
+def test_session_sans_identifiant():
+    with pytest.raises(SyntaxeInvalide, match="TIRON_SESSION_ID"):
+        build_add_argv(Job("at", "20m", None, "rappel", "x"), "session", "UTC", ENV, "tiron:1")
+
+
 def test_tache_unique_supprimee_apres_succes():
     argv = build_add_argv(Job("at", "20m", None, "rappel", "x"), "telegram", "UTC", ENV, "tiron:1")
     assert _opt(argv, "--at") == "20m" and "--delete-after-run" in argv

@@ -1,12 +1,11 @@
 # tiron_cron/livraison.py
 """Livraison du résultat d'une tâche /cron dans le coffre (dossier Réception),
-puis avis Telegram (spec courrier, « Livraisons vers Obsidian »). Une note par
+puis avis par courriel (spec canal Session ; spec courrier, « Livraisons vers Obsidian »). Une note par
 livraison : jamais d'ajout dans une note existante (conflits de synchronisation)."""
 from __future__ import annotations
 
 import json
 import re
-import subprocess
 from collections.abc import Callable, Mapping
 from datetime import datetime
 from pathlib import Path
@@ -49,16 +48,3 @@ def livrer(evt: dict, now: datetime, env: Mapping[str, str],
     except Exception:  # la note est écrite : un avis manqué ne doit pas faire rejouer la livraison
         pass
     return p
-
-
-def notifier_telegram(env: Mapping[str, str]) -> Callable[[str], None]:
-    def envoyer(texte: str) -> None:
-        dest = env.get("TIRON_TELEGRAM_CHAT_ID")
-        if not dest:
-            raise OSError("TIRON_TELEGRAM_CHAT_ID non configuré")
-        # Chemin complet : le PATH des services systemd n'inclut pas ~/.local/bin,
-        # où se trouve l'enveloppe openclaw (qui charge gateway.systemd.env).
-        exe = env.get("OPENCLAW_BIN") or str(Path.home() / ".local" / "bin" / "openclaw")
-        subprocess.run([exe, "message", "send", "--channel", "telegram", "-t", dest, "-m", texte],
-                       capture_output=True, text=True, timeout=60, check=True)
-    return envoyer

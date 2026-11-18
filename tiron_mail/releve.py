@@ -17,6 +17,7 @@ from pathlib import Path
 
 from tiron_mail.boite import Boite, ErreurBoite, _connecter_imap
 from tiron_mail.config import ErreurConfig
+from tiron_mail.envoi import _smtp, construire, envoyer
 from tiron_mail.message import analyser
 
 TRAITE, REFUSE = "Folders/Traite", "Folders/Refuse"
@@ -100,12 +101,12 @@ def _ecrire_etat(chemin: Path, etat: dict) -> None:
 
 
 def _prevenir(notifier, texte: str) -> bool:
-    """Un avis qui échoue (Telegram, openclaw) ne doit pas arrêter la relève."""
+    """Un avis qui échoue (courriel) ne doit pas arrêter la relève."""
     try:
         notifier(texte)
         return True
     except Exception as e:
-        print(f"avis Telegram non envoyé ({e}) : {texte}", file=sys.stderr)
+        print(f"avis non envoyé ({e}) : {texte}", file=sys.stderr)
         return False
 
 
@@ -115,7 +116,8 @@ def _ranger(conn, uid: str, dossier: str) -> None:
         print(f"message {uid} non rangé dans {dossier}", file=sys.stderr)
 
 
-def relever(cfg, env, executer, notifier, etat_chemin: Path = ETAT_DEFAUT, connecter=_connecter_imap) -> str:
+def relever(cfg, env, executer, notifier, etat_chemin: Path = ETAT_DEFAUT, connecter=_connecter_imap,
+            repondre=None) -> str:
     if not cfg.releve:
         raise ErreurConfig("aucune boîte à relever ([releve] boite = …)")
     compte = cfg.comptes[cfg.releve]
@@ -162,18 +164,29 @@ def relever(cfg, env, executer, notifier, etat_chemin: Path = ETAT_DEFAUT, conne
                 continue
             a = analyser(brut)
             cmds = commandes(a["objet"], a["texte"])
+            reponses: list[str] = []
             if not cmds:
                 _prevenir(notifier, f"Courriel de {exp} reçu sur {compte.adresse} sans commande : "
                                     "écrivez une ligne qui commence par /, par exemple /wikistatus.")
             for c in cmds:
                 if c.split()[0].lower().rstrip("?!") not in _PAR_COURRIEL:
                     _prevenir(notifier, f"{c.split()[0]} (courriel de {exp}) non admis par courriel : "
-                                        "à taper sur Telegram.")
+                                        "à taper sur Session ou Telegram.")
                     continue
                 try:
-                    executer(c)
+                    reponse = executer(c)
                 except Exception as e:  # les commandes suivantes passent quand même
                     _prevenir(notifier, f"Commande {c} (courriel de {exp}) en échec : {e}")
+                    continue
+                if reponse:
+                    reponses.append(f"{c}\n\n{reponse}")
+            if reponses and repondre:
+                objet = a["objet"].strip()
+                objet = objet if objet.lower().startswith("re:") else f"Re: {objet}"
+                try:
+                    repondre(exp, objet, "\n\n".join(reponses), mid)
+                except Exception as e:  # le message reste traité : jamais réexécuté
+                    print(f"réponse à {exp} non envoyée ({e})", file=sys.stderr)
             _ranger(conn, uid, TRAITE)
             bilan.append(f"{exp} : {len(cmds)} commande(s)")
         if mise_en_service and presents:
@@ -189,9 +202,9 @@ def relever(cfg, env, executer, notifier, etat_chemin: Path = ETAT_DEFAUT, conne
 
 
 def executer_openclaw(env: Mapping[str, str]):
-    """Commande : injectée comme un message Telegram (main). /consigne : agent consignes.
-    La réponse part sur Telegram."""
-    def executer(commande: str) -> None:
+    """Commande : agent main (crochets de derisk-deleg). /consigne : agent consignes.
+    Renvoie le texte de la réponse, que la relève renvoie par courriel."""
+    def executer(commande: str) -> str:
         exe = env.get("OPENCLAW_BIN") or str(Path.home() / ".local" / "bin" / "openclaw")
         mot, reste = (commande.split(None, 1) + [""])[:2]
         if mot.lower().rstrip("?!") == "/consigne":
@@ -202,7 +215,20 @@ def executer_openclaw(env: Mapping[str, str]):
                      f"agent:consignes:courrier-{uuid.uuid4().hex[:8]}", "--message", reste.strip()]
         else:
             cible = ["--agent", "main", "--session-key", "agent:main:courrier", "--message", commande]
-        subprocess.run([exe, "agent", *cible, "--deliver", "--reply-channel", "telegram",
-                        "--reply-to", env["TIRON_TELEGRAM_CHAT_ID"], "--json"],
-                       capture_output=True, text=True, timeout=600, check=True)
+        p = subprocess.run([exe, "agent", *cible, "--json"],
+                           capture_output=True, text=True, timeout=600, check=True)
+        res = (json.loads(p.stdout or "{}").get("result") or {}).get("payloads") or []
+        textes = [str(x.get("text") or "").strip() for x in res]
+        return "\n\n".join(t for t in textes if t and t != "NO_REPLY")
     return executer
+
+
+def repondeur_courriel(cfg, env: Mapping[str, str], smtp=_smtp):
+    """Réponse à une commande reçue par courriel : de la boîte d'envoi par défaut,
+    seulement vers une adresse du propriétaire."""
+    def repondre(dest: str, objet: str, corps: str, en_reponse_a: str) -> None:
+        if dest.lower() not in cfg.adresses_proprietaire:
+            raise ErreurBoite(f"réponse refusée : {dest} n'est pas une de vos adresses")
+        compte = cfg.comptes[cfg.envoi_defaut]
+        envoyer(construire(compte, dest, objet, corps, en_reponse_a or None), compte, env, smtp)
+    return repondre
