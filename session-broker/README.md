@@ -9,3 +9,7 @@ Transport Session Messenger de Secretarius (spec `docs/superpowers/specs/2026-11
 4. `cp systemd/session-broker.service ~/.config/systemd/user/ && systemctl --user daemon-reload`
 5. `systemctl --user enable --now session-broker`
 6. Vérifier : `GET /health` avec le jeton → `ok: true`.
+7. Veille (alerte par courriel si Tiron ne reçoit plus) : `avis = "<votre adresse>"` dans
+   `[envoi]` de `~/.config/tiron_mail/comptes.toml`, puis
+   `cp systemd/session-broker-veille.{service,timer} ~/.config/systemd/user/ && systemctl --user daemon-reload && systemctl --user enable --now session-broker-veille.timer`.
+8. Rappels `/cron` sur Session : `TIRON_SESSION_ID=<votre identifiant Session>` dans `~/.config/secrets.env`, puis `/maj`.
