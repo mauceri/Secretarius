@@ -1,0 +1,35 @@
+{
+  "name": "openclaw-plugin-session",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "files": [
+    "dist",
+    "openclaw.plugin.json",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "openclaw": ">=2026.8.2"
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "setupEntry": "./dist/setup-entry.js",
+    "channel": {
+      "id": "session",
+      "label": "Session",
+      "blurb": "Session Messenger par le broker local de Secretarius."
+    }
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "openclaw": "2026.8.2",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  }
+}
