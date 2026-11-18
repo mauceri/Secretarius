@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { sleepWithAbort } from "openclaw/plugin-sdk/runtime-env";
 import { BrokerClient } from "./broker-client.js";
-import { boucleReception, traiterEvenement } from "./monitor.js";
+import { boucleReception, traiterEvenement, Vus } from "./monitor.js";
 import { deposerPiecesJointes } from "./depot.js";
 import { creerDispatchTexte } from "./dispatch-sdk.js";
 
@@ -65,7 +65,7 @@ export const sessionPlugin = createChatChannelPlugin<SessionAccount>({
         const client = clientPour(account);
         const log = (l: string) => ctx.log?.info?.(l);
         const receptionDir = process.env.TIRON_RECEPTION_DIR || join(homedir(), "Documents", "Arbath", "Réception");
-        const seen = new Set<string>();
+        const seen = new Vus(join(homedir(), ".local", "state", "openclaw-session", "vus.json"));
         const dispatchTexte = creerDispatchTexte({ cfg: ctx.cfg, account, client, channelRuntime: ctx.channelRuntime, runtime: ctx.runtime, log });
         log(`[session] démarrage (${account.brokerUrl})`);
         await boucleReception({

@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { traiterEvenement, boucleReception } from "./monitor.js";
+import { traiterEvenement, boucleReception, Vus } from "./monitor.js";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const MOI = "05" + "a".repeat(64);
 const INCONNU = "05" + "b".repeat(64);
@@ -8,7 +11,7 @@ const evt = (o: any = {}) => ({ id: "m1", from: MOI, timestamp: 1, text: "salut"
 function deps(o: any = {}) {
   return {
     allowFrom: [MOI],
-    seen: new Set<string>(),
+    seen: new Vus(join(mkdtempSync(join(tmpdir(), "vus-")), "vus.json")),
     receptionDir: "/r",
     depot: vi.fn(() => ({ note: "/r/n.md", fichiers: ["/r/f"] })),
     dispatchTexte: vi.fn(async () => {}),
@@ -52,12 +55,35 @@ describe("traiterEvenement", () => {
     await traiterEvenement(evt({ attachments: [{ path: "", name: "g", contentType: "x", size: 3, error: "echec-telechargement" }] }), d);
     expect(d.repondre).toHaveBeenCalledWith(MOI, "Reçu : 0 pièce(s) jointe(s) déposée(s) dans Réception/ ; 1 pièce(s) non téléchargeable(s)");
   });
-  it("échec du dispatch : pas d'ack, le rejeu est retraité", async () => {
-    const d = deps({ dispatchTexte: vi.fn().mockRejectedValueOnce(new Error("panne")).mockResolvedValue(undefined) });
-    await expect(traiterEvenement(evt(), d)).rejects.toThrow("panne");
-    expect(d.ack).not.toHaveBeenCalled();
-    expect(await traiterEvenement(evt(), d)).toBe("texte");
-    expect(d.dispatchTexte).toHaveBeenCalledTimes(2);
+  it("échec du dispatch : erreur signalée, ack, pas de rejeu sans fin", async () => {
+    const d = deps({ dispatchTexte: vi.fn().mockRejectedValueOnce(new Error("panne")) });
+    expect(await traiterEvenement(evt(), d)).toBe("erreur");
+    expect(d.repondre).toHaveBeenCalledWith(MOI, "Message non traité (erreur : panne). Renvoyez-le si besoin.");
+    expect(d.ack).toHaveBeenCalledWith("m1");
+    expect(await traiterEvenement(evt(), d)).toBe("doublon");
+  });
+  it("échec du dépôt : erreur signalée, ack", async () => {
+    const d = deps({ depot: vi.fn(() => { throw new Error("ENAMETOOLONG"); }) });
+    expect(await traiterEvenement(evt({ attachments: [{ path: "/m/1", name: "p.png", contentType: "x", size: 3 }] }), d)).toBe("erreur");
+    expect(d.repondre).toHaveBeenCalledWith(MOI, "Message non traité (erreur : ENAMETOOLONG). Renvoyez-le si besoin.");
+    expect(d.ack).toHaveBeenCalledWith("m1");
+  });
+  it("redémarrage pendant le traitement : pas relancé, l'utilisateur est prévenu", async () => {
+    const fichier = join(mkdtempSync(join(tmpdir(), "vus-")), "vus.json");
+    const avant = new Vus(fichier);
+    avant.marquer("m1", "en-cours"); // processus précédent tué en plein tour
+    const d = deps({ seen: new Vus(fichier) });
+    expect(await traiterEvenement(evt(), d)).toBe("interrompu");
+    expect(d.dispatchTexte).not.toHaveBeenCalled();
+    expect(d.repondre).toHaveBeenCalledWith(MOI, "Message interrompu par un redémarrage de Secretarius. Renvoyez-le si besoin.");
+    expect(d.ack).toHaveBeenCalledWith("m1");
+  });
+  it("traité puis rejoué après redémarrage : doublon (persistant)", async () => {
+    const fichier = join(mkdtempSync(join(tmpdir(), "vus-")), "vus.json");
+    await traiterEvenement(evt(), deps({ seen: new Vus(fichier) }));
+    const d2 = deps({ seen: new Vus(fichier) });
+    expect(await traiterEvenement(evt(), d2)).toBe("doublon");
+    expect(d2.dispatchTexte).not.toHaveBeenCalled();
   });
   it("texte seul : dispatch puis ack", async () => {
     const d = deps();

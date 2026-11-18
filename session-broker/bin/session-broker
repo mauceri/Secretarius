@@ -2,7 +2,7 @@
 # Lance le broker avec les SEULES clés nécessaires tirées de secrets.env.
 set -euo pipefail
 f="${HOME}/.config/secrets.env"
-cle() { grep -m1 "^$1=" "$f" | cut -d= -f2-; }
+cle() { local v; v="$(grep -m1 "^$1=" "$f" | cut -d= -f2-)"; v="${v#\'}"; printf '%s' "${v%\'}"; }
 SESSION_BOT_MNEMONIC="$(cle SESSION_BOT_MNEMONIC)"
 TIRON_SESSION_BROKER_TOKEN="$(cle TIRON_SESSION_BROKER_TOKEN)"
 export SESSION_BOT_MNEMONIC TIRON_SESSION_BROKER_TOKEN

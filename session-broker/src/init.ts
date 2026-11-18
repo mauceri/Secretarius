@@ -15,7 +15,10 @@ export function initIdentity(
   const mnemonic = gen();
   const sessionId = sessionIdFrom(mnemonic);
   const sep = avant && !avant.endsWith("\n") ? "\n" : "";
-  const ajout = `SESSION_BOT_MNEMONIC=${mnemonic}\nTIRON_SESSION_BROKER_TOKEN=${randomBytes(32).toString("hex")}\n`;
+  // Entre apostrophes : secrets.env est sourcé par bash (~/.bashrc, install.sh) ;
+  // sans elles, le 2e mot serait exécuté comme une commande.
+  if (!/^[a-z ]+$/.test(mnemonic)) throw new Error("phrase secrète de forme inattendue");
+  const ajout = `SESSION_BOT_MNEMONIC='${mnemonic}'\nTIRON_SESSION_BROKER_TOKEN=${randomBytes(32).toString("hex")}\n`;
   writeFileSync(secretsPath, avant + sep + ajout, { mode });
   chmodSync(secretsPath, mode);
   return { sessionId };

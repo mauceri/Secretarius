@@ -22,7 +22,11 @@ export type InboundDeps = {
   cfg: BrokerConfig;
   publish(evt: InboundEvent): void;
   log(line: string): void;
+  ecrireFichier?: (path: string, data: Uint8Array) => void;
 };
+
+// Messages en cours de traitement (évite un doublon concurrent avant la mise en file).
+const enCours = new Set<string>();
 
 export const court = (id: string) => id.slice(0, 8);
 
@@ -42,7 +46,17 @@ export async function handleSessionMessage(msg: any, deps: InboundDeps): Promise
     log(`ignoré : message de ${court(String(msg.from))} (${msg.type === "private" ? "hors liste blanche" : "groupe"})`);
     return "dropped";
   }
-  if (store.seen(msg.id)) return "duplicate";
+  if (store.seen(msg.id) || enCours.has(msg.id)) return "duplicate";
+  enCours.add(msg.id);
+  try {
+    return await traiter(msg, deps);
+  } finally {
+    enCours.delete(msg.id);
+  }
+}
+
+async function traiter(msg: any, deps: InboundDeps): Promise<"queued"> {
+  const { cfg, store, session, log } = deps;
 
   const attachments: InboundAttachment[] = [];
   const pointeurs: any[] = (() => { try { return msg.getContent?.()?.dataMessage?.attachments ?? []; } catch { return []; } })();
@@ -69,7 +83,7 @@ export async function handleSessionMessage(msg: any, deps: InboundDeps): Promise
     mkdirSync(media, { recursive: true, mode: 0o700 });
     chmodSync(media, 0o700);
     const path = join(media, randomUUID());
-    writeFileSync(path, new Uint8Array(await file.arrayBuffer()), { mode: 0o600 });
+    (deps.ecrireFichier ?? ((p: string, d: Uint8Array) => writeFileSync(p, d, { mode: 0o600 })))(path, new Uint8Array(await file.arrayBuffer()));
     attachments.push({ path, name, contentType: file.type || contentType, size: file.size });
   }
 

@@ -1,10 +1,34 @@
 // Réception : boucle SSE vers le broker, aiguillage des événements.
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import type { InboundEvent } from "./broker-client.js";
 import type { deposerPiecesJointes } from "./depot.js";
 
+export type Etat = "en-cours" | "fait";
+
+// États des messages persistés sur disque : un redémarrage du gateway ne doit
+// ni relancer un /c déjà parti, ni rejouer un message déjà traité.
+export class Vus {
+  private etats: Record<string, Etat> = {};
+  constructor(private fichier: string, private max = 2000) {
+    try { this.etats = JSON.parse(readFileSync(fichier, "utf8")); } catch { this.etats = {}; }
+  }
+  etat(id: string): Etat | undefined { return this.etats[id]; }
+  marquer(id: string, etat: Etat): void {
+    delete this.etats[id];
+    this.etats[id] = etat;
+    const cles = Object.keys(this.etats);
+    for (const k of cles.slice(0, Math.max(0, cles.length - this.max))) delete this.etats[k];
+    mkdirSync(dirname(this.fichier), { recursive: true, mode: 0o700 });
+    const tmp = `${this.fichier}.tmp`;
+    writeFileSync(tmp, JSON.stringify(this.etats), { mode: 0o600 });
+    renameSync(tmp, this.fichier);
+  }
+}
+
 export type TraiterDeps = {
   allowFrom: string[];
-  seen: Set<string>;
+  seen: Vus;
   receptionDir: string;
   depot: typeof deposerPiecesJointes;
   dispatchTexte(evt: InboundEvent): Promise<void>;
@@ -12,26 +36,41 @@ export type TraiterDeps = {
   ack(id: string): Promise<void>;
 };
 
-export async function traiterEvenement(evt: InboundEvent, d: TraiterDeps): Promise<"ignore" | "doublon" | "depot" | "texte"> {
+export async function traiterEvenement(evt: InboundEvent, d: TraiterDeps): Promise<"ignore" | "doublon" | "interrompu" | "erreur" | "depot" | "texte"> {
   // Défense en profondeur : le broker filtre déjà, le plugin refiltre.
   if (!d.allowFrom.includes(evt.from)) { await d.ack(evt.id); return "ignore"; }
-  if (d.seen.has(evt.id)) { await d.ack(evt.id); return "doublon"; }
-  if (evt.attachments.length > 0) {
-    const { fichiers } = d.depot(evt, d.receptionDir, new Date());
-    const tropGrandes = evt.attachments.filter((a) => a.error === "trop-grande").length;
-    let msg = `Reçu : ${fichiers.length} pièce(s) jointe(s) déposée(s) dans Réception/`;
-    const echecs = evt.attachments.filter((a) => a.error === "echec-telechargement").length;
-    if (tropGrandes) msg += ` ; ${tropGrandes} pièce(s) trop grande(s), non reçue(s)`;
-    if (echecs) msg += ` ; ${echecs} pièce(s) non téléchargeable(s)`;
-    d.seen.add(evt.id);
-    await d.repondre(evt.from, msg);
+  const etat = d.seen.etat(evt.id);
+  if (etat === "fait") { await d.ack(evt.id); return "doublon"; }
+  if (etat === "en-cours") {
+    // Laissé « en cours » par un processus précédent : ne pas relancer (effets de bord possibles).
+    d.seen.marquer(evt.id, "fait");
+    await d.repondre(evt.from, "Message interrompu par un redémarrage de Secretarius. Renvoyez-le si besoin.");
     await d.ack(evt.id);
-    return "depot";
+    return "interrompu";
   }
-  await d.dispatchTexte(evt);
-  d.seen.add(evt.id);
+  d.seen.marquer(evt.id, "en-cours");
+  let resultat: "depot" | "texte" | "erreur";
+  try {
+    if (evt.attachments.length > 0) {
+      const { fichiers } = d.depot(evt, d.receptionDir, new Date());
+      const tropGrandes = evt.attachments.filter((a) => a.error === "trop-grande").length;
+      const echecs = evt.attachments.filter((a) => a.error === "echec-telechargement").length;
+      let msg = `Reçu : ${fichiers.length} pièce(s) jointe(s) déposée(s) dans Réception/`;
+      if (tropGrandes) msg += ` ; ${tropGrandes} pièce(s) trop grande(s), non reçue(s)`;
+      if (echecs) msg += ` ; ${echecs} pièce(s) non téléchargeable(s)`;
+      await d.repondre(evt.from, msg);
+      resultat = "depot";
+    } else {
+      await d.dispatchTexte(evt);
+      resultat = "texte";
+    }
+  } catch (e) {
+    await d.repondre(evt.from, `Message non traité (erreur : ${e instanceof Error ? e.message : String(e)}). Renvoyez-le si besoin.`).catch(() => {});
+    resultat = "erreur";
+  }
+  d.seen.marquer(evt.id, "fait");
   await d.ack(evt.id);
-  return "texte";
+  return resultat;
 }
 
 export type BoucleDeps = {

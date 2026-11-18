@@ -12,13 +12,16 @@ export class Store {
     this.db.run("CREATE TABLE IF NOT EXISTS seen (id TEXT PRIMARY KEY)");
     this.db.run("CREATE TABLE IF NOT EXISTS pending (id TEXT PRIMARY KEY, evt TEXT NOT NULL, ts INTEGER NOT NULL)");
   }
-  /** Marque l'id comme vu ; rend true s'il l'était déjà. */
+  /** Lecture seule : l'id a-t-il déjà été mis en file ? */
   seen(id: string): boolean {
-    const r = this.db.query("INSERT OR IGNORE INTO seen (id) VALUES (?)").run(id);
-    return r.changes === 0;
+    return this.db.query("SELECT 1 FROM seen WHERE id = ?").get(id) != null;
   }
+  /** Met en file ET marque vu, dans une même transaction. */
   enqueue(evt: InboundEvent): void {
-    this.db.query("INSERT OR REPLACE INTO pending (id, evt, ts) VALUES (?, ?, ?)").run(evt.id, JSON.stringify(evt), Date.now());
+    this.db.transaction(() => {
+      this.db.query("INSERT OR IGNORE INTO seen (id) VALUES (?)").run(evt.id);
+      this.db.query("INSERT OR REPLACE INTO pending (id, evt, ts) VALUES (?, ?, ?)").run(evt.id, JSON.stringify(evt), Date.now());
+    })();
   }
   pending(): InboundEvent[] {
     return (this.db.query("SELECT evt FROM pending ORDER BY ts").all() as { evt: string }[]).map((r) => JSON.parse(r.evt));

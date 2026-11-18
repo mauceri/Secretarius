@@ -27,7 +27,14 @@ describe("deposerPiecesJointes", () => {
     expect(noms).toContain("2026-11-18 1502 .bashrc");
     expect(noms).toContain("2026-11-18 1502 passwd");
     expect(noms).toContain("2026-11-18 1502 piece-jointe");
-    expect(r.fichiers.every((f) => f.length - recep.length < 140)).toBe(true);
+    expect(r.fichiers.every((f) => Buffer.byteLength(f.slice(recep.length + 1)) <= 200)).toBe(true);
+  });
+  it("nom long en caractères multioctets : tronqué en octets sous la limite du système", () => {
+    const r = deposerPiecesJointes(evt([pj("漢".repeat(300) + ".png")]), recep, now);
+    const nom = r.fichiers[0].slice(recep.length + 1);
+    expect(Buffer.byteLength(nom)).toBeLessThanOrEqual(200);
+    expect(nom.endsWith(".png")).toBe(true);
+    expect(nom).not.toContain("\uFFFD");
   });
   it("même nom deux fois : suffixe (2), rien d'écrasé", () => {
     deposerPiecesJointes(evt([pj("photo.png", "un")]), recep, now);

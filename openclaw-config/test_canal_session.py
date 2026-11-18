@@ -40,3 +40,11 @@ def test_refuse_identifiant_invalide():
     import pytest
     with pytest.raises(ValueError):
         ajouter_canal_session(_config(), "05abc", 8091)
+
+
+def test_installateur_n_exporte_pas_la_phrase_secrete():
+    # set -a exporte tout secrets.env aux sous-processus (docker build, openclaw…) :
+    # la phrase secrète de Session doit être retirée aussitôt après le chargement.
+    texte = (Path(__file__).parent.parent / "install.sh").read_text()
+    i = texte.index('set -a; source "$ENV_FILE"; set +a')
+    assert "unset SESSION_BOT_MNEMONIC" in texte[i:i + 200]

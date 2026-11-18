@@ -10,9 +10,15 @@ export const horodatage = (d: Date) =>
 export function assainir(nom: string): string {
   let n = basename(nom.replace(/\\/g, "/")).replace(/[/\\:\0\x00-\x1f\x7f]/g, "").trim();
   if (!n || n === "." || n === "..") n = "piece-jointe";
-  if (n.length > 120) {
+  // Limite en OCTETS (NAME_MAX = 255) : le nom final porte aussi l'horodatage et un suffixe éventuel.
+  if (Buffer.byteLength(n) > 180) {
     const ext = extname(n).slice(0, 12);
-    n = n.slice(0, 120 - ext.length) + ext;
+    let racine = "";
+    for (const c of n.slice(0, n.length - ext.length)) {
+      if (Buffer.byteLength(racine + c) + Buffer.byteLength(ext) > 180) break;
+      racine += c;
+    }
+    n = racine + ext;
   }
   return n;
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "bun:test";
-import { mkdtempSync, readdirSync, statSync, existsSync } from "node:fs";
+import { mkdtempSync, readdirSync, statSync, existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { handleSessionMessage, type SessionLike, type InboundEvent } from "../src/inbound";
@@ -87,6 +87,20 @@ describe("handleSessionMessage", () => {
     const j = journal.join("\n");
     expect(j).toContain("files.example.org/file/N?p");
     expect(j).not.toContain("987654");
+  });
+  it("échec d'écriture après réception : le message n'est pas marqué vu, il sera retraité", async () => {
+    const { s } = fauxSession();
+    let k = 0;
+    const d = { ...deps(s), ecrireFichier: (path: string, data: Uint8Array) => {
+      k++;
+      if (k === 1) throw new Error("ENOSPC");
+      writeFileSync(path, data, { mode: 0o600 });
+    } };
+    const m = msg({ attachments: [{ id: "a", name: "p.png", metadata: {}, size: 3 }] });
+    await expect(handleSessionMessage(m, d)).rejects.toThrow("ENOSPC");
+    expect(publies).toEqual([]);
+    expect(await handleSessionMessage(m, d)).toBe("queued");
+    expect(publies.length).toBe(1);
   });
   it("message de groupe : dropped", async () => {
     const { s } = fauxSession();
