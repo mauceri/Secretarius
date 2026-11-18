@@ -725,7 +725,8 @@ export default definePluginEntry({
                 // WebChat rend le Markdown correctement (contrairement à Telegram) :
                 // synthèse complète conservée pour ce canal. Bref+lien partout
                 // ailleurs, y compris si le canal n'est pas identifiable (défaut sûr).
-                const regime = ctx?.messageProvider === "webchat" ? "full" : "brief";
+                // Session : texte brut (pas de HTML Telegram).
+                const regime = ctx?.messageProvider === "webchat" ? "full" : ctx?.messageProvider === "session" ? "plain" : "brief";
                 const out = await runWikiOp(api, action.op, routed.args, undefined, regime);
                 return { handled: true, reply: { text: out.slice(0, 4000) } };
             }

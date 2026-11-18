@@ -85,8 +85,9 @@ type Exec = (api: any, argv: string[]) => Promise<{ code: number; stdout: string
 
 // "full" = synthèse complète (Obsidian, WebChat — rendent le Markdown
 // correctement). "brief" = résumé court + lien vers l'historique (Telegram,
-// et tout canal non identifiable). Voir la spec pour le détail par canal.
-export type WikiOpRegime = "brief" | "full";
+// et tout canal non identifiable). "plain" = brief sans échappement HTML
+// (Session n'interprète pas le HTML de Telegram). Voir la spec pour le détail par canal.
+export type WikiOpRegime = "brief" | "full" | "plain";
 
 // Compose execWikiSandbox : construit argv, exécute, parse JSON, formate ou renvoie erreur.
 export async function runWikiOp(
@@ -162,9 +163,10 @@ export function formatWikiResult(op: string, json: any, regime: WikiOpRegime = "
       // <a> a bloqué la livraison Telegram en test réel. Rendre l'hypertexte
       // navigable relève d'une surface de lecture servie en HTTPS, pas du
       // formatage des messages (décision d'architecture du 2026-09-08).
+      const esc = regime === "plain" ? (t: string) => t : escapeHtml;
       const parts: string[] = [];
-      if (brief) parts.push(escapeHtml(brief));
-      if (path) parts.push(escapeHtml(path));
+      if (brief) parts.push(esc(brief));
+      if (path) parts.push(esc(path));
       return parts.join("\n\n");
     }
     case "capture": {

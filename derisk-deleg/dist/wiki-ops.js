@@ -142,11 +142,12 @@ export function formatWikiResult(op, json, regime = "brief") {
             // <a> a bloqué la livraison Telegram en test réel. Rendre l'hypertexte
             // navigable relève d'une surface de lecture servie en HTTPS, pas du
             // formatage des messages (décision d'architecture du 2026-09-08).
+            const esc = regime === "plain" ? (t) => t : escapeHtml;
             const parts = [];
             if (brief)
-                parts.push(escapeHtml(brief));
+                parts.push(esc(brief));
             if (path)
-                parts.push(escapeHtml(path));
+                parts.push(esc(path));
             return parts.join("\n\n");
         }
         case "capture": {

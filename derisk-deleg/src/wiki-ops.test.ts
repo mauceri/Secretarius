@@ -99,6 +99,9 @@ describe("formatWikiResult", () => {
     expect(formatWikiResult("query", { brief: "État & <politiciens> > citoyens", history_path: "" }))
       .toBe("État &amp; &lt;politiciens&gt; &gt; citoyens");
   });
+  it("query (regime plain) : texte brut, sans échappement HTML (Session)", () => {
+    expect(formatWikiResult("query", { brief: "a & <b>", history_path: "p" }, "plain")).toBe("a & <b>\n\np");
+  });
   it("query (regime full) : ignore brief/history_path même présents", () => {
     expect(formatWikiResult("query",
       { synthesis: "# X", brief: "Résumé.", history_path: "Wiki_LM/historique/20260908-politiciens.md" }, "full"))
