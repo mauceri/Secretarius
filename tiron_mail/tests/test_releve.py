@@ -181,7 +181,7 @@ def test_confirm_par_courriel_refusee(cfg, tmp_path):
     serveur = FauxIMAP({1: brut_releve(1, "envoi", INTERNE, corps="/ecrire a@ex.fr bonjour\n/confirm")})
     faits, avis, _ = lancer(cfg, serveur, tmp_path)
     assert faits == ["/ecrire a@ex.fr bonjour"]
-    assert "/confirm" in avis[0] and "Telegram" in avis[0]
+    assert "/confirm" in avis[0] and "à taper sur Session ou Telegram" in avis[0]
 
 
 def test_avis_en_echec_n_arrete_pas_la_releve(cfg, tmp_path):
@@ -253,6 +253,75 @@ def test_commandes_natives_openclaw_refusees(cfg, tmp_path):
 
 from tiron_mail import releve
 from tiron_mail.releve import executer_openclaw
+import json
+import subprocess
+
+
+def _fini(sortie):
+    return subprocess.CompletedProcess([], 0, sortie, "")
+
+
+def test_executer_openclaw_sans_livraison_renvoie_le_texte(monkeypatch):
+    vus = []
+    sortie = json.dumps({"result": {"payloads": [{"text": "Ingestion à l'arrêt."}, {"text": ""},
+                                                 {"text": "Bloqués : 3."}]}})
+    monkeypatch.setattr(releve.subprocess, "run", lambda argv, **kw: vus.append(argv) or _fini(sortie))
+    texte = executer_openclaw({"OPENCLAW_BIN": "oc"})("/wikistatus")
+    assert texte == "Ingestion à l'arrêt.\n\nBloqués : 3."
+    assert not {"--deliver", "--reply-channel", "--reply-to"} & set(vus[0]) and "--json" in vus[0]
+
+
+def test_executer_openclaw_no_reply_vide(monkeypatch):
+    sortie = json.dumps({"result": {"payloads": [{"text": "NO_REPLY"}]}})
+    monkeypatch.setattr(releve.subprocess, "run", lambda argv, **kw: _fini(sortie))
+    assert executer_openclaw({"OPENCLAW_BIN": "oc"})("/c x") == ""
+
+
+def lancer_rep(cfg, serveur, tmp_path, executer, repondre):
+    (tmp_path / "etat.json").write_text('{"traites": [], "echecs": 0}')
+    avis = []
+    relever(cfg, {"GMAIL_APP_PASSWORD": "x"}, executer, avis.append, tmp_path / "etat.json",
+            connecter=lambda c: serveur, repondre=repondre)
+    return avis
+
+
+def test_reponse_renvoyee_a_l_expediteur(cfg, tmp_path):
+    envoyes = []
+    serveur = FauxIMAP({1: brut_releve(1, "/wikistatus", INTERNE)})
+    lancer_rep(cfg, serveur, tmp_path, lambda c: "Ingestion à l'arrêt.", lambda *a: envoyes.append(a))
+    (dest, objet, corps, ref), = envoyes
+    assert dest == PROPRIO[0] and objet == "Re: /wikistatus" and ref == "<r1@ex.fr>"
+    assert corps == "/wikistatus\n\nIngestion à l'arrêt."
+
+
+def test_deux_commandes_un_seul_courriel(cfg, tmp_path):
+    envoyes = []
+    serveur = FauxIMAP({1: brut_releve(1, "/wikistatus", INTERNE, corps="/tags")})
+    lancer_rep(cfg, serveur, tmp_path, lambda c: f"réponse {c}", lambda *a: envoyes.append(a))
+    assert len(envoyes) == 1
+    assert envoyes[0][2] == "/wikistatus\n\nréponse /wikistatus\n\n/tags\n\nréponse /tags"
+
+
+def test_reponse_vide_pas_de_courriel(cfg, tmp_path):
+    envoyes = []
+    serveur = FauxIMAP({1: brut_releve(1, "/c idée", INTERNE)})
+    lancer_rep(cfg, serveur, tmp_path, lambda c: "", lambda *a: envoyes.append(a))
+    assert envoyes == []
+
+
+def test_reponse_en_echec_n_arrete_pas_la_releve(cfg, tmp_path):
+    def repondre(*a):
+        raise OSError("SMTP injoignable")
+    serveur = FauxIMAP({1: brut_releve(1, "/a", INTERNE), 2: brut_releve(2, "/b", INTERNE)})
+    lancer_rep(cfg, serveur, tmp_path, lambda c: "ok", repondre)
+    assert serveur.ranges == [(1, "Folders/Traite"), (2, "Folders/Traite")]
+
+
+def test_repondeur_refuse_un_tiers(cfg):
+    from tiron_mail.boite import ErreurBoite
+    from tiron_mail.releve import repondeur_courriel
+    with pytest.raises(ErreurBoite, match="tiers@ex.fr"):
+        repondeur_courriel(cfg, {"GMAIL_APP_PASSWORD": "x"}, smtp=None)("tiers@ex.fr", "Re: x", "y", "<r1@ex.fr>")
 
 
 def test_consigne_par_courriel_admise(cfg, tmp_path):
@@ -263,7 +332,7 @@ def test_consigne_par_courriel_admise(cfg, tmp_path):
 
 def test_consigne_confiee_a_l_agent_consignes(monkeypatch):
     vus = []
-    monkeypatch.setattr(releve.subprocess, "run", lambda argv, **kw: vus.append(argv))
+    monkeypatch.setattr(releve.subprocess, "run", lambda argv, **kw: vus.append(argv) or _fini(""))
     executer_openclaw({"TIRON_TELEGRAM_CHAT_ID": "1", "OPENCLAW_BIN": "oc"})("/consigne fais le point")
     argv = vus[0]
     assert argv[argv.index("--agent") + 1] == "consignes"
@@ -273,14 +342,14 @@ def test_consigne_confiee_a_l_agent_consignes(monkeypatch):
 
 def test_commande_reste_sur_main(monkeypatch):
     vus = []
-    monkeypatch.setattr(releve.subprocess, "run", lambda argv, **kw: vus.append(argv))
+    monkeypatch.setattr(releve.subprocess, "run", lambda argv, **kw: vus.append(argv) or _fini(""))
     executer_openclaw({"TIRON_TELEGRAM_CHAT_ID": "1", "OPENCLAW_BIN": "oc"})("/wikistatus")
     assert vus[0][vus[0].index("--agent") + 1] == "main"
 
 
 def test_consigne_vide_refusee_sans_appel(monkeypatch):
     vus = []
-    monkeypatch.setattr(releve.subprocess, "run", lambda argv, **kw: vus.append(argv))
+    monkeypatch.setattr(releve.subprocess, "run", lambda argv, **kw: vus.append(argv) or _fini(""))
     with pytest.raises(ValueError, match="usage"):
         executer_openclaw({"TIRON_TELEGRAM_CHAT_ID": "1", "OPENCLAW_BIN": "oc"})("/consigne  ")
     assert vus == []
@@ -298,7 +367,7 @@ def test_consigne_suivie_d_une_commande_ou_d_une_citation():
 
 def test_consigne_separee_par_une_espace_insecable_va_a_consignes(monkeypatch):
     vus = []
-    monkeypatch.setattr(releve.subprocess, "run", lambda argv, **kw: vus.append(argv))
+    monkeypatch.setattr(releve.subprocess, "run", lambda argv, **kw: vus.append(argv) or _fini(""))
     executer_openclaw({"TIRON_TELEGRAM_CHAT_ID": "1", "OPENCLAW_BIN": "oc"})("/consigne fais le point")
     assert vus[0][vus[0].index("--agent") + 1] == "consignes"
     assert vus[0][vus[0].index("--message") + 1] == "fais le point"
