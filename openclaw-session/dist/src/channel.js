@@ -35,6 +35,9 @@ export const sessionPlugin = createChatChannelPlugin({
     base: {
         ...createChannelPluginBase({
             id: "session",
+            meta: { label: "Session", selectionLabel: "Session (broker local)", blurb: "Session Messenger par le broker local de Secretarius." },
+            // Le cœur lit capabilities.tts sans garde : capabilities est obligatoire.
+            capabilities: { chatTypes: ["direct"], media: false, reactions: false },
             config: {
                 listAccountIds: () => ["default"],
                 resolveAccount: resolveSessionAccount,

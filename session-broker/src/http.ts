@@ -14,6 +14,7 @@ export type HttpDeps = {
   session?: SessionLike;
   sleep?: (ms: number) => Promise<void>;
   log?: (line: string) => void;
+  keepaliveMs?: number;
 };
 
 function autorise(req: Request, token: string): boolean {
@@ -48,16 +49,22 @@ export function createServer(deps: HttpDeps) {
     if (req.method === "GET" && pathname === "/events" && deps.store) {
       const store = deps.store;
       let ctrl: ReadableStreamDefaultController<Uint8Array>;
+      let minuterie: ReturnType<typeof setInterval> | undefined;
+      const fin = () => { abonnes.delete(ctrl); if (minuterie) clearInterval(minuterie); };
       const stream = new ReadableStream<Uint8Array>({
         start(c) {
           ctrl = c;
+          // Commentaire SSE périodique : garde la connexion ouverte (délais d'inactivité).
+          minuterie = setInterval(() => {
+            try { c.enqueue(new TextEncoder().encode(": ping\n\n")); } catch { fin(); }
+          }, deps.keepaliveMs ?? 15000);
           c.enqueue(new TextEncoder().encode(": ok\n\n"));
           for (const evt of store.pending()) c.enqueue(trame(evt));
           abonnes.add(c);
         },
-        cancel() { abonnes.delete(ctrl); },
+        cancel() { fin(); },
       });
-      req.signal.addEventListener("abort", () => abonnes.delete(ctrl));
+      req.signal.addEventListener("abort", fin);
       return new Response(stream, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
     }
     if (req.method === "POST" && pathname === "/ack" && deps.store) {

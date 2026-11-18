@@ -49,7 +49,8 @@ async function serve() {
     catch (e) { log(`échec du poll : ${e instanceof Error ? e.message : String(e)}`); }
     finally { enCours = false; }
   }, POLL_MS);
-  Bun.serve({ hostname: "127.0.0.1", port: cfg.port, fetch: app.fetch });
+  // idleTimeout 0 : le flux SSE reste ouvert (défaut Bun : 10 s).
+  Bun.serve({ hostname: "127.0.0.1", port: cfg.port, fetch: app.fetch, idleTimeout: 0 });
   log(`session-broker prêt sur 127.0.0.1:${cfg.port}, identité ${status.sessionId.slice(0, 8)}`);
 }
 

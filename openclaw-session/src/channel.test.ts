@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveSessionAccount, inspectSessionAccount } from "./channel.js";
+import { resolveSessionAccount, inspectSessionAccount, sessionPlugin } from "./channel.js";
 
 const ID = "05" + "a".repeat(64);
 
@@ -21,5 +21,11 @@ describe("compte session", () => {
     expect(inspectSessionAccount(cfg)).toMatchObject({ configured: true, tokenStatus: "available" });
     delete process.env.TIRON_SESSION_BROKER_TOKEN;
     expect(inspectSessionAccount(cfg)).toMatchObject({ tokenStatus: "missing" });
+  });
+});
+
+describe("capacités", () => {
+  it("déclare capabilities (le cœur lit capabilities.tts sans garde)", () => {
+    expect((sessionPlugin as any).capabilities).toMatchObject({ chatTypes: ["direct"], media: false, reactions: false });
   });
 });

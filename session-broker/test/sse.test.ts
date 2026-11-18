@@ -9,11 +9,11 @@ const MOI = "05" + "a".repeat(64);
 let srv: ReturnType<typeof Bun.serve> | null = null;
 afterEach(() => { srv?.stop(true); srv = null; });
 
-function demarrer() {
+function demarrer(keepaliveMs?: number) {
   const d = mkdtempSync(join(tmpdir(), "sb-sse-"));
   const store = new Store(join(d, "broker.sqlite"));
   const cfg = { port: 0, allowFrom: [MOI], stateDir: d, token: "t", maxAttachmentBytes: 10 };
-  const app = createServer({ cfg, status: { lastPollOkAt: null, lastSendOkAt: null, sessionId: "05bot" }, store } as any);
+  const app = createServer({ cfg, status: { lastPollOkAt: null, lastSendOkAt: null, sessionId: "05bot" }, store, keepaliveMs } as any);
   srv = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: app.fetch });
   return { store, app, base: `http://127.0.0.1:${srv.port}` };
 }
@@ -34,6 +34,16 @@ async function premierEvenement(base: string): Promise<any> {
 }
 
 describe("SSE", () => {
+  it("envoie un commentaire de maintien périodique", async () => {
+    const { base } = demarrer(30);
+    const ac = new AbortController();
+    const r = await fetch(`${base}/events`, { headers: H, signal: ac.signal });
+    const reader = r.body!.getReader();
+    let buf = "";
+    while (!buf.includes(": ping")) buf += new TextDecoder().decode((await reader.read()).value);
+    ac.abort();
+    expect(buf).toContain(": ping\n\n");
+  });
   it("/events sans jeton : 401", async () => {
     const { base } = demarrer();
     expect((await fetch(`${base}/events`)).status).toBe(401);
