@@ -20,7 +20,9 @@ export async function traiterEvenement(evt: InboundEvent, d: TraiterDeps): Promi
     const { fichiers } = d.depot(evt, d.receptionDir, new Date());
     const tropGrandes = evt.attachments.filter((a) => a.error === "trop-grande").length;
     let msg = `Reçu : ${fichiers.length} pièce(s) jointe(s) déposée(s) dans Réception/`;
+    const echecs = evt.attachments.filter((a) => a.error === "echec-telechargement").length;
     if (tropGrandes) msg += ` ; ${tropGrandes} pièce(s) trop grande(s), non reçue(s)`;
+    if (echecs) msg += ` ; ${echecs} pièce(s) non téléchargeable(s)`;
     d.seen.add(evt.id);
     await d.repondre(evt.from, msg);
     await d.ack(evt.id);

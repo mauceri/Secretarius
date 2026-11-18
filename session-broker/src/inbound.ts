@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { BrokerConfig } from "./config";
 import type { Store } from "./store";
 
-export type InboundAttachment = { path: string; name: string; contentType: string; size: number; error?: "trop-grande" };
+export type InboundAttachment = { path: string; name: string; contentType: string; size: number; error?: "trop-grande" | "echec-telechargement" };
 export type InboundEvent = { id: string; from: string; timestamp: number; text: string; attachments: InboundAttachment[] };
 
 // Sous-ensemble de Session (@session.js/client 0.0.57) utilisé par le broker.
@@ -26,6 +26,16 @@ export type InboundDeps = {
 
 export const court = (id: string) => id.slice(0, 8);
 
+// Forme de l'adresse d'une pièce jointe pour le diagnostic : hôte et chemin, chiffres masqués.
+export function formeUrl(url: unknown): string {
+  if (typeof url !== "string" || !url) return "(pas d'url)";
+  try {
+    const u = new URL(url);
+    const params = [...u.searchParams.keys()].join("&");
+    return `${u.host}${u.pathname.replace(/\d+/g, "N")}${params ? "?" + params : ""}${u.hash ? "#…" : ""}`;
+  } catch { return "(url illisible)"; }
+}
+
 export async function handleSessionMessage(msg: any, deps: InboundDeps): Promise<"dropped" | "duplicate" | "queued"> {
   const { cfg, store, session, log } = deps;
   if (msg.type !== "private" || !cfg.allowFrom.includes(msg.from)) {
@@ -35,14 +45,22 @@ export async function handleSessionMessage(msg: any, deps: InboundDeps): Promise
   if (store.seen(msg.id)) return "duplicate";
 
   const attachments: InboundAttachment[] = [];
-  for (const att of msg.attachments ?? []) {
+  const pointeurs: any[] = (() => { try { return msg.getContent?.()?.dataMessage?.attachments ?? []; } catch { return []; } })();
+  for (const [i, att] of (msg.attachments ?? []).entries()) {
     const name = String(att.name ?? "piece-jointe");
     const contentType = String(att.metadata?.contentType ?? "application/octet-stream");
     if ((att.size ?? 0) > cfg.maxAttachmentBytes) {
       attachments.push({ path: "", name, contentType, size: att.size, error: "trop-grande" });
       continue;
     }
-    const file = await session.getFile(att);
+    let file: File;
+    try {
+      file = await session.getFile(att);
+    } catch (e) {
+      log(`pièce jointe non téléchargée (${e instanceof Error ? e.message : String(e)}) ; id ${String(att.id).length} chiffres, url ${formeUrl(pointeurs[i]?.url)}`);
+      attachments.push({ path: "", name, contentType, size: att.size ?? 0, error: "echec-telechargement" });
+      continue;
+    }
     if (file.size > cfg.maxAttachmentBytes) {
       attachments.push({ path: "", name, contentType, size: file.size, error: "trop-grande" });
       continue;

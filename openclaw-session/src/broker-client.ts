@@ -1,5 +1,5 @@
 // Client HTTP + SSE du broker Session (session-broker, 127.0.0.1).
-export type InboundAttachment = { path: string; name: string; contentType: string; size: number; error?: "trop-grande" };
+export type InboundAttachment = { path: string; name: string; contentType: string; size: number; error?: "trop-grande" | "echec-telechargement" };
 export type InboundEvent = { id: string; from: string; timestamp: number; text: string; attachments: InboundAttachment[] };
 
 export class BrokerNotAllowedError extends Error {}

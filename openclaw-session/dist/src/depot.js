@@ -40,7 +40,7 @@ export function deposerPiecesJointes(evt, dir, now) {
     const lignes = [];
     for (const att of evt.attachments) {
         if (att.error || !att.path) {
-            lignes.push(`- ${assainir(att.name)} (trop grande, non reçue)`);
+            lignes.push(`- ${assainir(att.name)} (${att.error === "echec-telechargement" ? "téléchargement impossible" : "trop grande, non reçue"})`);
             continue;
         }
         const nom = libre(dir, `${h} ${assainir(att.name)}`);

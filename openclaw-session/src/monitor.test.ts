@@ -47,6 +47,11 @@ describe("traiterEvenement", () => {
     await traiterEvenement(evt({ attachments: [{ path: "", name: "g", contentType: "x", size: 99, error: "trop-grande" }] }), d);
     expect(d.repondre).toHaveBeenCalledWith(MOI, "Reçu : 0 pièce(s) jointe(s) déposée(s) dans Réception/ ; 1 pièce(s) trop grande(s), non reçue(s)");
   });
+  it("pièce non téléchargée : signalée dans la réponse", async () => {
+    const d = deps({ depot: vi.fn(() => ({ note: "/r/n.md", fichiers: [] })) });
+    await traiterEvenement(evt({ attachments: [{ path: "", name: "g", contentType: "x", size: 3, error: "echec-telechargement" }] }), d);
+    expect(d.repondre).toHaveBeenCalledWith(MOI, "Reçu : 0 pièce(s) jointe(s) déposée(s) dans Réception/ ; 1 pièce(s) non téléchargeable(s)");
+  });
   it("échec du dispatch : pas d'ack, le rejeu est retraité", async () => {
     const d = deps({ dispatchTexte: vi.fn().mockRejectedValueOnce(new Error("panne")).mockResolvedValue(undefined) });
     await expect(traiterEvenement(evt(), d)).rejects.toThrow("panne");

@@ -76,6 +76,18 @@ describe("handleSessionMessage", () => {
     const media = join(cfg.stateDir, "media");
     expect(existsSync(media) ? readdirSync(media) : []).toEqual([]);
   });
+  it("téléchargement impossible : queued, texte gardé, error echec-telechargement, forme de l'URL journalisée", async () => {
+    const { s } = fauxSession();
+    s.getFile = async () => { throw new Error("Couldn't download file from filev2 server"); };
+    const m = msg({ attachments: [{ id: "123", name: "p.jpg", metadata: {}, size: 3 }],
+      getContent: () => ({ dataMessage: { attachments: [{ url: "http://files.example.org/file/987654?p=abc" }] } }) });
+    expect(await handleSessionMessage(m, deps(s))).toBe("queued");
+    expect(publies[0].text).toBe("bonjour secret");
+    expect(publies[0].attachments[0]).toMatchObject({ path: "", name: "p.jpg", error: "echec-telechargement" });
+    const j = journal.join("\n");
+    expect(j).toContain("files.example.org/file/N?p");
+    expect(j).not.toContain("987654");
+  });
   it("message de groupe : dropped", async () => {
     const { s } = fauxSession();
     expect(await handleSessionMessage(msg({ type: "group", groupId: "g" }), deps(s))).toBe("dropped");

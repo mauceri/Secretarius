@@ -48,6 +48,10 @@ describe("deposerPiecesJointes", () => {
     expect(note).toContain("![[2026-11-18 1502 photo.png]]");
     expect(existsSync(a.path)).toBe(false);
   });
+  it("pièce non téléchargée : signalée dans la note", () => {
+    const r = deposerPiecesJointes(evt([{ path: "", name: "p.jpg", contentType: "x", size: 3, error: "echec-telechargement" }]), recep, now);
+    expect(readFileSync(r.note, "utf8")).toContain("p.jpg (téléchargement impossible)");
+  });
   it("pièce trop grande : pas de fichier, signalée dans la note", () => {
     const r = deposerPiecesJointes(evt([{ path: "", name: "gros.bin", contentType: "x", size: 99, error: "trop-grande" }]), recep, now);
     expect(r.fichiers).toEqual([]);
