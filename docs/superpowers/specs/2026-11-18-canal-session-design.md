@@ -42,16 +42,21 @@ Réussite : pouvoir retirer Telegram sans rien perdre.
 - Précision des rappels à la minute : la plupart des rappels courants seront faits par Grok
   Bot ou un autre agent externe.
 
+**Exigences de sécurité — font partie de « ça marche »** (précision de l'utilisateur : un
+accès non autorisé ou une phrase secrète divulguée, c'est un canal qui ne marche pas)
+- **Seuls les identifiants Session autorisés commandent Tiron.** Liste blanche (au départ :
+  celui de l'utilisateur) ; les autres sont ignorés sans réponse ni accusé, et journalisés.
+  Tests obligatoires : un expéditeur hors liste n'atteint jamais l'agent ; le broker refuse
+  d'écrire à un identifiant hors liste.
+- **La phrase secrète de Tiron ne sort jamais de `~/.config/secrets.env`** : ni dépôt, ni
+  gateway, ni conteneur, ni journal, ni sortie de commande. Le broker et le plugin ne
+  s'acceptent qu'avec le jeton partagé, sur 127.0.0.1 seulement.
+
 **Anti-objectifs (ce qui serait un échec même si « ça marche »)**
 1. **Message perdu sans que personne ne le sache.** Mesures : accusé de réception (§ 5.4),
    envoi sortant réessayé puis échec journalisé.
-2. **Quelqu'un d'autre peut commander Tiron.** Seuls les identifiants Session de la liste
-   blanche sont traités (au départ : celui de l'utilisateur). Les autres sont ignorés sans
-   réponse et journalisés.
-3. **Panne silencieuse** (réseau Session modifié, Session.js cassé). Mesure : alerte par
+2. **Panne silencieuse** (réseau Session modifié, Session.js cassé). Mesure : alerte par
    courriel Proton (§ 5.6).
-4. **Phrase secrète de Tiron divulguée.** Elle ne vit que dans `~/.config/secrets.env`, n'entre
-   ni dans un dépôt, ni dans le gateway, ni dans un conteneur, ni dans un journal.
 
 ## 4. Contraintes établies
 
