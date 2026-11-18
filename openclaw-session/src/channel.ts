@@ -1,6 +1,12 @@
 // Plugin de canal « session » : Session Messenger par le broker local.
 import { createChannelPluginBase, createChatChannelPlugin } from "openclaw/plugin-sdk/channel-core";
+import { join } from "node:path";
+import { homedir } from "node:os";
+import { sleepWithAbort } from "openclaw/plugin-sdk/runtime-env";
 import { BrokerClient } from "./broker-client.js";
+import { boucleReception, traiterEvenement } from "./monitor.js";
+import { deposerPiecesJointes } from "./depot.js";
+import { creerDispatchTexte } from "./dispatch-sdk.js";
 
 export type SessionAccount = {
   accountId: "default";
@@ -50,6 +56,33 @@ export const sessionPlugin = createChatChannelPlugin<SessionAccount>({
         inspectAccount: inspectSessionAccount,
       } as any,
     }),
+    gateway: {
+      startAccount: async (ctx: any) => {
+        const account: SessionAccount = ctx.account;
+        const client = clientPour(account);
+        const log = (l: string) => ctx.log?.info?.(l);
+        const receptionDir = process.env.TIRON_RECEPTION_DIR || join(homedir(), "Documents", "Arbath", "Réception");
+        const seen = new Set<string>();
+        const dispatchTexte = creerDispatchTexte({ cfg: ctx.cfg, account, client, channelRuntime: ctx.channelRuntime, runtime: ctx.runtime, log });
+        log(`[session] démarrage (${account.brokerUrl})`);
+        await boucleReception({
+          abortSignal: ctx.abortSignal,
+          events: (signal) => client.events(signal),
+          traiter: async (evt) => {
+            await traiterEvenement(evt, {
+              allowFrom: account.allowFrom, seen, receptionDir, depot: deposerPiecesJointes,
+              dispatchTexte, repondre: async (to, text) => { await client.send(to, text); }, ack: (id) => client.ack(id),
+            });
+          },
+          sleep: (ms, signal) => sleepWithAbort(ms, signal),
+          log,
+        });
+      },
+    },
+    heartbeat: {
+      sendTyping: async ({ cfg, to }: any) => { await clientPour(resolveSessionAccount(cfg)).typing(String(to).replace(/^session:/, ""), true); },
+      clearTyping: async ({ cfg, to }: any) => { await clientPour(resolveSessionAccount(cfg)).typing(String(to).replace(/^session:/, ""), false); },
+    },
   } as any,
   security: {
     dm: {
