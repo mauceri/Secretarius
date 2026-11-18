@@ -16,7 +16,8 @@ from zoneinfo import ZoneInfo
 from tiron_cron import fallback
 from tiron_cron.deliver_obsidian import deliver
 from tiron_cron.describe import describe
-from tiron_cron.livraison import livrer, notifier_telegram
+from tiron_cron.livraison import livrer
+from tiron_mail.avis import notifier_courriel
 from tiron_cron.nl import parse_nl
 from tiron_cron.openclaw_cli import OpenClawError, add_job, build_add_argv, manage
 from tiron_cron.syntax import CANAUX, USAGE_ADD, Gestion, Job, SyntaxeInvalide, parse_command, to_args
@@ -41,8 +42,8 @@ def _apercu(job: Job, origin: str, tz: str, env, job_key: str, now: datetime) ->
     if job.quand_kind == "at" and "T" in job.quand and \
             datetime.fromisoformat(job.quand).replace(tzinfo=ZoneInfo(tz)) <= now:
         raise SyntaxeInvalide(f"date déjà passée : {job.quand}")
-    # Résultats de consignes et de commandes : Obsidian par défaut, avis Telegram
-    # (décision du 2026-10-09) ; les rappels restent sur le canal d'origine.
+    # Résultats de consignes et de commandes : Obsidian par défaut, avis par courriel
+    # (décisions du 2026-10-09 et du 2026-11-18) ; les rappels restent sur le canal d'origine.
     canal = job.canal or ("obsidian" if job.type in ("consigne", "commande") else _origine(origin))
     argv = build_add_argv(job, canal, tz, env, job_key)  # valide canal + destinataire dès l'aperçu
     return describe(job, canal, tz), argv
@@ -105,7 +106,7 @@ def main(argv=None, runner=subprocess.run, env=None, now=None, http=None, job_ke
                 out = {"ok": False, "text": f"Échec : {e}"}
         elif a.cmd == "livrer":
             evt = json.loads(sys.stdin.read() or "{}")
-            avis, erreurs = notifier or notifier_telegram(env), []
+            avis, erreurs = notifier or notifier_courriel(env), []
 
             def prevenir(texte: str) -> None:  # la note est écrite ; l'échec de l'avis est rapporté
                 try:
@@ -114,7 +115,7 @@ def main(argv=None, runner=subprocess.run, env=None, now=None, http=None, job_ke
                     erreurs.append(str(e))
             p = livrer(evt, now, env, prevenir)
             texte = str(p) if p else "rien à livrer"
-            out = {"ok": True, "text": texte + (f" ; avis Telegram non envoyé : {erreurs[0]}" if erreurs else "")}
+            out = {"ok": True, "text": texte + (f" ; avis non envoyé : {erreurs[0]}" if erreurs else "")}
         else:
             out = {"ok": True, "text": str(deliver(a.text, now, env))}
     except SyntaxeInvalide as e:

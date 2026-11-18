@@ -41,6 +41,7 @@ class Config:
     envoi_defaut: str
     adresses_proprietaire: tuple
     releve: str = ""
+    avis: str = ""  # adresse des avis et alertes (une des adresses du propriétaire)
 
 
 def charger(chemin: Path = CHEMIN_DEFAUT) -> Config:
@@ -55,7 +56,11 @@ def charger(chemin: Path = CHEMIN_DEFAUT) -> Config:
     releve = d.get("releve", {}).get("boite", "")
     if releve and releve not in comptes:
         raise ErreurConfig(f"releve.boite « {releve} » ne désigne aucune boîte configurée")
-    return Config(comptes, defaut, tuple(a.lower() for a in envoi.get("adresses_proprietaire", [])), releve)
+    proprietaire = tuple(a.lower() for a in envoi.get("adresses_proprietaire", []))
+    avis = envoi.get("avis", "").lower()
+    if avis and avis not in proprietaire:
+        raise ErreurConfig(f"envoi.avis « {avis} » n'est pas une des adresses_proprietaire")
+    return Config(comptes, defaut, proprietaire, releve, avis)
 
 
 def compte_de_prefixe(cfg: Config, prefixe: str) -> Compte:

@@ -128,9 +128,9 @@ def main(argv=None, env=None, connecter=_connecter_imap, smtp=_smtp) -> int:
                     f"Réponse à « {sujet} » ({m['repondre_a']}), depuis {compte.adresse} :"
                     f"\n\n{texte.strip()}{alerte}")}
         elif a.commande == "releve":
-            from tiron_cron.livraison import notifier_telegram
+            from tiron_mail.avis import notifier_courriel
             from tiron_mail.releve import executer_openclaw, relever
-            out = {"ok": True, "text": relever(cfg, env, executer_openclaw(env), notifier_telegram(env),
+            out = {"ok": True, "text": relever(cfg, env, executer_openclaw(env), notifier_courriel(env),
                                                connecter=connecter)}
         elif a.commande == "bloc":  # blocs /mail? et /mail! d'une note Obsidian
             dest, objet, corps = _lire_bloc(a.args)

@@ -161,4 +161,13 @@ def test_livrer_signale_un_avis_non_envoye(capsys, monkeypatch, tmp_path):
         raise OSError("openclaw : Node.js trop ancien")
     out = _call(capsys, ["livrer"], env=env, notifier=panne)
     assert out["ok"] and (tmp_path / "2026-10-02 1000 j.md").exists()
-    assert "avis Telegram non envoyé : openclaw : Node.js trop ancien" in out["text"]
+    assert "avis non envoyé : openclaw : Node.js trop ancien" in out["text"]
+
+
+def test_livrer_avis_par_courriel_par_defaut(capsys, monkeypatch, tmp_path):
+    import io
+    monkeypatch.setattr("sys.stdin", io.StringIO('{"jobId": "j", "status": "ok", "summary": "x"}'))
+    recus = []
+    monkeypatch.setattr("tiron_cron.__main__.notifier_courriel", lambda env: recus.append)
+    out = _call(capsys, ["livrer"], env=dict(ENV, TIRON_RECEPTION_DIR=str(tmp_path)))
+    assert out["ok"] and recus == ["Nouvelle livraison dans Obsidian : j (Réception)"]

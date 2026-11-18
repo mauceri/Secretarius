@@ -180,7 +180,7 @@ def _tiron_mail(argv: list[str]) -> dict:
 @app.post("/livraison")
 def handle_livraison():
     """Webhook des tâches /cron (OpenClaw, cron.webhookToken) : note dans
-    Réception/ et avis Telegram, par tiron_cron. Joignable par Tailscale :
+    Réception/ et avis par courriel, par tiron_cron. Joignable par Tailscale :
     jamais sans jeton."""
     attendu = os.environ.get("TIRON_LIVRAISON_TOKEN", "")
     if not attendu:

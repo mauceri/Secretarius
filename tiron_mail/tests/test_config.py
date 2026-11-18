@@ -55,3 +55,16 @@ def test_modele_du_depot_valide():
     from pathlib import Path
     cfg = charger(Path(__file__).parent.parent / "comptes.toml.modele")
     assert set(cfg.comptes) == {"gmail", "proton", "tiron"}
+
+
+def test_avis_lu(tmp_path):
+    p = tmp_path / "comptes.toml"
+    p.write_text(TOML.replace('adresses_proprietaire', 'avis = "moi@proton.me"\nadresses_proprietaire'), encoding="utf-8")
+    assert charger(p).avis == "moi@proton.me"
+
+
+def test_avis_hors_proprietaire_refuse(tmp_path):
+    p = tmp_path / "comptes.toml"
+    p.write_text(TOML.replace('adresses_proprietaire', 'avis = "autre@ex.fr"\nadresses_proprietaire'), encoding="utf-8")
+    with pytest.raises(ErreurConfig, match="avis"):
+        charger(p)

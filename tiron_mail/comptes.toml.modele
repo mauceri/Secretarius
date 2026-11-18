@@ -9,6 +9,9 @@
 defaut = "proton"
 # Adresses de l'utilisateur : envoi direct permis vers elles.
 adresses_proprietaire = ["vous@gmail.com", "vous@proton.me"]
+# Adresse qui reçoit les avis (livraisons /cron, relève) et les alertes de panne
+# de Session ; obligatoirement une des adresses ci-dessus.
+avis = "vous@proton.me"
 
 # Boîte relevée chaque minute (service tiron-mail-releve) : seules les commandes
 # de vos adresses, authentifiées par Proton, y sont exécutées.
