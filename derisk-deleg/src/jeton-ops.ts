@@ -1,5 +1,5 @@
 // /jeton : jetons des agents de la porte Grok (spec 2026-10-13-porte-grok),
-// par appel direct de porte-jeton sur l'hôte. Telegram seulement : la réponse
+// par appel direct de porte-jeton sur l'hôte. Canal direct (Telegram, Session) : la réponse
 // ne doit jamais atterrir dans une note du coffre, lisible par les agents.
 import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";

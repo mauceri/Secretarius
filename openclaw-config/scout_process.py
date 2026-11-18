@@ -13,7 +13,7 @@ import sys
 import requests
 
 GUARD_URL = "http://localhost:8990/check"
-GUARD_TIMEOUT = 3
+GUARD_TIMEOUT = 30  # 3 s ne suffisait pas : ~16 s mesurées sur une grosse page (2026-11-18)
 MAX_RAW_LEN = 200_000
 
 

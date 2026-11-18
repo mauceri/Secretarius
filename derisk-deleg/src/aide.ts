@@ -1,6 +1,6 @@
-// Aide des commandes tapées sur Telegram (le /help de Telegram est celui
+// Aide des commandes tapées sur Telegram et Session (le /help de Telegram est celui
 // d'OpenClaw ; l'aide des blocs wiki d'Obsidian est /help dans wiki.py).
-export const AIDE = `Commandes Secretarius (Telegram)
+export const AIDE = `Commandes Secretarius (Telegram, Session)
 
 Wiki
 /q <question> — réponse rédigée à partir du wiki (environ 1 min)

@@ -875,6 +875,19 @@ describe("before_agent_reply — régime de réponse par canal (query)", () => {
     expect(runWikiOpSpy).toHaveBeenCalledWith(api, "query", "question test", undefined, "brief");
   });
 
+  it("Session (ctx.messageProvider === 'session') → runWikiOp reçoit regime 'plain'", async () => {
+    stubRouterQuery();
+    const runWikiOpSpy = vi.fn(async () => "réponse simulée");
+    vi.doMock("./wiki-ops.js", () => ({ runWikiOp: runWikiOpSpy }));
+    const plugin = await freshPlugin();
+    const { api, hooks } = makeApi();
+    plugin.register(api);
+
+    await hooks["before_agent_reply"].handler({ cleanedBody: "question test" }, { messageProvider: "session" });
+
+    expect(runWikiOpSpy).toHaveBeenCalledWith(api, "query", "question test", undefined, "plain");
+  });
+
   it("ctx absent (canal inconnu) → runWikiOp reçoit regime 'brief'", async () => {
     stubRouterQuery();
     const runWikiOpSpy = vi.fn(async () => "réponse simulée");

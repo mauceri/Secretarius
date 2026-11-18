@@ -56,6 +56,7 @@ done
 if [[ -n "$ENV_FILE" ]]; then
   [[ -f "$ENV_FILE" ]] || { error "Fichier introuvable: $ENV_FILE"; exit 1; }
   set -a; source "$ENV_FILE"; set +a
+  unset SESSION_BOT_MNEMONIC  # réservée au broker Session : jamais aux sous-processus
 fi
 charger_profil "$PROFIL" || exit 1
 info "Profil ${PROFIL} : modules ${MODULES}"

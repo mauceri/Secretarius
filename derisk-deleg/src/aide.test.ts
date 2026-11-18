@@ -11,6 +11,10 @@ describe("/aide", () => {
     expect(absentes).toEqual([]);
   });
 
+  it("mentionne Session", () => {
+    expect(AIDE).toContain("Session");
+  });
+
   it("tient dans un message Telegram", () => {
     expect(AIDE.length).toBeLessThan(4000);
   });

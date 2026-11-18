@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Lance le broker avec les SEULES clés nécessaires tirées de secrets.env.
+set -euo pipefail
+f="${HOME}/.config/secrets.env"
+cle() { local v; v="$(grep -m1 "^$1=" "$f" | cut -d= -f2-)"; v="${v#\'}"; printf '%s' "${v%\'}"; }
+SESSION_BOT_MNEMONIC="$(cle SESSION_BOT_MNEMONIC)"
+TIRON_SESSION_BROKER_TOKEN="$(cle TIRON_SESSION_BROKER_TOKEN)"
+export SESSION_BOT_MNEMONIC TIRON_SESSION_BROKER_TOKEN
+ici="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)"
+exec "${HOME}/.bun/bin/bun" "${ici}/src/main.ts" serve
