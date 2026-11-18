@@ -36,6 +36,25 @@ export function formeUrl(url: unknown): string {
   } catch { return "(url illisible)"; }
 }
 
+// Diagnostic temporaire (essai 2026-11-18) : ce que répond le serveur à l'URL
+// du pointeur, et les noms (pas les valeurs) des paramètres du fragment.
+async function diagnostiquer(url: unknown, att: any, log: (l: string) => void): Promise<void> {
+  if (typeof url !== "string" || !url) return;
+  try {
+    const u = new URL(url);
+    const cles = u.hash.slice(1).split("&").map((x) => x.split("=")[0]).filter(Boolean).join(",");
+    const essais = [u.origin + u.pathname, "https://" + u.host + u.pathname, `http://filev2.getsession.org/file/${att.id}`];
+    for (const e of essais) {
+      try {
+        const r = await fetch(e, { redirect: "manual" });
+        const b = await r.arrayBuffer();
+        log(`diag ${formeUrl(e)} → HTTP ${r.status}, ${b.byteLength} octets, location ${formeUrl(r.headers.get("location"))}`);
+      } catch (x) { log(`diag ${formeUrl(e)} → ${x instanceof Error ? x.message : String(x)}`); }
+    }
+    log(`diag fragment : clés [${cles}] ; clé ${att._key ? att._key.length : 0} o, digest ${att._digest ? att._digest.length : 0} o, taille annoncée ${att.size ?? "?"}`);
+  } catch { /* diagnostic seulement */ }
+}
+
 export async function handleSessionMessage(msg: any, deps: InboundDeps): Promise<"dropped" | "duplicate" | "queued"> {
   const { cfg, store, session, log } = deps;
   if (msg.type !== "private" || !cfg.allowFrom.includes(msg.from)) {
@@ -58,6 +77,7 @@ export async function handleSessionMessage(msg: any, deps: InboundDeps): Promise
       file = await session.getFile(att);
     } catch (e) {
       log(`pièce jointe non téléchargée (${e instanceof Error ? e.message : String(e)}) ; id ${String(att.id).length} chiffres, url ${formeUrl(pointeurs[i]?.url)}`);
+      await diagnostiquer(pointeurs[i]?.url, att, log);
       attachments.push({ path: "", name, contentType, size: att.size ?? 0, error: "echec-telechargement" });
       continue;
     }
