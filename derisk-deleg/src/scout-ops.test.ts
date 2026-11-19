@@ -38,7 +38,7 @@ describe("tacheScout", () => {
   it("dépose une tâche URL au format du watcher et rend le verdict du garde", async () => {
     watcher(garde({ blocked: false, risk: "low", clean_text: "Texte propre" }));
     const v = await tacheScout({ url: "https://example.org" }, deps());
-    expect(v).toEqual({ status: "ok", risk: "low", clean_text: "Texte propre" });
+    expect(v).toEqual({ status: "ok", risk: "low", clean_text: "Texte propre", tronque: false });
     expect(vues[0].url_or_path).toBe("https://example.org");
   });
 
@@ -79,6 +79,19 @@ describe("lireSource", () => {
     expect(out).toContain("Un résumé.");
   });
 
+  it("page coupée par le garde : la réponse le dit", async () => {
+    watcher(garde({ blocked: false, risk: "low", clean_text: "Début", truncated: true }));
+    const out = await lireSource("https://example.org", deps({ resumer: async () => "Un résumé." }));
+    expect(out.startsWith("Page longue : seul le début (environ 40 000 caractères) a été résumé.")).toBe(true);
+    expect(out).toContain("Un résumé.");
+  });
+
+  it("page entière : pas d'avertissement de longueur", async () => {
+    watcher(garde({ blocked: false, risk: "low", clean_text: "Court", truncated: false }));
+    const out = await lireSource("https://example.org", deps({ resumer: async () => "Un résumé." }));
+    expect(out).not.toContain("Page longue");
+  });
+
   it("watcher absent : Scout indisponible", async () => {
     const out = await lireSource("https://example.org", deps({ timeoutMs: 50 }));
     expect(out).toContain("Scout indisponible");
@@ -94,6 +107,14 @@ describe("verifierCourriel", () => {
 });
 
 describe("resumerObfusque", () => {
+  it("envoie jusqu'à 40 000 caractères au modèle", async () => {
+    const fetchSpy = vi.fn(async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: "R." } }] }) }));
+    vi.stubGlobal("fetch", fetchSpy);
+    await resumerObfusque("a".repeat(39_000) + "b".repeat(2_000));
+    const user = JSON.parse((fetchSpy.mock.calls[0] as any)[1].body).messages[1].content;
+    expect(user).toBe(`<UNTRUSTED>\n${"a".repeat(39_000)}${"b".repeat(1_000)}\n</UNTRUSTED>`);
+  });
+
   it("n'envoie que la consigne fixe et le texte balisé, sans outils, et retire <think>", async () => {
     const fetchSpy = vi.fn(async () => ({
       ok: true,

@@ -121,5 +121,22 @@ class TestCheckEndpointConsultationSystematiqueDeberta:
             mock_risk.assert_not_called()
 
 
+class TestTroncature:
+    """/source coupait mauceri.me (39 000 car.) à 15 000 sans le dire (2026-11-13)."""
+
+    def _check(self, texte):
+        ig.app.config["TESTING"] = True
+        with patch.object(ig, "_deberta_risk", return_value="low"):
+            return ig.app.test_client().post("/check", json={"type": "text", "content": texte}).get_json()
+
+    def test_page_de_39000_caracteres_entiere(self):
+        data = self._check("a" * 39_000)
+        assert data["truncated"] is False and len(data["clean_text"]) == 39_000
+
+    def test_au_dela_de_40000_coupe_et_signale(self):
+        data = self._check("a" * 41_000)
+        assert data["truncated"] is True and len(data["clean_text"]) == 40_000
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))

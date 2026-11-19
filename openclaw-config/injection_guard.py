@@ -13,7 +13,7 @@ from flask import Flask, request, jsonify
 
 # ─── Constantes ──────────────────────────────────────────────────────────────
 
-MAX_CONTENT_LEN = 15_000
+MAX_CONTENT_LEN = 40_000
 MAX_RAW_LEN = 200_000
 DEBERTA_MAX_TOKENS = 512
 DEBERTA_BLOCK_THRESHOLD = 0.7
