@@ -277,6 +277,17 @@ def test_executer_openclaw_no_reply_vide(monkeypatch):
     assert executer_openclaw({"OPENCLAW_BIN": "oc"})("/c x") == ""
 
 
+def test_executer_openclaw_sortie_precedee_de_journal(monkeypatch):
+    sortie = "[plugins] session chargé\n" + json.dumps({"result": {"payloads": [{"text": "Fait."}]}}, indent=2)
+    monkeypatch.setattr(releve.subprocess, "run", lambda argv, **kw: _fini(sortie))
+    assert executer_openclaw({"OPENCLAW_BIN": "oc"})("/c x") == "Fait."
+
+
+def test_executer_openclaw_sortie_illisible_n_est_pas_un_echec(monkeypatch):
+    monkeypatch.setattr(releve.subprocess, "run", lambda argv, **kw: _fini("pas du json"))
+    assert "illisible" in executer_openclaw({"OPENCLAW_BIN": "oc"})("/c x")
+
+
 def lancer_rep(cfg, serveur, tmp_path, executer, repondre):
     (tmp_path / "etat.json").write_text('{"traites": [], "echecs": 0}')
     avis = []

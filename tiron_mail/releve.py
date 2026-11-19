@@ -201,6 +201,20 @@ def relever(cfg, env, executer, notifier, etat_chemin: Path = ETAT_DEFAUT, conne
     return "\n".join(bilan) or "Rien à relever."
 
 
+def _json_final(sortie: str) -> dict | None:
+    """Objet JSON de la sortie, éventuellement précédé de lignes de journal."""
+    debuts = [0] + [i + 1 for i, c in enumerate(sortie) if c == "\n"]
+    for d in debuts:
+        if sortie[d:d + 1] == "{":
+            try:
+                obj = json.loads(sortie[d:])
+            except ValueError:
+                continue
+            if isinstance(obj, dict):
+                return obj
+    return None
+
+
 def executer_openclaw(env: Mapping[str, str]):
     """Commande : agent main (crochets de derisk-deleg). /consigne : agent consignes.
     Renvoie le texte de la réponse, que la relève renvoie par courriel."""
@@ -217,7 +231,10 @@ def executer_openclaw(env: Mapping[str, str]):
             cible = ["--agent", "main", "--session-key", "agent:main:courrier", "--message", commande]
         p = subprocess.run([exe, "agent", *cible, "--json"],
                            capture_output=True, text=True, timeout=600, check=True)
-        res = (json.loads(p.stdout or "{}").get("result") or {}).get("payloads") or []
+        donnees = _json_final(p.stdout or "{}")
+        if donnees is None:  # commande exécutée (code 0) mais sortie inattendue
+            return "(commande exécutée ; réponse d'openclaw illisible)"
+        res = (donnees.get("result") or {}).get("payloads") or []
         textes = [str(x.get("text") or "").strip() for x in res]
         return "\n\n".join(t for t in textes if t and t != "NO_REPLY")
     return executer

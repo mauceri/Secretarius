@@ -41,10 +41,22 @@ def test_poll_trop_ancien(tmp_path):
     assert len(avis) == 1
 
 
-def test_poll_jamais_fait(tmp_path):
+def test_poll_jamais_fait_alerte_apres_le_seuil(tmp_path):
+    # Juste après un redémarrage du broker, aucune interrogation n'a encore réussi :
+    # pas d'alerte avant le seuil.
+    avis, jamais = [], (lambda: {"ok": True, "lastPollOkAt": None})
+    veiller(jamais, avis.append, T0, tmp_path / "v.json")
+    veiller(jamais, avis.append, T0 + timedelta(minutes=10), tmp_path / "v.json")
+    assert avis == []
+    veiller(jamais, avis.append, T0 + timedelta(minutes=16), tmp_path / "v.json")
+    assert len(avis) == 1 and "depuis 21:00" in avis[0]
+
+
+def test_demarrage_puis_poll_reussi_aucun_avis(tmp_path):
     avis = []
     veiller(lambda: {"ok": True, "lastPollOkAt": None}, avis.append, T0, tmp_path / "v.json")
-    assert len(avis) == 1
+    veiller(ok(T0 + timedelta(minutes=1)), avis.append, T0 + timedelta(minutes=5), tmp_path / "v.json")
+    assert avis == []
 
 
 def test_alerte_reessayee_si_envoi_echoue(tmp_path):
@@ -62,6 +74,13 @@ def test_alerte_reessayee_si_envoi_echoue(tmp_path):
 
 def test_etat_illisible(tmp_path):
     (tmp_path / "v.json").write_text("{pas du json")
+    avis = []
+    veiller(panne, avis.append, T0, tmp_path / "v.json")
+    assert len(avis) == 1
+
+
+def test_etat_incoherent(tmp_path):
+    (tmp_path / "v.json").write_text('{"panne_depuis": 12, "alerte": "oui"}')
     avis = []
     veiller(panne, avis.append, T0, tmp_path / "v.json")
     assert len(avis) == 1

@@ -43,8 +43,13 @@ def sonde_broker(jeton: str, url: str = URL, ouvrir=urllib.request.urlopen) -> C
 def _lire_etat(chemin: Path) -> dict:
     try:
         etat = json.loads(chemin.read_text(encoding="utf-8"))
-        return etat if isinstance(etat, dict) else {}
-    except (OSError, ValueError):
+        depuis = etat.get("panne_depuis")
+        if depuis is not None:
+            datetime.fromisoformat(depuis)
+        if not isinstance(etat.get("alerte", False), bool):
+            return {}
+        return etat
+    except (OSError, ValueError, TypeError, AttributeError):  # illisible ou incohérent
         return {}
 
 
@@ -62,12 +67,12 @@ def _heure(iso: str) -> str:
 def veiller(sonde: Callable[[], dict], notifier: Callable[[str], None], maintenant: datetime,
             etat_chemin: Path = ETAT, seuil: timedelta = timedelta(minutes=15)) -> str:
     etat = _lire_etat(etat_chemin)
-    motif, depuis = "", maintenant
+    motif, depuis, delai = "", maintenant, False
     try:
         sante = sonde()
         dernier = sante.get("lastPollOkAt")
-        if not dernier:
-            motif = "aucune interrogation réussie du réseau"
+        if not dernier:  # broker qui démarre : alerte seulement au-delà du seuil
+            motif, delai = "aucune interrogation réussie du réseau", True
         elif maintenant - datetime.fromisoformat(dernier) > seuil:
             motif, depuis = "réseau Session muet", datetime.fromisoformat(dernier)
     except Exception as e:  # arrêté, injoignable, réponse illisible
@@ -75,7 +80,8 @@ def veiller(sonde: Callable[[], dict], notifier: Callable[[str], None], maintena
     if motif:
         etat.setdefault("panne_depuis", None)
         etat["panne_depuis"] = etat["panne_depuis"] or depuis.isoformat()
-        if not etat.get("alerte"):
+        attendre = delai and maintenant - datetime.fromisoformat(etat["panne_depuis"]) <= seuil
+        if not etat.get("alerte") and not attendre:
             try:
                 notifier(f"Session : Tiron ne reçoit plus depuis {_heure(etat['panne_depuis'])} ({motif}).")
                 etat["alerte"] = True
