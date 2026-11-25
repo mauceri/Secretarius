@@ -108,5 +108,5 @@ spawner d'autres agents — cette isolation est la barrière, pas une consigne
 que le modèle pourrait choisir de suivre ou non. Le fetch réseau lui-même
 est fait hors du modèle, par `scout-watcher` (curl), jamais par l'agent
 scout. Tout contenu passe par `openclaw-injection-guard.service` (regex +
-DeBERTa, consulté systématiquement depuis le 16/09/2026 — voir
+classifieur Prompt Guard 2 86M depuis le 26/11/2026, qui avertit sans bloquer — voir
 `openclaw-config/injection_guard.py`) avant d'atteindre un LLM.

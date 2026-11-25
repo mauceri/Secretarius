@@ -55,7 +55,7 @@ _MAX = 3500
 
 
 def garde_injection(url: str = GARDE, ouvrir=urllib.request.urlopen) -> Callable[[str], dict]:
-    """Même garde que check_email : regex + DeBERTa, aucun LLM."""
+    """Même garde que check_email : regex + Prompt Guard 2, aucun LLM."""
     def verifier(texte: str) -> dict:
         req = urllib.request.Request(url, data=json.dumps({"type": "text", "content": texte}).encode(),
                                      headers={"Content-Type": "application/json"})

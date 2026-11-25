@@ -65,7 +65,7 @@ module_scout() {
            "${OPENCLAW_PATH}/workspace-scout/results"
   info "Répertoires scout (tasks/results) créés"
 
-  # injection-guard : filtre le contenu externe (motifs regex + DeBERTa) avant
+  # injection-guard : filtre le contenu externe (motifs regex + Prompt Guard 2) avant
   # toute lecture par un LLM. Installé et démarré AVANT scout-watcher : le
   # watcher l'appelle (via scout_process.py) dès la première tâche traitée.
   cp "${SCRIPT_DIR}/injection_guard.py" "${HOME}/.local/bin/injection_guard.py"

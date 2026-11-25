@@ -2,6 +2,7 @@
 """
 injection-guard — Service Flask de détection d'injection de prompt.
 Endpoint : POST /check  {type:"html"|"text", content:str}
+Regex (seules à bloquer) + Prompt Guard 2 86M (avertit).
 """
 import re
 import html as html_mod
@@ -15,9 +16,9 @@ from flask import Flask, request, jsonify
 
 MAX_CONTENT_LEN = 40_000
 MAX_RAW_LEN = 200_000
-DEBERTA_MAX_TOKENS = 512
-DEBERTA_BLOCK_THRESHOLD = 0.7
-DEBERTA_MEDIUM_THRESHOLD = 0.3
+PG2_MODELE = "meta-llama/Llama-Prompt-Guard-2-86M"
+PG2_FENETRE = 512
+PG2_SEUIL = 0.5
 
 # ─── HTML cleaning ────────────────────────────────────────────────────────────
 
@@ -100,42 +101,48 @@ def check_regex(text: str) -> Tuple[str, List[str]]:
     return "low", []
 
 
-# ─── DeBERTa ─────────────────────────────────────────────────────────────────
+# ─── Classifieur Prompt Guard 2 ──────────────────────────────────────────────
+# Remplace DeBERTa (protectai v2) le 2026-11-26 : sur 22 textes sains, DeBERTa
+# en signalait 9 à 11 (score ~1,0 sur du français ordinaire), PG2-86M aucun ;
+# PG2 ne repère en revanche que 12 injections sur 30 (surtout les formes
+# classiques). Il avertit, il ne bloque pas : seules les regex bloquent.
 
-_classifier = None
-_deberta_available = False
+_classifier_available = False
+_tokenizer = None
+_model = None
 
 
-def _load_deberta() -> None:
-    global _classifier, _deberta_available
+def _load_classifier() -> None:
+    global _tokenizer, _model, _classifier_available
     try:
-        from transformers import pipeline as hf_pipeline
-        _classifier = hf_pipeline(
-            "text-classification",
-            model="protectai/deberta-v3-base-prompt-injection-v2",
-            device=-1,
-        )
-        _deberta_available = True
-        logging.info("DeBERTa chargé.")
+        from transformers import AutoTokenizer, AutoModelForSequenceClassification
+        _tokenizer = AutoTokenizer.from_pretrained(PG2_MODELE)
+        _model = AutoModelForSequenceClassification.from_pretrained(PG2_MODELE).eval()
+        _classifier_available = True
+        logging.info("Prompt Guard 2 chargé.")
     except Exception as exc:
-        logging.error("Chargement DeBERTa échoué (%s) — mode regex-only.", exc)
+        logging.error("Chargement de Prompt Guard 2 échoué (%s) — mode regex-only.", exc)
 
 
-def _deberta_risk(text: str) -> str:
-    """Retourne 'blocked', 'medium' ou 'low' selon le score DeBERTa."""
-    if not _deberta_available or _classifier is None:
+def _score_malveillant(text: str) -> float:
+    """Probabilité « malveillant » maximale sur des fenêtres de 512 jetons."""
+    import torch
+    ids = _tokenizer(text, add_special_tokens=False)["input_ids"]
+    pas = PG2_FENETRE - 2  # place pour [CLS] et [SEP]
+    meilleur = 0.0
+    for i in range(0, max(len(ids), 1), pas):
+        fenetre = [_tokenizer.cls_token_id] + ids[i:i + pas] + [_tokenizer.sep_token_id]
+        with torch.no_grad():
+            logits = _model(input_ids=torch.tensor([fenetre])).logits
+        meilleur = max(meilleur, torch.softmax(logits, -1)[0, 1].item())
+    return meilleur
+
+
+def _classifier_risk(text: str) -> str:
+    """'medium' si PG2 juge le texte malveillant (ou s'il est absent), sinon 'low'."""
+    if not _classifier_available:
         return "medium"
-    result = _classifier(text[:DEBERTA_MAX_TOKENS])
-    label = result[0]['label'].upper()
-    score = result[0]['score']
-    if label == 'INJECTION':
-        if score >= DEBERTA_BLOCK_THRESHOLD:
-            return "blocked"
-        if score >= DEBERTA_MEDIUM_THRESHOLD:
-            return "medium"
-        return "low"
-    # label == LEGIT
-    return "low" if score >= DEBERTA_BLOCK_THRESHOLD else "medium"
+    return "medium" if _score_malveillant(text) >= PG2_SEUIL else "low"
 
 
 # ─── Flask app ────────────────────────────────────────────────────────────────
@@ -174,19 +181,15 @@ def check():
     if risk == "blocked":
         return jsonify({"blocked": True, "reason": ", ".join(patterns)})
 
-    # DeBERTa est désormais consulté systématiquement (medium ET low), pas
-    # seulement à "medium" comme avant le 16/09/2026 : les formulations
-    # anglaises passaient en "low" côté regex (jeu de motifs francocentré),
-    # donc n'atteignaient jamais le classifieur — angle mort mesuré par la
-    # revue DSH du 16/09/2026. Le texte est déjà tronqué à ce stade, donc le
-    # coût supplémentaire par appel reste modeste.
+    # Le classifieur est consulté systématiquement (medium ET low) depuis le
+    # 16/09/2026 : les formulations anglaises passaient en "low" côté regex et
+    # n'atteignaient jamais le classifieur (revue DSH). Il ne fait que relever
+    # le risque : un "medium" regex reste "medium".
     try:
-        deberta_risk = _deberta_risk(clean_text)
-        # Avertit sans bloquer (2026-11-13) : ce modèle note 1,000 un courriel
-        # français ordinaire comme une injection ; seules les regex bloquent.
-        risk = "medium" if deberta_risk == "blocked" else deberta_risk
+        if _classifier_risk(clean_text) == "medium":
+            risk = "medium"
     except Exception as exc:
-        logging.error("DeBERTa inference error: %s", exc)
+        logging.error("Erreur d'inférence du classifieur : %s", exc)
 
     return jsonify({
         "blocked": False,
@@ -199,12 +202,12 @@ def check():
 
 @app.route('/health', methods=['GET'])
 def health():
-    return jsonify({"status": "ok", "deberta": _deberta_available})
+    return jsonify({"status": "ok", "classifieur": _classifier_available})
 
 
 # ─── Entry point ──────────────────────────────────────────────────────────────
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    _load_deberta()
+    _load_classifier()
     app.run(host='127.0.0.1', port=8990, debug=False)
