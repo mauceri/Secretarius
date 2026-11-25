@@ -107,6 +107,10 @@ describe("verifierCourriel", () => {
 });
 
 describe("resumerObfusque", () => {
+  it("la consigne interdit de parler des balises", () => {
+    expect(CONSIGNE_RESUME).toContain("Ne mentionne pas les balises");
+  });
+
   it("envoie jusqu'à 40 000 caractères au modèle", async () => {
     const fetchSpy = vi.fn(async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: "R." } }] }) }));
     vi.stubGlobal("fetch", fetchSpy);
