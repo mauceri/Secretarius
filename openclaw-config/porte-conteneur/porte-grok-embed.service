@@ -1,7 +1,0 @@
-[Unit]
-Description=Embeddings des nouvelles pages du wiki Publication (dans le conteneur porte-grok)
-
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/docker exec porte-grok %h/Secretarius/Wiki_LM/.venv/bin/python3 %h/Secretarius/Wiki_LM/tools/embed.py
-ExecStartPost=-/usr/bin/docker exec porte-grok curl -fsS -X POST http://127.0.0.1:5051/reload

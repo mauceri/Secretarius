@@ -1,21 +1,14 @@
-# Porte Grok + wiki Publication dans un conteneur isolé (spec 2026-11-12-porte-sanroque).
+# Porte Grok dans un conteneur isolé (spec 2026-11-12-porte-sanroque) : coffre
+# Publication seulement ; plus de wiki ni d'accès à Ollama depuis le 2026-11-25.
 # Refuse de démarrer sans le pare-feu (témoin de porte-pare-feu.service).
 # --dns 192.0.2.1 (TEST-NET, non routé) : le résolveur intégré de Docker
 # interroge depuis l'hôte, hors pare-feu ; sans résolveur amont, pas de canal DNS.
-# Seul bge-m3 est monté du cache Hugging Face (pas token ni stored_tokens).
 #
 # ~/.config/porte-grok/conteneur.env (chmod 600 ; jamais porte.env, que
 # l'installateur réécrit) :
 #   PORTE_HOTE=0.0.0.0
 #   PORTE_COFFRE=/coffre
 #   PORTE_AGENTS=/etc/porte/agents
-#   PORTE_WIKI_URL=http://127.0.0.1:5051
-#   WIKI_PATH=/coffre/Wiki_LM
-#   WIKI_LLM_BACKEND=ollama
-#   OLLAMA_MODEL=qwen3:8b
-#   OLLAMA_BASE_URL=http://host.docker.internal:11434
-#   WIKI_VAULT_MIRRORS=
-#   HF_HUB_OFFLINE=1
 #   PYTHONDONTWRITEBYTECODE=1
 [Unit]
 Description=Porte Grok en conteneur (coffre Publication, 127.0.0.1:5052, Funnel 10000)
@@ -28,18 +21,15 @@ ExecStartPre=-/usr/bin/docker network create -o com.docker.network.bridge.name=b
 ExecStartPre=-/usr/bin/docker rm -f porte-grok
 ExecStart=/usr/bin/docker run --rm --name porte-grok \
   --network porte-grok -p 127.0.0.1:5052:5052 \
-  --add-host host.docker.internal:host-gateway --dns 192.0.2.1 \
+  --dns 192.0.2.1 \
   --user 1000:1000 --read-only --tmpfs /tmp \
   --cap-drop ALL --security-opt no-new-privileges \
   --env-file %h/.config/porte-grok/conteneur.env \
-  -e HOME=/tmp -e HF_HOME=/hf -e NLTK_DATA=/nltk \
-  -e VENV=%h/Secretarius/Wiki_LM/.venv -e TOOLS=%h/Secretarius/Wiki_LM/tools \
+  -e HOME=/tmp \
+  -e VENV=%h/Secretarius/Wiki_LM/.venv -e PORTE_DIR=%h/Secretarius/Wiki_LM/porte \
   -v %h/Documents/Publication:/coffre \
-  -v %h/Secretarius/Wiki_LM/tools:%h/Secretarius/Wiki_LM/tools:ro \
   -v %h/Secretarius/Wiki_LM/porte:%h/Secretarius/Wiki_LM/porte:ro \
   -v %h/Secretarius/Wiki_LM/.venv:%h/Secretarius/Wiki_LM/.venv:ro \
-  -v %h/.cache/huggingface/hub/models--BAAI--bge-m3:/hf/hub/models--BAAI--bge-m3:ro \
-  -v %h/nltk_data:/nltk:ro \
   -v %h/.config/porte-grok/agents:/etc/porte/agents:ro \
   porte-grok:local
 ExecStop=/usr/bin/docker stop porte-grok

@@ -35,7 +35,6 @@ json.dump(etat, open(etat_f, "w"))
 
 EST_RETURN = "-i br-porte -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN".split()
 EST_ACCEPT = "-i br-porte -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT".split()
-OLLAMA = "-i br-porte -p tcp --dport 11434 -j ACCEPT".split()
 DROP = "-i br-porte -j DROP".split()
 
 
@@ -75,7 +74,8 @@ def faux(tmp_path):
 def test_poser_ecrit_les_regles_dans_l_ordre(faux):
     assert faux.lancer("poser") == 0
     assert faux.etat()["DOCKER-USER"] == [EST_RETURN, DROP]
-    assert faux.etat()["INPUT"] == [EST_ACCEPT, OLLAMA, DROP]
+    # 2026-11-25 : plus de wiki dans le conteneur, donc plus d'accès à Ollama.
+    assert faux.etat()["INPUT"] == [EST_ACCEPT, DROP]
 
 
 def test_poser_deux_fois_sans_doublon(faux):

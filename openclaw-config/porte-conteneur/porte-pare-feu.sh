@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pare-feu du conteneur de la porte Grok (spec 2026-11-12-porte-sanroque).
-# Depuis le pont br-porte, seul Ollama (hôte:11434) est joignable ; tout le reste
-# (autres services de l'hôte, Internet) est rejeté. Lancé en root par
+# Depuis le pont br-porte, rien n'est joignable : ni les services de l'hôte (Ollama
+# compris depuis le 2026-11-25, le wiki a quitté le conteneur), ni Internet. Lancé en root par
 # porte-pare-feu.service ; `verifier` se passe de root (témoin dans /run).
 set -euo pipefail
 
@@ -9,14 +9,12 @@ IPTABLES="${IPTABLES:-iptables}"
 DOCKER="${DOCKER:-docker}"
 TEMOIN="${TEMOIN:-/run/porte-pare-feu.ok}"
 PONT="${PONT:-br-porte}"
-PORT_OLLAMA="${PORT_OLLAMA:-11434}"
 
 # Ordre final voulu dans chaque chaîne, de haut en bas.
 regles() {
   echo "DOCKER-USER -i $PONT -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN"
   echo "DOCKER-USER -i $PONT -j DROP"
   echo "INPUT -i $PONT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT"
-  echo "INPUT -i $PONT -p tcp --dport $PORT_OLLAMA -j ACCEPT"
   echo "INPUT -i $PONT -j DROP"
 }
 

@@ -1,10 +1,11 @@
-# Fiche du coordinateur — wiki et coffre « Publication » de Secretarius
+# Fiche du coordinateur — coffre « Publication » de Secretarius
 
 Vous coordonnez une équipe d'agents de publication (YouTube, Substack, LinkedIn, site).
-Secretarius vous ouvre un **connecteur MCP** sur la machine sanroque : lecture de son wiki
-et lecture/écriture de fichiers Markdown dans le coffre Obsidian « Publication » de
-l'utilisateur. **Rien n'entre dans le wiki sans validation humaine** : vous déposez des
-fichiers, l'utilisateur coche ce qu'il retient.
+Secretarius vous ouvre un **connecteur MCP** sur la machine sanroque : lecture/écriture de
+fichiers Markdown dans le coffre Obsidian « Publication » de l'utilisateur. Vous n'avez
+**pas accès au wiki** (depuis le 2026-11-25) : ce que Secretarius veut vous transmettre,
+l'utilisateur le dépose dans le coffre. **Rien n'entre dans le wiki sans validation
+humaine** : vous déposez des fichiers, l'utilisateur coche ce qu'il retient.
 
 ## Connexion
 
@@ -19,17 +20,11 @@ fichiers, l'utilisateur coche ce qu'il retient.
 
 | Outil | Paramètres | Usage |
 |---|---|---|
-| `wiki_recherche` | `mots` | À utiliser en premier : instantané, sans coût. Renvoie titres et extraits. |
-| `wiki_question` | `question` | Synthèse rédigée à partir du wiki + slugs cités. Jusqu'à ~1 min au réveil du modèle ; une question à la fois pour toute l'équipe (sinon « une question est déjà en cours » : réessayer plus tard). |
-| `wiki_page` | `slug` | Texte complet d'une page (`src-…`, `c-…`, `e-…`), slugs tirés des références de `wiki_question`. |
 | `coffre_lister` | `dossier` (facultatif) | Fichiers `.md` du coffre. |
 | `coffre_lire` | `chemin` | Lire un fichier `.md`. |
 | `coffre_ecrire` | `chemin`, `contenu` | Créer ou remplacer un fichier `.md`. |
 
 Exemples :
-- `wiki_recherche({"mots": "écriture IA valeur"})` → `[{"title": "Is AI Killing…", "excerpt": "…"}]`
-- `wiki_question({"question": "Que dit le wiki de la valeur de l'écriture humaine ?"})` →
-  `{"synthese": "…", "references": ["src-is-ai-killing-the-value-of-human-writing", …]}`
 - `coffre_ecrire({"chemin": "Brouillons/Veille/veille-2026-10-14.md", "contenu": "…"})` →
   `"Brouillons/Veille/veille-2026-10-14.md"`
 
@@ -67,7 +62,7 @@ Résumé : <3 à 6 phrases>.
 
 ## Ce que vous ne pouvez pas faire, et pourquoi
 
-Supprimer, renommer, capturer ou ingérer directement, lire hors du coffre. Tout ce qui entre
+Supprimer, renommer, capturer ou ingérer directement, interroger le wiki, lire hors du coffre. Tout ce qui entre
 dans le wiki passe par la validation de l'utilisateur, puis par la chaîne d'ingestion de
 Secretarius (qui va chercher et résume elle-même les pages, protégée contre l'injection de
 consignes) : ne recopiez pas le contenu d'une page web dans le wiki, donnez son URL.
@@ -75,5 +70,5 @@ consignes) : ne recopiez pas le contenu d'une page web dans le wiki, donnez son 
 ## Erreurs
 
 Les refus arrivent comme erreurs d'outil avec un message court (« le nom du fichier doit
-commencer par veille- », « zone interdite… », « wiki injoignable »). `401` : jeton absent,
+commencer par veille- », « zone interdite… »). `401` : jeton absent,
 invalide ou révoqué — prévenir l'utilisateur.

@@ -6,6 +6,13 @@ se fait désormais depuis sanroque, machine de travail de l'utilisateur. Publier
 porte par Funnel rend sanroque joignable depuis Internet : la porte doit donc être
 isolée du reste de la machine.
 
+> **Révision du 2026-11-25 (décision utilisateur)** : plus aucun accès au wiki depuis Grok.
+> Outils `wiki_question`, `wiki_recherche`, `wiki_page` retirés, serveur wiki Publication
+> retiré du conteneur, accès à Ollama fermé (le pont `br-porte` ne joint plus rien), minuterie
+> `porte-grok-embed` supprimée. La porte ne sert que le coffre. Secretarius transmettra des
+> textes à Grok en les déposant dans Publication, sous contrôle humain (spec à venir).
+> Ce qui suit décrit la conception d'origine.
+
 ## Décisions
 
 | Question | Décision |

@@ -223,7 +223,7 @@ module_porte() {
   local conf="${HOME}/.config/porte-grok"
   mkdir -p "$conf" && chmod 700 "$conf"
   [[ -f "${conf}/agents" ]] || { : > "${conf}/agents"; chmod 600 "${conf}/agents"; }
-  printf 'PORTE_COFFRE=%s\nPORTE_AGENTS=%s\nPORTE_WIKI_URL=http://127.0.0.1:5051\n' \
+  printf 'PORTE_COFFRE=%s\nPORTE_AGENTS=%s\n' \
     "$OBSIDIAN_PATH" "${conf}/agents" > "${conf}/porte.env"
   chmod 600 "${conf}/porte.env"
 

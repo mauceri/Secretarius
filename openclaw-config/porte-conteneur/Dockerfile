@@ -3,7 +3,7 @@
 # Aucune dépendance Python ici : un changement de code se prend au redémarrage.
 FROM ubuntu:24.04
 RUN apt-get update \
- && apt-get install -y --no-install-recommends python3 curl ca-certificates \
+ && apt-get install -y --no-install-recommends python3 ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 COPY demarrer.sh /usr/local/bin/demarrer.sh
 ENTRYPOINT ["/usr/local/bin/demarrer.sh"]

@@ -1,10 +1,8 @@
 """Serveur MCP de la porte Grok, en HTTP réel sur un port local libre."""
 import asyncio
-import json
 import socket
 import threading
 import time
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import httpx
 import pytest
@@ -15,20 +13,6 @@ from fastmcp.exceptions import ToolError
 
 from porte import jetons
 from porte.serveur import creer_app
-
-
-class _FauxWiki(BaseHTTPRequestHandler):
-    def do_POST(self):
-        self.rfile.read(int(self.headers["Content-Length"]))
-        data = {"text": "Synthèse.", "references": ["src-a"]} if self.path == "/query" \
-            else {"results": [{"title": "A", "excerpt": "ex"}]}
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(json.dumps(data).encode())
-
-    def log_message(self, *a):
-        pass
 
 
 def _port_libre():
@@ -47,9 +31,7 @@ def porte(tmp_path):
     (racine / "Notes.md").write_text("perso")
     agents = tmp_path / "agents"
     jeton = jetons.ajouter(agents, "veille")
-    wiki = ThreadingHTTPServer(("127.0.0.1", 0), _FauxWiki)
-    threading.Thread(target=wiki.serve_forever, daemon=True).start()
-    app = creer_app(racine, agents, f"http://127.0.0.1:{wiki.server_address[1]}")
+    app = creer_app(racine, agents)
     port = _port_libre()
     srv = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error"))
     threading.Thread(target=srv.run, daemon=True).start()
@@ -59,7 +41,6 @@ def porte(tmp_path):
         time.sleep(0.1)
     yield {"url": f"http://127.0.0.1:{port}", "jeton": jeton, "racine": racine, "agents": agents}
     srv.should_exit = True
-    wiki.shutdown()
 
 
 def _appeler(porte, jeton, outil=None, args=None):
@@ -82,16 +63,9 @@ def test_health_sans_jeton(porte):
     assert r.status_code == 200 and r.json() == {"status": "ok"}
 
 
-def test_six_outils(porte):
-    assert _appeler(porte, porte["jeton"]) == [
-        "coffre_ecrire", "coffre_lire", "coffre_lister", "wiki_page", "wiki_question", "wiki_recherche"]
-
-
-def test_outils_wiki(porte):
-    assert _appeler(porte, porte["jeton"], "wiki_question", {"question": "q"}) == \
-        {"synthese": "Synthèse.", "references": ["src-a"]}
-    assert _appeler(porte, porte["jeton"], "wiki_recherche", {"mots": "a"}) == [{"title": "A", "excerpt": "ex"}]
-    assert _appeler(porte, porte["jeton"], "wiki_page", {"slug": "src-a"}) == "page A"
+def test_trois_outils_du_coffre_seulement(porte):
+    # 2026-11-25 : plus aucun accès au wiki depuis Grok (décision utilisateur).
+    assert _appeler(porte, porte["jeton"]) == ["coffre_ecrire", "coffre_lire", "coffre_lister"]
 
 
 def test_ecriture_prefixee_et_refus(porte):
@@ -107,7 +81,7 @@ def test_ecriture_prefixee_et_refus(porte):
 
 
 def test_revocation_sans_redemarrage(porte):
-    assert _appeler(porte, porte["jeton"], "wiki_page", {"slug": "src-a"}) == "page A"
+    assert _appeler(porte, porte["jeton"], "coffre_lister", {}) == ["Notes.md"]
     jetons.retirer(porte["agents"], "veille")
     assert httpx.post(f"{porte['url']}/mcp", json={},
                       headers={"Authorization": f"Bearer {porte['jeton']}"}).status_code == 401

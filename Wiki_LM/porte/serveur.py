@@ -3,8 +3,8 @@
 Écoute sur 127.0.0.1:5052 ; Tailscale Funnel le publie sur 8443. Chaque
 requête /mcp doit porter « Authorization: Bearer <jeton> » d'un agent connu
 (fichier relu à chaque requête : un retrait est immédiat). Les outils
-synchrones tournent dans un pool de threads (fastmcp) : une question longue
-ne bloque pas les autres agents.
+synchrones tournent dans un pool de threads (fastmcp). Depuis le 2026-11-25,
+coffre seulement : plus aucun outil du wiki (décision utilisateur).
 """
 from __future__ import annotations
 
@@ -19,22 +19,20 @@ from fastmcp.server.dependencies import get_http_request
 from starlette.middleware import Middleware
 from starlette.responses import JSONResponse
 
-from porte import coffre, jetons, lecture_wiki
+from porte import coffre, jetons
 from porte.coffre import Refus
 
 journal = logging.getLogger("porte-grok")
 
 _INSTRUCTIONS = (
-    "Wiki et coffre Obsidian « Publication » de Secretarius. Lecture du wiki "
-    "(wiki_recherche avant wiki_question, gratuite et instantanée) et lecture/"
-    "écriture de fichiers .md du coffre ; vos fichiers doivent commencer par "
-    "votre préfixe d'agent. Rien n'entre dans le wiki sans validation humaine."
+    "Coffre Obsidian « Publication » de Secretarius : lecture/écriture de fichiers "
+    ".md ; vos fichiers doivent commencer par votre préfixe d'agent. Pas d'accès "
+    "au wiki. Rien n'entre dans le wiki sans validation humaine."
 )
 
 
-def creer_app(racine: Path, fichier_agents: Path, wiki_url: str):
+def creer_app(racine: Path, fichier_agents: Path):
     mcp = FastMCP("secretarius-porte", instructions=_INSTRUCTIONS)
-    wiki_dir = racine / "Wiki_LM" / "wiki"
 
     def _appel(outil: str, detail: str, fn):
         agent = jetons.agent_pour(fichier_agents, get_http_request().headers.get("authorization"))
@@ -42,7 +40,7 @@ def creer_app(racine: Path, fichier_agents: Path, wiki_url: str):
             raise ToolError("jeton invalide")
         try:
             resultat = fn(agent)
-        except (Refus, lecture_wiki.WikiIndisponible) as e:
+        except Refus as e:
             journal.info("%s %s %s refus : %s", agent, outil, detail, e)
             raise ToolError(str(e)) from None
         except Exception:
@@ -50,21 +48,6 @@ def creer_app(racine: Path, fichier_agents: Path, wiki_url: str):
             raise ToolError("erreur interne de la porte") from None
         journal.info("%s %s %s ok", agent, outil, detail)
         return resultat
-
-    @mcp.tool()
-    def wiki_question(question: str) -> dict:
-        """Pose une question au wiki ; renvoie une synthèse et les slugs cités. ~1 min si le modèle dort."""
-        return _appel("wiki_question", question[:80], lambda a: lecture_wiki.question(wiki_url, question))
-
-    @mcp.tool()
-    def wiki_recherche(mots: str) -> list[dict]:
-        """Recherche par mots-clés (sans LLM, instantanée) ; renvoie titres et extraits."""
-        return _appel("wiki_recherche", mots[:80], lambda a: lecture_wiki.recherche(wiki_url, mots))
-
-    @mcp.tool()
-    def wiki_page(slug: str) -> str:
-        """Lit une page du wiki par son slug (src-…, c-…, e-…)."""
-        return _appel("wiki_page", slug[:80], lambda a: lecture_wiki.page(wiki_dir, slug))
 
     @mcp.tool()
     def coffre_lister(dossier: str = "") -> list[str]:
@@ -110,8 +93,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(name)s %(message)s")
     racine = Path(os.environ["PORTE_COFFRE"])
     agents = Path(os.environ.get("PORTE_AGENTS", str(jetons.FICHIER_DEFAUT)))
-    wiki_url = os.environ.get("PORTE_WIKI_URL", "http://127.0.0.1:5051")
-    app = creer_app(racine, agents, wiki_url)
+    app = creer_app(racine, agents)
     uvicorn.run(app, host=hote_ecoute(), port=5052, log_level="warning")
 
 
