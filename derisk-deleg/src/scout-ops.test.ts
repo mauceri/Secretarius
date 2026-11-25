@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CONSIGNE_RESUME, lireSource, resumerObfusque, tacheScout, verifierCourriel } from "./scout-ops.js";
+import { CONSIGNE_RESUME, lireSource, resumerDeepseek, resumerObfusque, resumerWeb, tacheScout, verifierCourriel } from "./scout-ops.js";
 
 // Faux scout-watcher : prend chaque tâche de pending/, la complète, la pose dans done/.
 let ws: string;
@@ -145,5 +145,58 @@ describe("resumerObfusque", () => {
       { role: "system", content: CONSIGNE_RESUME },
       { role: "user", content: "<UNTRUSTED>\nTexte de la page\n</UNTRUSTED>" },
     ]);
+  });
+});
+
+describe("resumerDeepseek", () => {
+  afterEach(() => { vi.unstubAllEnvs(); });
+
+  it("deepseek-v4-flash sans raisonnement, même consigne, sans outils", async () => {
+    vi.stubEnv("DEEPSEEK_API_KEY", "cle-test");
+    const fetchSpy = vi.fn(async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: "Résumé DS." } }] }) }));
+    vi.stubGlobal("fetch", fetchSpy);
+    expect(await resumerDeepseek("Texte")).toBe("Résumé DS.");
+    const [url, init] = fetchSpy.mock.calls[0] as any;
+    expect(url).toBe("https://api.deepseek.com/v1/chat/completions");
+    expect(init.headers.Authorization).toBe("Bearer cle-test");
+    const corps = JSON.parse(init.body);
+    expect(corps.model).toBe("deepseek-v4-flash");
+    expect(corps.thinking).toEqual({ type: "disabled" });
+    expect(corps.tools).toBeUndefined();
+    expect(corps.messages).toEqual([
+      { role: "system", content: CONSIGNE_RESUME },
+      { role: "user", content: "<UNTRUSTED>\nTexte\n</UNTRUSTED>" },
+    ]);
+  });
+
+  it("sans clé : échoue sans rien envoyer", async () => {
+    vi.stubEnv("DEEPSEEK_API_KEY", "");
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    await expect(resumerDeepseek("Texte")).rejects.toThrow("DEEPSEEK_API_KEY");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("resumerWeb", () => {
+  afterEach(() => { vi.unstubAllEnvs(); });
+
+  it("DeepSeek d'abord", async () => {
+    vi.stubEnv("DEEPSEEK_API_KEY", "cle-test");
+    const fetchSpy = vi.fn(async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: "DS." } }] }) }));
+    vi.stubGlobal("fetch", fetchSpy);
+    expect(await resumerWeb("Texte")).toBe("DS.");
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("DeepSeek en échec : repli sur le modèle obfusqué, signalé", async () => {
+    vi.stubEnv("DEEPSEEK_API_KEY", "cle-test");
+    const fetchSpy = vi.fn(async (url: string) => url.includes("deepseek")
+      ? { ok: false, status: 503, json: async () => ({}) }
+      : { ok: true, json: async () => ({ choices: [{ message: { content: "Obf." } }] }) });
+    vi.stubGlobal("fetch", fetchSpy);
+    const out = await resumerWeb("Texte");
+    expect(out).toBe("(DeepSeek indisponible : résumé par le modèle obfusqué.)\n\nObf.");
+    expect((fetchSpy.mock.calls[1] as any)[0]).toBe("http://127.0.0.1:8001/v1/chat/completions");
   });
 });

@@ -9,6 +9,9 @@ import { randomUUID } from "node:crypto";
 
 const OBFUSQUE_URL = "http://127.0.0.1:8001/v1/chat/completions";
 const OBFUSQUE_MODELE = "qwen3-14b-h128-a1-h02";
+// Contenu web = non confidentiel : DeepSeek autorisé (règle utilisateur du 2026-10-06).
+const DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions";
+const DEEPSEEK_MODELE = "deepseek-v4-flash";
 const MAX_TEXTE_RESUME = 40000; // = MAX_CONTENT_LEN du garde
 export const CONSIGNE_RESUME =
   "Résume en français le texte placé entre les balises <UNTRUSTED>. " +
@@ -63,6 +66,41 @@ export async function tacheScout(tache: Tache, deps: ScoutDeps = {}): Promise<Ve
   return { status: "ok", risk: String(g.risk ?? "low"), clean_text: String(g.clean_text ?? ""), tronque: g.truncated === true };
 }
 
+function messagesResume(texte: string) {
+  return [
+    { role: "system", content: CONSIGNE_RESUME },
+    { role: "user", content: `<UNTRUSTED>\n${texte.slice(0, MAX_TEXTE_RESUME)}\n</UNTRUSTED>` },
+  ];
+}
+
+export async function resumerDeepseek(texte: string): Promise<string> {
+  const cle = process.env.DEEPSEEK_API_KEY;
+  if (!cle) throw new Error("DEEPSEEK_API_KEY absente");
+  const resp = await fetch(DEEPSEEK_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${cle}` },
+    body: JSON.stringify({
+      model: DEEPSEEK_MODELE,
+      max_tokens: 1500,
+      thinking: { type: "disabled" },
+      messages: messagesResume(texte),
+    }),
+    signal: AbortSignal.timeout(120000),
+  });
+  if (!resp.ok) throw new Error(`DeepSeek : HTTP ${resp.status}`);
+  const j: any = await resp.json();
+  return String(j?.choices?.[0]?.message?.content ?? "").trim();
+}
+
+/** Résumé d'une page web : DeepSeek, repli sur le modèle obfusqué. */
+export async function resumerWeb(texte: string): Promise<string> {
+  try {
+    return await resumerDeepseek(texte);
+  } catch {
+    return `(DeepSeek indisponible : résumé par le modèle obfusqué.)\n\n${await resumerObfusque(texte)}`;
+  }
+}
+
 export async function resumerObfusque(texte: string): Promise<string> {
   const resp = await fetch(OBFUSQUE_URL, {
     method: "POST",
@@ -70,10 +108,7 @@ export async function resumerObfusque(texte: string): Promise<string> {
     body: JSON.stringify({
       model: OBFUSQUE_MODELE,
       max_tokens: 1500,
-      messages: [
-        { role: "system", content: CONSIGNE_RESUME },
-        { role: "user", content: `<UNTRUSTED>\n${texte.slice(0, MAX_TEXTE_RESUME)}\n</UNTRUSTED>` },
-      ],
+      messages: messagesResume(texte),
     }),
     signal: AbortSignal.timeout(180000),
   });
@@ -97,7 +132,7 @@ export async function lireSource(url: string, deps: ScoutDeps = {}): Promise<str
   if (!v.clean_text.trim()) return "Page lue, mais aucun texte exploitable.";
   let resume: string;
   try {
-    resume = await (deps.resumer ?? resumerObfusque)(v.clean_text);
+    resume = await (deps.resumer ?? resumerWeb)(v.clean_text);
   } catch (e: any) {
     return `Page lue, mais résumé impossible (${e?.message ?? e}).`;
   }
