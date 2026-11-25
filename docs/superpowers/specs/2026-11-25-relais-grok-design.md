@@ -78,6 +78,18 @@ Limite assumée : DMARC et DKIM authentifient le domaine, pas la partie locale ;
 confiance à Grok Bot pour qu'aucun autre de ses utilisateurs ne puisse écrire sous `yc28mybv`.
 Le sélecteur n'élargit pas cette confiance.
 
+Réponse de Rector (2026-11-25, transmise par l'utilisateur) : l'adresse, avec ou sans
+`+sélecteur`, est attachée à l'utilisateur seul ; aucun autre utilisateur de Grok Bot ne peut
+écrire depuis elle « par les moyens normaux » (pas d'audit possible de la plateforme) ;
+`mail.grokbot.com` publie DMARC `p=reject` et n'autorise que les serveurs d'Amazon SES. Il
+recommande DMARC + DKIM `d=mail.grokbot.com` (retenu ci-dessous) et, en plus, un secret partagé
+dans le corps ou l'étiquette.
+
+**Pas de secret partagé (décision utilisateur 2026-11-25).** Rien de relayé n'est exécuté : le
+pire cas (faille interne de Grok Bot) est un faux message affiché sur Session, que l'utilisateur
+juge à la lecture. Le secret vivrait dans la mémoire des agents Grok et circulerait en clair à
+chaque courriel. **À réexaminer dès qu'un courriel de Grok pourra déclencher une action.**
+
 ### Authentification d'un relayé
 
 Admis seulement si, en plus de la règle d'adresse :
