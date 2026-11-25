@@ -111,6 +111,18 @@ describe("resumerObfusque", () => {
     expect(CONSIGNE_RESUME).toContain("Ne mentionne pas les balises");
   });
 
+  it("la consigne demande un résumé par article et d'ignorer menus, dates et catégories", () => {
+    expect(CONSIGNE_RESUME).toContain("chaque article ou section, sous son titre");
+    expect(CONSIGNE_RESUME).toContain("menus, dates, catégories");
+  });
+
+  it("laisse 1 500 jetons à la réponse", async () => {
+    const fetchSpy = vi.fn(async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: "R." } }] }) }));
+    vi.stubGlobal("fetch", fetchSpy);
+    await resumerObfusque("x");
+    expect(JSON.parse((fetchSpy.mock.calls[0] as any)[1].body).max_tokens).toBe(1500);
+  });
+
   it("envoie jusqu'à 40 000 caractères au modèle", async () => {
     const fetchSpy = vi.fn(async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: "R." } }] }) }));
     vi.stubGlobal("fetch", fetchSpy);
