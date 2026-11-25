@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Entrée `local@domaine` → admet `local@domaine` et `local+<sel>@domaine`, `sel` en `[a-z0-9-]+`, minuscules, domaine exact.
-- Relayé admis seulement si : un seul `From` ; `X-Pm-Origin` = `external` ; ≥ 1 `Authentication-Results` `mail.protonmail.ch;` avec `dmarc=`, tous `pass`, `header.from=<domaine>` ; ≥ 1 `dkim=pass` avec `header.d=<domaine>` ; `Message-ID` présent. Pas de contrôle `Return-Path`.
+- Relayé admis seulement si : un seul `From` ; `X-Pm-Origin` = `external` ; ≥ 1 `Authentication-Results` `mail.protonmail.ch;` avec `dmarc=`, tous `pass`, `header.from=<domaine>` ; (DKIM non exigé depuis la révision du 2026-11-25) ; `Message-ID` présent. Pas de contrôle `Return-Path`.
 - Garde : `POST http://127.0.0.1:8990/check` `{"type": "text", "content": texte}` ; réponse `{"blocked": bool, "reason"?, "risk"?, "clean_text"?}`.
 - Libellés exacts : en-tête `Courriel de Grok Bot (<sel>) — « <objet> »` (sans `(<sel>)` si pas de sélecteur) ; `Attention : contenu potentiellement suspect.` ; `contenu bloqué par le détecteur d'injection : <motif>` ; `contenu non vérifié (garde injoignable), consultez la boîte de Tiron` ; coupe à 3 500 caractères + `… (suite dans la boîte de Tiron)` ; repli `(Session indisponible) ` en tête.
 - Broker : `POST http://127.0.0.1:8091/send`, `Authorization: Bearer <TIRON_SESSION_BROKER_TOKEN>`, `{"to": <TIRON_SESSION_ID>, "text": …}` ; ces deux clés lues dans `~/.config/secrets.env` ligne par ligne, apostrophes retirées ; aucune autre clé lue.
@@ -24,7 +24,7 @@
 
 - Courriel relayé dont le texte contient `/wikistatus` → relayé, `executer` jamais appelé → `test_relaye_jamais_execute` (tâche 3).
 - `From` `yc28mybv@mail.grokbot.com` mais DMARC `fail` (usurpation) → refus, rangé dans Refuse → `test_relaye_dmarc_fail_refuse` (tâche 1) et `test_relaye_non_authentifie_refuse` (tâche 3).
-- DKIM `pass` seulement pour `amazonses.com` → refus → `test_dkim_autre_domaine_refuse` (tâche 1).
+- DKIM du domaine en échec mais DMARC `pass` → admis (révision 2026-11-25) → `test_dkim_du_domaine_en_echec_mais_dmarc_pass_admis` (tâche 1).
 - Broker arrêté et avis courriel en échec → message rangé quand même, jamais relayé deux fois → `test_relais_en_echec_n_arrete_pas_la_releve` (tâche 3).
 - Sous-domaine ou suffixe proche (`yc28mybvx@…`, `yc28mybv@x.mail.grokbot.com`) → pas relayé → `test_regle_adresse` (tâche 1).
 

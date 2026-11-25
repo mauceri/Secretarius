@@ -50,15 +50,18 @@ def test_dmarc_autre_domaine_refuse():
     assert authentifier_relaye(_m(AUTHENTIQUE.replace("header.from=mail.grokbot.com", "header.from=evil.fr")))
 
 
-def test_dkim_autre_domaine_refuse():
-    m = _m(AUTHENTIQUE.replace('dkim=pass (2048-bit key) header.d=mail.grokbot.com header.i=@mail.grokbot.com header.b="Nj"; ', ""))
-    assert "DKIM" in authentifier_relaye(m)
+def test_dkim_du_domaine_en_echec_mais_dmarc_pass_admis():
+    # Courriel réel du 2026-11-25 17:29 UTC : clé DKIM de mail.grokbot.com absente du DNS,
+    # DMARC passé par SPF aligné. DMARC seul suffit (décision utilisateur et Rector).
+    m = _m(AUTHENTIQUE.replace('dkim=pass (2048-bit key) header.d=mail.grokbot.com',
+                               'dkim=fail reason="key not found in DNS" (0-bit key) header.d=mail.grokbot.com'))
+    assert authentifier_relaye(m) == ""
 
 
 def test_auth_results_hors_proton_ignores():
     faux = AUTHENTIQUE.replace("X-Pm-Origin: external\n",
-                               "X-Pm-Origin: external\nAuthentication-Results: evil.fr; dkim=pass header.d=mail.grokbot.com\n")
-    faux = faux.replace("mail.protonmail.ch; dkim=pass", "mail.protonmail.ch; dkim=fail")
+                               "X-Pm-Origin: external\nAuthentication-Results: evil.fr; dmarc=pass header.from=mail.grokbot.com\n")
+    faux = faux.replace("mail.protonmail.ch; dmarc=pass", "mail.protonmail.ch; dmarc=fail")
     assert authentifier_relaye(_m(faux))
 
 

@@ -97,8 +97,12 @@ Admis seulement si, en plus de la règle d'adresse :
 - `X-Pm-Origin` = `external` ;
 - au moins un `Authentication-Results` commençant par `mail.protonmail.ch;` portant `dmarc=…`,
   et tous ceux-là à `pass`, avec `header.from=` égal au domaine de l'expéditeur ;
-- au moins un `dkim=pass` avec `header.d=` égal au domaine de l'expéditeur ;
 - `Message-ID` présent.
+
+**DMARC seul (révision du 2026-11-25, décision utilisateur, avis conforme de Rector)** : le
+courriel de Rector de 17 h 29 UTC avait `dkim=fail reason="key not found in DNS"` pour
+`mail.grokbot.com` et DMARC passé par SPF aligné ; l'exigence d'une signature DKIM du domaine,
+plus stricte que DMARC, l'avait fait refuser. Avec `p=reject`, DMARC suffit.
 
 Pas de contrôle `Return-Path` pour les relayés (SES le rend différent ; DMARC l'aligne déjà via
 SPF/DKIM). Échec d'un seul point → refus exactement comme aujourd'hui (rangé dans

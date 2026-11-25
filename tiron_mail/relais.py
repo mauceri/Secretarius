@@ -14,7 +14,6 @@ from tiron_mail.veille_session import lire_cle
 
 _DMARC = re.compile(r"\bdmarc=(\w+)", re.IGNORECASE)
 _DMARC_FROM = re.compile(r"\bdmarc=\w+[^;]*?\bheader\.from=([^\s;]+)", re.IGNORECASE)
-_DKIM = re.compile(r"\bdkim=(\w+)[^;]*?\bheader\.d=([^\s;]+)", re.IGNORECASE)
 
 
 def selecteur_relaye(adresse: str, relayes: tuple) -> str | None:
@@ -29,7 +28,9 @@ def selecteur_relaye(adresse: str, relayes: tuple) -> str | None:
 
 
 def authentifier_relaye(m: Message) -> str:
-    """"" si Proton a authentifié le domaine de l'expéditeur (DMARC + DKIM alignée), sinon le motif."""
+    """"" si Proton a validé DMARC pour le domaine de l'expéditeur, sinon le motif.
+    DMARC seul (2026-11-25) : il exige déjà SPF ou DKIM aligné ; une clé DKIM absente du DNS
+    chez Grok Bot ne doit pas faire perdre de messages."""
     froms = getaddresses([str(v) for v in m.get_all("From", [])])
     if len(froms) != 1:
         return "expéditeur absent ou multiple"
@@ -44,8 +45,6 @@ def authentifier_relaye(m: Message) -> str:
     domaines = [d.lower() for v in proton for d in _DMARC_FROM.findall(v)]
     if not resultats or any(r != "pass" for r in resultats) or not domaines or any(d != domaine for d in domaines):
         return f"DMARC non validé par Proton pour {domaine}"
-    if not any(res.lower() == "pass" and dom.lower() == domaine for v in proton for res, dom in _DKIM.findall(v)):
-        return f"aucune signature DKIM valide de {domaine}"
     return ""
 
 
