@@ -68,3 +68,16 @@ def test_avis_hors_proprietaire_refuse(tmp_path):
     p.write_text(TOML.replace('adresses_proprietaire', 'avis = "autre@ex.fr"\nadresses_proprietaire'), encoding="utf-8")
     with pytest.raises(ErreurConfig, match="avis"):
         charger(p)
+
+
+def test_relayes_lus(tmp_path):
+    p = tmp_path / "comptes.toml"
+    p.write_text(TOML + '\n[releve]\nrelayes = ["YC28MYBV@Mail.GrokBot.com"]\n', encoding="utf-8")
+    assert charger(p).relayes == ("yc28mybv@mail.grokbot.com",)
+
+
+def test_relaye_proprietaire_refuse(tmp_path):
+    p = tmp_path / "comptes.toml"
+    p.write_text(TOML + '\n[releve]\nrelayes = ["moi@proton.me"]\n', encoding="utf-8")
+    with pytest.raises(ErreurConfig, match="relayes"):
+        charger(p)

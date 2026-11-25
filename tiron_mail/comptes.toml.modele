@@ -17,6 +17,9 @@ avis = "vous@proton.me"
 # de vos adresses, authentifiées par Proton, y sont exécutées.
 # [releve]
 # boite = "tiron"
+# Expéditeurs relayés sur Session (DMARC + DKIM exigés), jamais exécutés ;
+# « local@domaine » admet aussi « local+sélecteur@domaine ».
+# relayes = ["yc28mybv@mail.grokbot.com"]
 
 # Gmail personnel : mot de passe d'application Google.
 [comptes.gmail]

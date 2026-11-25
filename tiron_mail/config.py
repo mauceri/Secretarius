@@ -42,6 +42,7 @@ class Config:
     adresses_proprietaire: tuple
     releve: str = ""
     avis: str = ""  # adresse des avis et alertes (une des adresses du propriétaire)
+    relayes: tuple = ()  # expéditeurs relayés sur Session, jamais exécutés (relais.py)
 
 
 def charger(chemin: Path = CHEMIN_DEFAUT) -> Config:
@@ -60,7 +61,11 @@ def charger(chemin: Path = CHEMIN_DEFAUT) -> Config:
     avis = envoi.get("avis", "").lower()
     if avis and avis not in proprietaire:
         raise ErreurConfig(f"envoi.avis « {avis} » n'est pas une des adresses_proprietaire")
-    return Config(comptes, defaut, proprietaire, releve, avis)
+    relayes = tuple(a.lower() for a in d.get("releve", {}).get("relayes", []))
+    for a in relayes:
+        if a in proprietaire:
+            raise ErreurConfig(f"releve.relayes « {a} » est aussi une des adresses_proprietaire")
+    return Config(comptes, defaut, proprietaire, releve, avis, relayes)
 
 
 def compte_de_prefixe(cfg: Config, prefixe: str) -> Compte:
