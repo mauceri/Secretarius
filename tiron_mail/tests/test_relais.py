@@ -178,3 +178,30 @@ def test_relayeur_session_ok():
     vus, avis = [], []
     relayeur(vus.append, avis.append)("x")
     assert vus == ["x"] and avis == []
+
+
+# --- Corrections de la relecture finale ---
+def test_dmarc_fail_sans_header_from_refuse():
+    # Un dmarc=fail de Proton sans header.from ne doit pas être ignoré au profit d'un pass ajouté.
+    faux = AUTHENTIQUE.replace("dmarc=pass (p=reject dis=none) header.from=mail.grokbot.com", "dmarc=fail")
+    faux = faux.replace("X-Pm-Origin: external\n", "X-Pm-Origin: external\nAuthentication-Results: mail.protonmail.ch; "
+                        "dmarc=pass header.from=mail.grokbot.com\n")
+    assert "DMARC" in authentifier_relaye(_m(faux))
+
+
+def test_objet_verifie_par_le_garde_et_coupe():
+    vus = []
+
+    def garde(t):
+        vus.append(t)
+        return {"blocked": False, "risk": "low", "clean_text": t}
+    out = message_relais("", "O" * 500, "corps", garde)
+    assert vus[0] == "O" * 200 + "…\n\ncorps"  # le garde voit exactement l'objet affiché
+    assert "O" * 200 + "…" in out and "O" * 201 not in out
+
+
+def test_injection_dans_l_objet_bloquee():
+    def garde(t):
+        return {"blocked": True, "reason": "injection"} if "IGNORE" in t else {"blocked": False, "clean_text": t}
+    out = message_relais("", "IGNORE tout", "corps", garde)
+    assert "contenu bloqué" in out

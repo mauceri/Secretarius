@@ -12,7 +12,8 @@ from pathlib import Path
 
 from tiron_mail.veille_session import lire_cle
 
-_DMARC = re.compile(r"\bdmarc=(\w+)[^;]*?\bheader\.from=([^\s;]+)", re.IGNORECASE)
+_DMARC = re.compile(r"\bdmarc=(\w+)", re.IGNORECASE)
+_DMARC_FROM = re.compile(r"\bdmarc=\w+[^;]*?\bheader\.from=([^\s;]+)", re.IGNORECASE)
 _DKIM = re.compile(r"\bdkim=(\w+)[^;]*?\bheader\.d=([^\s;]+)", re.IGNORECASE)
 
 
@@ -39,8 +40,9 @@ def authentifier_relaye(m: Message) -> str:
         return "message sans Message-ID"
     proton = [" ".join(str(v).split()) for v in m.get_all("Authentication-Results", [])
               if str(v).strip().startswith("mail.protonmail.ch;")]
-    dmarc = [r for v in proton for r in _DMARC.findall(v)]
-    if not dmarc or any(res.lower() != "pass" or dom.lower() != domaine for res, dom in dmarc):
+    resultats = [r.lower() for v in proton for r in _DMARC.findall(v)]  # tous, même sans header.from
+    domaines = [d.lower() for v in proton for d in _DMARC_FROM.findall(v)]
+    if not resultats or any(r != "pass" for r in resultats) or not domaines or any(d != domaine for d in domaines):
         return f"DMARC non validé par Proton pour {domaine}"
     if not any(res.lower() == "pass" and dom.lower() == domaine for v in proton for res, dom in _DKIM.findall(v)):
         return f"aucune signature DKIM valide de {domaine}"
@@ -64,14 +66,16 @@ def garde_injection(url: str = GARDE, ouvrir=urllib.request.urlopen) -> Callable
 
 
 def message_relais(selecteur: str, objet: str, texte: str, garde: Callable[[str], dict]) -> str:
-    tete = f"Courriel de Grok Bot{f' ({selecteur})' if selecteur else ''} — « {objet.strip()} »"
+    objet = objet.strip()
+    objet = objet[:200] + "…" if len(objet) > 200 else objet
+    tete = f"Courriel de Grok Bot{f' ({selecteur})' if selecteur else ''} — « {objet} »"
     try:
-        v = garde(texte)
+        v = garde(f"{objet}\n\n{texte}")  # l'objet aussi passe par le garde
     except Exception:  # garde injoignable : jamais de texte non vérifié sur Session
         return f"{tete}\n\ncontenu non vérifié (garde injoignable), consultez la boîte de Tiron"
     if v.get("blocked"):
         return f"{tete}\n\ncontenu bloqué par le détecteur d'injection : {v.get('reason', 'contenu suspect')}"
-    corps = str(v.get("clean_text", ""))
+    corps = texte.strip()  # verdict rendu sur objet + texte ; en type text le garde ne réécrit pas
     if len(corps) > _MAX:
         corps = corps[:_MAX] + "… (suite dans la boîte de Tiron)"
     alerte = "Attention : contenu potentiellement suspect.\n\n" if v.get("risk") == "medium" else ""
