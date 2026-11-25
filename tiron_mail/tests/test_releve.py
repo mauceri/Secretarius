@@ -388,3 +388,73 @@ def test_agenda_admis_par_courriel(cfg, tmp_path):
     serveur = FauxIMAP({1: brut_releve(1, "/agenda 3", INTERNE)})
     faits, avis, _ = lancer(cfg, serveur, tmp_path)
     assert faits == ["/agenda 3"] and avis == []
+
+
+# --- Relais des courriels de Grok Bot (spec 2026-11-25-relais-grok) ---
+import dataclasses
+
+GROK = [("From", "yc28mybv+rector@mail.grokbot.com"),
+        ("Return-Path", "<0100-000000@mail.mail.grokbot.com>"),
+        ("X-Pm-Origin", "external"),
+        ("Authentication-Results", "mail.protonmail.ch; dmarc=pass (p=reject dis=none) header.from=mail.grokbot.com"),
+        ("Authentication-Results", "mail.protonmail.ch; dkim=pass (2048-bit key) header.d=mail.grokbot.com")]
+GARDE_OK = lambda t: {"blocked": False, "risk": "low", "clean_text": t}  # noqa: E731
+
+
+@pytest.fixture
+def cfg_grok(cfg):
+    return dataclasses.replace(cfg, relayes=("yc28mybv@mail.grokbot.com",))
+
+
+def lancer_relais(cfg, serveur, tmp_path, relayer, executer=None):
+    etat = tmp_path / "etat.json"
+    if not etat.exists():
+        etat.write_text('{"traites": [], "echecs": 0}')
+    faits, avis = [], []
+    texte = relever(cfg, {"GMAIL_APP_PASSWORD": "x"}, executer or faits.append, avis.append, etat,
+                    connecter=lambda c: serveur, relayer=relayer, garde=GARDE_OK)
+    return faits, avis, texte
+
+
+def test_relaye_relaye_et_range(cfg_grok, tmp_path):
+    relais = []
+    serveur = FauxIMAP({1: brut_releve(1, "Conte posté", GROK, "C'est fait.")})
+    faits, avis, texte = lancer_relais(cfg_grok, serveur, tmp_path, relais.append)
+    assert relais == ["Courriel de Grok Bot (rector) — « Conte posté »\n\nC'est fait."]
+    assert serveur.ranges == [(1, "Folders/Traite")] and faits == [] and avis == []
+    assert "relayé" in texte
+
+
+def test_relaye_jamais_execute(cfg_grok, tmp_path):
+    relais = []
+    serveur = FauxIMAP({1: brut_releve(1, "/wikistatus", GROK, "/ingest\n/q tout")})
+    faits, avis, _ = lancer_relais(cfg_grok, serveur, tmp_path, relais.append)
+    assert faits == [] and len(relais) == 1
+
+
+def test_relaye_non_authentifie_refuse(cfg_grok, tmp_path):
+    relais = []
+    faux = [GROK[0], GROK[1], GROK[2], (GROK[3][0], GROK[3][1].replace("dmarc=pass", "dmarc=fail")), GROK[4]]
+    serveur = FauxIMAP({1: brut_releve(1, "x", faux)})
+    faits, avis, _ = lancer_relais(cfg_grok, serveur, tmp_path, relais.append)
+    assert relais == [] and faits == []
+    assert serveur.ranges == [(1, "Folders/Refuse")] and avis and avis[0].startswith("Courriel refusé")
+
+
+def test_relais_en_echec_n_arrete_pas_la_releve(cfg_grok, tmp_path):
+    def relayer(t):
+        raise OSError("Session et avis en échec")
+    serveur = FauxIMAP({1: brut_releve(1, "a", GROK), 2: brut_releve(2, "/wikistatus", INTERNE)})
+    faits, _, _ = lancer_relais(cfg_grok, serveur, tmp_path, relayer)
+    assert faits == ["/wikistatus"] and (1, "Folders/Traite") in serveur.ranges
+    relais = []
+    serveur2 = FauxIMAP({1: brut_releve(1, "a", GROK)})
+    lancer_relais(cfg_grok, serveur2, tmp_path, relais.append)
+    assert relais == []  # jamais relayé deux fois
+
+
+def test_sans_relayes_inchange(cfg, tmp_path):
+    relais = []
+    serveur = FauxIMAP({1: brut_releve(1, "x", GROK)})
+    _, avis, _ = lancer_relais(cfg, serveur, tmp_path, relais.append)
+    assert relais == [] and serveur.ranges == [(1, "Folders/Refuse")]

@@ -18,6 +18,7 @@ from pathlib import Path
 from tiron_mail.boite import Boite, ErreurBoite, _connecter_imap
 from tiron_mail.config import ErreurConfig
 from tiron_mail.envoi import _smtp, construire, envoyer
+from tiron_mail.relais import authentifier_relaye, garde_injection, message_relais, selecteur_relaye
 from tiron_mail.message import analyser
 
 TRAITE, REFUSE = "Folders/Traite", "Folders/Refuse"
@@ -117,7 +118,7 @@ def _ranger(conn, uid: str, dossier: str) -> None:
 
 
 def relever(cfg, env, executer, notifier, etat_chemin: Path = ETAT_DEFAUT, connecter=_connecter_imap,
-            repondre=None) -> str:
+            repondre=None, relayer=None, garde=None) -> str:
     if not cfg.releve:
         raise ErreurConfig("aucune boîte à relever ([releve] boite = …)")
     compte = cfg.comptes[cfg.releve]
@@ -155,7 +156,20 @@ def relever(cfg, env, executer, notifier, etat_chemin: Path = ETAT_DEFAUT, conne
             if mid:
                 etat["traites"].append(mid)
                 _ecrire_etat(etat_chemin, etat)  # avant l'exécution : jamais deux fois
-            motif = authentifier(m, cfg.adresses_proprietaire) or ("" if mid else "message sans Message-ID")
+            sel = selecteur_relaye(exp, cfg.relayes) if relayer else None
+            if sel is not None:  # relayé : information seulement, aucune commande n'est extraite
+                motif = authentifier_relaye(m)
+                if not motif:
+                    a = analyser(brut)
+                    try:
+                        relayer(message_relais(sel, a["objet"], a["texte"], garde or garde_injection()))
+                    except Exception as e:  # rangé quand même : jamais relayé deux fois
+                        print(f"relais de {exp} non transmis ({e})", file=sys.stderr)
+                    _ranger(conn, uid, TRAITE)
+                    bilan.append(f"relayé : {exp}")
+                    continue
+            else:
+                motif = authentifier(m, cfg.adresses_proprietaire) or ("" if mid else "message sans Message-ID")
             if motif:
                 _ranger(conn, uid, REFUSE)
                 _prevenir(notifier, f"Courriel refusé sur {compte.adresse} : de {exp}, {motif}. "
