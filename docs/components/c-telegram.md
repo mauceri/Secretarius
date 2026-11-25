@@ -5,6 +5,19 @@ date: 2026-05-14
 
 # Composant : c (Telegram -> Secretarius)
 
+> **Canal Telegram désactivé le 2026-11-25** (Session le remplace ; secours :
+> commandes par courriel authentifié à tiron@secretarius.co). Rien n'est
+> supprimé : jeton `TELEGRAM_BOT_TOKEN` toujours dans secrets.env, code intact.
+> Dans `~/.openclaw/openclaw.json` ont été modifiés : `channels.telegram.enabled`
+> → `false`, `"telegram:220537738"` retiré de `commands.ownerAllowFrom`, binding
+> `{agentId: main, match: {channel: telegram, accountId: default}}` retiré de
+> `bindings` (sauvegarde : `openclaw.json.avant-retrait-telegram`).
+>
+> **Réactiver** : rétablir ces trois valeurs (ou recopier la sauvegarde si rien
+> d'autre n'a changé depuis), `openclaw config validate`, puis
+> `systemctl --user restart openclaw-gateway`. Vérifier dans
+> `journalctl --user -u openclaw-gateway` la reprise des lignes `[telegram]`.
+
 ## Rôle
 
 Skill de capture rapide depuis Telegram. Sauvegarde des URLs, textes libres et
