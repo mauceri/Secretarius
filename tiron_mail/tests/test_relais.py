@@ -72,3 +72,109 @@ def test_sans_message_id_refuse():
 
 def test_deux_from_refuse():
     assert authentifier_relaye(_m("From: autre@evil.fr\n" + AUTHENTIQUE))
+
+
+# --- Tâche 2 : garde, mise en forme, envoi Session ---
+import json
+
+from tiron_mail.relais import envoyeur_session, message_relais, relayeur
+
+
+def _garde(rep):
+    return lambda texte: rep
+
+
+def test_message_ok():
+    g = _garde({"blocked": False, "risk": "low", "clean_text": "Bonjour"})
+    assert message_relais("rector", "Test", "Bonjour", g) == "Courriel de Grok Bot (rector) — « Test »\n\nBonjour"
+    assert message_relais("", "Test", "Bonjour", g) == "Courriel de Grok Bot — « Test »\n\nBonjour"
+
+
+def test_message_suspect():
+    out = message_relais("", "T", "x", _garde({"blocked": False, "risk": "medium", "clean_text": "x"}))
+    assert out == "Courriel de Grok Bot — « T »\n\nAttention : contenu potentiellement suspect.\n\nx"
+
+
+def test_message_bloque():
+    out = message_relais("", "T", "SECRET", _garde({"blocked": True, "reason": "injection"}))
+    assert out == "Courriel de Grok Bot — « T »\n\ncontenu bloqué par le détecteur d'injection : injection"
+
+
+def test_message_garde_injoignable():
+    def g(t):
+        raise ConnectionRefusedError("refusé")
+    out = message_relais("", "T", "SECRET", g)
+    assert "SECRET" not in out
+    assert out.endswith("contenu non vérifié (garde injoignable), consultez la boîte de Tiron")
+
+
+def test_message_coupe():
+    out = message_relais("", "T", "a" * 5000, _garde({"blocked": False, "risk": "low", "clean_text": "a" * 5000}))
+    assert out.endswith("a" * 3500 + "… (suite dans la boîte de Tiron)")
+    assert "a" * 3501 not in out
+
+
+class _Rep:
+    def __init__(self, status=200):
+        self.status = status
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def read(self):
+        return b"{}"
+
+
+def test_envoyeur_session(tmp_path):
+    s = tmp_path / "secrets.env"
+    s.write_text("SESSION_BOT_MNEMONIC='a b'\nTIRON_SESSION_BROKER_TOKEN='jt'\nTIRON_SESSION_ID=05ab\n")
+    vus = []
+
+    def ouvrir(req, timeout):
+        vus.append(req)
+        return _Rep()
+    envoyeur_session(s, ouvrir=ouvrir)("coucou")
+    req = vus[0]
+    assert req.full_url == "http://127.0.0.1:8091/send"
+    assert req.get_header("Authorization") == "Bearer jt"
+    assert json.loads(req.data) == {"to": "05ab", "text": "coucou"}
+    assert b"a b" not in req.data
+
+
+def test_envoyeur_sans_jeton(tmp_path):
+    s = tmp_path / "secrets.env"
+    s.write_text("TIRON_SESSION_ID=05ab\n")
+    vus = []
+    with pytest.raises(RuntimeError, match="TIRON_SESSION_BROKER_TOKEN"):
+        envoyeur_session(s, ouvrir=lambda req, timeout: vus.append(req))("x")
+    assert vus == []
+
+
+def test_envoyeur_http_en_erreur(tmp_path):
+    s = tmp_path / "secrets.env"
+    s.write_text("TIRON_SESSION_BROKER_TOKEN=jt\nTIRON_SESSION_ID=05ab\n")
+    with pytest.raises(RuntimeError):
+        envoyeur_session(s, ouvrir=lambda req, timeout: _Rep(502))("x")
+
+
+def test_relayeur_repli():
+    avis = []
+
+    def session(t):
+        raise OSError("broker arrêté")
+    relayeur(session, avis.append)("Courriel de Grok Bot — « T »")
+    assert avis == ["(Session indisponible) Courriel de Grok Bot — « T »"]
+
+    def avis_ko(t):
+        raise OSError("SMTP")
+    with pytest.raises(OSError):
+        relayeur(session, avis_ko)("x")
+
+
+def test_relayeur_session_ok():
+    vus, avis = [], []
+    relayeur(vus.append, avis.append)("x")
+    assert vus == ["x"] and avis == []

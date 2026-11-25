@@ -19,15 +19,20 @@ URL = "http://127.0.0.1:8091/health"
 CLE = "TIRON_SESSION_BROKER_TOKEN"
 
 
-def lire_jeton(chemin: Path) -> str:
+def lire_cle(chemin: Path, cle: str) -> str:
+    """Valeur de `cle` dans un fichier KEY=valeur, apostrophes retirées ; ne lit aucune autre clé."""
     try:
         lignes = chemin.read_text(encoding="utf-8").splitlines()
     except OSError:
         return ""
     for ligne in lignes:
-        if ligne.startswith(CLE + "="):
+        if ligne.startswith(cle + "="):
             return ligne.split("=", 1)[1].strip().strip("'\"")
     return ""
+
+
+def lire_jeton(chemin: Path) -> str:
+    return lire_cle(chemin, CLE)
 
 
 def sonde_broker(jeton: str, url: str = URL, ouvrir=urllib.request.urlopen) -> Callable[[], dict]:

@@ -2,9 +2,15 @@
 2026-11-25-relais-grok). Information seulement : rien n'en est jamais exécuté."""
 from __future__ import annotations
 
+import json
 import re
+import urllib.request
+from collections.abc import Callable
 from email.message import Message
 from email.utils import getaddresses
+from pathlib import Path
+
+from tiron_mail.veille_session import lire_cle
 
 _DMARC = re.compile(r"\bdmarc=(\w+)[^;]*?\bheader\.from=([^\s;]+)", re.IGNORECASE)
 _DKIM = re.compile(r"\bdkim=(\w+)[^;]*?\bheader\.d=([^\s;]+)", re.IGNORECASE)
@@ -39,3 +45,60 @@ def authentifier_relaye(m: Message) -> str:
     if not any(res.lower() == "pass" and dom.lower() == domaine for v in proton for res, dom in _DKIM.findall(v)):
         return f"aucune signature DKIM valide de {domaine}"
     return ""
+
+
+# --- Garde d'injection, mise en forme, envoi sur Session ---
+GARDE = "http://127.0.0.1:8990/check"
+BROKER = "http://127.0.0.1:8091/send"
+_MAX = 3500
+
+
+def garde_injection(url: str = GARDE, ouvrir=urllib.request.urlopen) -> Callable[[str], dict]:
+    """Même garde que check_email : regex + DeBERTa, aucun LLM."""
+    def verifier(texte: str) -> dict:
+        req = urllib.request.Request(url, data=json.dumps({"type": "text", "content": texte}).encode(),
+                                     headers={"Content-Type": "application/json"})
+        with ouvrir(req, timeout=60) as r:
+            return json.loads(r.read().decode("utf-8"))
+    return verifier
+
+
+def message_relais(selecteur: str, objet: str, texte: str, garde: Callable[[str], dict]) -> str:
+    tete = f"Courriel de Grok Bot{f' ({selecteur})' if selecteur else ''} — « {objet.strip()} »"
+    try:
+        v = garde(texte)
+    except Exception:  # garde injoignable : jamais de texte non vérifié sur Session
+        return f"{tete}\n\ncontenu non vérifié (garde injoignable), consultez la boîte de Tiron"
+    if v.get("blocked"):
+        return f"{tete}\n\ncontenu bloqué par le détecteur d'injection : {v.get('reason', 'contenu suspect')}"
+    corps = str(v.get("clean_text", ""))
+    if len(corps) > _MAX:
+        corps = corps[:_MAX] + "… (suite dans la boîte de Tiron)"
+    alerte = "Attention : contenu potentiellement suspect.\n\n" if v.get("risk") == "medium" else ""
+    return f"{tete}\n\n{alerte}{corps}"
+
+
+def envoyeur_session(secrets: Path, url: str = BROKER, ouvrir=urllib.request.urlopen) -> Callable[[str], None]:
+    """Envoi direct au broker Session ; ne lit dans secrets.env que le jeton et l'identifiant."""
+    def envoyer(texte: str) -> None:
+        jeton = lire_cle(secrets, "TIRON_SESSION_BROKER_TOKEN")
+        dest = lire_cle(secrets, "TIRON_SESSION_ID")
+        if not jeton or not dest:
+            raise RuntimeError("TIRON_SESSION_BROKER_TOKEN ou TIRON_SESSION_ID absent de secrets.env")
+        req = urllib.request.Request(url, data=json.dumps({"to": dest, "text": texte}).encode(),
+                                     headers={"Content-Type": "application/json",
+                                              "Authorization": f"Bearer {jeton}"})
+        with ouvrir(req, timeout=30) as r:
+            if r.status != 200:
+                raise RuntimeError(f"broker Session : HTTP {r.status}")
+    return envoyer
+
+
+def relayeur(session: Callable[[str], None], avis: Callable[[str], None]) -> Callable[[str], None]:
+    """Session d'abord ; sinon courriel d'avis ; lève si les deux échouent."""
+    def relayer(texte: str) -> None:
+        try:
+            session(texte)
+        except Exception:
+            avis("(Session indisponible) " + texte)
+    return relayer
