@@ -95,7 +95,8 @@ du propriétaire ne changent pas.
 
 ### Contenu
 
-- Partie `text/plain` de préférence, sinon `text/html` (nettoyée par le garde, `type: html`).
+- Texte extrait par `message.analyser` (déjà utilisé par la relève : `text/plain` de préférence,
+  sinon `text/html` converti), envoyé au garde en `type: text`.
 - Passage par le garde d'injection (`POST http://127.0.0.1:8990/check`), le même que pour
   `check_email` : regex + DeBERTa, **aucun LLM**.
   - `blocked` → relais de l'en-tête seul : expéditeur, objet, « contenu bloqué par le détecteur
