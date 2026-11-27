@@ -9,6 +9,7 @@ import json
 import re
 import subprocess
 import sys
+import time
 import uuid
 from collections.abc import Mapping
 from email.message import Message
@@ -118,7 +119,8 @@ def _ranger(conn, uid: str, dossier: str) -> None:
 
 
 def relever(cfg, env, executer, notifier, etat_chemin: Path = ETAT_DEFAUT, connecter=_connecter_imap,
-            repondre=None, relayer=None, garde=None) -> str:
+            repondre=None, relayer=None, garde=None, budget: float = 45.0,
+            horloge=time.monotonic) -> str:
     if not cfg.releve:
         raise ErreurConfig("aucune boîte à relever ([releve] boite = …)")
     compte = cfg.comptes[cfg.releve]
@@ -136,11 +138,15 @@ def relever(cfg, env, executer, notifier, etat_chemin: Path = ETAT_DEFAUT, conne
     etat["echecs"], etat["averti"] = 0, False
     bilan: list[str] = []
     presents = 0
+    debut = horloge()
     try:
         for dossier in (TRAITE, REFUSE):
             conn.create(dossier)  # « NO » si le dossier existe : sans effet
         typ, data = conn.uid("search", None, "ALL")
         for u in (data[0] or b"").split() if typ == "OK" else []:
+            if horloge() - debut > budget:  # la relève suivante (une minute) prend la suite
+                bilan.append(f"budget de {budget:g} s atteint : la suite à la prochaine relève")
+                break
             uid = u.decode()
             brut = b._fetch(conn, int(u), "(RFC822)")  # sans PEEK : marque le message lu
             m = email.message_from_bytes(brut, policy=email.policy.default)
@@ -162,11 +168,13 @@ def relever(cfg, env, executer, notifier, etat_chemin: Path = ETAT_DEFAUT, conne
                 if not motif:
                     a = analyser(brut)
                     try:
-                        relayer(message_relais(sel, a["objet"], a["texte"], garde or garde_injection()))
+                        voie = relayer(message_relais(sel, a["objet"], a["texte"], garde or garde_injection()))
+                        bilan.append(f"relayé par courriel (Session indisponible) : {exp}"
+                                     if voie == "courriel" else f"relayé : {exp}")
                     except Exception as e:  # rangé quand même : jamais relayé deux fois
                         print(f"relais de {exp} non transmis ({e})", file=sys.stderr)
+                        bilan.append(f"relais non transmis : {exp}")
                     _ranger(conn, uid, TRAITE)
-                    bilan.append(f"relayé : {exp}")
                     continue
             else:
                 motif = authentifier(m, cfg.adresses_proprietaire) or ("" if mid else "message sans Message-ID")

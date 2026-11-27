@@ -97,11 +97,18 @@ def envoyeur_session(secrets: Path, url: str = BROKER, ouvrir=urllib.request.url
     return envoyer
 
 
-def relayeur(session: Callable[[str], None], avis: Callable[[str], None]) -> Callable[[str], None]:
-    """Session d'abord ; sinon courriel d'avis ; lève si les deux échouent."""
-    def relayer(texte: str) -> None:
+def relayeur(session: Callable[[str], None], avis: Callable[[str], None]) -> Callable[[str], str]:
+    """Session d'abord ; sinon courriel d'avis ; lève si les deux échouent. Renvoie la voie."""
+    def relayer(texte: str) -> str:
         try:
             session(texte)
-        except Exception:
-            avis("(Session indisponible) " + texte)
+            return "session"
+        except Exception as e:
+            if isinstance(e, TimeoutError) or isinstance(getattr(e, "reason", None), TimeoutError):
+                # le broker a pu livrer après le délai : le doublon est signalé, pas évité
+                avis("(Session : pas de réponse du broker en 30 s, le message est peut-être "
+                     "aussi arrivé sur Session) " + texte)
+            else:
+                avis("(Session indisponible) " + texte)
+            return "courriel"
     return relayer

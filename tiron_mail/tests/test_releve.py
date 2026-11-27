@@ -458,3 +458,29 @@ def test_sans_relayes_inchange(cfg, tmp_path):
     serveur = FauxIMAP({1: brut_releve(1, "x", GROK)})
     _, avis, _ = lancer_relais(cfg, serveur, tmp_path, relais.append)
     assert relais == [] and serveur.ranges == [(1, "Folders/Refuse")]
+
+
+def test_bilan_relais_par_courriel(cfg_grok, tmp_path):
+    serveur = FauxIMAP({1: brut_releve(1, "a", GROK)})
+    _, _, texte = lancer_relais(cfg_grok, serveur, tmp_path, lambda t: "courriel")
+    assert texte == "relayé par courriel (Session indisponible) : yc28mybv+rector@mail.grokbot.com"
+
+
+def test_bilan_relais_en_echec(cfg_grok, tmp_path):
+    def relayer(t):
+        raise OSError("Session et avis en échec")
+    serveur = FauxIMAP({1: brut_releve(1, "a", GROK)})
+    _, _, texte = lancer_relais(cfg_grok, serveur, tmp_path, relayer)
+    assert texte == "relais non transmis : yc28mybv+rector@mail.grokbot.com"
+
+
+def test_budget_de_temps_atteint_la_suite_attend(cfg, tmp_path):
+    etat = tmp_path / "etat.json"
+    etat.write_text('{"traites": [], "echecs": 0}')
+    temps = iter([0.0, 0.0, 50.0])
+    faits = []
+    serveur = FauxIMAP({1: brut_releve(1, "/wikistatus", INTERNE), 2: brut_releve(2, "/wikistatus", INTERNE)})
+    texte = relever(cfg, {"GMAIL_APP_PASSWORD": "x"}, faits.append, [].append, etat,
+                    connecter=lambda c: serveur, budget=45.0, horloge=lambda: next(temps))
+    assert faits == ["/wikistatus"] and serveur.ranges == [(1, "Folders/Traite")]
+    assert "budget de 45 s atteint" in texte

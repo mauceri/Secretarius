@@ -81,3 +81,19 @@ def test_relaye_proprietaire_refuse(tmp_path):
     p.write_text(TOML + '\n[releve]\nrelayes = ["moi@proton.me"]\n', encoding="utf-8")
     with pytest.raises(ErreurConfig, match="relayes"):
         charger(p)
+
+
+@pytest.mark.parametrize("entree", ["pas-une-adresse", "a+b@x.fr", "a@b", "a b@x.fr", "@x.fr"])
+def test_relaye_invalide_refuse(tmp_path, entree):
+    p = tmp_path / "comptes.toml"
+    p.write_text(TOML + f'\n[releve]\nrelayes = ["{entree}"]\n', encoding="utf-8")
+    with pytest.raises(ErreurConfig, match="relayes"):
+        charger(p)
+
+
+def test_relaye_variante_du_proprietaire_refuse(tmp_path):
+    p = tmp_path / "comptes.toml"
+    toml = TOML.replace('"moi@proton.me"]', '"moi+tiron@proton.me"]')
+    p.write_text(toml + '\n[releve]\nrelayes = ["moi@proton.me"]\n', encoding="utf-8")
+    with pytest.raises(ErreurConfig, match="relayes"):
+        charger(p)

@@ -2,9 +2,12 @@
 Les mots de passe restent dans l'environnement (secret_env), cf. spec 2026-10-07."""
 from __future__ import annotations
 
+import re
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+
+from tiron_mail.relais import selecteur_relaye
 
 CHEMIN_DEFAUT = Path.home() / ".config" / "tiron_mail" / "comptes.toml"
 
@@ -63,7 +66,9 @@ def charger(chemin: Path = CHEMIN_DEFAUT) -> Config:
         raise ErreurConfig(f"envoi.avis « {avis} » n'est pas une des adresses_proprietaire")
     relayes = tuple(a.lower() for a in d.get("releve", {}).get("relayes", []))
     for a in relayes:
-        if a in proprietaire:
+        if not re.fullmatch(r"[^@\s+]+@[^@\s]+\.[^@\s]+", a):
+            raise ErreurConfig(f"releve.relayes « {a} » n'est pas une adresse (sans +sélecteur)")
+        if a in proprietaire or any(selecteur_relaye(p, (a,)) is not None for p in proprietaire):
             raise ErreurConfig(f"releve.relayes « {a} » est aussi une des adresses_proprietaire")
     return Config(comptes, defaut, proprietaire, releve, avis, relayes)
 

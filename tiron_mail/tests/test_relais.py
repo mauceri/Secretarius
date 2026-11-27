@@ -1,5 +1,6 @@
 # tiron_mail/tests/test_relais.py
 import email
+import urllib.error
 import email.policy
 
 import pytest
@@ -179,8 +180,26 @@ def test_relayeur_repli():
 
 def test_relayeur_session_ok():
     vus, avis = [], []
-    relayeur(vus.append, avis.append)("x")
+    assert relayeur(vus.append, avis.append)("x") == "session"
     assert vus == ["x"] and avis == []
+
+
+def test_relayeur_repli_renvoie_courriel():
+    def session(t):
+        raise OSError("broker arrêté")
+    assert relayeur(session, [].append)("x") == "courriel"
+
+
+@pytest.mark.parametrize("erreur", [TimeoutError("timed out"),
+                                    urllib.error.URLError(TimeoutError("timed out"))])
+def test_relayeur_delai_depasse_previent_du_doublon(erreur):
+    avis = []
+
+    def session(t):
+        raise erreur
+    relayeur(session, avis.append)("x")
+    assert avis == ["(Session : pas de réponse du broker en 30 s, le message est peut-être "
+                    "aussi arrivé sur Session) x"]
 
 
 # --- Corrections de la relecture finale ---
