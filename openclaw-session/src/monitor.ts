@@ -57,7 +57,7 @@ export async function traiterEvenement(evt: InboundEvent, d: TraiterDeps): Promi
       const echecs = evt.attachments.filter((a) => a.error === "echec-telechargement").length;
       let msg = `Reçu : ${fichiers.length} pièce(s) jointe(s) déposée(s) dans Réception/`;
       if (tropGrandes) msg += ` ; ${tropGrandes} pièce(s) trop grande(s), non reçue(s)`;
-      if (echecs) msg += ` ; ${echecs} pièce(s) non téléchargeable(s)`;
+      if (echecs) msg += ` ; ${echecs} pièce(s) non téléchargeable(s). Pour un fichier, passez par Obsidian : déposez-le dans Secretarius/Wiki_LM/attachments/ puis envoyez /c file:attachments/<nom> #tag`;
       await d.repondre(evt.from, msg);
       resultat = "depot";
     } else {

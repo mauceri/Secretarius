@@ -53,7 +53,7 @@ describe("traiterEvenement", () => {
   it("pièce non téléchargée : signalée dans la réponse", async () => {
     const d = deps({ depot: vi.fn(() => ({ note: "/r/n.md", fichiers: [] })) });
     await traiterEvenement(evt({ attachments: [{ path: "", name: "g", contentType: "x", size: 3, error: "echec-telechargement" }] }), d);
-    expect(d.repondre).toHaveBeenCalledWith(MOI, "Reçu : 0 pièce(s) jointe(s) déposée(s) dans Réception/ ; 1 pièce(s) non téléchargeable(s)");
+    expect(d.repondre).toHaveBeenCalledWith(MOI, "Reçu : 0 pièce(s) jointe(s) déposée(s) dans Réception/ ; 1 pièce(s) non téléchargeable(s). Pour un fichier, passez par Obsidian : déposez-le dans Secretarius/Wiki_LM/attachments/ puis envoyez /c file:attachments/<nom> #tag");
   });
   it("échec du dispatch : erreur signalée, ack, pas de rejeu sans fin", async () => {
     const d = deps({ dispatchTexte: vi.fn().mockRejectedValueOnce(new Error("panne")) });

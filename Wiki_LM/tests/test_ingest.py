@@ -1053,3 +1053,35 @@ def test_ingestor_kb_dir_suit_wiki_path(wiki_root: Path, raw_dir: Path, mock_llm
     # ~/Documents/Secretarius/Wiki_LM/knowledge_base, ignorant WIKI_PATH.
     ing = Ingestor(wiki_root, llm=mock_llm, raw_path=raw_dir)
     assert ing._kb_dir == wiki_root / "knowledge_base"
+
+
+class TestRawCompanionNote:
+    """Un document déposé par /c file: (ou capture.py --file) est accompagné
+    d'un .md du même nom portant tags et note : l'ingestion les applique au
+    document et n'ingère pas ce .md comme une page à part."""
+
+    def _depot(self, raw_dir: Path, note: str = "") -> None:
+        (raw_dir / "20261128-120000-doc.txt").write_text("Contenu du document.", encoding="utf-8")
+        (raw_dir / "20261128-120000-doc.md").write_text(
+            f"---\ntags: [context_engineering]\n---\n{note}\n", encoding="utf-8")
+
+    def test_companion_not_ingested_separately(self, ingestor, raw_dir):
+        self._depot(raw_dir)
+        slugs = ingestor.ingest_raw_dir()
+        assert len(slugs) == 1
+        assert ingestor.ingest_raw_dir() == []
+
+    def test_companion_tags_applied_to_document(self, ingestor, wiki_dir, raw_dir):
+        self._depot(raw_dir)
+        [slug] = ingestor.ingest_raw_dir()
+        post = frontmatter.loads((wiki_dir / "sources" / f"{slug}.md").read_text())
+        assert "context_engineering" in post["tags"]
+
+    def test_companion_note_applied_to_document(self, ingestor, wiki_dir, raw_dir):
+        self._depot(raw_dir, note="À lire en priorité.")
+        [slug] = ingestor.ingest_raw_dir()
+        assert "À lire en priorité." in (wiki_dir / "sources" / f"{slug}.md").read_text()
+
+    def test_lone_md_still_ingested(self, ingestor, raw_dir):
+        (raw_dir / "20261128-120000-note.md").write_text("Une note seule.", encoding="utf-8")
+        assert len(ingestor.ingest_raw_dir()) == 1

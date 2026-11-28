@@ -1161,6 +1161,14 @@ class Ingestor:
             and f.suffix.lower() in (".url", ".md", ".pdf", ".txt", ".html")
             and f.name != self._MANIFEST
         ]
+        # .md compagnon d'un document (capture_file : tags et note) : lu avec
+        # le document, jamais ingéré comme page à part.
+        _DOC_SUFFIXES = (".pdf", ".txt", ".html")
+        companions = {
+            f.with_suffix(".md") for f in processable
+            if f.suffix.lower() in _DOC_SUFFIXES and f.with_suffix(".md").is_file()
+        }
+        processable = [f for f in processable if f not in companions]
 
         def _needs_processing(f: Path) -> bool:
             if f.name not in already_done_names:
@@ -1210,11 +1218,17 @@ class Ingestor:
                         self.llm = _prev_llm
                 else:
                     user_tags = self._parse_raw_tags(path)
+                    companion = path.with_suffix(".md")
+                    companion_note = ""
+                    if companion in companions:
+                        user_tags = self._parse_raw_tags(companion)
+                        companion_note = _strip_leading_frontmatter(
+                            companion.read_text(encoding="utf-8")).strip()
                     # .md = note en texte libre → page verbatim (pas de résumé) ;
                     # .pdf/.txt/.html = document → résumé conservé.
                     is_note = path.suffix.lower() == ".md"
                     url_hint = self._extract_embedded_url(path.read_text(encoding="utf-8")) if is_note else ""
-                    slug = self.ingest(str(path), max_concepts=max_concepts, extra_tags=user_tags or None, rename_raw=False, local_note=is_note, url_hint=url_hint)
+                    slug = self.ingest(str(path), max_concepts=max_concepts, extra_tags=user_tags or None, rename_raw=False, local_note=is_note, url_hint=url_hint, note=companion_note)
                 slugs.append(slug)
                 self._mark_ingested(path.name, slug=slug, file_hash=_file_hash(path))
                 # Après _mark_ingested : une ingestion déjà réussie et payée

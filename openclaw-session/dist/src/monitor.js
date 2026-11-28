@@ -59,7 +59,7 @@ export async function traiterEvenement(evt, d) {
             if (tropGrandes)
                 msg += ` ; ${tropGrandes} pièce(s) trop grande(s), non reçue(s)`;
             if (echecs)
-                msg += ` ; ${echecs} pièce(s) non téléchargeable(s)`;
+                msg += ` ; ${echecs} pièce(s) non téléchargeable(s). Pour un fichier, passez par Obsidian : déposez-le dans Secretarius/Wiki_LM/attachments/ puis envoyez /c file:attachments/<nom> #tag`;
             await d.repondre(evt.from, msg);
             resultat = "depot";
         }
