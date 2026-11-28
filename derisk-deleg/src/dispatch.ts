@@ -54,7 +54,10 @@ const USAGES: Record<string, string> = {
     #tag      étiquette la capture
     ref:<url> cite une source
     @simple   écrit la note telle quelle comme page source du wiki, sans ingestion
-    file:<chemin> ajoute le contenu d'un fichier déjà déposé dans le wiki (pièce jointe)`,
+    file:<chemin> capture un fichier déposé dans Secretarius/Wiki_LM/ via Obsidian
+              (.md et .txt lus, .pdf ingéré) ; chemin depuis Wiki_LM/,
+              entre apostrophes s'il contient des espaces
+  Exemple : /c #tag file:'attachments/Mon document.pdf'`,
   "/q": `/q <question>
   question : en langage courant. Réponse rédigée à partir du wiki (environ 1 min).`,
   "/r": `/r <mots-clés>
