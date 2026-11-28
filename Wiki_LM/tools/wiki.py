@@ -28,7 +28,7 @@ _bootstrap_api_key()
 
 sys.path.insert(0, str(Path(__file__).parent))
 import frontmatter
-from capture import _parse_hashtags, capture_urls, capture_comment, slugify, timestamp, _write_note
+from capture import _parse_hashtags, capture_urls, capture_comment, capture_file, slugify, timestamp, _write_note
 from ingest import Ingestor
 from lint import WikiLint
 from llm import LLM
@@ -61,6 +61,7 @@ def op_capture(text: str, vault_name: str | None = None) -> dict:
         note = re.sub(r"\s*\bref:\S+", "", note).strip()
     wiki_root = _wiki_root()
     file_paths = re.findall(r"\bfile:(\S+)", note)
+    pdf_files: list[str] = []
     if file_paths:
         note = re.sub(r"\s*\bfile:\S+", "", note).strip()
         for fpath in file_paths:
@@ -72,10 +73,27 @@ def op_capture(text: str, vault_name: str | None = None) -> dict:
                 # tailnet), n'importe qui pourrait faire lire puis relire un
                 # fichier de l'hôte via /run + /c file:<chemin> (revue DSH du
                 # 16/09/2026).
-                resolved = Path(fpath).expanduser().resolve()
+                p = Path(fpath).expanduser()
+                if not p.is_absolute():
+                    p = wiki_root / p
+                resolved = p.resolve()
                 resolved.relative_to(wiki_root.resolve())
             except (OSError, ValueError):
                 continue
+            if not resolved.is_file():
+                return {"error": f"Fichier introuvable dans le wiki : {fpath}"}
+            suffix = resolved.suffix.lower()
+            if suffix == ".pdf":
+                raw = _raw_dir()
+                raw.mkdir(parents=True, exist_ok=True)
+                dest, sidecar = capture_file(resolved, raw, comment=note, tags=tags or None)
+                if dest is None:
+                    return {"error": f"PDF déjà capturé : {resolved.name}"}
+                pdf_files.extend(p.name for p in (dest, sidecar) if p is not None)
+                note = ""
+                continue
+            if suffix not in (".md", ".txt"):
+                return {"error": f"Type de fichier non pris en charge par /c file: ({resolved.name}) : seuls .md, .txt et .pdf le sont."}
             try:
                 content = resolved.read_text(encoding="utf-8")
                 if fpath.endswith(".md"):
@@ -102,7 +120,7 @@ def op_capture(text: str, vault_name: str | None = None) -> dict:
             created.append(capture_comment("", raw, tags=None, refs=refs, vault_name=vault_name))
     elif note or refs:
         created.append(capture_comment(note, raw, tags=tags or None, refs=refs or None, vault_name=vault_name))
-    return {"files": [p.name for p in created if p is not None]}
+    return {"files": pdf_files + [p.name for p in created if p is not None]}
 
 
 def _history_path(history_slug: str) -> str:

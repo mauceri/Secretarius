@@ -77,6 +77,81 @@ def test_capture_file_directive_ignores_path_outside_wiki_root(monkeypatch, tmp_
     outside.unlink()
 
 
+def test_capture_file_relative_path_resolved_from_wiki_root(monkeypatch, tmp_path):
+    """/c file:attachments/x.txt : chemin relatif à la racine du wiki, pas au
+    répertoire de travail du serveur (tools/)."""
+    wiki = _wiki(monkeypatch, tmp_path)
+    (tmp_path / "attachments").mkdir()
+    (tmp_path / "attachments" / "note.txt").write_text("Texte relatif.", encoding="utf-8")
+    monkeypatch.chdir(tmp_path.parent)
+
+    out = wiki.op_capture("#tag file:attachments/note.txt")
+
+    content = (tmp_path / "raw" / out["files"][0]).read_text(encoding="utf-8")
+    assert "Texte relatif." in content
+
+
+def test_capture_file_relative_path_cannot_escape_wiki_root(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    outside = tmp_path.parent / "hors-du-wiki-relatif.txt"
+    outside.write_text("CONTENU SENSIBLE", encoding="utf-8")
+
+    out = wiki.op_capture(f"#tag note file:../{outside.name}")
+
+    content = (tmp_path / "raw" / out["files"][0]).read_text(encoding="utf-8")
+    assert "CONTENU SENSIBLE" not in content
+    outside.unlink()
+
+
+def test_capture_file_pdf_copied_to_raw(monkeypatch, tmp_path):
+    """Un PDF n'est pas lu comme texte : il est copié dans raw/ pour
+    l'ingestion, la note et les tags l'accompagnent."""
+    wiki = _wiki(monkeypatch, tmp_path)
+    (tmp_path / "attachments").mkdir()
+    pdf = tmp_path / "attachments" / "facture.pdf"
+    pdf.write_bytes(b"%PDF-1.4\n\xff\xfe binaire")
+
+    out = wiki.op_capture("#compta à classer file:attachments/facture.pdf")
+
+    assert "error" not in out
+    copies = [f for f in out["files"] if f.endswith(".pdf")]
+    assert len(copies) == 1
+    assert (tmp_path / "raw" / copies[0]).read_bytes() == pdf.read_bytes()
+    sidecar = (tmp_path / "raw" / copies[0]).with_suffix(".md").read_text(encoding="utf-8")
+    assert "compta" in sidecar and "à classer" in sidecar
+
+
+def test_capture_file_pdf_already_captured(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    (tmp_path / "attachments").mkdir()
+    (tmp_path / "attachments" / "a.pdf").write_bytes(b"%PDF-1.4 meme contenu")
+    wiki.op_capture("file:attachments/a.pdf")
+
+    out = wiki.op_capture("file:attachments/a.pdf")
+
+    assert "déjà" in out["error"]
+
+
+def test_capture_file_unsupported_type_reports_error(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    (tmp_path / "attachments").mkdir()
+    (tmp_path / "attachments" / "photo.jpg").write_bytes(b"\xff\xd8\xff")
+
+    out = wiki.op_capture("#tag file:attachments/photo.jpg")
+
+    assert "photo.jpg" in out["error"]
+    assert list((tmp_path / "raw").iterdir()) == []
+
+
+def test_capture_file_missing_reports_error(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+
+    out = wiki.op_capture("#tag file:attachments/absent.pdf")
+
+    assert "absent.pdf" in out["error"]
+    assert list((tmp_path / "raw").iterdir()) == []
+
+
 def test_query_returns_synthesis(monkeypatch, tmp_path):
     wiki = _wiki(monkeypatch, tmp_path)
 
