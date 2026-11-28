@@ -60,10 +60,12 @@ def op_capture(text: str, vault_name: str | None = None) -> dict:
     if refs:
         note = re.sub(r"\s*\bref:\S+", "", note).strip()
     wiki_root = _wiki_root()
-    file_paths = re.findall(r"\bfile:(\S+)", note)
+    # file:chemin, ou file:'chemin avec espaces' / file:"chemin avec espaces"
+    file_re = r"""\bfile:(?:'([^']+)'|"([^"]+)"|(\S+))"""
+    file_paths = ["".join(m) for m in re.findall(file_re, note)]
     pdf_files: list[str] = []
     if file_paths:
-        note = re.sub(r"\s*\bfile:\S+", "", note).strip()
+        note = re.sub(r"\s*" + file_re, "", note).strip()
         for fpath in file_paths:
             try:
                 # file: est prévu pour relire une pièce jointe déjà déposée

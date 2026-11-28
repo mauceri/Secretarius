@@ -1150,3 +1150,16 @@ def test_alias_obfusque_suit_obfusque_base_url(monkeypatch):
     assert wiki.MODEL_ALIASES["obfusque"]["base_url"] == "http://172.17.0.1:8001/v1"
     monkeypatch.delenv("OBFUSQUE_BASE_URL")
     importlib.reload(wiki)
+
+
+def test_capture_file_quoted_path_with_spaces(monkeypatch, tmp_path):
+    wiki = _wiki(monkeypatch, tmp_path)
+    (tmp_path / "attachments").mkdir()
+    (tmp_path / "attachments" / "AI model collapse.txt").write_text("Texte à espaces.", encoding="utf-8")
+
+    for q in ("'", '"'):
+        out = wiki.op_capture(f"#tag file:{q}attachments/AI model collapse.txt{q} ma note")
+        content = (tmp_path / "raw" / out["files"][0]).read_text(encoding="utf-8")
+        assert "Texte à espaces." in content
+        assert "ma note" in content
+        assert "collapse.txt" not in content
